@@ -1,0 +1,53 @@
+import { useData } from '../../app/data';
+import { href } from '../../app/router';
+import { t } from '../../i18n';
+import { fmtAmount, fmtPercent } from '../../lib/format';
+import { NUTRIENTS } from '../../model/nutrients';
+import { Icon } from '../../ui/Icon';
+
+/** A food's nutrient profile per 100 g. */
+export function FoodPage({ code }: { code: string }) {
+  const d = useData();
+  const food = d.foods.byCode.get(code);
+  if (!food) return <p>{t('food.notFound')}</p>;
+  const group = d.foods.groups[food.group];
+  return (
+    <section>
+      <header className="page-head row">
+        <button className="icon-btn" onClick={() => history.back()} aria-label={t('common.back')}>
+          <Icon name="back" />
+        </button>
+        <h1 className="grow">{food.nameEn}</h1>
+      </header>
+      <p className="muted">
+        {food.nameDe} · {group?.en} · BLS {food.code}
+      </p>
+      <a className="btn btn-primary btn-block" href={href('log', d.today, food.code)}>
+        <Icon name="plus" /> {t('food.log')}
+      </a>
+      <h2 className="section-title">{t('food.per100')}</h2>
+      <table className="nutrient-table card">
+        <tbody>
+          {NUTRIENTS.map((n) => {
+            const v = food.per100[n.id];
+            const req = d.requirements.byNutrient.get(n.id);
+            const pct = typeof v === 'number' && req && !req.limitOnly && req.recommended > 0 ? v / req.recommended : undefined;
+            return (
+              <tr key={n.id}>
+                <td>
+                  <a href={href('nutrient', n.id)}>{n.name}</a>
+                </td>
+                <td className="num">{v === null || v === undefined ? <span className="muted">{t('food.noData')}</span> : v === 't' ? t('food.trace') : fmtAmount(n.id, v)}</td>
+                <td className="num muted">{pct !== undefined ? fmtPercent(pct) : ''}</td>
+                <td className="muted small" title={d.foods.provenanceCodes[food.provenance[n.id] ?? '-'] ?? ''}>
+                  {food.provenance[n.id] !== '-' ? food.provenance[n.id] : ''}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      <p className="muted small">{t('food.legend')}</p>
+    </section>
+  );
+}

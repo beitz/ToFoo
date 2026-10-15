@@ -533,16 +533,16 @@ export const uncertainty = {
 
 export const startingLevels = {
   averageFraction: {
-    value: 0.5,
+    value: 0.6,
     source: 'Modelling choice',
     confidence: 'assumption',
-    note: '"Average" start = half-full tanks. Realistic for a typical diet but not individual.',
+    note: '"Average" start = tanks 60 % full (inside the "fine" zone). Realistic for a typical diet but not individual.',
   } satisfies Valued<number>,
 };
 
 export const statusThresholds = {
   tank: {
-    value: { low: 0.25, gettingLow: 0.5 },
+    value: { low: 0.2, gettingLow: 0.4 },
     source: 'Modelling choice',
     confidence: 'assumption',
     note: 'Share of tank capacity.',

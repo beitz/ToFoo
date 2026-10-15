@@ -611,6 +611,21 @@
                             "preparation"
                           ]
                         }
+                      },
+                      "saltOverride": {
+                        "type": "object",
+                        "properties": {
+                          "iodised": {
+                            "type": "boolean"
+                          },
+                          "fluoridated": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "iodised",
+                          "fluoridated"
+                        ]
                       }
                     },
                     "required": [

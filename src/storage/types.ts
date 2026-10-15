@@ -104,7 +104,7 @@ export interface Batch extends Versioned {
   id: string;
   recipeId: string;
   /** Copy of the recipe at cooking time, so later edits do not change history. */
-  recipe: { name: string; portions: number; ingredients: Ingredient[] };
+  recipe: { name: string; portions: number; ingredients: Ingredient[]; saltOverride?: { iodised: boolean; fluoridated: boolean } };
   cookedDay: string;
   cookedAt: number;
   plan: { fresh: number; fridge: number; freezer: number };

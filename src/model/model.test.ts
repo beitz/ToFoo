@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { absorbByRule, absorbIron, absorbMeal, fatFactor, interpolateLog, type MealComposition } from './absorption';
 import { entryIntake } from './intake';
-import { nutrientParams } from '../../model/parameters';
+import { nutrientParams, startingLevels } from '../../model/parameters';
 import { resolveRequirements } from './requirements';
 import { retentionFactor } from './retention';
 import { effectiveDayStatus, groupMeals, simulate, type SimulationInput } from './simulate';
@@ -209,7 +209,7 @@ describe('simulation', () => {
     const fasted = Object.fromEntries(d.map((day) => [day, 'fasted' as const]));
     const fasting = simulate(baseInput(d, [], { dayStatus: fasted })).nutrients.get('FE')!;
     const unlogged = simulate(baseInput(d, [])).nutrients.get('FE')!;
-    const start = 0.5;
+    const start = startingLevels.averageFraction.value;
     expect(fasting.value.central).toBeLessThan(start);
     expect(unlogged.value.central).toBeCloseTo(start, 2); // neutral imputation
     expect(unlogged.value.low).toBeLessThan(unlogged.value.central); // but the range widens

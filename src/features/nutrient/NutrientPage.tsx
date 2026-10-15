@@ -1,0 +1,192 @@
+import { useMemo } from 'react';
+import { useData } from '../../app/data';
+import { href } from '../../app/router';
+import { t, type MessageKey } from '../../i18n';
+import { fmtAmount, fmtPercent } from '../../lib/format';
+import { NUTRIENT_BY_ID } from '../../model/nutrients';
+import { nutrientParams, statusThresholds, storage } from '../../../model/parameters';
+import { referenceValues } from '../../../model/reference-values';
+import { portionGrams } from '../../model/ranking';
+import { isOn } from '../../settings/features';
+import { NON_SINGLE_FOOD_GROUPS } from '../../foods/foodDb';
+import { LineChart } from '../../ui/LineChart';
+import { StatusBadge } from '../../ui/status';
+import { Icon } from '../../ui/Icon';
+
+export function NutrientPage({ id }: { id: string }) {
+  const d = useData();
+  const def = NUTRIENT_BY_ID.get(id);
+  const r = d.model.nutrients.get(id);
+  const req = d.requirements.byNutrient.get(id);
+  const ref = referenceValues.find((x) => x.nutrient === id);
+  const params = nutrientParams[id];
+  const showRange = isOn(d.settings.features, 'uncertaintyRanges');
+  const advanced = isOn(d.settings.features, 'advancedNumbers');
+
+  const sources = useMemo(() => {
+    const excludedGroups = new Set(d.profile.exclusions.groups);
+    const foods = d.foods.foods.filter((f) => !NON_SINGLE_FOOD_GROUPS.has(f.group) && !excludedGroups.has(f.group) && typeof f.per100[id] === 'number');
+    const per100 = [...foods].sort((a, b) => (b.per100[id] as number) - (a.per100[id] as number)).slice(0, 8);
+    const perPortion = [...foods]
+      .map((f) => ({ f, amount: ((f.per100[id] as number) * portionGrams(f.per100)) / 100, grams: portionGrams(f.per100) }))
+      .sort((a, b) => b.amount - a.amount)
+      .slice(0, 8);
+    return { per100, perPortion };
+  }, [d.foods, d.profile.exclusions, id]);
+
+  if (!def || !r) return <p>{t('nutrient.unknown')}</p>;
+
+  const model = storage[id];
+  const isTank = r.kind === 'tank';
+  const scale = (v: number) => v * 100;
+  const history = r.history.slice(-120).map((p) => ({ ...p, low: scale(p.low), central: scale(p.central), high: scale(p.high) }));
+  const guides =
+    r.kind === 'tank'
+      ? [
+          { value: 100, label: '100%' },
+          { value: statusThresholds.tank.value.gettingLow * 100, label: fmtPercent(statusThresholds.tank.value.gettingLow) },
+        ]
+      : r.kind === 'info'
+        ? []
+        : [{ value: 100, label: '100%' }];
+
+  return (
+    <section>
+      <header className="page-head row">
+        <a className="icon-btn" href={href()} aria-label={t('common.back')}>
+          <Icon name="back" />
+        </a>
+        <h1 className="grow">{def.name}</h1>
+      </header>
+      <div className="card">
+        <StatusBadge status={r.status} />
+        <p className="big-number">
+          {r.kind === 'tank'
+            ? t('gauge.full', { pct: fmtPercent(r.value.central) })
+            : r.kind === 'info'
+              ? `${fmtAmount(id, r.averageIntake)}/${t('nutrient.day')}`
+              : fmtPercent(r.value.central)}
+          {showRange && r.kind !== 'info' && r.value.high - r.value.low > 0.02 && <span className="muted range"> ({fmtPercent(r.value.low)}–{fmtPercent(r.value.high)})</span>}
+        </p>
+        <p className="small">
+          {r.kind === 'tank'
+            ? t('nutrient.tankExplain')
+            : r.kind === 'limit'
+              ? t('nutrient.limitExplain', { days: r.windowDays })
+              : r.kind === 'info'
+                ? t('nutrient.infoExplain', { days: r.windowDays })
+                : t('nutrient.rollingExplain', { days: r.windowDays })}
+        </p>
+        {r.kind !== 'info' && req && (
+          <p className="small muted">
+            {t('nutrient.averageIntake', { amount: fmtAmount(id, r.averageIntake), ref: fmtAmount(id, req.recommended) })}
+            {r.knownDays < r.windowDays && r.kind !== 'tank' ? ` ${t('nutrient.knownDays', { known: r.knownDays, days: r.windowDays })}` : ''}
+          </p>
+        )}
+        {r.missingDataDays > 0 && <p className="small notice">{t('nutrient.missingData', { n: r.missingDataDays })}</p>}
+        {r.ulRatio !== undefined && req?.upperLimit && (
+          <p className={`small${r.ulRatio > 1 ? ' notice' : ' muted'}`}>
+            {t('nutrient.upperLimit', {
+              limit: fmtAmount(req.upperLimit.basis === id ? id : id, req.upperLimit.value),
+              pct: fmtPercent(r.ulRatio),
+            })}
+            {req.upperLimit.basis !== id ? ` ${t(`nutrient.ulBasis.${req.upperLimit.basis}` as MessageKey)}` : ''}
+            {req.upperLimit.scope === 'supplements' ? ` ${t('nutrient.ulSupplements')}` : ''}
+          </p>
+        )}
+      </div>
+
+      {history.length > 1 && (
+        <>
+          <h2 className="section-title">{t('nutrient.history')}</h2>
+          <div className="card">
+            <LineChart points={history} guides={guides} showRange={showRange} format={(v) => `${Math.round(v)}%`} />
+            <p className="muted small">{isTank ? t('nutrient.historyTank') : t('nutrient.historyRolling', { days: r.windowDays })}</p>
+          </div>
+        </>
+      )}
+
+      {r.contributors.length > 0 && (
+        <>
+          <h2 className="section-title">{t('nutrient.contributors')}</h2>
+          <ul className="plain-list card">
+            {r.contributors.map((c) => (
+              <li key={c.label} className="row-between">
+                <span>{c.label}</span>
+                <span className="muted small">
+                  {fmtPercent(c.share)}
+                  {advanced ? ` · ${fmtAmount(id, c.amount)}/${t('nutrient.day')}` : ''}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+
+      <h2 className="section-title">{t('nutrient.sources')}</h2>
+      <div className="grid-2 sources">
+        <div>
+          <h3>{t('nutrient.per100')}</h3>
+          <ol className="source-list">
+            {sources.per100.map((f) => (
+              <li key={f.code}>
+                <a href={href('food', f.code)}>{f.nameEn}</a> <span className="muted small">{fmtAmount(id, f.per100[id] as number)}</span>
+              </li>
+            ))}
+          </ol>
+        </div>
+        <div>
+          <h3>{t('nutrient.perPortion')}</h3>
+          <ol className="source-list">
+            {sources.perPortion.map(({ f, amount, grams }) => (
+              <li key={f.code}>
+                <a href={href('food', f.code)}>{f.nameEn}</a>{' '}
+                <span className="muted small">
+                  {fmtAmount(id, amount)} / {Math.round(grams)} g
+                </span>
+              </li>
+            ))}
+          </ol>
+        </div>
+      </div>
+
+      <h2 className="section-title">{t('nutrient.howModelled')}</h2>
+      <div className="card small">
+        <p>
+          {model?.kind === 'rolling' ? t('nutrient.modelRolling', { days: r.windowDays }) : t('nutrient.modelTank')}{' '}
+          {params?.rule.type === 'saturable' && t('nutrient.ruleSaturable')}
+          {params?.rule.type === 'doseTable' && t('nutrient.ruleDose')}
+          {params?.rule.type === 'doseLog' && t('nutrient.ruleDose')}
+          {params?.rule.type === 'iron' && t('nutrient.ruleIron')}
+          {params?.fatSoluble && ` ${t('nutrient.ruleFat')}`}
+          {id === 'VITD' && ` ${t('nutrient.vitDSun')}`}
+        </p>
+        {req && (
+          <ul className="plain-list">
+            <li>
+              {t(`refKind.${req.kind}` as MessageKey)}: <strong>{fmtAmount(id, req.recommended)}</strong>/{t('nutrient.day')}
+            </li>
+            {req.physiological !== req.recommended && (
+              <li>
+                {t('nutrient.absorbedNeed')}: {fmtAmount(id, req.physiological)}/{t('nutrient.day')}
+                {req.physiologicalDerived ? ` (${t('nutrient.derived')})` : ''}
+              </li>
+            )}
+            {r.capacity !== undefined && advanced && (
+              <li>
+                {t('nutrient.capacity')}: {fmtAmount(id, r.capacity)}
+              </li>
+            )}
+          </ul>
+        )}
+        {ref && (
+          <p className="muted">
+            {t('nutrient.source')}: {ref.url ? <a href={ref.url} target="_blank" rel="noreferrer">{ref.source}</a> : ref.source} · {t('nutrient.confidence')}: {t(`conf.${ref.confidence}` as MessageKey)}
+            {advanced && ref.note ? ` · ${ref.note}` : ''}
+          </p>
+        )}
+        <p className="muted">{t('nutrient.notAdvice')}</p>
+      </div>
+    </section>
+  );
+}

@@ -118,7 +118,7 @@ export function createRepo(db: ToFooDB) {
       const batch: Batch = {
         id: newId(),
         recipeId: recipe.id,
-        recipe: { name: recipe.name, portions: recipe.portions, ingredients: recipe.ingredients.map((i) => ({ ...i })) },
+        recipe: { name: recipe.name, portions: recipe.portions, ingredients: recipe.ingredients.map((i) => ({ ...i })), ...(recipe.saltOverride ? { saltOverride: recipe.saltOverride } : {}) },
         cookedDay: day,
         cookedAt: Date.now(),
         plan,

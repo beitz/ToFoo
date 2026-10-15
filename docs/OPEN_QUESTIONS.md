@@ -16,7 +16,7 @@ Questions and assumptions that need an answer or a better source. Each model val
 
 - [ ] **Tank vs rolling average.** Proposed tanks: B12, vitamin A, vitamin D, iron, folate, iodine. Zinc is a rolling average (no mobilisable store). Everything else is rolling: 7-day window for energy, macronutrients, amino acids, B vitamins, sodium, potassium; 14-day window for vitamins C/E/K, calcium, magnesium, phosphorus, trace elements, essential fatty acids.
 - [ ] **Default visible nutrients:** all (as in the spec). Chromium has weak evidence and might be hidden by default.
-- [ ] **Status thresholds:** tanks low < 25 %, getting low < 50 %; rolling averages low < 70 %, getting low < 90 % of the requirement.
+- [ ] **Status thresholds:** tanks low < 20 %, getting low < 40 %; rolling averages low < 70 %, getting low < 90 % of the requirement.
 - [ ] **Day status:** a past day with at least one entry counts as "logged" unless marked "partly logged". Today counts only once something is logged or it is marked fasted.
 
 ## Values to verify against primary sources
@@ -40,7 +40,7 @@ During the first build session the build environment could not open dge.de, efsa
 - [ ] **Storage losses** for fridge and freezer-reheated portions (rough class averages).
 - [ ] **Vitamin D sun:** real-world factor 0.45 (clouds, body geometry), elevation ramp 25°–45°, MED 300 J/m², default routine 15 min/day at noon, face and hands.
 - [ ] **Uncertainty widths:** amounts ±5 % (A), ±25 % (B), ±50 % (C); BLS values ±0–30 % by provenance.
-- [ ] **"Average" starting level** = half-full tanks.
+- [ ] **"Average" starting level** = tanks 60 % full.
 - [ ] **Vitamin C** absorption at 3000 mg (extrapolated beyond Levine 1996).
 
 ## Later versions

@@ -88,7 +88,7 @@ export const batchSchema = z.object({
   id: z.string(),
   ...versioned,
   recipeId: z.string(),
-  recipe: z.object({ name: z.string(), portions: z.number().int().positive(), ingredients: z.array(ingredient) }),
+  recipe: z.object({ name: z.string(), portions: z.number().int().positive(), ingredients: z.array(ingredient), saltOverride: z.object({ iodised: z.boolean(), fluoridated: z.boolean() }).optional() }),
   cookedDay: day,
   cookedAt: z.number(),
   plan: planResolved,
