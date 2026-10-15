@@ -10,10 +10,12 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc"
+    "typecheck": "tsc",
+    "schema": "tsx scripts/gen-schema.ts"
   },
   "dependencies": {
     "dexie": "^4.4.6",
+    "dexie-react-hooks": "^4.4.0",
     "fflate": "^0.8.3",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",

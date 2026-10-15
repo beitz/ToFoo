@@ -1,0 +1,1617 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "format": {
+          "type": "string",
+          "const": "tofoo"
+        },
+        "formatVersion": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "type": {
+          "type": "string",
+          "const": "backup"
+        },
+        "exportedAt": {
+          "type": "string"
+        },
+        "app": {
+          "type": "object",
+          "properties": {
+            "version": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "version"
+          ]
+        },
+        "data": {
+          "type": "object",
+          "properties": {
+            "profile": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "const": "profile"
+                    },
+                    "schemaVersion": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "birthYear": {
+                      "type": "integer",
+                      "minimum": 1900,
+                      "maximum": 2100
+                    },
+                    "sex": {
+                      "type": "string",
+                      "enum": [
+                        "male",
+                        "female"
+                      ]
+                    },
+                    "weightHistory": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "day": {
+                            "type": "string",
+                            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                          },
+                          "kg": {
+                            "type": "number",
+                            "exclusiveMinimum": 0
+                          }
+                        },
+                        "required": [
+                          "day",
+                          "kg"
+                        ]
+                      }
+                    },
+                    "heightCm": {
+                      "type": "number",
+                      "exclusiveMinimum": 0
+                    },
+                    "activity": {
+                      "type": "string",
+                      "enum": [
+                        "low",
+                        "medium",
+                        "high"
+                      ]
+                    },
+                    "phytate": {
+                      "type": "string",
+                      "enum": [
+                        "low",
+                        "medium",
+                        "high"
+                      ]
+                    },
+                    "latitude": {
+                      "type": "number",
+                      "minimum": -90,
+                      "maximum": 90
+                    },
+                    "outdoorRoutine": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "weekdays": {
+                            "type": "array",
+                            "items": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 6
+                            }
+                          },
+                          "startHour": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 24
+                          },
+                          "minutes": {
+                            "type": "number",
+                            "minimum": 0
+                          },
+                          "skin": {
+                            "type": "string",
+                            "enum": [
+                              "faceHands",
+                              "faceHandsForearms",
+                              "faceHandsArms",
+                              "armsLegs",
+                              "mostOfBody"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "weekdays",
+                          "startHour",
+                          "minutes",
+                          "skin"
+                        ]
+                      }
+                    },
+                    "salt": {
+                      "type": "object",
+                      "properties": {
+                        "iodised": {
+                          "type": "boolean"
+                        },
+                        "fluoridated": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "iodised",
+                        "fluoridated"
+                      ]
+                    },
+                    "exclusions": {
+                      "type": "object",
+                      "properties": {
+                        "groups": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "foods": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "groups",
+                        "foods"
+                      ]
+                    },
+                    "startingLevel": {
+                      "type": "string",
+                      "enum": [
+                        "empty",
+                        "average",
+                        "custom"
+                      ]
+                    },
+                    "customStartLevels": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      }
+                    },
+                    "modelStartDay": {
+                      "type": "string",
+                      "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                    },
+                    "onboarded": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "schemaVersion",
+                    "weightHistory",
+                    "salt",
+                    "exclusions",
+                    "startingLevel",
+                    "modelStartDay",
+                    "onboarded"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "settings": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "const": "settings"
+                    },
+                    "schemaVersion": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "features": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {
+                        "type": "boolean"
+                      }
+                    },
+                    "hiddenNutrients": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "mealWindowMinutes": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "shortWindowDays": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "longWindowDays": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "theme": {
+                      "type": "string",
+                      "enum": [
+                        "system",
+                        "light",
+                        "dark"
+                      ]
+                    },
+                    "backupReminderDays": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "defaultPlan": {
+                      "type": "object",
+                      "properties": {
+                        "fresh": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "fridge": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "freezer": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "fresh",
+                        "fridge",
+                        "freezer"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "schemaVersion",
+                    "features",
+                    "hiddenNutrients",
+                    "mealWindowMinutes",
+                    "shortWindowDays",
+                    "longWindowDays",
+                    "theme",
+                    "backupReminderDays",
+                    "defaultPlan"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "recipes": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "schemaVersion": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "portions": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "ingredients": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "ref": {
+                          "oneOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "source": {
+                                  "type": "string",
+                                  "const": "BLS"
+                                },
+                                "version": {
+                                  "type": "string"
+                                },
+                                "code": {
+                                  "type": "string",
+                                  "pattern": "^[A-Z][0-9A-Z]{6}$"
+                                }
+                              },
+                              "required": [
+                                "source",
+                                "version",
+                                "code"
+                              ]
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "source": {
+                                  "type": "string",
+                                  "const": "custom"
+                                },
+                                "id": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "source",
+                                "id"
+                              ]
+                            }
+                          ]
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "grams": {
+                          "type": "number",
+                          "exclusiveMinimum": 0
+                        },
+                        "preparation": {
+                          "type": "string",
+                          "enum": [
+                            "asListed",
+                            "raw",
+                            "boiled",
+                            "steamed",
+                            "baked",
+                            "fried"
+                          ]
+                        },
+                        "isSalt": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "ref",
+                        "name",
+                        "grams",
+                        "preparation"
+                      ]
+                    }
+                  },
+                  "notes": {
+                    "type": "string"
+                  },
+                  "tags": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "defaultPlan": {
+                    "type": "object",
+                    "properties": {
+                      "fresh": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "fridge": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "freezer": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "fresh",
+                      "fridge",
+                      "freezer"
+                    ]
+                  },
+                  "saltOverride": {
+                    "type": "object",
+                    "properties": {
+                      "iodised": {
+                        "type": "boolean"
+                      },
+                      "fluoridated": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "iodised",
+                      "fluoridated"
+                    ]
+                  },
+                  "createdAt": {
+                    "type": "number"
+                  },
+                  "updatedAt": {
+                    "type": "number"
+                  },
+                  "archived": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "id",
+                  "schemaVersion",
+                  "name",
+                  "portions",
+                  "ingredients",
+                  "tags",
+                  "createdAt",
+                  "updatedAt"
+                ]
+              }
+            },
+            "batches": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "schemaVersion": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "recipeId": {
+                    "type": "string"
+                  },
+                  "recipe": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string"
+                      },
+                      "portions": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "ingredients": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "ref": {
+                              "oneOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "source": {
+                                      "type": "string",
+                                      "const": "BLS"
+                                    },
+                                    "version": {
+                                      "type": "string"
+                                    },
+                                    "code": {
+                                      "type": "string",
+                                      "pattern": "^[A-Z][0-9A-Z]{6}$"
+                                    }
+                                  },
+                                  "required": [
+                                    "source",
+                                    "version",
+                                    "code"
+                                  ]
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "source": {
+                                      "type": "string",
+                                      "const": "custom"
+                                    },
+                                    "id": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "source",
+                                    "id"
+                                  ]
+                                }
+                              ]
+                            },
+                            "name": {
+                              "type": "string"
+                            },
+                            "grams": {
+                              "type": "number",
+                              "exclusiveMinimum": 0
+                            },
+                            "preparation": {
+                              "type": "string",
+                              "enum": [
+                                "asListed",
+                                "raw",
+                                "boiled",
+                                "steamed",
+                                "baked",
+                                "fried"
+                              ]
+                            },
+                            "isSalt": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "ref",
+                            "name",
+                            "grams",
+                            "preparation"
+                          ]
+                        }
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "portions",
+                      "ingredients"
+                    ]
+                  },
+                  "cookedDay": {
+                    "type": "string",
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                  },
+                  "cookedAt": {
+                    "type": "number"
+                  },
+                  "plan": {
+                    "type": "object",
+                    "properties": {
+                      "fresh": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "fridge": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "freezer": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "fresh",
+                      "fridge",
+                      "freezer"
+                    ]
+                  },
+                  "remaining": {
+                    "type": "object",
+                    "properties": {
+                      "fresh": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "fridge": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "freezer": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "fresh",
+                      "fridge",
+                      "freezer"
+                    ]
+                  },
+                  "corrections": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "at": {
+                          "type": "number"
+                        },
+                        "storage": {
+                          "type": "string",
+                          "enum": [
+                            "fresh",
+                            "fridge",
+                            "freezer"
+                          ]
+                        },
+                        "delta": {
+                          "type": "number"
+                        },
+                        "reason": {
+                          "type": "string",
+                          "enum": [
+                            "discarded",
+                            "givenAway",
+                            "correction"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "at",
+                        "storage",
+                        "delta",
+                        "reason"
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "id",
+                  "schemaVersion",
+                  "recipeId",
+                  "recipe",
+                  "cookedDay",
+                  "cookedAt",
+                  "plan",
+                  "remaining",
+                  "corrections"
+                ]
+              }
+            },
+            "log": {
+              "type": "array",
+              "items": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "schemaVersion": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "time": {
+                        "type": "number"
+                      },
+                      "day": {
+                        "type": "string",
+                        "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                      },
+                      "confidence": {
+                        "type": "string",
+                        "enum": [
+                          "A",
+                          "B",
+                          "C"
+                        ]
+                      },
+                      "label": {
+                        "type": "string"
+                      },
+                      "kind": {
+                        "type": "string",
+                        "const": "food"
+                      },
+                      "ref": {
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "source": {
+                                "type": "string",
+                                "const": "BLS"
+                              },
+                              "version": {
+                                "type": "string"
+                              },
+                              "code": {
+                                "type": "string",
+                                "pattern": "^[A-Z][0-9A-Z]{6}$"
+                              }
+                            },
+                            "required": [
+                              "source",
+                              "version",
+                              "code"
+                            ]
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "source": {
+                                "type": "string",
+                                "const": "custom"
+                              },
+                              "id": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "source",
+                              "id"
+                            ]
+                          }
+                        ]
+                      },
+                      "grams": {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      "preparation": {
+                        "type": "string",
+                        "enum": [
+                          "asListed",
+                          "raw",
+                          "boiled",
+                          "steamed",
+                          "baked",
+                          "fried"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "schemaVersion",
+                      "time",
+                      "day",
+                      "confidence",
+                      "label",
+                      "kind",
+                      "ref",
+                      "grams",
+                      "preparation"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "schemaVersion": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "time": {
+                        "type": "number"
+                      },
+                      "day": {
+                        "type": "string",
+                        "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                      },
+                      "confidence": {
+                        "type": "string",
+                        "enum": [
+                          "A",
+                          "B",
+                          "C"
+                        ]
+                      },
+                      "label": {
+                        "type": "string"
+                      },
+                      "kind": {
+                        "type": "string",
+                        "const": "portion"
+                      },
+                      "batchId": {
+                        "type": "string"
+                      },
+                      "storage": {
+                        "type": "string",
+                        "enum": [
+                          "fresh",
+                          "fridge",
+                          "freezer"
+                        ]
+                      },
+                      "portions": {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "schemaVersion",
+                      "time",
+                      "day",
+                      "confidence",
+                      "label",
+                      "kind",
+                      "batchId",
+                      "storage",
+                      "portions"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "schemaVersion": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "time": {
+                        "type": "number"
+                      },
+                      "day": {
+                        "type": "string",
+                        "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                      },
+                      "confidence": {
+                        "type": "string",
+                        "enum": [
+                          "A",
+                          "B",
+                          "C"
+                        ]
+                      },
+                      "label": {
+                        "type": "string"
+                      },
+                      "kind": {
+                        "type": "string",
+                        "const": "custom"
+                      },
+                      "customFoodId": {
+                        "type": "string"
+                      },
+                      "servings": {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "schemaVersion",
+                      "time",
+                      "day",
+                      "confidence",
+                      "label",
+                      "kind",
+                      "customFoodId",
+                      "servings"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "schemaVersion": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "time": {
+                        "type": "number"
+                      },
+                      "day": {
+                        "type": "string",
+                        "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                      },
+                      "confidence": {
+                        "type": "string",
+                        "enum": [
+                          "A",
+                          "B",
+                          "C"
+                        ]
+                      },
+                      "label": {
+                        "type": "string"
+                      },
+                      "kind": {
+                        "type": "string",
+                        "const": "manual"
+                      },
+                      "nutrients": {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        "description": "Amounts by BLS component code, in BLS units (e.g. {\"VITC\": 12.5} mg)"
+                      },
+                      "isSupplement": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "schemaVersion",
+                      "time",
+                      "day",
+                      "confidence",
+                      "label",
+                      "kind",
+                      "nutrients",
+                      "isSupplement"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "schemaVersion": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "time": {
+                        "type": "number"
+                      },
+                      "day": {
+                        "type": "string",
+                        "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                      },
+                      "confidence": {
+                        "type": "string",
+                        "enum": [
+                          "A",
+                          "B",
+                          "C"
+                        ]
+                      },
+                      "label": {
+                        "type": "string"
+                      },
+                      "kind": {
+                        "type": "string",
+                        "const": "drink"
+                      },
+                      "drink": {
+                        "type": "string",
+                        "enum": [
+                          "tea",
+                          "coffee"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "schemaVersion",
+                      "time",
+                      "day",
+                      "confidence",
+                      "label",
+                      "kind",
+                      "drink"
+                    ]
+                  }
+                ]
+              }
+            },
+            "customFoods": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "schemaVersion": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "isSupplement": {
+                    "type": "boolean"
+                  },
+                  "servingLabel": {
+                    "type": "string"
+                  },
+                  "servingGrams": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "nutrients": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "description": "Amounts by BLS component code, in BLS units (e.g. {\"VITC\": 12.5} mg)"
+                  },
+                  "confidence": {
+                    "type": "string",
+                    "enum": [
+                      "A",
+                      "B",
+                      "C"
+                    ]
+                  },
+                  "createdAt": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "id",
+                  "schemaVersion",
+                  "name",
+                  "isSupplement",
+                  "servingLabel",
+                  "nutrients",
+                  "confidence",
+                  "createdAt"
+                ]
+              }
+            },
+            "dayStatus": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "day": {
+                    "type": "string",
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                  },
+                  "schemaVersion": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "logged",
+                      "partial",
+                      "fasted"
+                    ]
+                  }
+                },
+                "required": [
+                  "day",
+                  "schemaVersion",
+                  "status"
+                ]
+              }
+            },
+            "fasts": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "schemaVersion": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "startDay": {
+                    "type": "string",
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                  },
+                  "endDay": {
+                    "type": "string",
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                  }
+                },
+                "required": [
+                  "id",
+                  "schemaVersion",
+                  "startDay"
+                ]
+              }
+            },
+            "sunEntries": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "schemaVersion": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "day": {
+                    "type": "string",
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                  },
+                  "startHour": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 24
+                  },
+                  "minutes": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "skin": {
+                    "type": "string",
+                    "enum": [
+                      "faceHands",
+                      "faceHandsForearms",
+                      "faceHandsArms",
+                      "armsLegs",
+                      "mostOfBody"
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "schemaVersion",
+                  "day",
+                  "startHour",
+                  "minutes",
+                  "skin"
+                ]
+              }
+            }
+          },
+          "required": [
+            "profile",
+            "settings",
+            "recipes",
+            "batches",
+            "log",
+            "customFoods",
+            "dayStatus",
+            "fasts",
+            "sunEntries"
+          ]
+        }
+      },
+      "required": [
+        "format",
+        "formatVersion",
+        "type",
+        "exportedAt",
+        "data"
+      ]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "format": {
+          "type": "string",
+          "const": "tofoo"
+        },
+        "formatVersion": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "type": {
+          "type": "string",
+          "const": "recipe"
+        },
+        "recipe": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "portions": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "ingredients": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "source": {
+                        "type": "string",
+                        "const": "BLS"
+                      },
+                      "version": {
+                        "type": "string"
+                      },
+                      "code": {
+                        "type": "string",
+                        "pattern": "^[A-Z][0-9A-Z]{6}$"
+                      },
+                      "grams": {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      "preparation": {
+                        "default": "asListed",
+                        "type": "string",
+                        "enum": [
+                          "asListed",
+                          "raw",
+                          "boiled",
+                          "steamed",
+                          "baked",
+                          "fried"
+                        ]
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "isSalt": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "source",
+                      "version",
+                      "code",
+                      "grams"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "source": {
+                        "type": "string",
+                        "const": "manual"
+                      },
+                      "name": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "grams": {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      "per100g": {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        "description": "Amounts by BLS component code, in BLS units (e.g. {\"VITC\": 12.5} mg)"
+                      },
+                      "confidence": {
+                        "type": "string",
+                        "enum": [
+                          "A",
+                          "B",
+                          "C"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "source",
+                      "name",
+                      "grams",
+                      "per100g",
+                      "confidence"
+                    ]
+                  }
+                ]
+              }
+            },
+            "storagePlan": {
+              "type": "object",
+              "properties": {
+                "fresh": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "fridge": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "freezer": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "fresh",
+                "fridge",
+                "freezer"
+              ]
+            },
+            "shelfLifeDays": {
+              "type": "object",
+              "properties": {
+                "fridge": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "freezer": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                }
+              }
+            },
+            "instructions": {
+              "type": "string"
+            },
+            "notes": {
+              "type": "string"
+            },
+            "tags": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "name",
+            "portions",
+            "ingredients"
+          ]
+        }
+      },
+      "required": [
+        "format",
+        "formatVersion",
+        "type",
+        "recipe"
+      ]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "format": {
+          "type": "string",
+          "const": "tofoo"
+        },
+        "formatVersion": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "type": {
+          "type": "string",
+          "const": "logEntry"
+        },
+        "entries": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "time": {
+                "description": "ISO 8601 date-time; defaults to now",
+                "type": "string"
+              },
+              "confidence": {
+                "default": "C",
+                "type": "string",
+                "enum": [
+                  "A",
+                  "B",
+                  "C"
+                ]
+              },
+              "isSupplement": {
+                "type": "boolean"
+              },
+              "items": {
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "source": {
+                          "type": "string",
+                          "const": "BLS"
+                        },
+                        "version": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string",
+                          "pattern": "^[A-Z][0-9A-Z]{6}$"
+                        },
+                        "grams": {
+                          "type": "number",
+                          "exclusiveMinimum": 0
+                        },
+                        "preparation": {
+                          "default": "asListed",
+                          "type": "string",
+                          "enum": [
+                            "asListed",
+                            "raw",
+                            "boiled",
+                            "steamed",
+                            "baked",
+                            "fried"
+                          ]
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "isSalt": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "source",
+                        "version",
+                        "code",
+                        "grams"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "source": {
+                          "type": "string",
+                          "const": "manual"
+                        },
+                        "name": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "grams": {
+                          "type": "number",
+                          "exclusiveMinimum": 0
+                        },
+                        "per100g": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {
+                            "type": "number",
+                            "minimum": 0
+                          },
+                          "description": "Amounts by BLS component code, in BLS units (e.g. {\"VITC\": 12.5} mg)"
+                        },
+                        "confidence": {
+                          "type": "string",
+                          "enum": [
+                            "A",
+                            "B",
+                            "C"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "source",
+                        "name",
+                        "grams",
+                        "per100g",
+                        "confidence"
+                      ]
+                    }
+                  ]
+                }
+              },
+              "drinks": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "tea",
+                    "coffee"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "name",
+              "items"
+            ]
+          }
+        }
+      },
+      "required": [
+        "format",
+        "formatVersion",
+        "type",
+        "entries"
+      ]
+    }
+  ],
+  "$id": "https://beitz.github.io/ToFoo/exchange-format.schema.json",
+  "title": "ToFoo exchange format, version 1",
+  "description": "Generated from src/exchange/schema.ts. See docs/exchange-format.md."
+}
