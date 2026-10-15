@@ -1302,3 +1302,29 @@ details.tree details {
 .cgauge.gauge-tooHigh .cgauge-line svg {
   flex: none;
 }
+
+/* ── Full food ranking ───────────────────────────────────────── */
+.food-rank {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.food-rank li + li {
+  border-top: 1px solid var(--border);
+}
+.food-rank-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 8px 2px;
+  color: inherit;
+  text-decoration: none;
+}
+.food-rank-name {
+  font-weight: 600;
+}
+.food-rank-amount {
+  flex: none;
+  text-align: right;
+}

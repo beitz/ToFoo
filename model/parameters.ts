@@ -72,7 +72,13 @@ export const nutrientParams: Record<string, NutrientParams> = {
     fatSoluble: true,
   },
   VITE: {
-    ...fixed(0.5, 'EFSA NDA Panel (2015): DRVs for vitamin E — absorption of α-tocopherol varies widely (~20–80 %)', 'low', 'Not re-checked (EFSA opinion not reachable).', [0.2, 0.8]),
+    ...fixed(
+      0.75,
+      'EFSA NDA Panel (2015) EFSA Journal 13(7):4149, Section 2.3.1: "the average α-tocopherol absorption from a usual diet is about 75 %", from two balance studies (75 %, 69 %) and a kinetic study (81 %)',
+      'medium',
+      'Checked in the full text (2026-10-15). Reported means range from ~10 % (no fat) to 80 %; the fat effect is modelled separately.',
+      [0.69, 0.81],
+    ),
     fatSoluble: true,
   },
   VITK: {

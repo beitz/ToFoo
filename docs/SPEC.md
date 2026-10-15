@@ -224,7 +224,7 @@ The home screen answers "how am I doing, and what do I eat next?" at a glance, w
 3. **Foods that fill your gaps**: one horizontal row of single foods from the BLS, ranked by how many urgent gaps they close at once without pushing anything over its upper limit, respecting food exclusions. Tap a food for its nutrient profile.
 4. **Best next batch** (once the recipe book has recipes): the same ranking applied to the user's own recipes. Hidden while the book is empty.
 
-**Tap a gauge** to expand: history chart, forecast (if on), contributing foods, the wiki summary, and good sources from the BLS (varied: one variant per food, e.g. one liver, not ten).
+**Tap a gauge** to expand: history chart, forecast (if on), contributing foods, the wiki summary, a short explanation (what the nutrient does, what too little and too much mean, with source), and good sources from the BLS (varied: one food per BLS subgroup and main name word, e.g. one liver, one mushroom). "All foods, ranked" opens the full list: per portion or per 100 g, filter by name and food group, optional "one per kind of food", exclusions applied.
 
 **UX principles**:
 

@@ -96,6 +96,7 @@ export function SettingsPage() {
 
       <ul className="link-list card">
         <LinkRow to={['about']} label={t('about.title')} />
+        <LinkRow to={['settings', 'diagnostics']} label={t('diag.title')} detail={t('diag.linkDetail')} />
       </ul>
     </section>
   );
