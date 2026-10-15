@@ -6,19 +6,11 @@
 
 const KEY = 'tofoo.diagnostics';
 const MAX_ENTRIES = 300;
-const FLAGS_KEY = 'tofoo.diagnostics.flags';
 
 export interface DiagEntry {
   t: number;
   e: string;
   [k: string]: unknown;
-}
-
-export interface DiagFlags {
-  /** Experiment: force the browser to repaint after each screen change. */
-  repaint?: boolean;
-  /** Workaround: reload the page on each screen change (slower, but a fresh page every time). */
-  reloadOnNavigate?: boolean;
 }
 
 function read(): DiagEntry[] {
@@ -52,22 +44,6 @@ export function clearDiag(): void {
   }
 }
 
-export function diagFlags(): DiagFlags {
-  try {
-    return JSON.parse(localStorage.getItem(FLAGS_KEY) ?? '{}') as DiagFlags;
-  } catch {
-    return {};
-  }
-}
-
-export function setDiagFlags(flags: DiagFlags): void {
-  try {
-    localStorage.setItem(FLAGS_KEY, JSON.stringify(flags));
-  } catch {
-    // ignore
-  }
-}
-
 /** Sizes and positions that would explain an empty-looking screen. */
 export function layoutSnapshot(): Record<string, unknown> {
   const doc = document.documentElement;
@@ -89,6 +65,11 @@ export function layoutSnapshot(): Record<string, unknown> {
 /** Called once at startup: global listeners for errors, navigation and slow tasks. */
 export function installDiagnostics(): void {
   const standalone = window.matchMedia('(display-mode: standalone)').matches;
+  try {
+    localStorage.removeItem('tofoo.diagnostics.flags'); // experiments for the 2026-10 black screen, now removed
+  } catch {
+    // ignore
+  }
   diag('start', {
     ua: navigator.userAgent,
     screen: `${screen.width}x${screen.height}@${window.devicePixelRatio}`,
@@ -101,10 +82,6 @@ export function installDiagnostics(): void {
   window.addEventListener('hashchange', () => {
     const at = performance.now();
     diag('hashchange', { hash: location.hash, ...layoutSnapshot() });
-    if (diagFlags().reloadOnNavigate) {
-      location.reload();
-      return;
-    }
     // Does the browser still produce frames after the change? A hung page would not.
     let framed = false;
     requestAnimationFrame(() => {
@@ -128,11 +105,3 @@ export function installDiagnostics(): void {
   }
 }
 
-/** Experiment: nudge the compositor to repaint everything. */
-export function forceRepaint(): void {
-  const body = document.body;
-  body.style.transform = 'translateZ(0)';
-  requestAnimationFrame(() => {
-    body.style.transform = '';
-  });
-}

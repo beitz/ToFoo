@@ -45,7 +45,8 @@ Resolved:
 Still open:
 
 - [ ] **Fluoride conflict:** EFSA's 2025 safe level (3.3 mg/day, all sources) is below the DGE guide value for men (3.5 mg). With food data only (no drinking water, no toothpaste), intake from BLS foods will normally stay well below both.
-- [ ] **Not reachable for re-checking** (EFSA Journal and NIH fact sheets block automated access): EPA + DHA AI 250 mg (EFSA 2010), iron losses 0.95 / 1.34 mg (EFSA 2015), typical absorption of vitamin D, iodine body store 15–20 mg (NIH), the vitamin C points at 500 / 1250 mg, the Monsen formula and the Holick MED yield (paper bodies, not abstracts).
+- [x] **Checked from texts supplied by the owner (2026-10-15):** EPA + DHA AI 250 mg (EFSA 2010), iron losses 0.95 / 1.34 mg (EFSA 2015), vitamin D absorption 80 % (EFSA 2016), vitamin E absorption 75 % (EFSA 2015), iodine body store 15–20 mg (NIH).
+- [ ] **Not reachable for re-checking** (paper bodies, not abstracts): the vitamin C points at 500 / 1250 mg (Levine 1996), the Monsen formula and the Holick MED yield.
 - [ ] **Salt 6 g and saturated fat 10 %:** from DGE position papers, not the reference value tables; not re-checked.
 - [ ] **No USDA retention factors** for vitamins D, E, K, pantothenic acid and biotin: no cooking loss is modelled for them.
 
