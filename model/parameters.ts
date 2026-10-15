@@ -68,7 +68,13 @@ export const nutrientParams: Record<string, NutrientParams> = {
     fatSoluble: true,
   },
   VITD: {
-    ...fixed(0.8, 'EFSA NDA Panel (2016): DRVs for vitamin D — dietary vitamin D is well absorbed (~80 %)', 'low', 'Not re-checked (EFSA opinion not reachable).', [0.55, 0.99]),
+    ...fixed(
+      0.8,
+      'EFSA NDA Panel (2016) EFSA Journal 14(10):4547, Section 2.3.2: "the average absorption of vitamin D from a usual diet is about 80%"; studies 55–99 % (mean 78 %)',
+      'medium',
+      'Checked (full text, 2026-10-15).',
+      [0.55, 0.99],
+    ),
     fatSoluble: true,
   },
   VITE: {
@@ -263,7 +269,7 @@ export const storage: Record<string, StorageModel> = {
       value: r(10_000, 15_000, 20_000),
       source: 'NIH ODS Iodine fact sheet: body of a healthy adult contains 15–20 mg iodine, 70–80 % in the thyroid',
       confidence: 'medium',
-      note: 'µg at 70 kg. Not re-checked (the NIH site blocked automated access); EFSA (2014, abstract) confirms "large iodine stores" with adequate status.',
+      note: 'µg at 70 kg. Checked (fact sheet text, 2026-10-15): "The iodine-replete healthy adult has about 15–20 mg of iodine, 70%–80% of which is contained in the thyroid". Low end 10 mg allows for less than replete stores.',
     },
   },
 

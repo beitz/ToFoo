@@ -98,7 +98,7 @@ export const referenceValues: ReferenceValue[] = [
     source: 'EFSA NDA Panel (2010): Scientific Opinion on Dietary Reference Values for fats (EPA + DHA adequate intake 250 mg/day)',
     url: 'https://doi.org/10.2903/j.efsa.2010.1461',
     confidence: 'medium',
-    note: 'DGE gives no separate value for EPA + DHA; EFSA adequate intake used. Not re-checked (EFSA journal not reachable from the build environment).',
+    note: 'DGE gives no separate value for EPA + DHA; EFSA adequate intake used. Checked (full text, 2026-10-15): "the Panel proposes to set an AI of 250 mg for EPA plus DHA" for adults, based on cardiovascular considerations.',
   },
 
   // Essential amino acids: WHO mean requirements in mg/kg/day, converted to g/kg (BLS unit g).
@@ -416,7 +416,7 @@ export const referenceValues: ReferenceValue[] = [
       url: 'https://doi.org/10.2903/j.efsa.2015.4254',
       confidence: 'medium',
       note:
-        'Absorbed iron needed. Postmenopausal women have the losses of men but absorb less (DGE: 14 vs 11 mg intake), which the model expresses as a correspondingly higher absorbed need: 0.95 × 14/11 ≈ 1.21 mg. IOM figure checked; EFSA medians not re-checked (journal not reachable).',
+        'Absorbed iron needed. Postmenopausal women have the losses of men but absorb less (DGE: 14 vs 11 mg intake), which the model expresses as a correspondingly higher absorbed need: 0.95 × 14/11 ≈ 1.21 mg. Checked (EFSA full text, 2026-10-15): median obligatory losses 0.95 mg/day in men, 1.34 mg/day in premenopausal women; EFSA converts with 16 % / 18 % absorption at serum ferritin 30 µg/L.',
     },
     upperLimit: {
       value: 40,

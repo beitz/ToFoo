@@ -4,7 +4,7 @@ import { t } from '../i18n';
 import { DataProvider, useData } from './data';
 import { ToastProvider } from './toast';
 import { ErrorBoundary } from './ErrorBoundary';
-import { diag, diagFlags, forceRepaint, layoutSnapshot } from './diagnostics';
+import { diag, layoutSnapshot } from './diagnostics';
 import { Icon } from '../ui/Icon';
 import { AboutPage } from '../features/about/AboutPage';
 import { HomePage } from '../features/home/HomePage';
@@ -88,10 +88,9 @@ export function App() {
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [path]);
-  // Diagnostics for the black-screen-after-navigation report (Android Chrome).
+  // Device diagnostics (Settings → Diagnostics): what each screen change produced.
   useLayoutEffect(() => {
     diag('commit', { route: path, ...layoutSnapshot() });
-    if (diagFlags().repaint) forceRepaint();
   }, [path]);
 
   return (
