@@ -321,6 +321,13 @@
                         "fridge",
                         "freezer"
                       ]
+                    },
+                    "homeView": {
+                      "type": "string",
+                      "enum": [
+                        "compact",
+                        "detailed"
+                      ]
                     }
                   },
                   "required": [

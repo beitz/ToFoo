@@ -2,7 +2,7 @@ import type { GaugeStatus } from '../model/simulate';
 import { t, type MessageKey } from '../i18n';
 import { Icon } from './Icon';
 
-const ICON: Record<GaugeStatus, string> = {
+export const STATUS_ICON: Record<GaugeStatus, string> = {
   fine: 'check',
   gettingLow: 'down',
   low: 'alert',
@@ -19,7 +19,7 @@ export function statusLabel(s: GaugeStatus): string {
 export function StatusBadge({ status, compact = false }: { status: GaugeStatus; compact?: boolean }) {
   return (
     <span className={`status status-${status}`}>
-      <Icon name={ICON[status]} size={compact ? 14 : 16} />
+      <Icon name={STATUS_ICON[status]} size={compact ? 14 : 16} />
       <span className={compact ? 'status-text-compact' : undefined}>{statusLabel(status)}</span>
     </span>
   );

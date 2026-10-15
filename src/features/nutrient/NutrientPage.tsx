@@ -9,6 +9,7 @@ import { referenceValues } from '../../../model/reference-values';
 import { portionGrams } from '../../model/ranking';
 import { isOn } from '../../settings/features';
 import { NON_SINGLE_FOOD_GROUPS } from '../../foods/foodDb';
+import { diverseTop } from '../../foods/variety';
 import { LineChart } from '../../ui/LineChart';
 import { StatusBadge } from '../../ui/status';
 import { Icon } from '../../ui/Icon';
@@ -26,11 +27,18 @@ export function NutrientPage({ id }: { id: string }) {
   const sources = useMemo(() => {
     const excludedGroups = new Set(d.profile.exclusions.groups);
     const foods = d.foods.foods.filter((f) => !NON_SINGLE_FOOD_GROUPS.has(f.group) && !excludedGroups.has(f.group) && typeof f.per100[id] === 'number');
-    const per100 = [...foods].sort((a, b) => (b.per100[id] as number) - (a.per100[id] as number)).slice(0, 8);
-    const perPortion = [...foods]
-      .map((f) => ({ f, amount: ((f.per100[id] as number) * portionGrams(f.per100)) / 100, grams: portionGrams(f.per100) }))
-      .sort((a, b) => b.amount - a.amount)
-      .slice(0, 8);
+    const per100 = diverseTop(
+      [...foods].sort((a, b) => (b.per100[id] as number) - (a.per100[id] as number)),
+      8,
+      (f) => f,
+    );
+    const perPortion = diverseTop(
+      foods
+        .map((f) => ({ f, amount: ((f.per100[id] as number) * portionGrams(f.per100)) / 100, grams: portionGrams(f.per100) }))
+        .sort((a, b) => b.amount - a.amount),
+      8,
+      (x) => x.f,
+    );
     return { per100, perPortion };
   }, [d.foods, d.profile.exclusions, id]);
 

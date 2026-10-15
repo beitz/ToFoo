@@ -7,8 +7,9 @@ export interface MealComposition {
   hemeIron: number;
   mfpGrams: number;
   phytateGrams: number;
-  tea: boolean;
-  coffee: boolean;
+  /** Weight (0–1) of tea / coffee as iron inhibitors, by timing relative to the meal (1 = with the meal). */
+  tea: number;
+  coffee: number;
 }
 
 export interface AbsorptionOptions {
@@ -67,10 +68,36 @@ export function fatFactor(fatG: number, scenario: Scenario): number {
   return min + (1 - min) * (Math.max(fatG, 0) / threshold);
 }
 
-/** Absorbed iron (mg) from a meal: heme and non-heme with enhancers and inhibitors. */
-export function absorbIron(meal: MealComposition, scenario: Scenario): number {
+/** Linear interpolation in a [x, y] table; flat outside. */
+function interpolate(points: ReadonlyArray<readonly [number, number]>, x: number): number {
+  const first = points[0];
+  if (!first) return 1;
+  if (x <= first[0]) return first[1];
+  for (let i = 1; i < points.length; i++) {
+    const [x1, y1] = points[i]!;
+    const [x0, y0] = points[i - 1]!;
+    if (x <= x1) return y0 + ((y1 - y0) * (x - x0)) / (x1 - x0);
+  }
+  return points[points.length - 1]![1];
+}
+
+/** How much a tea or coffee drink counts for a meal (0–1), by minutes after the meal's start (negative = before). */
+export function drinkTimingWeight(kind: 'tea' | 'coffee', minutesAfterMealStart: number): number {
+  const timing = iron.drinkTiming.value;
+  if (minutesAfterMealStart < 0) return clamp(interpolate(timing.before, minutesAfterMealStart), 0, 1);
+  return clamp(interpolate(timing[kind], minutesAfterMealStart), 0, 1);
+}
+
+/** Multiplier on non-heme iron absorption for the current iron store (mg): more is absorbed when stores are low. */
+export function ironStatusFactor(storeMg: number, scenario: Scenario): number {
+  const { storeMgPerFerritin, points } = iron.statusAdaptation.value;
+  return interpolate(points[scenario], Math.max(0, storeMg) / storeMgPerFerritin);
+}
+
+/** Absorbed iron (mg) from a meal at reference iron stores, split into heme and non-heme. */
+export function absorbIronParts(meal: MealComposition, scenario: Scenario): { heme: number; nonheme: number } {
   const total = meal.intake.FE ?? 0;
-  if (total <= 0) return 0;
+  if (total <= 0) return { heme: 0, nonheme: 0 };
   const heme = Math.min(meal.hemeIron, total);
   const nonheme = total - heme;
 
@@ -83,13 +110,19 @@ export function absorbIron(meal: MealComposition, scenario: Scenario): number {
   const n = iron.nonheme.value;
   const nonhemePct = Math.min(n.base + n.coefficient * Math.log((enhancers + 100) / 100), n.max);
   let nonhemeFraction = (nonhemePct / 100) * iron.nonhemeScale.value[scenario];
-  if (meal.tea) nonhemeFraction *= iron.tea.value[scenario];
-  if (meal.coffee) nonhemeFraction *= iron.coffee.value[scenario];
+  nonhemeFraction *= 1 - clamp(meal.tea, 0, 1) * (1 - iron.tea.value[scenario]);
+  nonhemeFraction *= 1 - clamp(meal.coffee, 0, 1) * (1 - iron.coffee.value[scenario]);
   const phy = iron.phytate.value;
   const phyRamp = clamp(meal.phytateGrams / phy.fullGrams, 0, 1);
   nonhemeFraction *= 1 - (1 - phy.factor[scenario]) * phyRamp;
 
-  return (heme * iron.hemeAbsorption.value[scenario] + nonheme * nonhemeFraction) * calciumFactor;
+  return { heme: heme * iron.hemeAbsorption.value[scenario] * calciumFactor, nonheme: nonheme * nonhemeFraction * calciumFactor };
+}
+
+/** Absorbed iron (mg) from a meal at reference iron stores. */
+export function absorbIron(meal: MealComposition, scenario: Scenario): number {
+  const { heme, nonheme } = absorbIronParts(meal, scenario);
+  return heme + nonheme;
 }
 
 /** Absorbed amounts for every nutrient in the meal. */

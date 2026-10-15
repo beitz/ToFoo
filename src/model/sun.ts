@@ -57,8 +57,8 @@ export function clearSkyUvIndex(elevationDeg: number): number {
 }
 
 /** Share of erythemal UV that is effective for vitamin D at this solar elevation (0–1). */
-export function vitaminDEffectiveness(elevationDeg: number): number {
-  const { zero, full } = sun.elevationRampDeg.value;
+export function vitaminDEffectiveness(elevationDeg: number, scenario: Scenario = 'central'): number {
+  const { zero, full } = sun.elevationRampDeg.value[scenario];
   return Math.min(1, Math.max(0, (elevationDeg - zero) / (full - zero)));
 }
 
@@ -79,7 +79,7 @@ export function sunVitaminD(input: SunDayInput): Range {
         const hour = session.startHour + (m + dt / 2) / 60;
         const elev = solarElevation(input.year, input.month, input.day, hour, input.utcOffsetHours, input.latitude, lon);
         const irradiance = clearSkyUvIndex(elev) * sun.erythemalWm2PerUvi.value; // W/m²
-        effectiveDose += irradiance * dt * 60 * sun.realWorldFactor.value[s] * vitaminDEffectiveness(elev);
+        effectiveDose += irradiance * dt * 60 * sun.realWorldFactor.value[s] * vitaminDEffectiveness(elev, s);
       }
       const med = effectiveDose / sun.medJm2.value[s];
       medTotal += med;

@@ -19,6 +19,7 @@ import type {
   Preparation,
   Range,
   RetentionClass,
+  Scenario,
   Storage,
   StorageModel,
   Valued,
@@ -344,7 +345,7 @@ export const iron = {
       'Monsen ER, Balintfy JL (1982) J Am Diet Assoc 80:307–11: non-heme absorption (%) = 3 + 8.93·ln((EF + 100)/100), max 8 %, where EF = mg vitamin C + g meat/fish/poultry in the meal',
     url: 'https://pubmed.ncbi.nlm.nih.gov/7061776/',
     confidence: 'medium',
-    note: 'Assumes moderate iron stores (500 mg); people with low stores absorb more. The abstract confirms the model (enhancement by ascorbic acid and meat/fish/poultry); the formula itself is from the paper body and was not re-checked.',
+    note: 'Assumes moderate iron stores (500 mg); lower stores raise absorption via `statusAdaptation`. The abstract confirms the model (enhancement by ascorbic acid and meat/fish/poultry); the formula itself is from the paper body and was not re-checked.',
   } satisfies Valued<{ base: number; coefficient: number; max: number }>,
   nonhemeScale: {
     value: r(0.8, 1, 1.25),
@@ -365,7 +366,7 @@ export const iron = {
       'Morck TA, Lynch SR, Cook JD (1983) Am J Clin Nutr 37:416–20: a cup of coffee reduced iron absorption from a hamburger meal by 39 %, from a semipurified meal from 5.88 % to 1.64 % (−72 %); no effect 1 h before the meal, full effect 1 h after',
     url: 'https://pubmed.ncbi.nlm.nih.gov/6402915/',
     confidence: 'high',
-    note: 'Abstract checked. The timing result supports counting drinks within the meal window.',
+    note: 'Abstract checked. Timing is handled by `drinkTiming`.',
   } satisfies Valued<Range>,
   calcium: {
     value: { fromMg: 40, fullMg: 300, factor: r(0.4, 0.45, 0.5) },
@@ -388,6 +389,67 @@ export const iron = {
   teaExcludePattern: { value: 'fruit|rooibos', source: 'Food-name match: fruit and rooibos teas were not studied', confidence: 'assumption' } satisfies Valued<string>,
   coffeePattern: { value: '\\b(coffee|espresso|cappuccino|latte macchiato|mocha)\\b', source: 'Food-name match', confidence: 'high' } satisfies Valued<string>,
   coffeeExcludePattern: { value: 'coffee cream|substitute|chicory|yogurt', source: 'Food-name match: not coffee drinks, or not studied', confidence: 'assumption' } satisfies Valued<string>,
+  /**
+   * When a tea or coffee drink counts for a meal, by minutes relative to the meal's first entry
+   * (negative = before). Weight 1 = full effect, 0 = none; linear in between.
+   */
+  drinkTiming: {
+    value: {
+      before: [
+        [-60, 0],
+        [-30, 1],
+      ],
+      tea: [
+        [0, 1],
+        [60, 0.5],
+        [120, 0],
+      ],
+      coffee: [
+        [0, 1],
+        [60, 1],
+        [120, 0],
+      ],
+    } as { before: ReadonlyArray<readonly [number, number]>; tea: ReadonlyArray<readonly [number, number]>; coffee: ReadonlyArray<readonly [number, number]> },
+    source:
+      'Ahmad Fuzi SF et al. (2017) Am J Clin Nutr 106:1413–21: tea 1 h after a porridge meal halved the inhibition (37 % → 18 %); Morck TA, Lynch SR, Cook JD (1983) Am J Clin Nutr 37:416–20: coffee 1 h before a meal had no effect, 1 h after the same effect as with the meal',
+    url: 'https://pubmed.ncbi.nlm.nih.gov/29046302/',
+    confidence: 'medium',
+    note: 'Abstracts checked. Full effect from 30 min before the meal (no study; the 1-h-before result is the zero point) and no effect from 2 h after (assumption: absorption of a meal\'s iron is mostly over by then).',
+  },
+  /**
+   * People with small iron stores absorb more iron. Multiplier on non-heme absorption by serum ferritin
+   * (µg/L), relative to 60 µg/L (Monsen's formula assumes ~500 mg stores ≈ 60 µg/L).
+   */
+  statusAdaptation: {
+    value: {
+      storeMgPerFerritin: 8,
+      points: {
+        low: [
+          [15, 1.9],
+          [30, 1.28],
+          [45, 1.1],
+          [60, 1],
+        ],
+        central: [
+          [15, 2.8],
+          [30, 1.55],
+          [45, 1.2],
+          [60, 1],
+        ],
+        high: [
+          [15, 4],
+          [30, 2],
+          [45, 1.33],
+          [60, 1],
+        ],
+      },
+    } as { storeMgPerFerritin: number; points: Record<Scenario, ReadonlyArray<readonly [number, number]>> },
+    source:
+      'Dainty JR et al. (2014) PLoS One 9:e111824, Table 2: dietary iron absorption 11 % at serum ferritin 60 µg/L, 13–14 % at 45, 16–18 % at 30, 31 % at 15 (probability model); ratio method (∝ 1/ferritin) 10 / 13 / 20 / 39 %. Hallberg L et al. (1997) Am J Clin Nutr 66:347–56: no further regulation above ~60 µg/L. Stores ≈ 8 mg per µg/L ferritin (IOM 2001).',
+    url: 'https://doi.org/10.1371/journal.pone.0111824',
+    confidence: 'medium',
+    note: 'Central: probability model ÷ 11 %; high: ratio method; low: half the central effect (assumption). Measured for total dietary iron and applied to non-heme iron only (heme absorption is regulated less; Hallberg 1997). The tank level stands in for stores; below 15 µg/L the factor stays at the 15 µg/L value. Paper table checked.',
+  },
   /** Only drinks count as tea / coffee / cocoa (not biscuits, cakes or cocoa butter). */
   drinkGroups: { value: ['N', 'M'] as readonly string[], source: 'BLS groups: non-alcoholic beverages (N), milk drinks (M)', confidence: 'high' } satisfies Valued<readonly string[]>,
 };
@@ -622,13 +684,13 @@ export const sun = {
     confidence: 'assumption',
   } satisfies Valued<Range>,
   elevationRampDeg: {
-    value: { zero: 35, full: 45 },
+    value: { low: { zero: 38, full: 48 }, central: { zero: 35, full: 45 }, high: { zero: 25, full: 40 } },
     source:
       'Webb AR, Kline L, Holick MF (1988) J Clin Endocrinol Metab 67:373–8: no previtamin D3 on cloudless days in Boston (42.2°N) November–February and in Edmonton (52°N) October–March',
     url: 'https://pubmed.ncbi.nlm.nih.gov/2839537/',
     confidence: 'low',
-    note: 'Vitamin-D effectiveness of UV relative to erythemal UV, ramped from 0 at 35° to 1 at 45° solar elevation. Derived from Webb\'s months: the mid-month noon sun was ≤ 35.6° when no synthesis occurred and ≥ 39.3° when it did (abstract checked). The width of the ramp is an assumption.',
-  } satisfies Valued<{ zero: number; full: number }>,
+    note: "Vitamin-D effectiveness of UV relative to erythemal UV, ramped from 0 at `zero` to 1 at `full` solar elevation. Central from Webb's months: the mid-month noon sun was ≤ 35.6° when no synthesis occurred and ≥ 39.3° when it did (abstract checked). Webb measured whole days against a detection limit, so some synthesis below 35° (morning, evening) is plausible: the high run starts at 25°. Low and high ramps are assumptions.",
+  } satisfies Valued<Record<Scenario, { zero: number; full: number }>>,
   /** Share of body surface exposed (rule of nines, approximate). */
   skinFractions: {
     value: { faceHands: 0.08, faceHandsForearms: 0.15, faceHandsArms: 0.25, armsLegs: 0.45, mostOfBody: 0.8 },

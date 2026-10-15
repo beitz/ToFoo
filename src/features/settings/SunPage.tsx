@@ -28,13 +28,22 @@ export function SunPage() {
   const update = (i: number, patch: Partial<OutdoorSession>) => save(routine.map((s, j) => (j === i ? { ...s, ...patch } : s)));
   const lat = p.latitude ?? DEFAULT_LATITUDE;
   const year = Number(d.today.slice(0, 4));
-  const estimate = (month: number, offset: number) => {
-    const weekday = new Date(year, month - 1, 15).getDay();
-    const sessions = routine.filter((s) => s.weekdays.includes(weekday)).map((s) => ({ startHour: s.startHour, minutes: s.minutes, skin: s.skin }));
-    return sunVitaminD({ year, month, day: 15, utcOffsetHours: offset, latitude: lat, sessions });
+  const onDay = (month: number, day: number, offset: number, sessions: OutdoorSession[]) =>
+    sunVitaminD({ year, month, day, utcOffsetHours: offset, latitude: lat, sessions: sessions.map((s) => ({ startHour: s.startHour, minutes: s.minutes, skin: s.skin })) });
+  /** Average per day over the week from the 15th, so routines on any weekday count. */
+  const weekAverage = (month: number, offset: number) => {
+    const sum = { low: 0, central: 0, high: 0 };
+    for (let day = 15; day < 22; day++) {
+      const weekday = new Date(year, month - 1, day).getDay();
+      const r = onDay(month, day, offset, routine.filter((s) => s.weekdays.includes(weekday)));
+      sum.low += r.low / 7;
+      sum.central += r.central / 7;
+      sum.high += r.high / 7;
+    }
+    return sum;
   };
-  const june = estimate(6, 2);
-  const dec = estimate(12, 1);
+  const june = weekAverage(6, 2);
+  const dec = weekAverage(12, 1);
   const today = d.model.nutrients.get('VITD');
 
   return (
@@ -60,6 +69,7 @@ export function SunPage() {
             <Field label={t('sun.minutes')}>{(id) => <NumberInput id={id} value={s.minutes} onChange={(v) => update(i, { minutes: v ?? 0 })} suffix="min" min={0} />}</Field>
           </div>
           <SkinSelect id={`skin-${i}`} value={s.skin} onChange={(skin) => update(i, { skin })} />
+          <RoutineEstimate june={onDay(6, 15, 2, [s])} />
           <button className="btn btn-small btn-ghost" onClick={() => save(routine.filter((_, j) => j !== i))}>
             <Icon name="trash" size={16} /> {t('common.delete')}
           </button>
@@ -79,10 +89,20 @@ export function SunPage() {
       <div className="card small">
         <p>{t('sun.estimateJune', { ug: fmtNumber(june.central, 1), low: fmtNumber(june.low, 1), high: fmtNumber(june.high, 1) })}</p>
         <p>{t('sun.estimateDec', { ug: fmtNumber(dec.central, 1) })}</p>
+        <p className="muted">{t('sun.midday')}</p>
         {today && <p className="muted">{t('sun.need', { ug: fmtNumber(d.requirements.byNutrient.get('VITD')?.recommended ?? 20, 0) })}</p>}
         <p className="muted">{t('sun.winter')}</p>
         <p className="muted">{sunGuidance.source}</p>
       </div>
     </SubPage>
+  );
+}
+
+function RoutineEstimate({ june }: { june: { low: number; central: number; high: number } }) {
+  return (
+    <p className="small muted">
+      {t('sun.routineJune', { ug: fmtNumber(june.central, 1), low: fmtNumber(june.low, 1), high: fmtNumber(june.high, 1) })}
+      {june.central < 0.5 && <span className="notice"> {t('sun.lowSun')}</span>}
+    </p>
   );
 }

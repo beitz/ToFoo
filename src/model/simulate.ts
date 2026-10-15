@@ -3,8 +3,8 @@
  * run three times (low / central / high). Pure: everything it needs is passed in.
  */
 import { nutrientParams, referenceWeightKg, startingLevels, statusThresholds, storage, uncertainty } from '../../model/parameters';
-import { absorbMeal, type MealComposition } from './absorption';
-import { entryIntake, TRACKED_IDS, type EntryIntake } from './intake';
+import { absorbIronParts, absorbMeal, drinkTimingWeight, ironStatusFactor, type MealComposition } from './absorption';
+import { entryIntake, isCoffee, isTea, TRACKED_IDS, type EntryIntake } from './intake';
 import { MODEL_NUTRIENT_IDS } from './nutrients';
 import type { Range, Scenario, Sex } from './paramTypes';
 import { SCENARIOS } from './paramTypes';
@@ -92,12 +92,14 @@ export interface MealSummary {
 
 interface DayTotals {
   absorbed: Record<string, number>;
+  /** Absorbed non-heme iron at reference stores (part of absorbed.FE), for the iron-status adaptation. */
+  nonhemeFE: number;
   intake: Record<string, number>;
   supplementIntake: Record<string, number>;
   missing: Set<string>;
 }
 
-const emptyTotals = (): DayTotals => ({ absorbed: {}, intake: {}, supplementIntake: {}, missing: new Set() });
+const emptyTotals = (): DayTotals => ({ absorbed: {}, nonhemeFE: 0, intake: {}, supplementIntake: {}, missing: new Set() });
 const add = (rec: Record<string, number>, id: string, v: number) => {
   rec[id] = (rec[id] ?? 0) + v;
 };
@@ -118,6 +120,40 @@ export function groupMeals<T extends { time: number }>(entries: readonly T[], wi
   }
   if (current.length) meals.push(current);
   return meals;
+}
+
+/**
+ * Tea, coffee or cocoa logged on its own (a drink entry, or only such drinks): it acts on the iron of
+ * meals around it rather than forming a meal. null for anything else.
+ */
+export function drinkKind(e: ModelEntry): { tea: boolean; coffee: boolean } | null {
+  if (e.direct && Object.keys(e.direct).length > 0) return null;
+  const parts = e.parts.filter((p) => p.grams > 0);
+  if (parts.length === 0) return e.modifiers?.tea || e.modifiers?.coffee ? { tea: !!e.modifiers.tea, coffee: !!e.modifiers.coffee } : null;
+  let tea = false;
+  let coffee = false;
+  for (const p of parts) {
+    const t = isTea(p.nameEn, p.group);
+    const c = isCoffee(p.nameEn, p.group);
+    if (!t && !c) return null;
+    tea ||= t;
+    coffee ||= c;
+  }
+  return { tea, coffee };
+}
+
+/** Largest timing weight of the drinks around a meal starting at `start` (ms). Drinks are sorted by time. */
+function drinkWeights(start: number, drinks: ReadonlyArray<{ time: number; tea: boolean; coffee: boolean }>): { tea: number; coffee: number } {
+  let tea = 0;
+  let coffee = 0;
+  for (const d of drinks) {
+    const minutes = (d.time - start) / 60_000;
+    if (minutes < -120) continue;
+    if (minutes > 180) break;
+    if (d.tea) tea = Math.max(tea, drinkTimingWeight('tea', minutes));
+    if (d.coffee) coffee = Math.max(coffee, drinkTimingWeight('coffee', minutes));
+  }
+  return { tea, coffee };
 }
 
 /** Effective day status: explicit, else "logged" if the day has entries, else unknown. Today without anything is "pending". */
@@ -143,14 +179,14 @@ function typicalFractionFor(req: ResolvedRequirements) {
 }
 
 function mealComposition(intakes: EntryIntake[]): MealComposition {
-  const comp: MealComposition = { intake: {}, hemeIron: 0, mfpGrams: 0, phytateGrams: 0, tea: false, coffee: false };
+  const comp: MealComposition = { intake: {}, hemeIron: 0, mfpGrams: 0, phytateGrams: 0, tea: 0, coffee: 0 };
   for (const ei of intakes) {
     for (const [id, v] of Object.entries(ei.intake)) add(comp.intake, id, v);
     comp.hemeIron += ei.hemeIron;
     comp.mfpGrams += ei.mfpGrams;
     comp.phytateGrams += ei.phytateGrams;
-    comp.tea ||= ei.tea;
-    comp.coffee ||= ei.coffee;
+    if (ei.tea) comp.tea = 1;
+    if (ei.coffee) comp.coffee = 1;
   }
   return comp;
 }
@@ -187,7 +223,21 @@ export function simulate(input: SimulationInput): SimulationResult {
   const statuses = effectiveDayStatus(days, input.dayStatus, input.entries);
   const typical = typicalFractionFor(req);
   const inRange = input.entries.filter((e) => dayIndex.has(e.dayKey));
-  const meals = groupMeals(inRange, settings.mealWindowMinutes);
+  // Drinks logged on their own don't start meals; they act on meals around them by timing.
+  const drinks: Array<{ time: number; tea: boolean; coffee: boolean }> = [];
+  const foodEntries: ModelEntry[] = [];
+  const drinkMeals: ModelEntry[][] = [];
+  for (const e of inRange) {
+    const kind = drinkKind(e);
+    if (kind) {
+      drinks.push({ time: e.time, ...kind });
+      drinkMeals.push([e]);
+    } else foodEntries.push(e);
+  }
+  drinks.sort((a, b) => a.time - b.time);
+  const meals = [...groupMeals(foodEntries, settings.mealWindowMinutes), ...drinkMeals].sort((a, b) => a[0]!.time - b[0]!.time);
+  const drinkMealSet = new Set(drinkMeals);
+  const mealDrinks = meals.map((m) => (drinkMealSet.has(m) ? { tea: 0, coffee: 0 } : drinkWeights(m[0]!.time, drinks)));
 
   // ── 1. Daily totals per scenario ──
   const contribFrom = days.length - Math.max(settings.shortWindowDays, settings.longWindowDays) - 1;
@@ -196,12 +246,16 @@ export function simulate(input: SimulationInput): SimulationResult {
   const mealSummaries: MealSummary[] = [];
   for (const s of SCENARIOS) {
     totals[s] = days.map(emptyTotals);
-    for (const meal of meals) {
+    meals.forEach((meal, mi) => {
       const di = dayIndex.get(meal[0]!.dayKey)!;
       const day = totals[s][di]!;
       const intakes = meal.map((e) => entryIntake(e, s, { retention: settings.retention }));
       const comp = mealComposition(intakes);
+      const around = mealDrinks[mi]!;
+      comp.tea = Math.max(comp.tea, around.tea);
+      comp.coffee = Math.max(comp.coffee, around.coffee);
       const absorbed = absorbMeal(comp, s, { modelled: settings.absorption, typicalFraction: typical });
+      if (settings.absorption) day.nonhemeFE += absorbIronParts(comp, s).nonheme;
       for (const [id, v] of Object.entries(absorbed)) add(day.absorbed, id, v);
       for (const [id, v] of Object.entries(comp.intake)) add(day.intake, id, v);
       meal.forEach((e, i) => {
@@ -223,7 +277,7 @@ export function simulate(input: SimulationInput): SimulationResult {
       if (s === 'central') {
         mealSummaries.push({ day: meal[0]!.dayKey, start: meal[0]!.time, entryIds: meal.map((e) => e.id), intake: comp.intake, absorbed });
       }
-    }
+    });
   }
 
   // ── 2. Per nutrient ──
@@ -245,9 +299,14 @@ export function simulate(input: SimulationInput): SimulationResult {
 
     // Daily inflow (absorbed) per scenario, with imputation for unknown / partial days.
     const inflow = {} as Record<Scenario, number[]>;
+    // Iron only: non-heme part of each day's inflow, which rises when stores are low.
+    const adaptIron = id === 'FE' && settings.absorption;
+    const nonhemeInflow = {} as Record<Scenario, number[]>;
     for (const s of SCENARIOS) {
       const series: number[] = [];
+      const nhSeries: number[] = [];
       const knownHistory: number[] = [];
+      const knownNh: number[] = [];
       days.forEach((d, i) => {
         const logged = totals[s][i]!.absorbed[id] ?? 0;
         const st = statuses[d];
@@ -261,8 +320,19 @@ export function simulate(input: SimulationInput): SimulationResult {
         else v = s === 'low' ? 0 : s === 'central' ? imputed : Math.max(imputed, physiological);
         if (st === 'logged' || st === 'fasted') knownHistory.push(logged);
         series.push(v);
+        if (adaptIron) {
+          const nh = totals[s][i]!.nonhemeFE;
+          // Imputed amounts get the non-heme share of recent known days (none known: no adaptation).
+          let share = 0;
+          let nhSum = 0;
+          for (let k = knownNh.length - n; k < knownNh.length; k++) nhSum += knownNh[k]!;
+          if (sum > 0) share = nhSum / sum;
+          nhSeries.push(v === logged ? nh : nh + (v - logged) * share);
+          if (st === 'logged' || st === 'fasted') knownNh.push(nh);
+        }
       });
       inflow[s] = series;
+      nonhemeInflow[s] = nhSeries;
     }
 
     // Window: ends today if today counts, else yesterday.
@@ -316,6 +386,7 @@ export function simulate(input: SimulationInput): SimulationResult {
 
     if (kind === 'tank') {
       const capacity = tankCapacity(id, input.weightKg, input.sex, physiological) ?? 1;
+      const refWeight = referenceWeightKg.value[input.sex ?? 'unknown'];
       const startFraction =
         input.startingLevel === 'empty'
           ? 0
@@ -330,6 +401,11 @@ export function simulate(input: SimulationInput): SimulationResult {
         const series: number[] = [];
         days.forEach((d, i) => {
           const sunUg = id === 'VITD' && settings.sun ? (input.sunByDay?.[d]?.[s] ?? 0) : 0;
+          if (adaptIron) {
+            // Stores scale with body weight; the ferritin relation is for a reference-sized adult.
+            const factor = ironStatusFactor((l / capacity) * (tankCapacity(id, refWeight, input.sex, physiological) ?? capacity), s);
+            inflow[s][i] = inflow[s][i]! + nonhemeInflow[s][i]! * (factor - 1);
+          }
           l = Math.min(capacity, Math.max(0, l + inflow[s][i]! + sunUg - physiological));
           series.push(l);
         });
@@ -345,6 +421,7 @@ export function simulate(input: SimulationInput): SimulationResult {
       const hi = Math.max(value.low, value.central, value.high);
       results.set(id, {
         ...base,
+        averageAbsorbed: mean(inflow.central, win),
         status: classify('tank', value.central, ulRatio, true),
         value: { low: lo, central: value.central, high: hi },
         capacity,

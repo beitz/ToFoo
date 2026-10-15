@@ -1138,3 +1138,167 @@ details.tree details {
 .onboarding {
   padding-top: 1rem;
 }
+
+/* ── Error screen ────────────────────────────────────────────── */
+.error-screen {
+  padding: 1rem 0;
+}
+.error-details {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+  padding: 10px;
+  margin-top: 12px;
+  user-select: text;
+}
+
+/* ── Compact gauges ──────────────────────────────────────────── */
+.section-title h2 {
+  margin: 0;
+}
+.section-title .segmented {
+  flex: none;
+  margin: 0;
+}
+.section-title .segmented button {
+  min-height: 44px;
+  padding: 0 12px;
+  font-size: 0.85rem;
+}
+.macro-row {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 4px;
+  margin-bottom: 10px;
+}
+.cgauge-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 10px;
+}
+@media (min-width: 560px) {
+  .cgauge-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+.cgauge {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  min-height: 44px;
+  min-width: 0;
+  padding: 4px 6px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.cgauge-row {
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+}
+.cgauge:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 1px;
+}
+.cgauge-line {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  font-size: 0.88rem;
+}
+.cgauge-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+.cgauge-value {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+.cgauge-cell {
+  align-items: stretch;
+  justify-content: flex-start;
+  padding: 6px 4px;
+}
+.cgauge-cell .cgauge-line {
+  font-size: 0.78rem;
+}
+.cgauge-cell .cgauge-value {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text);
+}
+.cgauge-bar {
+  position: relative;
+  display: block;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+.cgauge-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: 3px;
+  background: currentColor;
+}
+.cgauge-target {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--text);
+  opacity: 0.5;
+}
+.cgauge.gauge-fine .cgauge-line svg,
+.cgauge.gauge-fine .cgauge-fill {
+  color: var(--ok);
+}
+.cgauge.gauge-gettingLow .cgauge-line svg,
+.cgauge.gauge-gettingLow .cgauge-fill {
+  color: var(--warn);
+}
+.cgauge.gauge-low .cgauge-line svg,
+.cgauge.gauge-low .cgauge-fill {
+  color: var(--low);
+}
+.cgauge.gauge-tooHigh .cgauge-line svg,
+.cgauge.gauge-tooHigh .cgauge-fill {
+  color: var(--high);
+}
+.cgauge.gauge-unknown .cgauge-line svg,
+.cgauge.gauge-info .cgauge-line svg,
+.cgauge.gauge-unknown .cgauge-fill {
+  color: var(--unknown);
+}
+.cgauge-cell .cgauge-name {
+  font-weight: 500;
+  color: var(--text-muted);
+}
+.cgauge-cell .cgauge-line svg {
+  flex: none;
+}
+.cgauge.gauge-fine .cgauge-line svg,
+.cgauge.gauge-gettingLow .cgauge-line svg,
+.cgauge.gauge-low .cgauge-line svg,
+.cgauge.gauge-tooHigh .cgauge-line svg {
+  flex: none;
+}

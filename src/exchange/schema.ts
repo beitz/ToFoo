@@ -68,6 +68,7 @@ export const settingsSchema = z.object({
   theme: z.enum(['system', 'light', 'dark']),
   backupReminderDays: z.number().int().positive(),
   defaultPlan: plan,
+  homeView: z.enum(['compact', 'detailed']).optional(),
 });
 
 export const recipeRecordSchema = z.object({

@@ -3,6 +3,7 @@ import { useRoute, href } from './router';
 import { t } from '../i18n';
 import { DataProvider, useData } from './data';
 import { ToastProvider } from './toast';
+import { ErrorBoundary } from './ErrorBoundary';
 import { Icon } from '../ui/Icon';
 import { AboutPage } from '../features/about/AboutPage';
 import { HomePage } from '../features/home/HomePage';
@@ -77,33 +78,38 @@ export function App() {
   useEffect(() => window.scrollTo(0, 0), [route.join('/')]);
 
   return (
-    <ToastProvider>
-      <div className="app">
-        <main className="page">
-          <DataProvider
-            fallback={({ error }) =>
-              error ? (
-                <div className="center-message" role="alert">
-                  <p>{t('app.loadError')}</p>
-                  <pre className="small">{error}</pre>
-                </div>
-              ) : (
-                <div className="center-message muted">{t('common.loading')}</div>
-              )
-            }
-          >
-            <Page route={route} />
-          </DataProvider>
-        </main>
-        <nav className="bottom-nav" aria-label="Main">
-          {NAV.map((n) => (
-            <a key={n.key} href={href(...n.to)} aria-current={active === n.key ? 'page' : undefined}>
-              <Icon name={n.icon} size={24} />
-              {t(n.label)}
-            </a>
-          ))}
-        </nav>
-      </div>
-    </ToastProvider>
+    <ErrorBoundary>
+      <ToastProvider>
+        <div className="app">
+          <main className="page">
+            <DataProvider
+              fallback={({ error }) =>
+                error ? (
+                  <div className="center-message" role="alert">
+                    <p>{t('app.loadError')}</p>
+                    <pre className="small">{error}</pre>
+                  </div>
+                ) : (
+                  <div className="center-message muted">{t('common.loading')}</div>
+                )
+              }
+            >
+              {/* Keyed by route: navigating away from a broken page gives the next page a fresh start. */}
+              <ErrorBoundary key={route.join('/')} showHome={route.length > 0}>
+                <Page route={route} />
+              </ErrorBoundary>
+            </DataProvider>
+          </main>
+          <nav className="bottom-nav" aria-label="Main">
+            {NAV.map((n) => (
+              <a key={n.key} href={href(...n.to)} aria-current={active === n.key ? 'page' : undefined}>
+                <Icon name={n.icon} size={24} />
+                {t(n.label)}
+              </a>
+            ))}
+          </nav>
+        </div>
+      </ToastProvider>
+    </ErrorBoundary>
   );
 }
