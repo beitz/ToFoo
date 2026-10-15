@@ -38,13 +38,14 @@ Resolved:
 - [x] **Retention factors** recomputed from the USDA data file as 10th/50th/90th percentiles (e.g. boiled: vitamin C 80 %, thiamin 60 %, B6 65 %); reheating 95 % for vitamin C, folate, thiamin.
 - [x] **Vitamin D winter:** synthesis now starts at 35° solar elevation (was 25°), matching Webb (1988): none October–March at 52°N.
 - [x] **Vitamin C:** complete absorption up to 200 mg (Levine 1996), so the typical fraction is 1.0.
+- [x] **Vitamin E absorption:** 75 % from a usual diet (EFSA 2015, Section 2.3.1; full text checked, was 50 %).
 - [x] **Tea/coffee timing** (2026-10-15): drinks are logged on their own and act on meals around them: full effect from 30 min before the meal, tea halved at 1 h after (Ahmad Fuzi 2017), coffee full at 1 h after and none at 1 h before (Morck 1983), none from 2 h after.
 - [x] **Iron status adaptation** (2026-10-15): non-heme absorption × 2.8 at serum ferritin 15 µg/L, × 1.55 at 30, × 1.2 at 45, × 1 from 60 (Dainty 2014, Table 2; Hallberg 1997). Tank level converted to ferritin at 8 mg per µg/L.
 
 Still open:
 
 - [ ] **Fluoride conflict:** EFSA's 2025 safe level (3.3 mg/day, all sources) is below the DGE guide value for men (3.5 mg). With food data only (no drinking water, no toothpaste), intake from BLS foods will normally stay well below both.
-- [ ] **Not reachable for re-checking** (EFSA Journal and NIH fact sheets block automated access): EPA + DHA AI 250 mg (EFSA 2010), iron losses 0.95 / 1.34 mg (EFSA 2015), typical absorption of vitamins D and E, iodine body store 15–20 mg (NIH), the vitamin C points at 500 / 1250 mg, the Monsen formula and the Holick MED yield (paper bodies, not abstracts).
+- [ ] **Not reachable for re-checking** (EFSA Journal and NIH fact sheets block automated access): EPA + DHA AI 250 mg (EFSA 2010), iron losses 0.95 / 1.34 mg (EFSA 2015), typical absorption of vitamin D, iodine body store 15–20 mg (NIH), the vitamin C points at 500 / 1250 mg, the Monsen formula and the Holick MED yield (paper bodies, not abstracts).
 - [ ] **Salt 6 g and saturated fat 10 %:** from DGE position papers, not the reference value tables; not re-checked.
 - [ ] **No USDA retention factors** for vitamins D, E, K, pantothenic acid and biotin: no cooking loss is modelled for them.
 
@@ -69,7 +70,8 @@ Still open:
 - [ ] **Model speed:** the whole history is recomputed after each change (≈0.2 s per year of heavy logging on a desktop CPU). If it feels slow on the phone, move the model into a Web Worker and/or cache daily totals.
 - [ ] **Search ranking** is tuned by feel (English first, plain foods before dishes, recent foods boosted). Refine after real use.
 - [x] **"Good sources" lists** are now varied: one variant per BLS base food and per main name word (one liver, not ten). Dried herbs and spices still rank high per 100 g; a curated "cheap and simple" list comes with the wiki (v2).
-- [ ] **Black screen on navigation (Android Chrome, 2026-10-15):** not reproducible in desktop or emulated mobile Chromium. An error boundary now shows the error with a "Copy details" button instead of an empty screen; fix the root cause once the details are known.
+- [ ] **Black screen on navigation (Android Chrome, 2026-10-15):** not reproducible in desktop or emulated mobile Chromium, and no render error on the device (the error boundary never shows). A device-local diagnostics log (Settings → Diagnostics) records each screen change, whether a frame follows, layout sizes and long tasks; experiments: forced repaint, reload on each screen change. Waiting for a log from the phone.
+- [ ] **Nutrient explanations** (`src/i18n/nutrientInfo.en.ts`): short general summaries; the NIH fact sheets they cite block automated access, so the wording was not compared line by line. Check against the sources.
 
 ## Later versions
 

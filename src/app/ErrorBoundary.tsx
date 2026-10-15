@@ -1,6 +1,7 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { t } from '../i18n';
 import { href } from './router';
+import { diag } from './diagnostics';
 
 interface Props {
   children: ReactNode;
@@ -27,6 +28,7 @@ export class ErrorBoundary extends Component<Props, State> {
   componentDidCatch(error: Error, info: ErrorInfo): void {
     this.setState({ componentStack: info.componentStack ?? undefined });
     console.error(error, info.componentStack);
+    diag('render-error', { msg: `${error.name}: ${error.message}` });
   }
 
   render() {

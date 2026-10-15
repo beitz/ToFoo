@@ -1,9 +1,10 @@
-import { useEffect } from 'react';
+import { useEffect, useLayoutEffect } from 'react';
 import { useRoute, href } from './router';
 import { t } from '../i18n';
 import { DataProvider, useData } from './data';
 import { ToastProvider } from './toast';
 import { ErrorBoundary } from './ErrorBoundary';
+import { diag, diagFlags, forceRepaint, layoutSnapshot } from './diagnostics';
 import { Icon } from '../ui/Icon';
 import { AboutPage } from '../features/about/AboutPage';
 import { HomePage } from '../features/home/HomePage';
@@ -13,10 +14,12 @@ import { RecipesPage } from '../features/recipes/RecipesPage';
 import { RecipeEditor } from '../features/recipes/RecipeEditor';
 import { RecipeView } from '../features/recipes/RecipeView';
 import { NutrientPage } from '../features/nutrient/NutrientPage';
+import { NutrientFoodsPage } from '../features/nutrient/NutrientFoodsPage';
 import { FoodPage } from '../features/food/FoodPage';
 import { SettingsPage } from '../features/settings/SettingsPage';
 import { ProfilePage } from '../features/settings/ProfilePage';
 import { SunPage } from '../features/settings/SunPage';
+import { DiagnosticsPage } from '../features/settings/DiagnosticsPage';
 import { BackupPage, ExclusionsPage, NutrientVisibilityPage, SavedPage, StartPage } from '../features/settings/MorePages';
 import { Onboarding } from '../features/onboarding/Onboarding';
 
@@ -35,6 +38,7 @@ function Page({ route }: { route: string[] }) {
       if (b) return <RecipeView id={b} />;
       return <RecipesPage />;
     case 'nutrient':
+      if (c === 'foods') return <NutrientFoodsPage key={b} id={b ?? ''} />;
       return <NutrientPage id={b ?? ''} />;
     case 'food':
       return <FoodPage code={b ?? ''} />;
@@ -54,6 +58,8 @@ function Page({ route }: { route: string[] }) {
           return <SavedPage />;
         case 'backup':
           return <BackupPage />;
+        case 'diagnostics':
+          return <DiagnosticsPage />;
         default:
           return <SettingsPage />;
       }
@@ -75,7 +81,13 @@ export function App() {
   const route = useRoute();
   const section = route[0] === 'about' ? 'settings' : (route[0] ?? 'home');
   const active = NAV.some((n) => n.key === section) ? section : 'home';
-  useEffect(() => window.scrollTo(0, 0), [route.join('/')]);
+  const path = route.join('/');
+  useEffect(() => window.scrollTo(0, 0), [path]);
+  // Diagnostics for the black-screen-after-navigation report (Android Chrome).
+  useLayoutEffect(() => {
+    diag('commit', { route: path, ...layoutSnapshot() });
+    if (diagFlags().repaint) forceRepaint();
+  }, [path]);
 
   return (
     <ErrorBoundary>
@@ -95,7 +107,7 @@ export function App() {
               }
             >
               {/* Keyed by route: navigating away from a broken page gives the next page a fresh start. */}
-              <ErrorBoundary key={route.join('/')} showHome={route.length > 0}>
+              <ErrorBoundary key={path} showHome={route.length > 0}>
                 <Page route={route} />
               </ErrorBoundary>
             </DataProvider>

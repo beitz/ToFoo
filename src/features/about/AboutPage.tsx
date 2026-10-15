@@ -1,3 +1,4 @@
+import { href } from '../../app/router';
 import { t } from '../../i18n';
 import { useData } from '../../app/data';
 
@@ -48,6 +49,8 @@ export function AboutPage() {
         <a href="https://github.com/beitz/ToFoo/blob/main/docs/OPEN_QUESTIONS.md" target="_blank" rel="noreferrer">
           {t('about.openQuestions')}
         </a>
+        {' · '}
+        <a href={href('settings', 'diagnostics')}>{t('diag.title')}</a>
       </p>
     </section>
   );

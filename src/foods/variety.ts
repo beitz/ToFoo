@@ -1,8 +1,9 @@
 /**
  * Varied "best foods" lists. Ranking all foods by amount puts every liver (veal, beef, lamb, raw,
- * fried, frozen…) at the top. This keeps the order but skips a food when it is a variant of one
- * already listed: same BLS base food (first four code characters, e.g. V532 = veal liver) or a
- * shared main word in its English name ("liver", "kidney", "beef").
+ * fried, frozen…) at the top. This keeps the order but skips a food when it is similar to one
+ * already listed: same BLS subgroup (first two code characters, e.g. K7 = mushrooms, V5 = offal)
+ * or a shared main word in its English name ("liver", "kidney", "beef"). The full ranked list
+ * is a separate view.
  */
 
 /** Words that describe preparation or state, not what the food is. */
@@ -29,7 +30,7 @@ export function diverseTop<T>(ranked: readonly T[], n: number, food: (item: T) =
   for (const item of ranked) {
     if (out.length >= n) break;
     const f = food(item);
-    const base = f.code.slice(0, 4);
+    const base = f.code.slice(0, 2);
     const ws = nameWords(f.nameEn);
     if (bases.has(base) || ws.some((w) => words.has(w))) continue;
     out.push(item);

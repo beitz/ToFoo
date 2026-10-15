@@ -19,4 +19,13 @@ describe('varied food lists', () => {
     ];
     expect(diverseTop(foods, 3, (f) => f).map((f) => f.code)).toEqual(['V532182', 'G620100', 'G520100']);
   });
+
+  it('lists one food per BLS subgroup', () => {
+    const foods = [
+      { code: 'K711100', nameEn: 'Chanterelle dried' },
+      { code: 'K702100', nameEn: 'Morel dried' },
+      { code: 'T101100', nameEn: 'Anchovy grilled' },
+    ];
+    expect(diverseTop(foods, 3, (f) => f).map((f) => f.code)).toEqual(['K711100', 'T101100']);
+  });
 });

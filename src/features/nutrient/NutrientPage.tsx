@@ -10,6 +10,7 @@ import { portionGrams } from '../../model/ranking';
 import { isOn } from '../../settings/features';
 import { NON_SINGLE_FOOD_GROUPS } from '../../foods/foodDb';
 import { diverseTop } from '../../foods/variety';
+import { infoId, NUTRIENT_INFO_SOURCES } from '../../i18n/nutrientInfo.en';
 import { LineChart } from '../../ui/LineChart';
 import { StatusBadge } from '../../ui/status';
 import { Icon } from '../../ui/Icon';
@@ -104,6 +105,8 @@ export function NutrientPage({ id }: { id: string }) {
         )}
       </div>
 
+      <NutrientInfo id={id} />
+
       {history.length > 1 && (
         <>
           <h2 className="section-title">{t('nutrient.history')}</h2>
@@ -158,6 +161,10 @@ export function NutrientPage({ id }: { id: string }) {
         </div>
       </div>
 
+      <a className="btn btn-secondary btn-block" href={href('nutrient', id, 'foods')}>
+        <Icon name="search" /> {t('nutrient.allFoods')}
+      </a>
+
       <h2 className="section-title">{t('nutrient.howModelled')}</h2>
       <div className="card small">
         <p>
@@ -196,5 +203,35 @@ export function NutrientPage({ id }: { id: string }) {
         <p className="muted">{t('nutrient.notAdvice')}</p>
       </div>
     </section>
+  );
+}
+
+/** What the nutrient does and what too little / too much means. */
+function NutrientInfo({ id }: { id: string }) {
+  const key = infoId(id);
+  const source = NUTRIENT_INFO_SOURCES[key];
+  const text = (part: 'role' | 'low' | 'high') => t(`info.${key}.${part}` as MessageKey);
+  if (text('role').startsWith('info.')) return null; // no text for this nutrient
+  return (
+    <>
+      <h2 className="section-title">{t('nutrient.whatItDoes')}</h2>
+      <div className="card small nutrient-info">
+        <p>{text('role')}</p>
+        <p>
+          <strong>{t('nutrient.tooLittle')}:</strong> {text('low')}
+        </p>
+        <p>
+          <strong>{t('nutrient.tooMuch')}:</strong> {text('high')}
+        </p>
+        {source && (
+          <p className="muted">
+            {t('nutrient.infoSource')}:{' '}
+            <a href={source.url} target="_blank" rel="noreferrer">
+              {source.label}
+            </a>
+          </p>
+        )}
+      </div>
+    </>
   );
 }
