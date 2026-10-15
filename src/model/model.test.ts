@@ -70,6 +70,16 @@ describe('requirements', () => {
     expect(b12.physiologicalDerived).toBe(true);
   });
 
+  it('picks the iron value by menstruation status (DGE 2024)', () => {
+    const young = resolveRequirements({ sex: 'female', birthYear: 1995 }, 2026);
+    expect(young.byNutrient.get('FE')!.recommended).toBe(16);
+    const older = resolveRequirements({ sex: 'female', birthYear: 1970 }, 2026);
+    expect(older.byNutrient.get('FE')!.recommended).toBe(14);
+    expect(older.byNutrient.get('FE')!.physiological).toBeCloseTo(1.21);
+    const pill = resolveRequirements({ sex: 'female', birthYear: 1995, menstruation: 'none' }, 2026);
+    expect(pill.byNutrient.get('FE')!.recommended).toBe(11);
+  });
+
   it('uses the explicit physiological requirement for iron', () => {
     const fe = male30.byNutrient.get('FE')!;
     expect(fe.physiological).toBeCloseTo(0.95);
@@ -85,10 +95,13 @@ describe('requirements', () => {
 
 describe('absorption rules', () => {
   it('saturates B12 per meal (intrinsic factor cap + ~1 % passive)', () => {
+    // IOM (1998), Adams 1971: ~50 % of 1 µg, 20 % of 5 µg (1.0 µg), just over 5 % of 25 µg (~1.3 µg).
     expect(absorbByRule(B12, 1, 'central', 0.5)).toBeCloseTo(0.51);
-    expect(absorbByRule(B12, 4, 'central', 0.5)).toBeCloseTo(2.04);
+    expect(absorbByRule(B12, 5, 'central', 0.5)).toBeGreaterThan(1.0);
+    expect(absorbByRule(B12, 5, 'central', 0.5)).toBeLessThan(1.6);
+    expect(absorbByRule(B12, 25, 'central', 0.5) / 25).toBeLessThan(0.08);
     const supplement = absorbByRule(B12, 1000, 'central', 0.5);
-    expect(supplement).toBeCloseTo(12);
+    expect(supplement).toBeCloseTo(11.5);
     expect(supplement / 1000).toBeLessThan(0.02);
   });
 
@@ -100,8 +113,9 @@ describe('absorption rules', () => {
 
   it('lowers the vitamin C fraction at high doses', () => {
     expect(interpolateLog([[0, 0.9], [200, 0.9], [500, 0.73]], 100)).toBeCloseTo(0.9);
-    expect(absorbByRule(VITC, 100, 'central', 0.85) / 100).toBeCloseTo(0.9);
-    expect(absorbByRule(VITC, 1250, 'central', 0.85) / 1250).toBeCloseTo(0.49, 2);
+    // Levine 1996: complete up to 200 mg, declining from 500 mg.
+    expect(absorbByRule(VITC, 100, 'central', 1) / 100).toBeCloseTo(1);
+    expect(absorbByRule(VITC, 1250, 'central', 1) / 1250).toBeCloseTo(0.49, 2);
   });
 
   it('lowers the calcium fraction with the load per meal', () => {
@@ -112,9 +126,11 @@ describe('absorption rules', () => {
   });
 
   it('reduces fat-soluble vitamins in low-fat meals', () => {
-    expect(fatFactor(0, 'central')).toBeCloseTo(0.7);
+    // Dawson-Hughes 2015: +32 % with fat → fat-free ≈ 0.76; Roodenburg 2000: 3 g fat is enough.
+    expect(fatFactor(0, 'central')).toBeCloseTo(1 / 1.32, 2);
+    expect(fatFactor(3, 'central')).toBe(1);
     expect(fatFactor(20, 'central')).toBe(1);
-    expect(fatFactor(2.5, 'central')).toBeCloseTo(0.85);
+    expect(fatFactor(1.5, 'central')).toBeCloseTo(0.88);
   });
 
   it('models iron: heme better absorbed, vitamin C helps, tea hurts', () => {
@@ -146,9 +162,12 @@ describe('absorption rules', () => {
 
 describe('retention', () => {
   it('reduces vitamin C when boiled, not protein', () => {
-    expect(retentionFactor('VITC', 'boiled', 'fresh', 'central')).toBeCloseTo(0.6);
+    // USDA Release 6 medians: boiled vitamin C 80 %, thiamin 60 %; reheated vitamin C 95 %.
+    expect(retentionFactor('VITC', 'boiled', 'fresh', 'central')).toBeCloseTo(0.8);
+    expect(retentionFactor('THIA', 'boiled', 'fresh', 'central')).toBeCloseTo(0.6);
     expect(retentionFactor('PROT625', 'boiled', 'freezer', 'central')).toBe(1);
-    expect(retentionFactor('VITC', 'asListed', 'freezer', 'central')).toBeCloseTo(0.75);
+    expect(retentionFactor('VITC', 'asListed', 'fridge', 'central')).toBeCloseTo(0.95);
+    expect(retentionFactor('VITC', 'asListed', 'freezer', 'central')).toBeCloseTo(0.9);
     expect(retentionFactor('VITC', 'raw', 'fresh', 'central')).toBe(1);
   });
 
@@ -163,7 +182,7 @@ describe('retention', () => {
       parts: [{ label: 'Broccoli', grams: 200, per100: { VITC: 100, FE: null }, preparation: 'boiled', storage: 'fresh' }],
     };
     const c = entryIntake(entry, 'central', { retention: true });
-    expect(c.intake.VITC).toBeCloseTo(120);
+    expect(c.intake.VITC).toBeCloseTo(160);
     expect(c.missing).toContain('FE');
     const low = entryIntake(entry, 'low', { retention: true });
     expect(low.intake.VITC!).toBeLessThan(c.intake.VITC!);

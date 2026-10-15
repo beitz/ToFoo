@@ -1,6 +1,6 @@
 import { referenceValues, infoOnly } from '../../model/reference-values';
 import { nutrientParams } from '../../model/parameters';
-import type { ActivityLevel, AgeGroup, AmountSpec, ByAge, Confidence, PhytateIntake, ReferenceKind, Sex, UpperLimit } from './paramTypes';
+import type { ActivityLevel, AgeGroup, AmountSpec, ByAge, Confidence, Menstruation, PhytateIntake, ReferenceKind, Sex, UpperLimit } from './paramTypes';
 import { AGE_GROUPS } from './paramTypes';
 
 /** The profile inputs the model needs. All optional: defaults follow docs/SPEC.md. */
@@ -10,6 +10,8 @@ export interface ModelProfile {
   weightKg?: number;
   activity?: ActivityLevel;
   phytate?: PhytateIntake;
+  /** Women only; not set: menstruating under 51, postmenopausal from 51. */
+  menstruation?: Menstruation;
 }
 
 export const PROFILE_DEFAULTS = {
@@ -59,7 +61,7 @@ function pick(arr: ByAge, group: AgeGroup): number {
  * Resolve the amount for one sex, or for "not set": the safer value (higher need).
  * `energyKcal` is needed for energy-percent amounts.
  */
-function amountFor(spec: AmountSpec, sex: Sex | undefined, group: AgeGroup, ctx: { weightKg: number; activity: ActivityLevel; phytate: PhytateIntake; energyKcal: number }): number {
+function amountFor(spec: AmountSpec, sex: Sex | undefined, group: AgeGroup, ctx: { weightKg: number; activity: ActivityLevel; phytate: PhytateIntake; menstruation: Menstruation; energyKcal: number }): number {
   const bySex = (f: (s: Sex) => number) => (sex ? f(sex) : Math.max(f('male'), f('female')));
   switch (spec.type) {
     case 'bySexAge':
@@ -73,6 +75,8 @@ function amountFor(spec: AmountSpec, sex: Sex | undefined, group: AgeGroup, ctx:
       return sex ? pick(spec[sex][ctx.activity], group) : Math.min(pick(spec.male[ctx.activity], group), pick(spec.female[ctx.activity], group));
     case 'byPhytate':
       return bySex((s) => spec[s][ctx.phytate]);
+    case 'iron':
+      return bySex((s) => (s === 'male' ? spec.male : spec.female[ctx.menstruation]));
   }
 }
 
@@ -91,9 +95,10 @@ export function resolveRequirements(profile: ModelProfile, currentYear: number):
   const activity = profile.activity ?? PROFILE_DEFAULTS.activity;
   if (!profile.activity) defaultsUsed.push('activity');
   const phytate = profile.phytate ?? PROFILE_DEFAULTS.phytate;
+  const menstruation: Menstruation = profile.menstruation ?? (ageGroup === '51-64' || ageGroup === '65+' ? 'postmenopausal' : 'menstruating');
 
   const energyRef = referenceValues.find((r) => r.nutrient === 'ENERCC');
-  const ctx = { weightKg, activity, phytate, energyKcal: 0 };
+  const ctx = { weightKg, activity, phytate, menstruation, energyKcal: 0 };
   ctx.energyKcal = energyRef ? amountFor(energyRef.amount, profile.sex, ageGroup, ctx) : 2000;
 
   const byNutrient = new Map<string, Requirement>();

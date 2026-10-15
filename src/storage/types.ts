@@ -2,7 +2,7 @@
  * Stored records. Every record carries `schemaVersion`; migrations in ./migrations.ts bring old
  * records up to CURRENT_SCHEMA_VERSION on app start.
  */
-import type { ActivityLevel, PhytateIntake, Preparation, Sex, Storage } from '../model/paramTypes';
+import type { ActivityLevel, Menstruation, PhytateIntake, Preparation, Sex, Storage } from '../model/paramTypes';
 import type { EntryConfidence } from '../model/types';
 import type { SkinExposure } from '../model/sun';
 import type { StartingLevelChoice } from '../model/simulate';
@@ -32,6 +32,8 @@ export interface Profile extends Versioned {
   heightCm?: number;
   activity?: ActivityLevel;
   phytate?: PhytateIntake;
+  /** Women only, for the iron reference value. */
+  menstruation?: Menstruation;
   latitude?: number;
   outdoorRoutine?: OutdoorSession[];
   salt: { iodised: boolean; fluoridated: boolean };

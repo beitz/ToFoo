@@ -100,6 +100,14 @@
                         "high"
                       ]
                     },
+                    "menstruation": {
+                      "type": "string",
+                      "enum": [
+                        "menstruating",
+                        "postmenopausal",
+                        "none"
+                      ]
+                    },
                     "latitude": {
                       "type": "number",
                       "minimum": -90,

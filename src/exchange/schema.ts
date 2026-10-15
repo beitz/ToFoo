@@ -44,6 +44,7 @@ export const profileSchema = z.object({
   heightCm: z.number().positive().optional(),
   activity: z.enum(['low', 'medium', 'high']).optional(),
   phytate: z.enum(['low', 'medium', 'high']).optional(),
+  menstruation: z.enum(['menstruating', 'postmenopausal', 'none']).optional(),
   latitude: z.number().min(-90).max(90).optional(),
   outdoorRoutine: z
     .array(z.object({ weekdays: z.array(z.number().int().min(0).max(6)), startHour: z.number().min(0).max(24), minutes: z.number().nonnegative(), skin }))
