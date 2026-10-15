@@ -82,7 +82,12 @@ export function App() {
   const section = route[0] === 'about' ? 'settings' : (route[0] ?? 'home');
   const active = NAV.some((n) => n.key === section) ? section : 'home';
   const path = route.join('/');
-  useEffect(() => window.scrollTo(0, 0), [path]);
+  // Braces matter: an effect's return value is its cleanup, and newer Chrome returns a Promise
+  // from scrollTo. React then called that Promise on the next screen change ("is not a function")
+  // and unmounted the app: the black screen on Android Chrome 155.
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [path]);
   // Diagnostics for the black-screen-after-navigation report (Android Chrome).
   useLayoutEffect(() => {
     diag('commit', { route: path, ...layoutSnapshot() });
