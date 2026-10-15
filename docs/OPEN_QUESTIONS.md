@@ -70,7 +70,7 @@ Still open:
 - [ ] **Model speed:** the whole history is recomputed after each change (≈0.2 s per year of heavy logging on a desktop CPU). If it feels slow on the phone, move the model into a Web Worker and/or cache daily totals.
 - [ ] **Search ranking** is tuned by feel (English first, plain foods before dishes, recent foods boosted). Refine after real use.
 - [x] **"Good sources" lists** are now varied: one variant per BLS base food and per main name word (one liver, not ten). Dried herbs and spices still rank high per 100 g; a curated "cheap and simple" list comes with the wiki (v2).
-- [ ] **Black screen on navigation (Android Chrome, 2026-10-15):** not reproducible in desktop or emulated mobile Chromium, and no render error on the device (the error boundary never shows). A device-local diagnostics log (Settings → Diagnostics) records each screen change, whether a frame follows, layout sizes and long tasks; experiments: forced repaint, reload on each screen change. Waiting for a log from the phone.
+- [x] **Black screen on navigation (Android Chrome 155, 2026-10-15):** `useEffect(() => window.scrollTo(0, 0))` returned scrollTo's result; newer Chrome returns a Promise there, React called it as the effect cleanup on the next screen change and the app unmounted. Found with the device diagnostics log (Settings → Diagnostics); fixed, and a test now rejects effects that return a plain expression.
 - [ ] **Nutrient explanations** (`src/i18n/nutrientInfo.en.ts`): short general summaries; the NIH fact sheets they cite block automated access, so the wording was not compared line by line. Check against the sources.
 
 ## Later versions
