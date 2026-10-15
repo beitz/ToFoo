@@ -1,0 +1,44 @@
+import { t } from '../../i18n';
+
+export const BLS_CITATION =
+  'Max Rubner-Institut (2025): Bundeslebensmittelschlüssel (BLS), Version 4.0 — Deutsche Nährstoffdatenbank. Karlsruhe.';
+export const BLS_DOI = '10.25826/Data20251217-134202-0';
+
+export function AboutPage() {
+  return (
+    <section className="prose">
+      <h1>{t('about.title')}</h1>
+      <p>{t('about.intro')}</p>
+
+      <h2>{t('about.blsHeading')}</h2>
+      <p>
+        {BLS_CITATION} DOI:{' '}
+        <a href={`https://doi.org/${BLS_DOI}`} target="_blank" rel="noreferrer">
+          {BLS_DOI}
+        </a>
+      </p>
+      <p>
+        {t('about.licence')}:{' '}
+        <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">
+          CC BY 4.0
+        </a>
+        . {t('about.blsConverted')}
+      </p>
+
+      <h2>{t('about.privacyHeading')}</h2>
+      <p>{t('about.privacy')}</p>
+
+      <h2>{t('about.codeHeading')}</h2>
+      <p>
+        {t('about.code')}{' '}
+        <a href="https://github.com/beitz/ToFoo" target="_blank" rel="noreferrer">
+          github.com/beitz/ToFoo
+        </a>
+        .
+      </p>
+      <p className="muted">
+        {t('about.version')}: {__APP_VERSION__}
+      </p>
+    </section>
+  );
+}
