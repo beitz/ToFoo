@@ -58,12 +58,16 @@ const phytateGroups = new Set(iron.phytate.value.groups);
 const teaRe = new RegExp(iron.teaPattern.value, 'i');
 const teaExcludeRe = new RegExp(iron.teaExcludePattern.value, 'i');
 const coffeeRe = new RegExp(iron.coffeePattern.value, 'i');
+const coffeeExcludeRe = new RegExp(iron.coffeeExcludePattern.value, 'i');
 
-export function isTea(nameEn: string | undefined): boolean {
-  return !!nameEn && teaRe.test(nameEn) && !teaExcludeRe.test(nameEn);
+const drinkGroups = new Set(iron.drinkGroups.value);
+
+/** Tea, herbal tea or cocoa drink (iron inhibitors). Without a group, the name alone decides. */
+export function isTea(nameEn: string | undefined, group?: string): boolean {
+  return !!nameEn && (group === undefined || drinkGroups.has(group)) && teaRe.test(nameEn) && !teaExcludeRe.test(nameEn);
 }
-export function isCoffee(nameEn: string | undefined): boolean {
-  return !!nameEn && coffeeRe.test(nameEn);
+export function isCoffee(nameEn: string | undefined, group?: string): boolean {
+  return !!nameEn && (group === undefined || drinkGroups.has(group)) && coffeeRe.test(nameEn) && !coffeeExcludeRe.test(nameEn);
 }
 
 /** Relative uncertainty of one value: amount (entry confidence) + data (BLS provenance), capped. */
@@ -109,8 +113,8 @@ export function entryIntake(entry: ModelEntry, scenario: Scenario, opts: { reten
     const amountFactor = scenarioFactor(uncertainty.amountByConfidence.value[entry.confidence], scenario);
     if (part.group && mfp.has(part.group)) mfpGrams += part.grams * amountFactor;
     if (part.group && phytateGroups.has(part.group)) phytateGrams += part.grams * amountFactor;
-    if (isTea(part.nameEn)) tea = true;
-    if (isCoffee(part.nameEn)) coffee = true;
+    if (isTea(part.nameEn, part.group)) tea = true;
+    if (isCoffee(part.nameEn, part.group)) coffee = true;
   }
 
   for (let k = 0; k < acc.length; k++) {

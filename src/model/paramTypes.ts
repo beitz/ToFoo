@@ -36,6 +36,8 @@ export type ByAge = readonly [number, number, number, number];
 
 export type ActivityLevel = 'low' | 'medium' | 'high';
 export type PhytateIntake = 'low' | 'medium' | 'high';
+/** For the iron reference value (DGE 2024). */
+export type Menstruation = 'menstruating' | 'postmenopausal' | 'none';
 
 /** How the daily reference amount is expressed. All amounts are in the nutrient's BLS unit. */
 export type AmountSpec =
@@ -47,7 +49,9 @@ export type AmountSpec =
   /** Energy guide values by activity level (DGE PAL 1.4 / 1.6 / 1.8). */
   | { type: 'energy'; male: Record<ActivityLevel, ByAge>; female: Record<ActivityLevel, ByAge> }
   /** Zinc: depends on dietary phytate (DGE 2019). */
-  | { type: 'byPhytate'; male: Record<PhytateIntake, number>; female: Record<PhytateIntake, number> };
+  | { type: 'byPhytate'; male: Record<PhytateIntake, number>; female: Record<PhytateIntake, number> }
+  /** Iron: women depend on menstruation (DGE 2024). */
+  | { type: 'iron'; male: number; female: Record<Menstruation, number> };
 
 /** DGE terminology: Empfehlung (recommended), Schätzwert (estimate), Richtwert (guide value). */
 export type ReferenceKind = 'recommended' | 'estimate' | 'guide';

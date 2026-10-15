@@ -73,6 +73,7 @@ Profile inputs, grouped (all optional, all editable in settings):
 | Body | Body weight (kg), with history | 70 kg | Protein need, store capacity |
 | Body | Height | Not used until set | Reserved for energy estimates |
 | Body | Activity level (low / medium / high) | Medium | Energy, a few B vitamins |
+| Body | Periods (women): yes / after menopause / no, other reason | By age: periods under 51 | Iron reference value (DGE 2024) |
 | Sun and vitamin D | Location latitude | 51° N (central Germany) | Sun strength by season |
 | Sun and vitamin D | Outdoor routine | Little time outdoors | Vitamin D synthesis |
 | Sun and vitamin D | Usually exposed skin | Face and hands | Vitamin D synthesis |

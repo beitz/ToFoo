@@ -50,6 +50,11 @@ CI (`.github/workflows/deploy.yml`) runs data → typecheck → test → build o
 11. Food names: English is the primary display and search language, German second (both from BLS).
 12. Keep `docs/SPEC.md`, `docs/OPEN_QUESTIONS.md` and the exchange-format docs current when decisions change.
 
+## Workflow
+
+- Work on a branch and open a pull request into `main`. Once CI is green, merge it yourself; no need to wait for the owner's confirmation (owner's standing instruction, 2026-10-15).
+- Merging to `main` deploys to GitHub Pages.
+
 ## Checking UI changes
 
 Chromium is available for Playwright (`/opt/node22/lib/node_modules/playwright`). Run `npm run dev`, then screenshot pages at 390×844 in light and dark mode before calling a UI change done.

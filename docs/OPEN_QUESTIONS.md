@@ -6,10 +6,10 @@ Questions and assumptions that need an answer or a better source. Each model val
 
 - [x] **UI framework:** React (2026-10-15). The bundled data dominates download size, so Svelte's smaller runtime wouldn't matter much.
 - [x] **Heme/non-heme iron and phytate in BLS 4.0:** neither is present. Both are estimated from the food group.
-- [x] **Selenium:** BLS 4.0 has no selenium. Not tracked in v1; revisit with the USDA lookup in v3.
+- [x] **Selenium:** BLS 4.0 has no selenium. Not tracked in v1; revisit with the USDA lookup in v3 (DGE: 70 µg men, 60 µg women).
 - [x] **Food names:** English is the primary display and search language; German is searchable too and shown second.
 - [x] **Code licence:** none; reuse welcome with credit to the repo (README).
-- [x] **Retention factors:** USDA Table of Nutrient Retention Factors, Release 6 (2007), as class averages (`model/parameters.ts`). BLS cooked entries are preferred where they exist.
+- [x] **Retention factors:** USDA Table of Nutrient Retention Factors, Release 6 (2007), percentiles per cooking method computed from the data file (`model/parameters.ts`). BLS cooked entries are preferred where they exist.
 - [x] **Vitamin D synthesis model:** clear-sky UV index from solar elevation (Madronich 2007) × minutes × exposed skin, relative to the minimal erythema dose, yield per MED from Holick (2004), with a "vitamin D winter" ramp by solar elevation. Several factors are assumptions (below).
 
 ## For the user to decide (proposals in place)
@@ -19,29 +19,46 @@ Questions and assumptions that need an answer or a better source. Each model val
 - [ ] **Status thresholds:** tanks low < 20 %, getting low < 40 %; rolling averages low < 70 %, getting low < 90 % of the requirement.
 - [ ] **Day status:** a past day with at least one entry counts as "logged" unless marked "partly logged". Today counts only once something is logged or it is marked fasted.
 
-## Values to verify against primary sources
+## Source check (2026-10-15)
 
-During the first build session the build environment could not open dge.de, efsa.europa.eu or ods.od.nih.gov directly (network policy), so values were checked through web search results where possible. Everything marked "Verify" in `model/reference-values.ts` and `model/parameters.ts` still needs a check against the original table. Most important:
+With full internet access, the values were compared with the primary sources: the DGE reference value pages (all nutrients, 3rd edition 2025, plus erratum 1/2026), the EFSA UL overview (version 11, Aug 2025), PubMed abstracts of the cited studies, the IOM Dietary Reference Intakes (full text) and the USDA retention data file.
 
-- [ ] DGE values for thiamin, riboflavin, niacin, vitamin K, pantothenic acid, biotin, folate, vitamin C, sodium, chloride, potassium, calcium, copper, protein, fibre, linoleic / α-linolenic acid, and the energy guide values outside the 25–50 age group.
-- [ ] Iron for women: the 2024 DGE values are 14–16 mg while menstruating and 11 mg without. Modelled as 16 mg under 51 and 11 mg from 51. A profile question ("Do you menstruate?") would be more accurate.
-- [ ] Fluoride: DGE revised it in 2024 (guide value for total intake); the exact adult values could not be confirmed, so EFSA's adequate intake is used. EFSA's 2025 fluoride UL update is also unconfirmed.
-- [ ] Chromium: does DGE still list a value? EFSA (2014) found no adequate intake.
-- [ ] EFSA 2024 upper levels: vitamin A (3000 µg preformed, retained?), iron (safe level 40 mg?), vitamin B6 (12 or 12.5 mg?).
-- [ ] Calcium absorption curve: Heaney et al. (1990) coefficients (0.889 − 0.0964·ln load) were recalled, not confirmed.
-- [ ] Non-heme iron formula: Monsen & Balintfy (1982), recalled, not confirmed.
+Resolved:
+
+- [x] All DGE adult values now match the DGE tables, including energy for every age group and the derivation years.
+- [x] **Iron for women:** 16 mg while menstruating, 14 mg after menopause (lower bioavailability), 11 mg without periods for other reasons. New optional profile question "Periods"; default by age (under 51: periods). Postmenopausal absorbed need modelled as 0.95 × 14/11 ≈ 1.21 mg.
+- [x] **Fluoride:** DGE 2024 guide values for total intake, 3.5 mg (men) / 3.0 mg (women), replace the EFSA AI.
+- [x] **Copper:** DGE 1.0–1.5 mg for everyone (not split by sex); lower end used. **Molybdenum:** DGE 50–100 µg; lower end used. **Chromium:** DGE still lists 30–100 µg.
+- [x] **EFSA upper levels:** vitamin A 3000 µg (preformed), B6 12 mg, D 100 µg, E 300 mg, folic acid 1000 µg, calcium 2500 mg, zinc 25 mg, copper 5 mg, iodine 600 µg, molybdenum 0.6 mg, magnesium 250 mg (supplements), iron 40 mg and manganese 8 mg (safe levels) all confirmed.
+- [x] **Calcium curve (Heaney 1990):** consistent with the abstract (64 % at 15 mg, 28.6 % at 500 mg); study range 15–500 mg.
+- [x] **B12:** stores 2–3 mg (was 3 mg central, up to 5), per-meal cap 1.5 µg (was 2 µg), 50 % assumed absorption, ~1 % passive (IOM 1998).
+- [x] **Folate store** 12–28 mg (IOM); **vitamin A** liver ratio 0.03 (was 0.024), total:liver 1.1, 0.5 %/day loss (IOM); **iron store** ≈ 1 g in men (IOM).
+- [x] **Iron modifiers:** tea much stronger than assumed (black tea −79–94 %, herbal teas and cocoa too; central factor now 0.3, was 0.4); coffee −39 % to −72 %; calcium −50–60 % at ≥ 165–300 mg; phytate −18 % to −82 % by dose. Only drinks (BLS groups N, M) count.
+- [x] **Fat-soluble vitamins:** 3 g fat per meal is enough (Roodenburg 2000; was 5 g); without fat ≈ 0.76 (Dawson-Hughes 2015: +32 %, CI 11–52 %).
+- [x] **Retention factors** recomputed from the USDA data file as 10th/50th/90th percentiles (e.g. boiled: vitamin C 80 %, thiamin 60 %, B6 65 %); reheating 95 % for vitamin C, folate, thiamin.
+- [x] **Vitamin D winter:** synthesis now starts at 35° solar elevation (was 25°), matching Webb (1988): none October–March at 52°N.
+- [x] **Vitamin C:** complete absorption up to 200 mg (Levine 1996), so the typical fraction is 1.0.
+
+Still open:
+
+- [ ] **Fluoride conflict:** EFSA's 2025 safe level (3.3 mg/day, all sources) is below the DGE guide value for men (3.5 mg). With food data only (no drinking water, no toothpaste), intake from BLS foods will normally stay well below both.
+- [ ] **Not reachable for re-checking** (EFSA Journal and NIH fact sheets block automated access): EPA + DHA AI 250 mg (EFSA 2010), iron losses 0.95 / 1.34 mg (EFSA 2015), typical absorption of vitamins D and E, iodine body store 15–20 mg (NIH), the vitamin C points at 500 / 1250 mg, the Monsen formula and the Holick MED yield (paper bodies, not abstracts).
+- [ ] **Salt 6 g and saturated fat 10 %:** from DGE position papers, not the reference value tables; not re-checked.
+- [ ] **No USDA retention factors** for vitamins D, E, K, pantothenic acid and biotin: no cooking loss is modelled for them.
 
 ## Model assumptions (no good source yet)
 
-- [ ] **Vitamin A tank size:** central liver concentration of 100 µg/g (range 20–300 µg/g).
-- [ ] **Vitamin D tank size:** 60 days of the absorbed requirement (range 30–120).
-- [ ] **Fat threshold for fat-soluble vitamins:** 5 g fat per meal (range 3–10 g), and absorption at 0 g fat = 70 % (range 50–85 %).
-- [ ] **Iron: phytate estimate** from grams of legumes/nuts/seeds, cereals and bread in the meal (full effect from 100 g, factor 0.5). **Calcium inhibition** as a linear ramp from 40 to 300 mg per meal.
-- [ ] **Storage losses** for fridge and freezer-reheated portions (rough class averages).
-- [ ] **Vitamin D sun:** real-world factor 0.45 (clouds, body geometry), elevation ramp 25°–45°, MED 300 J/m², default routine 15 min/day at noon, face and hands.
+- [ ] **Vitamin A tank size:** central liver concentration of 100 µg/g (range 20–300 µg/g; 20 µg/g is the IOM minimum).
+- [ ] **Vitamin D tank size:** 60 days of the absorbed requirement (≈ the ~2-month half-life of stored vitamin D, Jones 2008).
+- [ ] **Iron storage in women:** ~300 mg, from typical ferritin values × 8 mg per µg/L (IOM rule); no single source checked.
+- [ ] **Fat effect on vitamins A, E, K:** measured for vitamin D3 only (Dawson-Hughes 2015); no data below 3 g fat.
+- [ ] **Iron: phytate estimate** from grams of legumes/nuts/seeds, cereals and bread in the meal (full effect from 100 g, factor 0.35). **Calcium inhibition** as a linear ramp from 40 to 300 mg per meal. Fruit and rooibos teas are not counted as inhibitors (not studied).
+- [ ] **Freezer storage loss** of cooked dishes on top of reheating (central 5 % for vitamin C, folate, thiamin).
+- [ ] **Vitamin D sun:** real-world factor 0.45 (clouds, body geometry), width of the elevation ramp (35°–45°), MED 300 J/m², default routine 15 min/day at noon, face and hands.
 - [ ] **Uncertainty widths:** amounts ±5 % (A), ±25 % (B), ±50 % (C); BLS values ±0–30 % by provenance.
 - [ ] **"Average" starting level** = tanks 60 % full.
 - [ ] **Vitamin C** absorption at 3000 mg (extrapolated beyond Levine 1996).
+- [ ] **Vitamin K typical absorption** (0.5): EFSA says an average cannot be estimated; only affects the absorbed amount shown.
 
 ## Engineering
 

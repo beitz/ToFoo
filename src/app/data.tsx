@@ -101,7 +101,7 @@ export function DataProvider({ children, fallback }: { children: ReactNode; fall
     const customFoodsById = new Map(customFoods.map((c) => [c.id, c]));
     const weight = currentWeight(profile);
     const requirements = resolveRequirements(
-      { birthYear: profile.birthYear, sex: profile.sex, weightKg: weight, activity: profile.activity, phytate: profile.phytate },
+      { birthYear: profile.birthYear, sex: profile.sex, weightKg: weight, activity: profile.activity, phytate: profile.phytate, menstruation: profile.menstruation },
       Number(today.slice(0, 4)),
     );
     const ctx = { foods, batches: batchesById, customFoods: customFoodsById, salt: profile.salt };

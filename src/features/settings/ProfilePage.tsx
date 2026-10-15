@@ -54,6 +54,23 @@ export function ProfilePage() {
           />
           <div className="field-hint">{t('profile.sexHint')}</div>
         </div>
+        {p.sex !== 'male' && (
+          <div className="field">
+            <span className="field-label">{t('profile.menstruation')}</span>
+            <Segmented
+              label={t('profile.menstruation')}
+              value={p.menstruation ?? 'auto'}
+              onChange={(v) => update({ menstruation: v === 'auto' ? undefined : v })}
+              options={[
+                { value: 'auto', label: t('profile.menstruationAuto') },
+                { value: 'menstruating', label: t('profile.menstruationYes') },
+                { value: 'postmenopausal', label: t('profile.menstruationPost') },
+                { value: 'none', label: t('profile.menstruationNone') },
+              ]}
+            />
+            <div className="field-hint">{t('profile.menstruationHint')}</div>
+          </div>
+        )}
         <div className="field">
           <span className="field-label">{t('profile.activity')}</span>
           <Segmented
