@@ -69,6 +69,8 @@ export interface Settings extends Versioned {
   backupReminderDays: number;
   /** Default storage plan for new recipes. */
   defaultPlan: StoragePlan;
+  /** Home screen nutrient layout; unset = compact. */
+  homeView?: 'compact' | 'detailed';
 }
 
 export interface StoragePlan {

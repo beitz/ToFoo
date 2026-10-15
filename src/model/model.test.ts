@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { absorbByRule, absorbIron, absorbMeal, fatFactor, interpolateLog, type MealComposition } from './absorption';
+import { absorbByRule, absorbIron, absorbMeal, drinkTimingWeight, fatFactor, interpolateLog, ironStatusFactor, type MealComposition } from './absorption';
 import { entryIntake } from './intake';
 import { nutrientParams, startingLevels } from '../../model/parameters';
 import { resolveRequirements } from './requirements';
 import { retentionFactor } from './retention';
-import { effectiveDayStatus, groupMeals, simulate, type SimulationInput } from './simulate';
+import { drinkKind, effectiveDayStatus, groupMeals, simulate, type SimulationInput } from './simulate';
 import { clearSkyUvIndex, solarElevation, sunVitaminD } from './sun';
 import { DEFAULT_MODEL_SETTINGS, type ModelEntry } from './types';
 
@@ -139,24 +139,72 @@ describe('absorption rules', () => {
       hemeIron: 0,
       mfpGrams: 0,
       phytateGrams: 0,
-      tea: false,
-      coffee: false,
+      tea: 0,
+      coffee: 0,
       ...o,
     });
     const plain = absorbIron(meal({}), 'central');
     expect(plain).toBeCloseTo(0.09); // 3 % of 3 mg
     expect(absorbIron(meal({ hemeIron: 1.5, mfpGrams: 0 }), 'central')).toBeGreaterThan(plain);
     expect(absorbIron(meal({ intake: { FE: 3, VITC: 75 } }), 'central')).toBeCloseTo(3 * 0.08, 3);
-    expect(absorbIron(meal({ tea: true }), 'central')).toBeLessThan(plain);
+    expect(absorbIron(meal({ tea: 1 }), 'central')).toBeLessThan(plain);
     expect(absorbIron(meal({ intake: { FE: 3, CA: 400 } }), 'central')).toBeCloseTo(plain * 0.5);
   });
 
   it('uses typical fractions when absorption modelling is off', () => {
-    const out = absorbMeal({ intake: { VITB12: 100 }, hemeIron: 0, mfpGrams: 0, phytateGrams: 0, tea: false, coffee: false }, 'central', {
+    const out = absorbMeal({ intake: { VITB12: 100 }, hemeIron: 0, mfpGrams: 0, phytateGrams: 0, tea: 0, coffee: 0 }, 'central', {
       modelled: false,
       typicalFraction: () => 0.5,
     });
     expect(out.VITB12).toBe(50);
+  });
+});
+
+describe('tea, coffee and iron status', () => {
+  it('weights drinks by timing around the meal', () => {
+    // Morck 1983: coffee 1 h before no effect, 1 h after full; Ahmad Fuzi 2017: tea 1 h after halves the effect.
+    expect(drinkTimingWeight('tea', 0)).toBe(1);
+    expect(drinkTimingWeight('tea', -30)).toBe(1);
+    expect(drinkTimingWeight('coffee', -60)).toBe(0);
+    expect(drinkTimingWeight('tea', 60)).toBeCloseTo(0.5);
+    expect(drinkTimingWeight('coffee', 60)).toBe(1);
+    expect(drinkTimingWeight('tea', 150)).toBe(0);
+  });
+
+  it('absorbs more non-heme iron when stores are low', () => {
+    // Dainty 2014: 31 % at ferritin 15 µg/L vs 11 % at 60 µg/L; ~8 mg stores per µg/L.
+    expect(ironStatusFactor(0, 'central')).toBeCloseTo(2.8);
+    expect(ironStatusFactor(480, 'central')).toBeCloseTo(1);
+    expect(ironStatusFactor(1000, 'central')).toBe(1);
+    expect(ironStatusFactor(240, 'central')).toBeCloseTo(1.55);
+  });
+
+  it('treats tea logged on its own as a drink, not a meal', () => {
+    const tea = manual('t', '2026-01-01', 12, {}, { modifiers: { tea: true } });
+    expect(drinkKind(tea)).toEqual({ tea: true, coffee: false });
+    expect(drinkKind(manual('m', '2026-01-01', 12, { FE: 5 }))).toBeNull();
+  });
+
+  it('applies tea to meals by timing', () => {
+    const d = ['2026-01-01'];
+    const meal = manual('meal', d[0]!, 12, { FE: 10 });
+    const teaAt = (minutes: number) => manual('tea', d[0]!, 12, {}, { modifiers: { tea: true }, time: meal.time + minutes * 60_000 });
+    const absorbed = (entries: ModelEntry[]) => simulate(baseInput(d, entries)).meals.find((m) => m.entryIds.includes('meal'))!.absorbed.FE!;
+    const alone = absorbed([meal]);
+    expect(absorbed([meal, teaAt(20)])).toBeLessThan(alone * 0.5);
+    expect(absorbed([meal, teaAt(-90)])).toBeCloseTo(alone);
+    expect(absorbed([meal, teaAt(180)])).toBeCloseTo(alone);
+    const oneHourAfter = absorbed([meal, teaAt(60)]);
+    expect(oneHourAfter).toBeLessThan(alone);
+    expect(oneHourAfter).toBeGreaterThan(absorbed([meal, teaAt(20)]));
+  });
+
+  it('fills an empty iron store faster than reference absorption', () => {
+    const d = days('2026-01-01', 7);
+    const entries = d.map((day) => manual(`fe-${day}`, day, 12, { FE: 12 }));
+    const res = simulate(baseInput(d, entries, { startingLevel: 'empty' }));
+    const reference = res.meals.reduce((a, m) => a + (m.absorbed.FE ?? 0), 0) / d.length;
+    expect(res.nutrients.get('FE')!.averageAbsorbed).toBeGreaterThan(reference * 2);
   });
 });
 

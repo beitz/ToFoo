@@ -6,15 +6,20 @@ import { t } from '../../i18n';
 import { addDays, formatDay } from '../../lib/dates';
 import { isOn } from '../../settings/features';
 import { repo } from '../../storage/repo';
-import { Gauge } from '../../ui/Gauge';
+import { CompactGauge, Gauge } from '../../ui/Gauge';
 import { Icon } from '../../ui/Icon';
 import { urgencyRank } from '../../ui/status';
 import { NUTRIENT_BY_ID, NUTRIENTS } from '../../model/nutrients';
 import { rankFoods } from '../../model/ranking';
 import { NON_SINGLE_FOOD_GROUPS } from '../../foods/foodDb';
-import { Field, Sheet } from '../../ui/controls';
+import { diverseTop } from '../../foods/variety';
+import { Field, Segmented, Sheet } from '../../ui/controls';
+import type { NutrientResult } from '../../model/simulate';
 import { Prompts } from './Prompts';
 import { StockChips } from './StockChips';
+
+/** Shown first, in one row: energy and the macronutrients. */
+const MACRO_ROW = ['ENERCC', 'PROT625', 'FAT', 'CHO', 'FIBT'];
 
 /** Nutrients whose need or store scales with body weight. */
 const PER_KG = new Set(['PROT625', 'HIS', 'ILE', 'LEU', 'LYS', 'SAA', 'AAA', 'THR', 'TRP', 'VAL']);
@@ -31,9 +36,11 @@ export function HomePage() {
   const todayStatus = model.dayStatus[today];
   const todayEntries = d.log.filter((e) => e.day === today);
 
+  const view = settings.homeView ?? 'compact';
+  const macros = MACRO_ROW.map((id) => (hidden.has(id) ? undefined : model.nutrients.get(id))).filter((r): r is NutrientResult => !!r);
   const gauges = useMemo(
     () =>
-      NUTRIENTS.filter((n) => !hidden.has(n.id))
+      NUTRIENTS.filter((n) => !hidden.has(n.id) && !MACRO_ROW.includes(n.id))
         .map((n) => model.nutrients.get(n.id)!)
         .filter(Boolean)
         .sort((a, b) => urgencyRank(a.status) - urgencyRank(b.status) || (b.status === 'tooHigh' ? (b.ulRatio ?? b.value.central) - (a.ulRatio ?? a.value.central) : a.value.central - b.value.central)),
@@ -47,7 +54,8 @@ export function HomePage() {
     const candidates = d.foods.foods
       .filter((f) => !NON_SINGLE_FOOD_GROUPS.has(f.group) && !excludedGroups.has(f.group) && !excludedFoods.has(f.code))
       .map((f) => ({ key: f.code, per100: f.per100 }));
-    return rankFoods(candidates, model.nutrients, d.requirements, 12);
+    const ranked = rankFoods(candidates, model.nutrients, d.requirements, 80);
+    return diverseTop(ranked, 12, (g) => d.foods.byCode.get(g.key) ?? { code: g.key, nameEn: g.key });
   }, [d.foods, d.profile.exclusions, model, d.requirements]);
 
   const weightDefault = d.requirements.defaultsUsed.includes('weight');
@@ -103,7 +111,18 @@ export function HomePage() {
 
       <Prompts />
 
-      <h2 className="section-title">{t('home.gauges')}</h2>
+      <div className="section-title row-between">
+        <h2>{t('home.gauges')}</h2>
+        <Segmented
+          label={t('home.view')}
+          value={view}
+          onChange={(v) => void repo.updateSettings({ homeView: v })}
+          options={[
+            { value: 'compact', label: t('home.viewCompact') },
+            { value: 'detailed', label: t('home.viewDetailed') },
+          ]}
+        />
+      </div>
       {(weightDefault || sexDefault) && (
         <p className="muted small">
           {weightDefault ? '* ' : ''}
@@ -111,17 +130,23 @@ export function HomePage() {
           <a href={href('settings', 'profile')}>{t('home.addProfile')}</a>
         </p>
       )}
-      <div className="gauge-grid">
-        {gauges.map((r) => (
-          <Gauge
-            key={r.id}
-            result={r}
-            showRange={showRange}
-            advanced={advanced}
-            defaultBased={weightDefault && (r.kind === 'tank' || PER_KG.has(r.id))}
-            onClick={() => navigate('nutrient', r.id)}
-          />
-        ))}
+      {macros.length > 0 && (
+        <div className="macro-row" role="group" aria-label={t('home.macros')}>
+          {macros.map((r) => (
+            <CompactGauge key={r.id} variant="cell" result={r} defaultBased={weightDefault && PER_KG.has(r.id)} onClick={() => navigate('nutrient', r.id)} />
+          ))}
+        </div>
+      )}
+      <div className={view === 'compact' ? 'cgauge-grid' : 'gauge-grid'}>
+        {gauges.map((r) => {
+          const defaultBased = weightDefault && (r.kind === 'tank' || PER_KG.has(r.id));
+          const open = () => navigate('nutrient', r.id);
+          return view === 'compact' ? (
+            <CompactGauge key={r.id} result={r} defaultBased={defaultBased} onClick={open} />
+          ) : (
+            <Gauge key={r.id} result={r} showRange={showRange} advanced={advanced} defaultBased={defaultBased} onClick={open} />
+          );
+        })}
       </div>
 
       <h2 className="section-title">{t('home.gaps')}</h2>

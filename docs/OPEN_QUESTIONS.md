@@ -38,6 +38,8 @@ Resolved:
 - [x] **Retention factors** recomputed from the USDA data file as 10th/50th/90th percentiles (e.g. boiled: vitamin C 80 %, thiamin 60 %, B6 65 %); reheating 95 % for vitamin C, folate, thiamin.
 - [x] **Vitamin D winter:** synthesis now starts at 35° solar elevation (was 25°), matching Webb (1988): none October–March at 52°N.
 - [x] **Vitamin C:** complete absorption up to 200 mg (Levine 1996), so the typical fraction is 1.0.
+- [x] **Tea/coffee timing** (2026-10-15): drinks are logged on their own and act on meals around them: full effect from 30 min before the meal, tea halved at 1 h after (Ahmad Fuzi 2017), coffee full at 1 h after and none at 1 h before (Morck 1983), none from 2 h after.
+- [x] **Iron status adaptation** (2026-10-15): non-heme absorption × 2.8 at serum ferritin 15 µg/L, × 1.55 at 30, × 1.2 at 45, × 1 from 60 (Dainty 2014, Table 2; Hallberg 1997). Tank level converted to ferritin at 8 mg per µg/L.
 
 Still open:
 
@@ -54,7 +56,9 @@ Still open:
 - [ ] **Fat effect on vitamins A, E, K:** measured for vitamin D3 only (Dawson-Hughes 2015); no data below 3 g fat.
 - [ ] **Iron: phytate estimate** from grams of legumes/nuts/seeds, cereals and bread in the meal (full effect from 100 g, factor 0.35). **Calcium inhibition** as a linear ramp from 40 to 300 mg per meal. Fruit and rooibos teas are not counted as inhibitors (not studied).
 - [ ] **Freezer storage loss** of cooked dishes on top of reheating (central 5 % for vitamin C, folate, thiamin).
-- [ ] **Vitamin D sun:** real-world factor 0.45 (clouds, body geometry), width of the elevation ramp (35°–45°), MED 300 J/m², default routine 15 min/day at noon, face and hands.
+- [ ] **Vitamin D sun:** real-world factor 0.45 (clouds, body geometry), width of the elevation ramp (central 35°–45°; low 38°–48°, high 25°–40°, so early/late routines show a range instead of a flat 0), MED 300 J/m², default routine 15 min/day at noon, face and hands.
+- [ ] **Tea/coffee timing:** full effect from 30 min before the meal and no effect from 2 h after are assumptions (only the 1-h points are measured).
+- [ ] **Iron adaptation:** measured for total dietary iron, applied to non-heme only; heme absorption is not adapted. The low scenario (half the effect) is an assumption.
 - [ ] **Uncertainty widths:** amounts ±5 % (A), ±25 % (B), ±50 % (C); BLS values ±0–30 % by provenance.
 - [ ] **"Average" starting level** = tanks 60 % full.
 - [ ] **Vitamin C** absorption at 3000 mg (extrapolated beyond Levine 1996).
@@ -64,7 +68,8 @@ Still open:
 
 - [ ] **Model speed:** the whole history is recomputed after each change (≈0.2 s per year of heavy logging on a desktop CPU). If it feels slow on the phone, move the model into a Web Worker and/or cache daily totals.
 - [ ] **Search ranking** is tuned by feel (English first, plain foods before dishes, recent foods boosted). Refine after real use.
-- [ ] **"Good sources" lists** rank all single foods by amount, so offal and blood top the iron/vitamin A lists. A curated "cheap and simple" list comes with the wiki (v2).
+- [x] **"Good sources" lists** are now varied: one variant per BLS base food and per main name word (one liver, not ten). Dried herbs and spices still rank high per 100 g; a curated "cheap and simple" list comes with the wiki (v2).
+- [ ] **Black screen on navigation (Android Chrome, 2026-10-15):** not reproducible in desktop or emulated mobile Chromium. An error boundary now shows the error with a "Copy details" button instead of an empty screen; fix the root cause once the details are known.
 
 ## Later versions
 

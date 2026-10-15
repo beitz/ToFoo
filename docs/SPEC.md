@@ -114,7 +114,7 @@ A meal is all entries within a configurable window (default 2 hours), so OMAD co
 1. **Fixed fraction**: absorbed = intake × f.
 2. **Saturable per meal**: a capped active route plus a small passive fraction (B12 is the key case).
 3. **Dose-dependent**: fraction falls as the dose rises (vitamin C, calcium).
-4. **Iron, with modifiers**: heme vs non-heme split (estimated from food group if BLS has no split); non-heme absorption raised by vitamin C and meat/fish in the meal, lowered by calcium, tea/coffee and phytate-rich foods (phytate estimated from food group).
+4. **Iron, with modifiers**: heme vs non-heme split (estimated from food group if BLS has no split); non-heme absorption raised by vitamin C and meat/fish in the meal, lowered by calcium, tea/coffee and phytate-rich foods (phytate estimated from food group). Tea and coffee count by timing: full effect from 30 minutes before to the start of the meal, tea halved 1 hour after, none from 2 hours after (coffee still full at 1 hour). Non-heme absorption also rises when the iron tank is low (by serum ferritin, Dainty 2014), so stores refill faster from low levels.
 5. **Fat-soluble vitamins (A, D, E, K, carotenoids)**: absorption reduced when the meal's fat is below a threshold. The app also shows meal fat, so low-oil cooking becomes visible.
 
 ### Cooking and storage losses
@@ -194,7 +194,7 @@ Confidence is shown as a small marker on entries and widens the uncertainty rang
 
 **Day status**: logged (complete), partly logged, fasted (nothing eaten), or not logged. Fasting is one tap: "Fasting since…" marks today and every following day as fasted until the next logged meal ends the fast, so multi-day water fasts need no daily input. During a fast the tanks drain as modelled. Not-logged days count as unknown: they do not drain stores to zero, they widen the range. A past day with at least one entry counts as logged unless marked "partly logged"; drinks and supplements do not end a fast. The dashboard nudges gently when yesterday has no status (switchable).
 
-**Supplements** are loggable items with their own nutrient values (manual entry, confidence A when taken from the label). Drinks such as coffee and tea can be logged as meal modifiers for iron absorption.
+**Supplements** are loggable items with their own nutrient values (manual entry, confidence A when taken from the label). Drinks such as coffee and tea are logged on their own when drunk (time defaults to now, editable); the model applies them to meals around them by timing.
 
 ## Exchange format, QR codes and the Claude helper
 
@@ -220,11 +220,11 @@ The home screen answers "how am I doing, and what do I eat next?" at a glance, w
 **Home screen, top to bottom**:
 
 1. **Today**: day status, a large "Log meal" button, and a "Fasting" button; freezer-stock chips for one-tap logging once batches exist.
-2. **Nutrient gauges** (the main content): a compact grid, one gauge per visible nutrient, sorted by urgency (low and too-high first). Each gauge shows level, range and a status colour: fine / getting low / low / too high. Tank and rolling-average nutrients are visually distinct but look related.
+2. **Nutrient gauges** (the main content): energy and macronutrients first in one row, then one gauge per visible nutrient, sorted by urgency (low and too-high first). Two layouts, switchable on the dashboard: compact (default; a dense two-column list with a thin bar per nutrient) and detailed (cards). Each gauge shows level, range and a status colour: fine / getting low / low / too high. Tank and rolling-average nutrients are visually distinct but look related.
 3. **Foods that fill your gaps**: one horizontal row of single foods from the BLS, ranked by how many urgent gaps they close at once without pushing anything over its upper limit, respecting food exclusions. Tap a food for its nutrient profile.
 4. **Best next batch** (once the recipe book has recipes): the same ranking applied to the user's own recipes. Hidden while the book is empty.
 
-**Tap a gauge** to expand: history chart, forecast (if on), contributing foods, the wiki summary, and good sources from the BLS.
+**Tap a gauge** to expand: history chart, forecast (if on), contributing foods, the wiki summary, and good sources from the BLS (varied: one variant per food, e.g. one liver, not ten).
 
 **UX principles**:
 
