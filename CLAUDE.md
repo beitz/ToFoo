@@ -11,9 +11,10 @@ npm run dev         # local dev server
 npm test            # Vitest
 npm run typecheck   # tsc, strict
 npm run build       # data + typecheck + vite build (dist/)
+npm run schema      # regenerate docs/exchange-format.schema.json after changing src/exchange/schema.ts
 ```
 
-CI (`.github/workflows/deploy.yml`) runs data → typecheck → test → build on every push and PR; pushes to `main` deploy to Pages.
+CI (`.github/workflows/deploy.yml`) runs data → typecheck → test → build on every push (any branch); pushes to `main` also deploy to Pages.
 
 ## Layout
 
@@ -24,6 +25,9 @@ CI (`.github/workflows/deploy.yml`) runs data → typecheck → test → build o
 | `model/` | **Data files with sources**: `reference-values.ts` (DGE/EFSA), `parameters.ts` (absorption, capacity, retention, sun). Every number has a citation, a low/central/high range and a confidence note. |
 | `src/model/` | The nutrient model: **pure functions only** (no React, no IndexedDB, no `Date.now()`), fully unit-tested. |
 | `src/foods/` | Loading the BLS JSON, food lookup, search. |
+| `src/logic/` | Pure glue from stored data to model inputs (log → model entries, fasting days, sun per day). |
+| `src/app/` | App shell: router, data context (`useData`: live queries + model), toasts with undo. |
+| `src/lib/` | Small helpers (dates as local `YYYY-MM-DD` day keys, formatting, ids). |
 | `src/storage/` | IndexedDB (Dexie) behind repository interfaces; schema versions and migrations. |
 | `src/exchange/` | ToFoo exchange format (backup, recipe, logEntry): zod schema, parser, validator. |
 | `src/features/<name>/` | UI per feature (home, log, recipes, settings, about…). |
@@ -45,6 +49,10 @@ CI (`.github/workflows/deploy.yml`) runs data → typecheck → test → build o
 10. **Privacy:** no analytics, no third-party requests. Nothing personal in the repo.
 11. Food names: English is the primary display and search language, German second (both from BLS).
 12. Keep `docs/SPEC.md`, `docs/OPEN_QUESTIONS.md` and the exchange-format docs current when decisions change.
+
+## Checking UI changes
+
+Chromium is available for Playwright (`/opt/node22/lib/node_modules/playwright`). Run `npm run dev`, then screenshot pages at 390×844 in light and dark mode before calling a UI change done.
 
 ## Style
 

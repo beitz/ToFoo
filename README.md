@@ -5,6 +5,14 @@ Tobi Food — a personal nutrition tracker that models your body's nutrient stor
 - App: https://beitz.github.io/ToFoo/ (installable PWA, works offline, all data stays on your device)
 - Specification: [docs/SPEC.md](docs/SPEC.md) · Conventions: [CLAUDE.md](CLAUDE.md) · Open questions: [docs/OPEN_QUESTIONS.md](docs/OPEN_QUESTIONS.md)
 
+## Install on the phone
+
+1. Open https://beitz.github.io/ToFoo/ in Chrome on Android.
+2. Menu (⋮) → **Install app** (or "Add to home screen").
+3. It works offline from then on. Export a backup now and then (Settings → Backup).
+
+Deployment: every push to `main` runs the tests and publishes to GitHub Pages (repository Settings → Pages → Source: **GitHub Actions** must be set once).
+
 ## Development
 
 ```sh

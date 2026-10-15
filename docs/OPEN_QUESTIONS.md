@@ -43,6 +43,12 @@ During the first build session the build environment could not open dge.de, efsa
 - [ ] **"Average" starting level** = tanks 60 % full.
 - [ ] **Vitamin C** absorption at 3000 mg (extrapolated beyond Levine 1996).
 
+## Engineering
+
+- [ ] **Model speed:** the whole history is recomputed after each change (≈0.2 s per year of heavy logging on a desktop CPU). If it feels slow on the phone, move the model into a Web Worker and/or cache daily totals.
+- [ ] **Search ranking** is tuned by feel (English first, plain foods before dishes, recent foods boosted). Refine after real use.
+- [ ] **"Good sources" lists** rank all single foods by amount, so offal and blood top the iron/vitamin A lists. A curated "cheap and simple" list comes with the wiki (v2).
+
 ## Later versions
 
 - [ ] QR size: confirm a typical recipe fits a comfortably scannable code (v2).

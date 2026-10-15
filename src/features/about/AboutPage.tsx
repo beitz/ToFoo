@@ -1,10 +1,12 @@
 import { t } from '../../i18n';
+import { useData } from '../../app/data';
 
 export const BLS_CITATION =
   'Max Rubner-Institut (2025): Bundeslebensmittelschlüssel (BLS), Version 4.0 — Deutsche Nährstoffdatenbank. Karlsruhe.';
 export const BLS_DOI = '10.25826/Data20251217-134202-0';
 
 export function AboutPage() {
+  const d = useData();
   return (
     <section className="prose">
       <h1>{t('about.title')}</h1>
@@ -25,6 +27,9 @@ export function AboutPage() {
         . {t('about.blsConverted')}
       </p>
 
+      <h2>{t('about.modelHeading')}</h2>
+      <p>{t('about.model')}</p>
+
       <h2>{t('about.privacyHeading')}</h2>
       <p>{t('about.privacy')}</p>
 
@@ -37,7 +42,12 @@ export function AboutPage() {
         .
       </p>
       <p className="muted">
-        {t('about.version')}: {__APP_VERSION__}
+        {t('about.version')}: {__APP_VERSION__} · {t('about.dataVersion')}: BLS {d.foods.version} ({d.foods.foods.length.toLocaleString('en-GB')} foods)
+      </p>
+      <p className="muted small">
+        <a href="https://github.com/beitz/ToFoo/blob/main/docs/OPEN_QUESTIONS.md" target="_blank" rel="noreferrer">
+          {t('about.openQuestions')}
+        </a>
       </p>
     </section>
   );

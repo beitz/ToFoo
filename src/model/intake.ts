@@ -1,11 +1,41 @@
 import { iron, uncertainty } from '../../model/parameters';
 import { MODEL_NUTRIENT_IDS, UL_BASIS_IDS } from './nutrients';
-import { retentionFactor } from './retention';
+import { retentionTable } from './retention';
 import type { Scenario } from './paramTypes';
-import type { ModelEntry } from './types';
+import type { FoodPart, ModelEntry } from './types';
 
 /** All nutrient ids whose intake is tracked (model nutrients + upper-limit bases). */
 export const TRACKED_IDS: readonly string[] = [...MODEL_NUTRIENT_IDS, ...UL_BASIS_IDS];
+const ONES = new Float64Array(TRACKED_IDS.length).fill(1);
+const FE_INDEX = TRACKED_IDS.indexOf('FE');
+const MAX_U = uncertainty.maxRelative.value;
+
+/** A food's values as arrays aligned with TRACKED_IDS (string-keyed lookups are slow in the hot loop). */
+interface FoodVector {
+  values: Float64Array;
+  missing: Uint8Array;
+  /** Relative data uncertainty by BLS provenance. */
+  dataU: Float64Array;
+}
+const vectorCache = new WeakMap<object, FoodVector>();
+
+function vectorFor(part: FoodPart): FoodVector {
+  let v = vectorCache.get(part.per100);
+  if (!v) {
+    const n = TRACKED_IDS.length;
+    v = { values: new Float64Array(n), missing: new Uint8Array(n), dataU: new Float64Array(n) };
+    for (let k = 0; k < n; k++) {
+      const id = TRACKED_IDS[k]!;
+      const raw = part.per100[id];
+      if (raw === null || raw === undefined) v.missing[k] = 1;
+      else v.values[k] = raw === 't' ? 0 : raw;
+      const prov = part.provenance?.[id];
+      v.dataU[k] = prov ? (uncertainty.dataByProvenance.value[prov] ?? 0) : 0;
+    }
+    vectorCache.set(part.per100, v);
+  }
+  return v;
+}
 
 /** What one entry contributes, for one scenario. */
 export interface EntryIntake {
@@ -23,6 +53,8 @@ export interface EntryIntake {
   coffee: boolean;
 }
 
+const mfp = new Set(iron.mfpGroups.value);
+const phytateGroups = new Set(iron.phytate.value.groups);
 const teaRe = new RegExp(iron.teaPattern.value, 'i');
 const teaExcludeRe = new RegExp(iron.teaExcludePattern.value, 'i');
 const coffeeRe = new RegExp(iron.coffeePattern.value, 'i');
@@ -52,29 +84,38 @@ export function entryIntake(entry: ModelEntry, scenario: Scenario, opts: { reten
   let phytateGrams = 0;
   let tea = entry.modifiers?.tea ?? false;
   let coffee = entry.modifiers?.coffee ?? false;
-  const mfp = new Set(iron.mfpGroups.value);
-  const phytateGroups = new Set(iron.phytate.value.groups);
 
+  const acc = new Float64Array(TRACKED_IDS.length);
+  const missingFlags = new Uint8Array(TRACKED_IDS.length);
   for (const part of entry.parts) {
     if (!(part.grams > 0)) continue;
-    for (const id of TRACKED_IDS) {
-      const raw = part.per100[id];
-      if (raw === null || raw === undefined) {
-        missing.add(id);
+    const vec = vectorFor(part);
+    const keep = opts.retention ? retentionTable(TRACKED_IDS, part.preparation, part.storage, scenario) : ONES;
+    const gramsFactor = part.grams / 100;
+    const amountU = uncertainty.amountByConfidence.value[entry.confidence];
+    const sign = scenario === 'low' ? -1 : scenario === 'high' ? 1 : 0;
+    for (let k = 0; k < vec.values.length; k++) {
+      if (vec.missing[k]) {
+        missingFlags[k] = 1;
         continue;
       }
-      if (raw === 't') continue; // trace: counts as zero
-      const u = relativeUncertainty(entry.confidence, part.provenance?.[id]);
-      const keep = opts.retention ? retentionFactor(id, part.preparation, part.storage, scenario) : 1;
-      const amount = (raw * part.grams) / 100 * scenarioFactor(u, scenario) * keep;
-      intake[id] = (intake[id] ?? 0) + amount;
-      if (id === 'FE' && part.group && mfp.has(part.group)) hemeIron += amount * iron.hemeShareOfMfpIron.value[scenario];
+      const raw = vec.values[k]!;
+      if (raw === 0) continue; // includes trace
+      const u = sign === 0 ? 0 : Math.min(amountU + vec.dataU[k]!, MAX_U);
+      const amount = raw * gramsFactor * (1 + sign * u) * keep[k]!;
+      acc[k] = acc[k]! + amount;
+      if (k === FE_INDEX && part.group && mfp.has(part.group)) hemeIron += amount * iron.hemeShareOfMfpIron.value[scenario];
     }
     const amountFactor = scenarioFactor(uncertainty.amountByConfidence.value[entry.confidence], scenario);
     if (part.group && mfp.has(part.group)) mfpGrams += part.grams * amountFactor;
     if (part.group && phytateGroups.has(part.group)) phytateGrams += part.grams * amountFactor;
     if (isTea(part.nameEn)) tea = true;
     if (isCoffee(part.nameEn)) coffee = true;
+  }
+
+  for (let k = 0; k < acc.length; k++) {
+    if (acc[k] !== 0) intake[TRACKED_IDS[k]!] = acc[k]!;
+    if (missingFlags[k]) missing.add(TRACKED_IDS[k]!);
   }
 
   if (entry.direct) {

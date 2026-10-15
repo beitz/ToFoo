@@ -13,6 +13,9 @@ import type { DayStatus, ModelEntry, ModelSettings } from './types';
 
 export type StartingLevelChoice = 'empty' | 'average' | 'custom';
 
+/** Days of history kept per nutrient (for charts). */
+export const HISTORY_DAYS = 180;
+
 export interface SimulationInput {
   /** Every calendar day from the model start to today, ascending (YYYY-MM-DD). */
   days: string[];
@@ -187,6 +190,7 @@ export function simulate(input: SimulationInput): SimulationResult {
   const meals = groupMeals(inRange, settings.mealWindowMinutes);
 
   // ── 1. Daily totals per scenario ──
+  const contribFrom = days.length - Math.max(settings.shortWindowDays, settings.longWindowDays) - 1;
   const totals = {} as Record<Scenario, DayTotals[]>;
   const contrib = days.map(() => new Map<string, Record<string, number>>()); // central: day → label → absorbed
   const mealSummaries: MealSummary[] = [];
@@ -204,8 +208,8 @@ export function simulate(input: SimulationInput): SimulationResult {
         const ei = intakes[i]!;
         ei.missing.forEach((m) => day.missing.add(m));
         if (e.isSupplement) for (const [id, v] of Object.entries(ei.intake)) add(day.supplementIntake, id, v);
-        if (s === 'central') {
-          // Attribute the meal's absorbed amount to entries by their share of intake.
+        if (s === 'central' && di >= contribFrom) {
+          // Attribute the meal's absorbed amount to entries by their share of intake (only needed within the window).
           const byLabel = contrib[di]!;
           for (const [id, v] of Object.entries(ei.intake)) {
             const total = comp.intake[id] ?? 0;
@@ -247,8 +251,10 @@ export function simulate(input: SimulationInput): SimulationResult {
       days.forEach((d, i) => {
         const logged = totals[s][i]!.absorbed[id] ?? 0;
         const st = statuses[d];
-        const recent = knownHistory.slice(-lookback);
-        const imputed = recent.length ? recent.reduce((a, b) => a + b, 0) / recent.length : physiological;
+        const n = Math.min(lookback, knownHistory.length);
+        let sum = 0;
+        for (let k = knownHistory.length - n; k < knownHistory.length; k++) sum += knownHistory[k]!;
+        const imputed = n ? sum / n : physiological;
         let v: number;
         if (st === 'logged' || st === 'fasted' || st === 'pending') v = logged;
         else if (st === 'partial') v = s === 'low' ? logged : Math.max(logged, imputed);
@@ -330,10 +336,10 @@ export function simulate(input: SimulationInput): SimulationResult {
         levels[s] = series;
         level[s] = series[series.length - 1] ?? l;
       }
-      days.forEach((d, i) => {
+      for (let i = Math.max(0, days.length - HISTORY_DAYS); i < days.length; i++) {
         const vals = SCENARIOS.map((s) => levels[s][i]! / capacity);
-        history.push({ day: d, low: Math.min(...vals), central: levels.central[i]! / capacity, high: Math.max(...vals) });
-      });
+        history.push({ day: days[i]!, low: Math.min(...vals), central: levels.central[i]! / capacity, high: Math.max(...vals) });
+      }
       const value = { low: level.low / capacity, central: level.central / capacity, high: level.high / capacity };
       const lo = Math.min(value.low, value.central, value.high);
       const hi = Math.max(value.low, value.central, value.high);
@@ -351,19 +357,29 @@ export function simulate(input: SimulationInput): SimulationResult {
     // Rolling, limit and info.
     const denom = kind === 'limit' ? (r?.recommended ?? 1) : kind === 'info' ? 1 : physiological || 1;
     const source = kind === 'limit' || kind === 'info' ? null : inflow;
+    // Prefix sums make every window average O(1).
+    const knownMask = days.map((d) => (known(d) ? 1 : 0));
+    const prefix = (arr: number[]) => {
+      const p = new Float64Array(arr.length + 1);
+      for (let i = 0; i < arr.length; i++) p[i + 1] = p[i]! + arr[i]!;
+      return p;
+    };
+    const knownPrefix = prefix(knownMask);
+    const sums = {} as Record<Scenario, Float64Array>;
+    for (const s of SCENARIOS) {
+      sums[s] = source ? prefix(source[s]) : prefix(days.map((_, i) => (knownMask[i] ? (totals[s][i]!.intake[id] ?? 0) : 0)));
+    }
     const valueAt = (s: Scenario, endIdx: number) => {
-      const idx = windowIdx(endIdx);
-      if (source) return mean(source[s], idx) / denom;
-      // Limit / info: raw intake on known days.
-      const k = idx.filter((i) => known(days[i]!));
-      const series = days.map((_, i) => totals[s][i]!.intake[id] ?? 0);
-      return mean(series, k) / denom;
+      const start = Math.max(0, endIdx - windowDays + 1);
+      const total = sums[s][endIdx + 1]! - sums[s][start]!;
+      // Rolling: all days count (unknown days are imputed). Limit / info: raw intake on known days only.
+      const n = source ? endIdx - start + 1 : knownPrefix[endIdx + 1]! - knownPrefix[start]!;
+      return n > 0 ? total / n / denom : 0;
     };
     const history: HistoryPoint[] = [];
-    for (let i = 0; i < days.length; i++) {
-      if (i > end) break;
+    for (let i = Math.max(0, end - HISTORY_DAYS + 1); i <= end; i++) {
       const vals = SCENARIOS.map((s) => valueAt(s, i));
-      history.push({ day: days[i]!, low: Math.min(...vals), central: valueAt('central', i), high: Math.max(...vals) });
+      history.push({ day: days[i]!, low: Math.min(...vals), central: vals[1]!, high: Math.max(...vals) });
     }
     const v = end >= 0 ? { low: valueAt('low', end), central: valueAt('central', end), high: valueAt('high', end) } : { low: 0, central: 0, high: 0 };
     const value = { low: Math.min(v.low, v.central, v.high), central: v.central, high: Math.max(v.low, v.central, v.high) };

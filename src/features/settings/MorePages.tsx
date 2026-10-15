@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useData } from '../../app/data';
 import { useToast } from '../../app/toast';
@@ -8,7 +8,6 @@ import { fmtPercent } from '../../lib/format';
 import { formatDay } from '../../lib/dates';
 import { NUTRIENT_GROUPS, NUTRIENTS, type NutrientDef } from '../../model/nutrients';
 import { storage } from '../../../model/parameters';
-import { buildBackup, backupFileName, backupSummary, parseExchange } from '../../exchange/parse';
 import type { BackupFile } from '../../exchange/schema';
 import type { Snapshot } from '../../storage/repo';
 import { repo } from '../../storage/repo';
@@ -244,12 +243,16 @@ export function BackupPage() {
   const lastBackup = useLiveQuery(() => repo.getMeta<string>('lastBackupDay'), []);
   const d = useData();
   const [pending, setPending] = useState<BackupFile | null>(null);
+  const [summary, setSummary] = useState<Array<[string, number]>>([]);
   const [error, setError] = useState<string>();
   const [paste, setPaste] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
+  // Preload the exchange module so sharing stays within the tap's user activation.
+  useEffect(() => void import('../../exchange/parse'), []);
 
   async function exportAll() {
     const now = new Date();
+    const { buildBackup, backupFileName } = await import('../../exchange/parse');
     const file = buildBackup(await repo.snapshot(), __APP_VERSION__, now);
     const json = JSON.stringify(file, null, 1);
     const name = backupFileName(now);
@@ -273,11 +276,14 @@ export function BackupPage() {
     }
   }
 
-  function readText(text: string) {
+  async function readText(text: string) {
     setError(undefined);
+    // Loaded on demand: the validator is only needed here.
+    const { parseExchange, backupSummary } = await import('../../exchange/parse');
     const res = parseExchange(text);
     if (!res.ok) return setError(res.error);
     if (res.value.type !== 'backup') return setError(t('backup.notBackup'));
+    setSummary(backupSummary(res.value));
     setPending(res.value);
   }
 
@@ -308,7 +314,7 @@ export function BackupPage() {
           className="visually-hidden"
           onChange={async (e) => {
             const f = e.target.files?.[0];
-            if (f) readText(await f.text());
+            if (f) await readText(await f.text());
             e.target.value = '';
           }}
         />
@@ -318,7 +324,7 @@ export function BackupPage() {
         <details>
           <summary className="small">{t('backup.pasteInstead')}</summary>
           <textarea rows={4} value={paste} onChange={(e) => setPaste(e.target.value)} aria-label={t('backup.pasteInstead')} />
-          <button className="btn btn-small" disabled={!paste.trim()} onClick={() => readText(paste)}>
+          <button className="btn btn-small" disabled={!paste.trim()} onClick={() => void readText(paste)}>
             {t('backup.check')}
           </button>
         </details>
@@ -334,7 +340,7 @@ export function BackupPage() {
               <strong>{t('backup.preview', { date: new Date(pending.exportedAt).toLocaleString('en-GB') })}</strong>
             </p>
             <ul className="plain-list small">
-              {backupSummary(pending).map(([label, n]) => (
+              {summary.map(([label, n]) => (
                 <li key={label} className="row-between">
                   <span>{label}</span>
                   <span>{n}</span>

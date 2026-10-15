@@ -429,6 +429,10 @@ export const en = {
   'about.blsConverted':
     'The BLS data was converted to a compact format and abridged (only the nutrients the app uses are included).',
   'about.licence': 'Licence',
+  'about.modelHeading': 'Reference values and model',
+  'about.model':
+    'Daily needs: DGE/ÖGE reference values (EFSA for upper limits, WHO for amino acids). Absorption, body stores, cooking losses and sun synthesis come from published studies; every value is cited in the app\'s parameter files, and assumptions are marked as such.',
+  'about.openQuestions': 'Open questions and assumptions',
   'about.privacyHeading': 'Privacy',
   'about.privacy':
     'All your data stays on this device. ToFoo has no accounts, no analytics and makes no requests to third parties.',

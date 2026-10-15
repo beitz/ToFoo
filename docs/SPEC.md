@@ -31,12 +31,12 @@ ToFoo is an installable progressive web app (PWA), hosted on GitHub Pages from t
 | --- | --- | --- |
 | Language | TypeScript (strict) | Type safety for the nutrient model |
 | Build | Vite | Fast, simple, static output for Pages |
-| UI | React (or Svelte; Claude Code may propose, user decides) | Mature ecosystem for charts and PWA |
+| UI | React (decided 2026-10-15) | Mature ecosystem for charts and PWA |
 | Local storage | IndexedDB (e.g. via Dexie) | Reliable on-device storage for logs |
 | Offline / install | Service worker + web manifest (e.g. vite-plugin-pwa) | Works offline in the kitchen, home-screen icon |
 | Tests | Vitest | The model math must be unit-tested |
 | Deploy | GitHub Actions → GitHub Pages | Push to main = new version live |
-| UI language | English | Food names stay German (BLS) |
+| UI language | English (translation layer ready for German and others) | Food names: English first, German second (BLS 4.0 has both) |
 
 Design targets: mobile-first (phone width), touch-friendly, light and dark mode. A desktop layout and multi-device sync are explicitly later (v4); the architecture should not block them, e.g. keep storage behind a repository layer so a sync backend can be added later.
 
@@ -149,7 +149,7 @@ From recent average intake, estimate when each tank crosses into "low" or "too f
 
 A recipe is entered once; each time it is cooked becomes a batch with a storage plan, and eating a portion is one tap that also updates freezer stock.
 
-**Recipe**: name, ingredients (`source + version + code`, grams, preparation method), number of portions, optional notes and tags. Ingredient search is fast and fuzzy over the German BLS names, with recently used ingredients first. Salt uses the profile default (iodised or not) unless overridden. Grams accept decimals, since the user weighs precisely.
+**Recipe**: name, ingredients (`source + version + code`, grams, preparation method), number of portions, optional notes and tags. Ingredient search is fast and fuzzy over the English and German BLS names (English weighted higher), with recently used ingredients first. Salt uses the profile default (iodised or not) unless overridden. Grams accept decimals, since the user weighs precisely.
 
 **Batch**: one cooking of a recipe, with date and a storage plan. The default plan is remembered per recipe and per user, matching the usual workflow:
 
@@ -191,7 +191,7 @@ Every log entry carries a confidence level, and every day has an explicit status
 
 Confidence is shown as a small marker on entries and widens the uncertainty range in the model.
 
-**Day status**: logged (complete), partly logged, fasted (nothing eaten), or not logged. Fasting is one tap: "Fasting since…" marks today and every following day as fasted until the next logged meal ends the fast, so multi-day water fasts need no daily input. During a fast the tanks drain as modelled. Not-logged days count as unknown: they do not drain stores to zero, they widen the range. The dashboard nudges gently when yesterday has no status (switchable).
+**Day status**: logged (complete), partly logged, fasted (nothing eaten), or not logged. Fasting is one tap: "Fasting since…" marks today and every following day as fasted until the next logged meal ends the fast, so multi-day water fasts need no daily input. During a fast the tanks drain as modelled. Not-logged days count as unknown: they do not drain stores to zero, they widen the range. A past day with at least one entry counts as logged unless marked "partly logged"; drinks and supplements do not end a fast. The dashboard nudges gently when yesterday has no status (switchable).
 
 **Supplements** are loggable items with their own nutrient values (manual entry, confidence A when taken from the label). Drinks such as coffee and tea can be logged as meal modifiers for iron absorption.
 
@@ -300,17 +300,17 @@ All personal data stays on the phone in IndexedDB; a one-tap export file is the 
 
 v1 is the smallest app that is useful every day; each later version adds to the same data model without rewrites. Each version ends when the user has used it for real and is happy with it.
 
-**v1 — Daily use**
+**v1 — Daily use** (built 2026-10-15; done once used for real)
 
-- [ ] BLS pipeline and bundled data, attribution page
-- [ ] Profile, DGE reference values, parameter file with sources
-- [ ] Recipes, batches with storage plans, freezer stock
-- [ ] Logging: freezer portion, BLS food or dish, manual entry; day status; supplements
-- [ ] Nutrient model: tanks, rolling averages, absorption rules, retention, upper limits, starting levels, uncertainty ranges
-- [ ] Vitamin D sun estimate (manual outdoor routine)
-- [ ] Dashboard with gauges, detail view, "foods that fill your gaps" row, fasting mode
-- [ ] Settings, feature toggles, nutrient visibility page, food exclusions, low-friction onboarding
-- [ ] Export/import backup; installable PWA; deploy to GitHub Pages
+- [x] BLS pipeline and bundled data, attribution page
+- [x] Profile, DGE reference values, parameter file with sources
+- [x] Recipes, batches with storage plans, freezer stock
+- [x] Logging: freezer portion, BLS food or dish, manual entry; day status; supplements
+- [x] Nutrient model: tanks, rolling averages, absorption rules, retention, upper limits, starting levels, uncertainty ranges
+- [x] Vitamin D sun estimate (manual outdoor routine)
+- [x] Dashboard with gauges, detail view, "foods that fill your gaps" row, fasting mode
+- [x] Settings, feature toggles, nutrient visibility page, food exclusions, low-friction onboarding
+- [x] Export/import backup; installable PWA; deploy to GitHub Pages
 
 **v2 — Planning**
 
@@ -346,12 +346,12 @@ Claude Code builds v1 in small, reviewable steps, never invents physiological nu
 
 ## Open questions
 
-None of these block starting v1; they get answered while building.
+None of these block starting v1; they get answered while building. The living list with all assumptions and values to verify is docs/OPEN_QUESTIONS.md.
 
-- [ ] UI framework: React or Svelte (Claude Code to recommend after seeing the data size and chart needs).
-- [ ] Exact list of tank vs rolling-average nutrients, and which nutrients appear on the dashboard by default.
-- [ ] Does BLS 4.0 split heme and non-heme iron, and does it contain phytate? (Determines how much of the iron model is estimated.)
-- [ ] Fat threshold per meal for fat-soluble vitamin absorption: find a citable value.
-- [ ] Retention factors: which published table to use where BLS has no cooked entry.
-- [ ] Vitamin D synthesis model: which simplified published model to base it on.
+- [x] UI framework: React.
+- [ ] Exact list of tank vs rolling-average nutrients, and which nutrients appear on the dashboard by default. *Proposal in place (see docs/OPEN_QUESTIONS.md); all nutrients visible by default.*
+- [x] Does BLS 4.0 split heme and non-heme iron, and does it contain phytate? *No to both: estimated from the food group.* BLS 4.0 also has no selenium (not tracked in v1).
+- [ ] Fat threshold per meal for fat-soluble vitamin absorption: find a citable value. *5 g used as an assumption (Roodenburg 2000: 3 g enough for carotenes).*
+- [x] Retention factors: USDA Table of Nutrient Retention Factors, Release 6, as class averages.
+- [x] Vitamin D synthesis model: clear-sky UV index from solar elevation (Madronich 2007), MED-based yield (Holick 2004), elevation ramp for the "vitamin D winter" (Webb 1988). Several factors are assumptions.
 - [ ] QR size: confirm a typical recipe fits a comfortably scannable code; otherwise shorten the payload format.

@@ -9,3 +9,14 @@ export function retentionFactor(nutrient: string, preparation: Preparation, stor
   const store = storageRetention.value[storage][cls]?.[scenario] ?? 1;
   return prep * store;
 }
+
+const tableCache: Record<string, Float64Array> = {};
+
+/**
+ * Retention factors for all `ids` at once, cached per preparation/storage/scenario
+ * (the hot path of the model: called for every food part).
+ */
+export function retentionTable(ids: readonly string[], preparation: Preparation, storage: Storage, scenario: Scenario): Float64Array {
+  const key = preparation + storage + scenario;
+  return (tableCache[key] ??= Float64Array.from(ids, (id) => retentionFactor(id, preparation, storage, scenario)));
+}
