@@ -23,7 +23,10 @@ export default defineConfig({
         start_url: '/ToFoo/',
         scope: '/ToFoo/',
         display: 'standalone',
-        background_color: '#f6f5f1',
+        // Chrome on Android paints the system navigation bar of the installed app in this colour, and the
+        // manifest cannot switch it for dark mode (the theme-color meta tags can, but they only tint the
+        // status bar). Dark surface colour, matching the tab bar in dark mode, the owner's setting.
+        background_color: '#1b221e',
         theme_color: '#2f6f4e',
         icons: [
           { src: 'icon-192.png', sizes: '192x192', type: 'image/png' },

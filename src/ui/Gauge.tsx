@@ -15,6 +15,13 @@ interface Props {
 
 const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
 
+/**
+ * No logged or fasted day in the window yet. Rolling values are then pure imputation (the model assumes
+ * you met your need, so it shows 100 %), and limit / info values are an average over zero days: neither
+ * is a measurement, so the UI shows "–" and an empty bar. Tanks always have a modelled level.
+ */
+export const hasNoData = (r: NutrientResult) => r.kind !== 'tank' && r.knownDays === 0;
+
 /** Visual scale: rolling averages show 0–150 % of the need; tanks 0–100 % full. */
 function toScale(r: NutrientResult, v: number): number {
   if (r.kind === 'tank') return clamp01(v);
@@ -38,14 +45,15 @@ export function CompactGauge({ result: r, onClick, defaultBased, variant = 'row'
   const name = def?.short ?? r.id;
   // Cells are narrow: no "full" / "/day" suffixes there.
   const cellValue = r.kind === 'info' ? fmtAmount(r.id, r.averageIntake) : fmtPercent(r.value.central);
-  const value = r.status === 'unknown' ? '–' : variant === 'cell' ? cellValue : gaugeLabel(r);
+  const noData = r.status === 'unknown' || hasNoData(r);
+  const value = noData ? '–' : variant === 'cell' ? cellValue : gaugeLabel(r);
   const icon = <Icon name={STATUS_ICON[r.status]} size={14} />;
-  const fill = toScale(r, r.value.central);
+  const fill = noData ? 0 : toScale(r, r.value.central);
   return (
     <button
       className={`cgauge cgauge-${variant} gauge-${r.kind} gauge-${r.status}`}
       onClick={onClick}
-      aria-label={`${def?.name ?? r.id}: ${r.status === 'unknown' ? '' : gaugeLabel(r)}, ${statusLabel(r.status)}`}
+      aria-label={`${def?.name ?? r.id}: ${noData ? '' : gaugeLabel(r)}, ${statusLabel(r.status)}`}
     >
       <span className="cgauge-line">
         {variant === 'row' && icon}
@@ -74,12 +82,13 @@ export function CompactGauge({ result: r, onClick, defaultBased, variant = 'row'
 export function Gauge({ result: r, showRange, advanced, onClick, defaultBased }: Props) {
   const def = NUTRIENT_BY_ID.get(r.id);
   const name = def?.short ?? r.id;
-  const central = toScale(r, r.value.central);
-  const lo = toScale(r, r.value.low);
-  const hi = toScale(r, r.value.high);
-  const label = gaugeLabel(r);
+  const noData = r.status === 'unknown' || hasNoData(r);
+  const central = noData ? 0 : toScale(r, r.value.central);
+  const lo = noData ? 0 : toScale(r, r.value.low);
+  const hi = noData ? 0 : toScale(r, r.value.high);
+  const label = noData ? '–' : gaugeLabel(r);
   const range =
-    showRange && r.kind !== 'info' && r.status !== 'unknown' && hi - lo > 0.02 ? `${fmtPercent(r.value.low)}–${fmtPercent(r.value.high)}` : null;
+    showRange && r.kind !== 'info' && !noData && hi - lo > 0.02 ? `${fmtPercent(r.value.low)}–${fmtPercent(r.value.high)}` : null;
   const kindLabel = r.kind === 'tank' ? t('gauge.kindTank') : r.kind === 'info' ? t('gauge.kindInfo') : t('gauge.kindRolling', { days: r.windowDays });
 
   return (
@@ -102,7 +111,7 @@ export function Gauge({ result: r, showRange, advanced, onClick, defaultBased }:
           </div>
         )}
         <div className="gauge-values">
-          <span className="gauge-value">{r.status === 'unknown' ? '–' : label}</span>
+          <span className="gauge-value">{label}</span>
           {range && <span className="gauge-range">{range}</span>}
         </div>
       </div>
