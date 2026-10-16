@@ -9,6 +9,8 @@ import { Icon } from '../ui/Icon';
 import { AboutPage } from '../features/about/AboutPage';
 import { HomePage } from '../features/home/HomePage';
 import { FastShortcut } from '../features/home/FastShortcut';
+import { CalendarPage } from '../features/review/CalendarPage';
+import { ReviewPage } from '../features/review/ReviewPage';
 import { LogPage } from '../features/log/LogPage';
 import { AssistantPage } from '../features/assistant/AssistantPage';
 import { AssistantSettingsPage } from '../features/settings/AssistantSettingsPage';
@@ -72,6 +74,10 @@ function Page({ route }: { route: string[] }) {
       }
     case 'about':
       return <AboutPage />;
+    case 'calendar':
+      return <CalendarPage month={b} />;
+    case 'review':
+      return <ReviewPage from={b} to={c} />;
     case 'fast':
       return <FastShortcut />;
     default:

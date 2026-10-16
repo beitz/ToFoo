@@ -60,6 +60,15 @@ export function DiaryPage({ day: dayParam }: { day?: string }) {
         </button>
       </header>
 
+      <div className="row diary-links">
+        <a className="btn btn-small btn-secondary" href={href('calendar', day.slice(0, 7))}>
+          <Icon name="calendar" size={18} /> {t('diary.calendar')}
+        </a>
+        <a className="btn btn-small btn-secondary" href={href('review', day, day)}>
+          <Icon name="bars" size={18} /> {t('diary.dayNutrients')}
+        </a>
+      </div>
+
       <div className="card">
         <div className="row-between">
           <span className="muted small">{t('diary.status')}</span>

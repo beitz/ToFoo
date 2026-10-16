@@ -289,9 +289,9 @@ The home screen answers "how am I doing, and what do I eat next?" at a glance, w
 
 **Reviewing the past** (decided 2026-10-16, needed; the owner named this as what makes ToFoo feel lacking next to other apps):
 
-- **Day and range breakdown**: the full nutrient breakdown for one day, a week or a chosen date range ("how was September?"), using the same gauges and percentages. The diary links to the day view. The stores view stays the main one on Home.
+- **Day and range breakdown** (built 2026-10-16): the full nutrient breakdown for one day, a week, a month or a chosen date range ("how was September?"), using the same gauges and percentages. It shows what was logged, nothing filled in: the average per day over the days that count in the model (logged and fasted days, and days without entries unless "Fill in unlogged days" is on; partly logged days are left out and counted separately). Percentages are the absorbed amount against the absorbed need, as on Home, and intake against the limit for limits; nutrients with stores show the daily average here, not a fill level. The diary links to the day view and the calendar to the month. The stores view stays the main one on Home.
 - **Trends and weekly look-back**: weekly averages and charts across nutrients, not only one nutrient's history. This is the "weekly recap card" (see Motivation), shipped on its own, without the rest of gamification.
-- **Calendar of day statuses**: a month view with logged / partly / fasted / not logged per day (icon and label, not colour alone), tap a day to open it. Unlogged days matter for the model, so finding and fixing them fast is worth more here than in other apps.
+- **Calendar of day statuses** (built 2026-10-16): a month view, Monday first, with logged / partly / fasted / not logged per day (icon and label, not colour alone) and the count per status; tap a day to open it in the diary, which links back to the calendar. Unlogged days matter for the model, so finding and fixing them fast is worth more here than in other apps.
 - **Fasting timer** (nice to have): "fasted 31 h" on Home, from the last meal's time. Information only, no rewards for longer fasts.
 
 **UX principles**:
@@ -412,7 +412,8 @@ v1 is the smallest app that is useful every day; each later version adds to the 
 - [ ] Cooked weight per batch, log portions by grams
 - [ ] Change a dish's ingredients when logging it; swap preview in the recipe editor
 - [x] Repeat a past meal; favourite foods; home-screen shortcuts (built 2026-10-16)
-- [ ] Day and range nutrient breakdown; trends and weekly look-back; calendar of day statuses
+- [x] Day and range nutrient breakdown; calendar of day statuses (built 2026-10-16)
+- [ ] Trends and weekly look-back
 - [ ] Water; day notes
 - [ ] Nice to have: fasting timer; "eat soon" flag for fridge portions (needs a shelf-life source)
 

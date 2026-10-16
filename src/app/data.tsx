@@ -37,6 +37,8 @@ export interface AppData {
   requirements: ResolvedRequirements;
   modelEntries: ModelEntry[];
   model: SimulationResult;
+  /** The days the model covers, aligned with `model.daily`. */
+  modelDays: string[];
   activeFast: Fast | undefined;
   /** Food code → recency boost (0–1), for search. */
   recentFoods: Map<string, number>;
@@ -168,6 +170,7 @@ export function DataProvider({ children, fallback }: { children: ReactNode; fall
       requirements,
       modelEntries,
       model,
+      modelDays: days,
       activeFast: activeFast(fasts, log, customFoodsById, today),
       recentFoods,
       weightKg: weight ?? 70,
