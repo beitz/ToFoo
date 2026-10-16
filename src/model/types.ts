@@ -47,6 +47,11 @@ export interface ModelSettings {
   absorption: boolean;
   retention: boolean;
   sun: boolean;
+  /**
+   * Fill in unlogged past days (and the rest of partly logged ones) with recent intake, widening the range.
+   * Off: the log is taken as complete, so an unlogged day counts as nothing eaten.
+   */
+  imputeUnlogged: boolean;
   shortWindowDays: number;
   longWindowDays: number;
   mealWindowMinutes: number;
@@ -56,6 +61,7 @@ export const DEFAULT_MODEL_SETTINGS: ModelSettings = {
   absorption: true,
   retention: true,
   sun: true,
+  imputeUnlogged: false,
   shortWindowDays: 7,
   longWindowDays: 14,
   mealWindowMinutes: 120,

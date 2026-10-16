@@ -281,7 +281,9 @@ export function simulate(input: SimulationInput): SimulationResult {
   }
 
   // ── 2. Per nutrient ──
-  const known = (d: string) => statuses[d] === 'logged' || statuses[d] === 'fasted';
+  const impute = settings.imputeUnlogged;
+  // Without imputation the log is taken as complete: an unlogged past day is a known day with nothing eaten.
+  const known = (d: string) => statuses[d] === 'logged' || statuses[d] === 'fasted' || (!impute && statuses[d] === 'unknown');
   const today = days[days.length - 1];
   const todayCounts = today !== undefined && statuses[today] !== 'pending';
   const lookback = uncertainty.imputationLookbackDays.value;
@@ -315,10 +317,10 @@ export function simulate(input: SimulationInput): SimulationResult {
         for (let k = knownHistory.length - n; k < knownHistory.length; k++) sum += knownHistory[k]!;
         const imputed = n ? sum / n : physiological;
         let v: number;
-        if (st === 'logged' || st === 'fasted' || st === 'pending') v = logged;
+        if (!impute || st === 'logged' || st === 'fasted' || st === 'pending') v = logged;
         else if (st === 'partial') v = s === 'low' ? logged : Math.max(logged, imputed);
         else v = s === 'low' ? 0 : s === 'central' ? imputed : Math.max(imputed, physiological);
-        if (st === 'logged' || st === 'fasted') knownHistory.push(logged);
+        if (known(d)) knownHistory.push(logged);
         series.push(v);
         if (adaptIron) {
           const nh = totals[s][i]!.nonhemeFE;
@@ -328,7 +330,7 @@ export function simulate(input: SimulationInput): SimulationResult {
           for (let k = knownNh.length - n; k < knownNh.length; k++) nhSum += knownNh[k]!;
           if (sum > 0) share = nhSum / sum;
           nhSeries.push(v === logged ? nh : nh + (v - logged) * share);
-          if (st === 'logged' || st === 'fasted') knownNh.push(nh);
+          if (known(d)) knownNh.push(nh);
         }
       });
       inflow[s] = series;

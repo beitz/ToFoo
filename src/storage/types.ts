@@ -55,6 +55,7 @@ export type FeatureKey =
   | 'bestNextBatch'
   | 'advancedNumbers'
   | 'yesterdayNudge'
+  | 'fillUnloggedDays'
   | 'backupReminder'
   | 'aiAssistant';
 

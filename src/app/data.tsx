@@ -119,6 +119,7 @@ export function DataProvider({ children, fallback }: { children: ReactNode; fall
         absorption: isOn(f, 'absorption'),
         retention: isOn(f, 'retention'),
         sun: isOn(f, 'sunVitaminD'),
+        imputeUnlogged: isOn(f, 'fillUnloggedDays'),
         shortWindowDays: settings.shortWindowDays,
         longWindowDays: settings.longWindowDays,
         mealWindowMinutes: settings.mealWindowMinutes,

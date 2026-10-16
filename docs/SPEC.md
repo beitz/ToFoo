@@ -140,7 +140,7 @@ The user chooses at setup (changeable later, with a one-line pro/con each):
 
 ### Uncertainty
 
-Every calculation runs three times: low, central and high parameter sets (absorption, retention, data confidence). The UI shows the central value with a range. The range widens with estimated food entries and with "not logged" days.
+Every calculation runs three times: low, central and high parameter sets (absorption, retention, data confidence). The UI shows the central value with a range. The range widens with estimated food entries and, when "Fill in unlogged days" is on, with "not logged" days.
 
 ### Forecast (optional feature)
 
@@ -193,7 +193,7 @@ Every log entry carries a confidence level, and every day has an explicit status
 
 Confidence is shown as a small marker on entries and widens the uncertainty range in the model.
 
-**Day status**: logged (complete), partly logged, fasted (nothing eaten), or not logged. Fasting is one tap: "Fasting since…" marks today and every following day as fasted until the next logged meal ends the fast, so multi-day water fasts need no daily input. During a fast the tanks drain as modelled. Not-logged days count as unknown: they do not drain stores to zero, they widen the range. A past day with at least one entry counts as logged unless marked "partly logged"; drinks and supplements do not end a fast. The dashboard nudges gently when yesterday has no status (switchable).
+**Day status**: logged (complete), partly logged, fasted (nothing eaten), or not logged. Fasting is one tap: "Fasting since…" marks today and every following day as fasted until the next logged meal ends the fast, so multi-day water fasts need no daily input. During a fast the tanks drain as modelled. By default the log is taken as complete: a past day without entries counts as nothing eaten, so stores drain and averages drop (owner's decision, 2026-10-16: no assumed intake unless asked for). The optional "Fill in unlogged days" toggle (off by default) instead treats them as unknown: they are filled with recent intake (or the requirement when nothing is known yet), do not drain stores to zero, and widen the range. Rolling gauges with no known day in their window show "–" rather than a number. A past day with at least one entry counts as logged unless marked "partly logged"; drinks and supplements do not end a fast. The dashboard nudges gently when yesterday has no status (switchable).
 
 **Supplements** are loggable items with their own nutrient values (manual entry, confidence A when taken from the label). Drinks such as coffee and tea are logged on their own when drunk (time defaults to now, editable); the model applies them to meals around them by timing.
 

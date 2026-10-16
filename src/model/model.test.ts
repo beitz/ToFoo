@@ -271,11 +271,13 @@ describe('simulation', () => {
     expect(a.level!.central).toBeLessThan(b.level!.central);
   });
 
-  it('drains tanks while fasting and keeps them when days are not logged (central)', () => {
+  const imputing = { settings: { ...DEFAULT_MODEL_SETTINGS, imputeUnlogged: true } };
+
+  it('with imputation: drains tanks while fasting and keeps them when days are not logged (central)', () => {
     const d = days('2026-01-01', 30);
     const fasted = Object.fromEntries(d.map((day) => [day, 'fasted' as const]));
-    const fasting = simulate(baseInput(d, [], { dayStatus: fasted })).nutrients.get('FE')!;
-    const unlogged = simulate(baseInput(d, [])).nutrients.get('FE')!;
+    const fasting = simulate(baseInput(d, [], { ...imputing, dayStatus: fasted })).nutrients.get('FE')!;
+    const unlogged = simulate(baseInput(d, [], imputing)).nutrients.get('FE')!;
     const start = startingLevels.averageFraction.value;
     expect(fasting.value.central).toBeLessThan(start);
     expect(unlogged.value.central).toBeCloseTo(start, 2); // neutral imputation
@@ -298,9 +300,27 @@ describe('simulation', () => {
     expect(simulate(baseInput(d, supps)).nutrients.get('MG')!.status).toBe('tooHigh');
   });
 
-  it('reports rolling nutrients as unknown without any logged day', () => {
+  it('with imputation: reports rolling nutrients as unknown without any logged day', () => {
     const d = days('2026-01-01', 5);
-    expect(simulate(baseInput(d, [])).nutrients.get('VITC')!.status).toBe('unknown');
+    expect(simulate(baseInput(d, [], imputing)).nutrients.get('VITC')!.status).toBe('unknown');
+  });
+
+  it('without imputation: an unlogged day counts as nothing eaten', () => {
+    const d = days('2026-01-01', 30);
+    const fasted = Object.fromEntries(d.map((day) => [day, 'fasted' as const]));
+    const fasting = simulate(baseInput(d, [], { dayStatus: fasted })).nutrients.get('FE')!;
+    const unlogged = simulate(baseInput(d, [])).nutrients.get('FE')!;
+    expect(unlogged.value.central).toBeCloseTo(fasting.value.central, 6);
+    const vitc = simulate(baseInput(d, [])).nutrients.get('VITC')!;
+    expect(vitc.value.high).toBe(0);
+    expect(vitc.knownDays).toBeGreaterThan(0);
+    expect(vitc.status).toBe('low');
+  });
+
+  it('without imputation: today alone, still empty, has no data yet', () => {
+    const vitc = simulate(baseInput(days('2026-01-01', 1), [])).nutrients.get('VITC')!;
+    expect(vitc.knownDays).toBe(0);
+    expect(vitc.status).toBe('unknown');
   });
 
   it('attributes contributors', () => {

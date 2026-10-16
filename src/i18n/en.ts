@@ -239,7 +239,7 @@ export const en = {
   'diary.complete': 'Complete',
   'diary.partial': 'Partly',
   'diary.fasted': 'Fasted',
-  'diary.statusHint': 'Auto: a day with entries counts as complete. Unlogged days widen the range instead of draining your stores.',
+  'diary.statusHint': 'Auto: a day with entries counts as complete. A day without entries counts as nothing eaten, unless "Fill in unlogged days" is on in Settings.',
   'diary.statusSaved': 'Day status saved.',
   'diary.logForDay': 'Add food',
   'diary.empty': 'No entries on this day.',
