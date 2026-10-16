@@ -234,6 +234,8 @@ Logging should feel like telling a friend what you ate, not operating a database
 
 **Later steps**: Open Food Facts lookup (by barcode in a photo or by brand name) and USDA as extra assistant tools (v3); remembering corrections ("my bowl is 350 g") as portion helpers.
 
+**Bulk photo import** (later version, idea 2026-10-16): take a photo of everything eaten during the day, then log it all at once when there is time. The user picks many photos in one go; the app reads each photo's capture time from its EXIF data (`DateTimeOriginal`), groups photos taken close together into one meal, and runs each meal through the normal assistant flow, logged at that date and time. Each meal gets its own confirm card, so nothing is logged unchecked. When a photo has no capture time (some apps and pickers strip EXIF), the app falls back to the file date and shows that time as editable on the card.
+
 ## Exchange format, QR codes and the Claude helper
 
 One versioned JSON format ("ToFoo exchange format") is used for QR codes, pasted entries, and backups, so every import path shares one parser and one validator.
@@ -364,6 +366,7 @@ v1 is the smallest app that is useful every day; each later version adds to the 
 
 - [ ] USDA FoodData Central lookup
 - [ ] Barcode (Open Food Facts) and label-photo reading, also as assistant tools
+- [ ] Bulk photo import: many photos at once, each meal logged at its photo's capture time
 - [ ] Blood-test calibration; freezer overview with shelf life per recipe
 - [ ] Optional location-history import for sun exposure
 
