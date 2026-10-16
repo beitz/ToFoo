@@ -9,6 +9,8 @@ import { Icon } from '../ui/Icon';
 import { AboutPage } from '../features/about/AboutPage';
 import { HomePage } from '../features/home/HomePage';
 import { LogPage } from '../features/log/LogPage';
+import { AssistantPage } from '../features/assistant/AssistantPage';
+import { AssistantSettingsPage } from '../features/settings/AssistantSettingsPage';
 import { DiaryPage } from '../features/diary/DiaryPage';
 import { RecipesPage } from '../features/recipes/RecipesPage';
 import { RecipeEditor } from '../features/recipes/RecipeEditor';
@@ -30,6 +32,8 @@ function Page({ route }: { route: string[] }) {
   switch (a) {
     case 'log':
       return <LogPage key={`${b}-${c}`} day={b} foodCode={c} />;
+    case 'assistant':
+      return <AssistantPage key={b} day={b} />;
     case 'diary':
       return <DiaryPage day={b} />;
     case 'recipes':
@@ -58,6 +62,8 @@ function Page({ route }: { route: string[] }) {
           return <SavedPage />;
         case 'backup':
           return <BackupPage />;
+        case 'assistant':
+          return <AssistantSettingsPage />;
         case 'diagnostics':
           return <DiagnosticsPage />;
         default:

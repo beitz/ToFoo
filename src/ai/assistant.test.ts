@@ -1,0 +1,144 @@
+import { describe, expect, it } from 'vitest';
+import type * as Beta from '@anthropic-ai/sdk/resources/beta/messages/messages';
+import type { Food } from '../foods/foodDb';
+import { buildIndex } from '../foods/search';
+import { emptyConversation, requestParams, sendMessage, type CreateMessage } from './assistant';
+import { describeFood, MAX_ITEM_GRAMS, runSearchFoods, validateProposal, type ToolContext } from './tools';
+
+function food(code: string, nameEn: string, nameDe: string, kcal: number | null): Food {
+  return { code, nameEn, nameDe, group: code.charAt(0), per100: { ENERCC: kcal, PROT625: 8.9, FAT: 't', CHO: null }, provenance: {} };
+}
+const foods = [food('D7A5400', 'Milk roll (yeast dough)', 'Milchbrötchen (Hefeteig)', 337), food('S450000', 'Nougat', 'Nugat/Nougat/Noisette', 461)];
+const db = { byCode: new Map(foods.map((f) => [f.code, f])), groups: { D: { en: 'Cakes, pastries and biscuits', de: 'Kuchen' } } };
+const ctx: ToolContext = { db, index: buildIndex(foods.map((f) => ({ key: f.code, nameEn: f.nameEn, nameDe: f.nameDe }))) };
+
+function reply(content: Beta.BetaContentBlock[], stop_reason: Beta.BetaStopReason): Beta.BetaMessage {
+  return { id: 'msg', type: 'message', role: 'assistant', model: 'claude-opus-5-5', content, stop_reason } as unknown as Beta.BetaMessage;
+}
+const toolUse = (id: string, name: string, input: unknown) => ({ type: 'tool_use', id, name, input }) as Beta.BetaToolUseBlock;
+const text = (t: string) => ({ type: 'text', text: t }) as Beta.BetaTextBlock;
+
+/** A fake API that answers from a script and records every request. */
+function scripted(...responses: Beta.BetaMessage[]) {
+  const requests: Beta.MessageCreateParamsNonStreaming[] = [];
+  const create: CreateMessage = async (p) => {
+    requests.push(structuredClone(p));
+    const r = responses.shift();
+    if (!r) throw new Error('no more responses');
+    return r;
+  };
+  return { create, requests };
+}
+
+describe('tools', () => {
+  it('describes a food with code, both names and macros, keeping missing values visible', () => {
+    expect(describeFood(foods[0]!, db)).toBe('D7A5400 | Milk roll (yeast dough) | Milchbrötchen (Hefeteig) | Cakes, pastries and biscuits | per 100 g: 337 kcal, protein 8.9 g, fat trace g, carbs ? g');
+  });
+
+  it('searches in German and English and reports empty results', () => {
+    const r = runSearchFoods({ queries: ['Milchbrötchen', 'kimchi'] }, ctx);
+    expect(r.ok).toBe(true);
+    expect(r.text).toContain('D7A5400');
+    expect(r.text).toContain('Results for "kimchi":\nNo matches');
+  });
+
+  it('rejects malformed search input', () => {
+    expect(runSearchFoods({ q: 'x' }, ctx).ok).toBe(false);
+  });
+
+  it('accepts a proposal of known codes and plausible grams', () => {
+    const r = validateProposal({ summary: 'Snack', items: [{ code: 'S450000', grams: 12.34, preparation: 'asListed', note: ' Giotto ' }], assumptions: [' 3 balls ', ''], confidence: 'C' }, db);
+    expect(r.ok && r.proposal).toEqual({ summary: 'Snack', items: [{ food: foods[1], grams: 12.3, preparation: 'asListed', note: 'Giotto' }], assumptions: ['3 balls'], confidence: 'C' });
+  });
+
+  it('rejects invented codes and implausible amounts, naming each problem', () => {
+    const r = validateProposal(
+      {
+        summary: 'x',
+        items: [
+          { code: 'X999999', grams: 50, preparation: 'raw', note: '' },
+          { code: 'S450000', grams: MAX_ITEM_GRAMS + 1, preparation: 'raw', note: '' },
+          { code: 'S450000', grams: 0, preparation: 'raw', note: '' },
+        ],
+        assumptions: [],
+        confidence: 'B',
+      },
+      db,
+    );
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.error).toContain('Unknown code X999999');
+      expect(r.error).toContain(`${MAX_ITEM_GRAMS + 1} g is not plausible`);
+      expect(r.error).toContain('0 g is not plausible');
+    }
+  });
+});
+
+describe('sendMessage', () => {
+  const proposal = { summary: 'Milk roll', items: [{ code: 'D7A5400', grams: 60, preparation: 'asListed', note: '' }], assumptions: ['one roll'], confidence: 'C' };
+
+  it('runs searches, then stops at a proposal and owes its result to the next message', async () => {
+    const api = scripted(
+      reply([toolUse('t1', 'search_foods', { queries: ['Milchbrötchen'] })], 'tool_use'),
+      reply([text('Looks like one milk roll.'), toolUse('t2', 'propose_meal', proposal)], 'tool_use'),
+    );
+    const img = { mediaType: 'image/jpeg' as const, data: 'AAAA' };
+    const { conversation, outcome } = await sendMessage(api.create, 'claude-opus-5-5', emptyConversation(), { text: ' from work ', images: [img] }, ctx);
+
+    expect(outcome.kind).toBe('proposal');
+    if (outcome.kind === 'proposal') {
+      expect(outcome.text).toBe('Looks like one milk roll.');
+      expect(outcome.proposal.items[0]?.food.code).toBe('D7A5400');
+    }
+    // Second request carries the search result for t1.
+    const second = api.requests[1]!.messages;
+    const toolResult = (second[2]!.content as Beta.BetaContentBlockParam[])[0] as Beta.BetaToolResultBlockParam;
+    expect(toolResult.tool_use_id).toBe('t1');
+    expect(String(toolResult.content)).toContain('D7A5400');
+    // First message: photo, then text.
+    expect((api.requests[0]!.messages[0]!.content as Beta.BetaContentBlockParam[]).map((b) => b.type)).toEqual(['image', 'text']);
+    expect(conversation.pendingResults.map((r) => r.tool_use_id)).toEqual(['t2']);
+
+    // The user's correction goes out with the owed tool result first.
+    const next = scripted(reply([text('Two rolls then?')], 'end_turn'));
+    const after = await sendMessage(next.create, 'claude-opus-5-5', conversation, { text: 'it was two', images: [] }, ctx);
+    const last = next.requests[0]!.messages.at(-1)!.content as Beta.BetaContentBlockParam[];
+    expect(last.map((b) => b.type)).toEqual(['tool_result', 'text']);
+    expect(after.outcome).toEqual({ kind: 'reply', text: 'Two rolls then?' });
+    expect(after.conversation.pendingResults).toEqual([]);
+  });
+
+  it('sends an invalid proposal back to the model as an error', async () => {
+    const api = scripted(
+      reply([toolUse('t1', 'propose_meal', { ...proposal, items: [{ code: 'NOPE', grams: 60, preparation: 'asListed', note: '' }] })], 'tool_use'),
+      reply([text('Let me search first.')], 'end_turn'),
+    );
+    const { outcome } = await sendMessage(api.create, 'claude-opus-5-5', emptyConversation(), { text: 'a roll', images: [] }, ctx);
+    const result = (api.requests[1]!.messages[2]!.content as Beta.BetaToolResultBlockParam[])[0]!;
+    expect(result.is_error).toBe(true);
+    expect(String(result.content)).toContain('Unknown code NOPE');
+    expect(outcome).toEqual({ kind: 'reply', text: 'Let me search first.' });
+  });
+
+  it('reports refusals and runaway tool loops instead of looping forever', async () => {
+    const refused = scripted(reply([], 'refusal'));
+    expect((await sendMessage(refused.create, 'claude-opus-5-5', emptyConversation(), { text: 'x', images: [] }, ctx)).outcome).toEqual({ kind: 'error', reason: 'refusal' });
+
+    const loop = scripted(...Array.from({ length: 20 }, (_, i) => reply([toolUse(`t${i}`, 'search_foods', { queries: ['roll'] })], 'tool_use')));
+    expect((await sendMessage(loop.create, 'claude-opus-5-5', emptyConversation(), { text: 'x', images: [] }, ctx)).outcome).toEqual({ kind: 'error', reason: 'tooManySteps' });
+  });
+
+  it('does not mutate the conversation it was given', async () => {
+    const conv = emptyConversation();
+    await sendMessage(scripted(reply([text('Hi')], 'end_turn')).create, 'claude-opus-5-5', conv, { text: 'hi', images: [] }, ctx);
+    expect(conv.messages).toEqual([]);
+  });
+});
+
+describe('requestParams', () => {
+  it('uses server-side fallback where the model supports it', () => {
+    expect(requestParams('claude-opus-5-5', []).fallbacks).toBe('default');
+    expect(requestParams('claude-sonnet-5-5', []).betas).toEqual(['server-side-fallback-2026-07-01']);
+    expect(requestParams('claude-haiku-5-5', []).fallbacks).toBeUndefined();
+  });
+});

@@ -55,7 +55,8 @@ export type FeatureKey =
   | 'bestNextBatch'
   | 'advancedNumbers'
   | 'yesterdayNudge'
-  | 'backupReminder';
+  | 'backupReminder'
+  | 'aiAssistant';
 
 export interface Settings extends Versioned {
   id: 'settings';
