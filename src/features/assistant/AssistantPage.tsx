@@ -4,9 +4,10 @@ import { useToast } from '../../app/toast';
 import { href, navigate } from '../../app/router';
 import { t, type MessageKey } from '../../i18n';
 import { dayKey } from '../../lib/dates';
-import { fmtNumber } from '../../lib/format';
+import { fmtNumber, fmtTokens, fmtUsd } from '../../lib/format';
 import { emptyConversation, sendMessage, type AiModel, type Conversation, type TurnOutcome } from '../../ai/assistant';
-import { classifyError, getAiSettings, makeCreate } from '../../ai/client';
+import { classifyError, getAiSettings, makeCreate, saveUsage } from '../../ai/client';
+import { mergeModelTokens, modelTokensCost, totalTokens, type ModelTokens } from '../../ai/pricing';
 import { prepareImage, type PreparedImage } from '../../ai/image';
 import type { Proposal, ProposedItem } from '../../ai/tools';
 import type { EntryConfidence } from '../../model/types';
@@ -83,6 +84,9 @@ function Chat({ apiKey, model, day }: { apiKey: string; model: AiModel; day: str
   const fileRef = useRef<HTMLInputElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const [create] = useState(() => makeCreate(apiKey));
+  /** Billed tokens: the whole chat, and the user's latest message (all requests it caused). */
+  const [chatTokens, setChatTokens] = useState<ModelTokens>({});
+  const [turnTokens, setTurnTokens] = useState<ModelTokens>({});
 
   useEffect(() => {
     endRef.current?.scrollIntoView?.({ block: 'end', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
@@ -109,9 +113,15 @@ function Chat({ apiKey, model, day }: { apiKey: string; model: AiModel; day: str
     setBubbles((b) => [...b, { role: 'user', text: msg.text.trim(), previews: msg.images.map((i) => i.preview) }]);
     setText('');
     setImages([]);
+    setTurnTokens({});
+    const onUsage = (tokens: ModelTokens) => {
+      setChatTokens((c) => mergeModelTokens(c, tokens));
+      setTurnTokens((c) => mergeModelTokens(c, tokens));
+      void saveUsage(tokens);
+    };
     try {
       const ctx = { db: d.foods, index: d.searchIndex, boost: d.searchBoost };
-      const r = await sendMessage(create, model, conversation, msg, ctx);
+      const r = await sendMessage(create, model, conversation, msg, ctx, onUsage);
       setConversation(r.conversation);
       show(r.outcome);
     } catch (e) {
@@ -164,6 +174,7 @@ function Chat({ apiKey, model, day }: { apiKey: string; model: AiModel; day: str
             <Icon name="alert" size={18} /> {t(error)}
           </div>
         )}
+        <UsageLine chat={chatTokens} turn={turnTokens} model={model} />
         <div ref={endRef} />
       </div>
 
@@ -204,6 +215,17 @@ function Chat({ apiKey, model, day }: { apiKey: string; model: AiModel; day: str
         </div>
       </div>
     </>
+  );
+}
+
+/** What this chat has cost so far, from the token counts the API reports (an estimate at list prices). */
+function UsageLine({ chat, turn, model }: { chat: ModelTokens; turn: ModelTokens; model: AiModel }) {
+  const tokens = Object.values(chat).reduce((n, t) => n + totalTokens(t), 0);
+  if (tokens === 0) return null;
+  return (
+    <p className="usage-line muted small">
+      {t('ai.usageLine', { chat: fmtUsd(modelTokensCost(chat, model)), last: fmtUsd(modelTokensCost(turn, model)), tokens: fmtTokens(tokens) })}
+    </p>
   );
 }
 

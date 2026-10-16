@@ -229,6 +229,7 @@ Logging should feel like telling a friend what you ate, not operating a database
 - Photos are scaled down on the phone before sending (long side ≤ 1568 px), which keeps cost and upload time low.
 - Model is selectable in the assistant settings (default the most capable; cheaper ones for lower cost). A meal costs roughly 5–15 cents with the default model and under a cent with the cheapest (estimate; check real usage in the Anthropic console).
 - The conversation is not stored; only the confirmed log entries are.
+- **Usage and cost**: every API answer reports its token counts (input, output, cache reads and writes, per model when a fallback answered). The app multiplies them by Anthropic's list prices (a dated table in `src/ai/pricing.ts`) and shows the running cost of the current chat and its last message under the conversation, plus today / last 30 days / all time in the assistant settings. Only token counts per day and model are stored (on the device, not in backups), so a price fix re-prices the past. It is an estimate: the exact bill is in the Anthropic console, which a normal API key cannot read.
 
 **Privacy**: the feature is off until the user turns it on and enters a key. The settings screen says plainly that photos and messages go to Anthropic. Nothing is sent when the feature is off.
 

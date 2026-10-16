@@ -13,7 +13,8 @@ const db = { byCode: new Map(foods.map((f) => [f.code, f])), groups: { D: { en: 
 const ctx: ToolContext = { db, index: buildIndex(foods.map((f) => ({ key: f.code, nameEn: f.nameEn, nameDe: f.nameDe }))) };
 
 function reply(content: Beta.BetaContentBlock[], stop_reason: Beta.BetaStopReason): Beta.BetaMessage {
-  return { id: 'msg', type: 'message', role: 'assistant', model: 'claude-opus-5-5', content, stop_reason } as unknown as Beta.BetaMessage;
+  const usage = { input_tokens: 100, output_tokens: 50, cache_read_input_tokens: 0, cache_creation_input_tokens: 0, cache_creation: null, iterations: null };
+  return { id: 'msg', type: 'message', role: 'assistant', model: 'claude-opus-5-5', content, stop_reason, usage } as unknown as Beta.BetaMessage;
 }
 const toolUse = (id: string, name: string, input: unknown) => ({ type: 'tool_use', id, name, input }) as Beta.BetaToolUseBlock;
 const text = (t: string) => ({ type: 'text', text: t }) as Beta.BetaTextBlock;
@@ -106,6 +107,16 @@ describe('sendMessage', () => {
     expect(last.map((b) => b.type)).toEqual(['tool_result', 'text']);
     expect(after.outcome).toEqual({ kind: 'reply', text: 'Two rolls then?' });
     expect(after.conversation.pendingResults).toEqual([]);
+  });
+
+  it('reports the billed tokens of every response', async () => {
+    const api = scripted(reply([toolUse('t1', 'search_foods', { queries: ['roll'] })], 'tool_use'), reply([text('One roll?')], 'end_turn'));
+    const seen: unknown[] = [];
+    await sendMessage(api.create, 'claude-opus-5-5', emptyConversation(), { text: 'a roll', images: [] }, ctx, (t) => seen.push(t));
+    expect(seen).toEqual([
+      { 'claude-opus-5-5': { input: 100, output: 50, cacheRead: 0, cacheWrite5m: 0, cacheWrite1h: 0 } },
+      { 'claude-opus-5-5': { input: 100, output: 50, cacheRead: 0, cacheWrite5m: 0, cacheWrite1h: 0 } },
+    ]);
   });
 
   it('sends an invalid proposal back to the model as an error', async () => {
