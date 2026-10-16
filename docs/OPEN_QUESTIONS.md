@@ -78,4 +78,7 @@ Still open:
 
 ## Later versions
 
+- [ ] **Shelf life per storage type** (fridge, freezer) for the "eat soon" flag and the freezer overview: find a citable food-safety source (e.g. BfR, USDA FSIS cold storage chart). Feature review 2026-10-16.
+- [ ] **Water reference value:** take the DGE guide value for total water (drinks + food) with its source before adding the water gauge. Feature review 2026-10-16.
+
 - [ ] QR size: confirm a typical recipe fits a comfortably scannable code (v2).

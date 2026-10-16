@@ -162,11 +162,19 @@ A recipe is entered once; each time it is cooked becomes a batch with a storage 
 
 This split is the global default, but any split is possible: each recipe can store its own default plan (e.g. "all in the fridge, keeps a week", or "cook fresh each day" with no stored portions), and each batch can still be adjusted when it is cooked (e.g. 2 in the fridge). Each storage type maps to retention factors in the nutrient model.
 
+**Cooked weight per batch** (decided 2026-10-16): the usual workflow is one large pot divided into portions, and every pot comes out slightly different. So each batch can record the weight of the cooked food (pot weighed full minus the empty pot's weight, which the app remembers), and portions can then be logged by grams ("350 g of the curry") as well as by portion. A batch without a cooked weight works as today, by portion.
+
+**Changing a dish when logging it** (decided 2026-10-16): a logged portion of a recipe can differ from the recipe, e.g. this time 150 g tofu instead of 200 g beef. When logging, "Change ingredients" lets the user swap, remove, add or re-weigh ingredients for that entry only; the recipe and the batch stay as they are. The entry stores the changes, so the history stays recomputable. Changes can also apply to a whole batch when it is cooked ("this pot had tofu").
+
+**Swap preview in the recipe editor** (decided 2026-10-16): while editing a recipe, show how a change moves the user's gaps, e.g. "adding 100 g spinach: iron gap 40 % → 65 % covered". This is the recipe preview (below) made live inside the editor, where the decision happens.
+
+**Later, for other workflows** (feature review 2026-10-16, not needed by the owner now): duplicate a recipe to make a variant; scale a recipe when cooking a batch (e.g. 8 portions instead of 6, without editing the recipe); a shopping list for the next batch from the recipe's ingredients, with tick-offs and the Android share sheet. Shopping list first, scaling last.
+
 **Freezer stock**: the app tracks remaining portions per batch, with cook date. Logging a portion from the dashboard ("Linsencurry · 3 left") removes it and applies the right storage losses. Manual corrections are allowed (portion thrown away, given away).
 
 **Recipe preview** (v2): before cooking, show how eating this batch for a week would move each tank.
 
-**Freezer overview** (v3): a view of everything in the freezer and fridge, with age per batch. Each recipe can store how long it keeps per storage type (fridge, freezer), also carried in the QR code, so the overview can flag portions to eat soon.
+**Freezer overview** (v3): a view of everything in the freezer and fridge, with age per batch. Each recipe can store how long it keeps per storage type (fridge, freezer), also carried in the QR code, so the overview can flag portions to eat soon. A simple "eat soon" flag on stock chips for old fridge portions can come before the full overview. Shelf-life times are food-safety values and need a source like the physiological numbers (open question: which source).
 
 ## Logging and confidence
 
@@ -194,6 +202,16 @@ Every log entry carries a confidence level, and every day has an explicit status
 Confidence is shown as a small marker on entries and widens the uncertainty range in the model.
 
 **Day status**: logged (complete), partly logged, fasted (nothing eaten), or not logged. Fasting is one tap: "Fasting since…" marks today and every following day as fasted until the next logged meal ends the fast, so multi-day water fasts need no daily input. During a fast the tanks drain as modelled. By default the log is taken as complete: a past day without entries counts as nothing eaten, so stores drain and averages drop (owner's decision, 2026-10-16: no assumed intake unless asked for). The optional "Fill in unlogged days" toggle (off by default) instead treats them as unknown: they are filled with recent intake (or the requirement when nothing is known yet), do not drain stores to zero, and widen the range. Rolling gauges with no known day in their window show "–" rather than a number. A past day with at least one entry counts as logged unless marked "partly logged"; drinks and supplements do not end a fast. The dashboard nudges gently when yesterday has no status (switchable).
+
+**Faster repeat logging** (decided 2026-10-16, needed):
+
+- **Repeat a past meal**: one tap on a meal in the diary (or under "Recent") logs it again now, with all its items, as an editable copy.
+- **Favourite foods**: pin BLS foods and saved items used all the time (oats, a certain bread), so they stay at the top of the log screen instead of dropping out of "Recent".
+- **Home-screen shortcuts**: long-press the app icon for "Log meal" and "Start fast" (web manifest `shortcuts`).
+
+**Water** (decided 2026-10-16): drinks can be logged as water amounts with one tap (e.g. +250 ml), and the water in foods counts too (BLS has water content per food). Shown as an amount-only or rolling gauge against a DGE guide value for water; the reference value still needs to be taken from the DGE tables with a source.
+
+**Day notes** (decided 2026-10-16): a free-text note per day in the diary ("ate out, guessed amounts", "felt tired"), stored with the day, included in backups and exports. No symptom tracking or correlations.
 
 **Supplements** are loggable items with their own nutrient values (manual entry, confidence A when taken from the label). Drinks such as coffee and tea are logged on their own when drunk (time defaults to now, editable); the model applies them to meals around them by timing.
 
@@ -252,7 +270,7 @@ One versioned JSON format ("ToFoo exchange format") is used for QR codes, pasted
 
 **Sharing full recipes by QR**: viable within limits. A QR code holds at most about 3 KB, and printed codes scan reliably only well below that. Ingredients as codes plus grams are tiny; instruction text is what takes the space. So the payload is tiered: the data block (name, portions, ingredients, storage plan, shelf life) is always included; the instructions are added, compressed, when the result stays under a size budget (target about 1 KB); otherwise they are left out and the QR notes that the steps are on the printed sheet. Because ToFoo is a public web app, anyone can scan the code and open the recipe, with or without using ToFoo for tracking. The app reads only the fields it needs and ignores unknown ones, so the format can grow.
 
-**Claude helper** (v2): instead of an AI API inside the app, a Claude Project (in claude.ai) holds the exchange-format description and instructions. The user posts photos, labels or a description of an unplanned meal; Claude returns a `logEntry` in the exchange format with confidence C, preferring BLS codes where a match exists. The user pastes it into the app. It remains the no-API-key alternative to the in-app AI assistant (above). Claude Code writes the project instructions file (`docs/claude-helper-instructions.md`) once the format is stable.
+**Claude helper** (v2): instead of an AI API inside the app, a Claude Project (in claude.ai) holds the exchange-format description and instructions. The user posts photos, labels or a description of an unplanned meal; Claude returns a `logEntry` in the exchange format with confidence C, preferring BLS codes where a match exists. The user pastes it into the app. Because there is no standard recipe format on the web, importing a recipe from a website also goes through the helper (and the in-app assistant): paste the recipe text or link, get a `recipe` in the exchange format back, matched to BLS codes. It remains the no-API-key alternative to the in-app AI assistant (above). Claude Code writes the project instructions file (`docs/claude-helper-instructions.md`) once the format is stable.
 
 ## Dashboard and UX
 
@@ -266,6 +284,13 @@ The home screen answers "how am I doing, and what do I eat next?" at a glance, w
 4. **Best next batch** (once the recipe book has recipes): the same ranking applied to the user's own recipes. Hidden while the book is empty.
 
 **Tap a gauge** to expand: history chart, forecast (if on), contributing foods, the wiki summary, a short explanation (what the nutrient does, what too little and too much mean, with source), and good sources from the BLS (varied: one food per BLS subgroup and main name word, e.g. one liver, one mushroom). "All foods, ranked" opens the full list: per portion or per 100 g, filter by name and food group, optional "one per kind of food", exclusions applied.
+
+**Reviewing the past** (decided 2026-10-16, needed; the owner named this as what makes ToFoo feel lacking next to other apps):
+
+- **Day and range breakdown**: the full nutrient breakdown for one day, a week or a chosen date range ("how was September?"), using the same gauges and percentages. The diary links to the day view. The stores view stays the main one on Home.
+- **Trends and weekly look-back**: weekly averages and charts across nutrients, not only one nutrient's history. This is the "weekly recap card" (see Motivation), shipped on its own, without the rest of gamification.
+- **Calendar of day statuses**: a month view with logged / partly / fasted / not logged per day (icon and label, not colour alone), tap a day to open it. Unlogged days matter for the model, so finding and fixing them fast is worth more here than in other apps.
+- **Fasting timer** (nice to have): "fasted 31 h" on Home, from the last meal's time. Information only, no rewards for longer fasts.
 
 **UX principles**:
 
@@ -337,6 +362,8 @@ All personal data stays on the phone in IndexedDB; a one-tap export file is the 
 - **Backup**: "Export everything" writes one JSON file in the exchange format (`type: backup`) via the Android share sheet or download. "Import backup" restores it with a preview. Optional reminder when the last backup is older than N days (default 14).
 - **Model is recomputable**: tank levels are derived from the log and parameters, not stored as truth, so a parameter update or bug fix recalculates history correctly. Cache results for speed.
 - **Privacy**: no analytics, no third-party requests in v1 except loading the app itself. Later online features (USDA, Open Food Facts) are clearly marked and send only the search term or barcode. The AI assistant is opt-in, and sends the photos and messages of an assistant conversation (plus the matching BLS search results) to Anthropic, and nothing else.
+- **CSV export** (later, nice to have): daily intake per nutrient and the diary as CSV, for analysis in Excel. The JSON backup remains the backup.
+- **Phone health data** (later, low priority): the phone already tracks things like weight and activity, but a PWA in Chrome cannot read Health Connect. Options to look at: importing a Health Connect / Google Fit export file, or a small native companion.
 - **Secrets**: any future API key is entered in the app and stored only on the device, never in the repo.
 
 ## Roadmap
@@ -375,6 +402,25 @@ v1 is the smallest app that is useful every day; each later version adds to the 
 
 - [ ] Desktop layout
 - [ ] Multi-device sync
+
+**Feature review 2026-10-16** (comparison with Cronometer, MyFitnessPal, Yazio, Paprika and others; owner's decisions). Needed, in no fixed order yet:
+
+- [ ] Cooked weight per batch, log portions by grams
+- [ ] Change a dish's ingredients when logging it; swap preview in the recipe editor
+- [ ] Repeat a past meal; favourite foods; home-screen shortcuts
+- [ ] Day and range nutrient breakdown; trends and weekly look-back; calendar of day statuses
+- [ ] Water; day notes
+- [ ] Nice to have: fasting timer; "eat soon" flag for fridge portions (needs a shelf-life source)
+
+**Later, no version yet**:
+
+- [ ] Shopping list for the next batch; duplicate a recipe; scale a recipe when cooking (last)
+- [ ] CSV export
+- [ ] Phone health data (Health Connect), low priority
+- [ ] Energy in and out (calorie balance): would be nice in one app since it overlaps with nutrient tracking, but the focus stays on nutrients, not weight loss or gain. Only if it can be added cleanly, as an optional feature that keeps the gamification guardrails (no rewards for eating less).
+- [ ] Keep in mind, not needed now: user-set target per nutrient (e.g. from a doctor), clearly marked as user-set. The DGE-derived targets stay as they are.
+
+**Not planned**: social features, community recipes, coaching, ads (one user, privacy, calm by default).
 
 ## Working agreements for Claude Code
 
