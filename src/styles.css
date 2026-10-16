@@ -1328,3 +1328,156 @@ details.tree details {
   flex: none;
   text-align: right;
 }
+
+/* ── AI assistant ────────────────────────────────────────────── */
+.assistant-entry {
+  margin: 4px 0 12px;
+}
+.assistant-page {
+  /* Room for the composer, which sits above the bottom navigation. */
+  padding-bottom: 80px;
+}
+.chat {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.bubble {
+  max-width: 88%;
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.bubble p {
+  margin: 0;
+}
+.bubble-assistant {
+  align-self: flex-start;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-bottom-left-radius: 4px;
+}
+.bubble-user {
+  align-self: flex-end;
+  background: var(--accent-soft);
+  border-bottom-right-radius: 4px;
+}
+.bubble-photos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.bubble-photos img {
+  width: 96px;
+  height: 96px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+}
+.notice-card {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  color: var(--warn);
+  border-color: var(--warn);
+}
+.proposal {
+  border-color: var(--accent);
+}
+.proposal-item {
+  display: grid;
+  grid-template-columns: 1fr 104px 44px;
+  align-items: center;
+  gap: 8px;
+}
+.proposal-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.assumptions {
+  margin: 2px 0 6px;
+  padding-left: 1.2rem;
+}
+.composer {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(var(--nav-h) + env(safe-area-inset-bottom));
+  z-index: 15;
+  background: var(--bg);
+  border-top: 1px solid var(--border);
+  padding: 8px var(--gutter);
+}
+.composer-row,
+.composer-photos {
+  display: flex;
+  gap: 6px;
+  max-width: 608px;
+  margin: 0 auto;
+}
+.composer-row {
+  align-items: flex-end;
+}
+.composer-row textarea {
+  flex: 1;
+  resize: none;
+  max-height: 30vh;
+  field-sizing: content;
+}
+.composer-btn {
+  color: var(--accent);
+}
+.composer-send:not(:disabled) {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+.composer-photos {
+  margin-bottom: 6px;
+}
+.composer-photo {
+  position: relative;
+}
+.composer-photo img {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  display: block;
+}
+.composer-photo .icon-btn {
+  position: absolute;
+  top: -14px;
+  right: -14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  width: 28px;
+  height: 28px;
+}
+/* The small remove button sits inside a 44 px tap area. */
+.composer-photo .icon-btn::before {
+  content: '';
+  position: absolute;
+  inset: -8px;
+}
+.radio-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  min-height: 52px;
+  cursor: pointer;
+}
+.radio-row + .radio-row {
+  border-top: 1px solid var(--border);
+}
+.radio-row input {
+  width: 22px;
+  min-height: 22px;
+  height: 22px;
+  flex: none;
+  accent-color: var(--accent);
+}
+/* Keep toasts clear of the chat composer. */
+body:has(.composer) .toast-area {
+  bottom: calc(var(--nav-h) + 84px + env(safe-area-inset-bottom));
+}

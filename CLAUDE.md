@@ -25,6 +25,7 @@ CI (`.github/workflows/deploy.yml`) runs data → typecheck → test → build o
 | `model/` | **Data files with sources**: `reference-values.ts` (DGE/EFSA), `parameters.ts` (absorption, capacity, retention, sun). Every number has a citation, a low/central/high range and a confidence note. |
 | `src/model/` | The nutrient model: **pure functions only** (no React, no IndexedDB, no `Date.now()`), fully unit-tested. |
 | `src/foods/` | Loading the BLS JSON, food lookup, search. |
+| `src/ai/` | AI assistant logging: tools (BLS search, meal proposal check), prompt, conversation loop (pure, tested), API client and photo scaling. |
 | `src/logic/` | Pure glue from stored data to model inputs (log → model entries, fasting days, sun per day). |
 | `src/app/` | App shell: router, data context (`useData`: live queries + model), toasts with undo. |
 | `src/lib/` | Small helpers (dates as local `YYYY-MM-DD` day keys, formatting, ids). |
@@ -46,7 +47,7 @@ CI (`.github/workflows/deploy.yml`) runs data → typecheck → test → build o
 7. **Storage records carry `schemaVersion`;** migrations are pure functions with tests.
 8. **Feature toggles** go through `src/settings/features.ts`; new optional features get a toggle.
 9. **UI:** mobile-first (check at 360–412 px width), touch targets ≥ 44 px, status never by colour alone, light and dark mode, undo instead of confirm for everyday actions, respect `prefers-reduced-motion`.
-10. **Privacy:** no analytics, no third-party requests. Nothing personal in the repo.
+10. **Privacy:** no analytics, no third-party requests except opt-in features the user turns on (the AI assistant, which talks to Anthropic with the user's own key). Nothing personal in the repo; API keys stay on the device and out of backups.
 11. Food names: English is the primary display and search language, German second (both from BLS).
 12. Keep `docs/SPEC.md`, `docs/OPEN_QUESTIONS.md` and the exchange-format docs current when decisions change.
 

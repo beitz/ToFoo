@@ -73,6 +73,8 @@ Still open:
 - [x] **"Good sources" lists** are now varied: one variant per BLS base food and per main name word (one liver, not ten). Dried herbs and spices still rank high per 100 g; a curated "cheap and simple" list comes with the wiki (v2).
 - [x] **Black screen on navigation (Android Chrome 155, 2026-10-15):** `useEffect(() => window.scrollTo(0, 0))` returned scrollTo's result; newer Chrome returns a Promise there, React called it as the effect cleanup on the next screen change and the app unmounted. Found with the device diagnostics log (Settings → Diagnostics); fixed, and a test now rejects effects that return a plain expression.
 - [ ] **Nutrient explanations** (`src/i18n/nutrientInfo.en.ts`): short general summaries; the NIH fact sheets they cite block automated access, so the wording was not compared line by line. Check against the sources.
+- [ ] **AI assistant accuracy and cost:** the prompt and tools are untested on real meals. Try it on typical cases (a branded sweet, a bakery item, a restaurant dish shared from a pot), check how often the proposed grams need fixing and what a meal really costs per model, then tune the prompt or the default model.
+- [ ] **AI assistant and branded foods:** BLS has no brands, so packaged products map to the nearest generic food. Adding Open Food Facts as an assistant tool (v3) should improve these.
 
 ## Later versions
 

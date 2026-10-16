@@ -9,6 +9,7 @@ import type { Food } from '../../foods/foodDb';
 import { repo } from '../../storage/repo';
 import type { CustomFood, LogEntry } from '../../storage/types';
 import { Icon } from '../../ui/Icon';
+import { isOn } from '../../settings/features';
 import { nextStorage, totalLeft, logPortion } from '../home/StockChips';
 import { AmountSheet } from './AmountSheet';
 import { CustomSheet } from './CustomSheet';
@@ -84,6 +85,12 @@ export function LogPage({ day: dayParam, foodCode }: { day?: string; foodCode?: 
             {t('log.done')}
           </button>
         </div>
+      )}
+
+      {isOn(d.settings.features, 'aiAssistant') && (
+        <a className="btn btn-primary btn-block assistant-entry" href={dayParam ? href('assistant', day) : href('assistant')}>
+          <Icon name="camera" /> {t('ai.entry')}
+        </a>
       )}
 
       <div className="search-box">

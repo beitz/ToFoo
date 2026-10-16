@@ -26,6 +26,9 @@ const paths: Record<string, string> = {
   download: 'M12 4v11M7 10l5 5 5-5M5 20h14',
   upload: 'M12 20V9M7 14l5-5 5 5M5 4h14',
   pill: 'M10.5 20.5a5 5 0 0 1-7-7l6-6a5 5 0 0 1 7 7zM7 10l7 7',
+  camera: 'M4 8h3l1.5-2.5h7L17 8h3v11H4zM12 10.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z',
+  send: 'M4 12 20 4l-4 16-4.5-6.5zM11.5 13.5 20 4',
+  chat: 'M4 5h16v11H9l-5 4zM8 9h8M8 12h5',
   tank: 'M8 4h8a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z',
 };
 

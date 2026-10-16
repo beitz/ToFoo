@@ -177,8 +177,9 @@ Every log entry carries a confidence level, and every day has an explicit status
 1. Tap a freezer-stock portion on the dashboard.
 2. Pick a single BLS food or composite dish (e.g. a salami pizza) and an amount; portion helpers ("1 pizza", "1 plate") with editable gram defaults.
 3. Manual entry: free name plus whatever nutrients are known (from a label, a supplement).
-4. Paste an entry in the ToFoo exchange format (e.g. produced by the Claude helper, see below).
-5. Later: barcode, label photo (v3), in-app AI photo estimate (v4).
+4. Tell the AI assistant what you ate, by photo, text or both (optional, see below).
+5. Paste an entry in the ToFoo exchange format (e.g. produced by the Claude helper, see below).
+6. Later: barcode and label photo (v3).
 
 **Time of entry**: a new entry assumes the meal was just finished, so the timestamp defaults to now. Date and time stay one tap away for logging after the fact. Any eating pattern is supported; OMAD is the optimised path, not a requirement.
 
@@ -196,6 +197,43 @@ Confidence is shown as a small marker on entries and widens the uncertainty rang
 
 **Supplements** are loggable items with their own nutrient values (manual entry, confidence A when taken from the label). Drinks such as coffee and tea are logged on their own when drunk (time defaults to now, editable); the model applies them to meals around them by timing.
 
+## AI assistant logging
+
+Logging should feel like telling a friend what you ate, not operating a database: snap a photo or type "a Giotto from the office", answer a question or two, check the result, done. The assistant is optional, off by default, and uses the user's own API key.
+
+**Flow**:
+
+1. On the log screen, "Tell the assistant" opens a chat. The user sends photos (the plate, the packaging, the menu) and/or text, in English or German.
+2. The assistant identifies the foods and estimates amounts. When it is unsure in a way that matters (portion size, what is hidden in a sauce, which variant), it asks one short question at a time instead of guessing silently. It does not ask about things that barely change the result.
+3. It proposes the meal as a list of items with grams. The app shows a confirm card: each item with name, grams (editable) and a remove button, plus the meal time. Nothing is logged until the user taps "Log".
+4. The user can keep chatting instead ("it was two balls, not one") and the assistant revises its proposal.
+
+**Where the numbers come from** (source ladder, most concrete first):
+
+1. BLS food matching the item (e.g. "Milchbrötchen").
+2. Branded product databases (Open Food Facts via barcode or name, v3), with micronutrients borrowed from the nearest BLS food.
+3. USDA FoodData Central (v3).
+4. Built from ingredients: a dish not in any database (Korean hotpot at a restaurant) becomes several BLS ingredients with estimated grams.
+5. Nearest-match guess: the closest BLS food, clearly marked.
+
+**The core rule**: the AI only chooses foods and estimates amounts; it never supplies nutrient values. Every nutrient number still comes from a database (BLS in the first version), so an AI mistake shows up as a wrong portion or a wrong food, which the user sees and can fix on the confirm card, never as an invented vitamin value. This keeps rule "Every number has a source" intact.
+
+**Confidence**: entries from the assistant are logged as C · Estimate by default; the assistant may suggest B when the food is certain and the amount comes from a label or a standard portion. Assumptions the assistant made ("assumed one bowl of broth") are shown on the confirm card.
+
+**Why one model, not several voting**: models share the same blind spots (portion size, hidden fat), so several models tend to agree and be wrong together; a fourth model to break ties has no ground truth either. Restricting the AI to database foods, asking when unsure, and a quick human check catch more errors for a quarter of the cost.
+
+**Technical shape**:
+
+- The app talks to the Claude API directly from the browser with the user's own key (static app, no server). The key is stored only on the device (IndexedDB), never in backups or the repo.
+- The model works through tools the app provides: `search_foods` (searches the bundled BLS locally and returns codes, names and macros per 100 g), and `propose_meal` (food codes, grams, preparation, assumptions). Questions to the user are plain chat messages. The app checks every proposed code exists in BLS and every amount is plausible before showing the card; otherwise it sends the error back to the model.
+- Photos are scaled down on the phone before sending (long side ≤ 1568 px), which keeps cost and upload time low.
+- Model is selectable in the assistant settings (default the most capable; cheaper ones for lower cost). A meal costs roughly 5–15 cents with the default model and under a cent with the cheapest (estimate; check real usage in the Anthropic console).
+- The conversation is not stored; only the confirmed log entries are.
+
+**Privacy**: the feature is off until the user turns it on and enters a key. The settings screen says plainly that photos and messages go to Anthropic. Nothing is sent when the feature is off.
+
+**Later steps**: Open Food Facts lookup (by barcode in a photo or by brand name) and USDA as extra assistant tools (v3); remembering corrections ("my bowl is 350 g") as portion helpers.
+
 ## Exchange format, QR codes and the Claude helper
 
 One versioned JSON format ("ToFoo exchange format") is used for QR codes, pasted entries, and backups, so every import path shares one parser and one validator.
@@ -211,7 +249,7 @@ One versioned JSON format ("ToFoo exchange format") is used for QR codes, pasted
 
 **Sharing full recipes by QR**: viable within limits. A QR code holds at most about 3 KB, and printed codes scan reliably only well below that. Ingredients as codes plus grams are tiny; instruction text is what takes the space. So the payload is tiered: the data block (name, portions, ingredients, storage plan, shelf life) is always included; the instructions are added, compressed, when the result stays under a size budget (target about 1 KB); otherwise they are left out and the QR notes that the steps are on the printed sheet. Because ToFoo is a public web app, anyone can scan the code and open the recipe, with or without using ToFoo for tracking. The app reads only the fields it needs and ignores unknown ones, so the format can grow.
 
-**Claude helper** (v2): instead of an AI API inside the app, a Claude Project (in claude.ai) holds the exchange-format description and instructions. The user posts photos, labels or a description of an unplanned meal; Claude returns a `logEntry` in the exchange format with confidence C, preferring BLS codes where a match exists. The user pastes it into the app. Claude Code writes the project instructions file (`docs/claude-helper-instructions.md`) once the format is stable.
+**Claude helper** (v2): instead of an AI API inside the app, a Claude Project (in claude.ai) holds the exchange-format description and instructions. The user posts photos, labels or a description of an unplanned meal; Claude returns a `logEntry` in the exchange format with confidence C, preferring BLS codes where a match exists. The user pastes it into the app. It remains the no-API-key alternative to the in-app AI assistant (above). Claude Code writes the project instructions file (`docs/claude-helper-instructions.md`) once the format is stable.
 
 ## Dashboard and UX
 
@@ -279,6 +317,7 @@ Optional features are modules with an on/off switch, so the app can be tuned bet
 | "Best next batch" suggestion | On (v2) | Recipe ranking on the dashboard |
 | Visible nutrients | All | Opens the nutrient visibility page |
 | Advanced numbers | Off | Show units, parameter values, sources inline |
+| AI assistant | Off | Log meals by chatting with photos and text (needs your API key) |
 
 Settings also hold the profile, starting-level choice, salt defaults, meal window, rolling-average window, and backup options. Features are implemented behind one feature-flag module so new ones get a toggle by default.
 
@@ -294,7 +333,7 @@ All personal data stays on the phone in IndexedDB; a one-tap export file is the 
 - **Schema versioning**: every stored record has a schema version; migrations run on app start and are unit-tested.
 - **Backup**: "Export everything" writes one JSON file in the exchange format (`type: backup`) via the Android share sheet or download. "Import backup" restores it with a preview. Optional reminder when the last backup is older than N days (default 14).
 - **Model is recomputable**: tank levels are derived from the log and parameters, not stored as truth, so a parameter update or bug fix recalculates history correctly. Cache results for speed.
-- **Privacy**: no analytics, no third-party requests in v1 except loading the app itself. Later online features (USDA, Open Food Facts) are clearly marked and send only the search term or barcode.
+- **Privacy**: no analytics, no third-party requests in v1 except loading the app itself. Later online features (USDA, Open Food Facts) are clearly marked and send only the search term or barcode. The AI assistant is opt-in, and sends the photos and messages of an assistant conversation (plus the matching BLS search results) to Anthropic, and nothing else.
 - **Secrets**: any future API key is entered in the app and stored only on the device, never in the repo.
 
 ## Roadmap
@@ -315,6 +354,7 @@ v1 is the smallest app that is useful every day; each later version adds to the 
 
 **v2 — Planning**
 
+- [ ] AI assistant logging: chat with photos and text, BLS foods, confirm card, user's own API key
 - [ ] QR export/import for recipes; exchange-format paste import
 - [ ] Claude helper project instructions
 - [ ] Nutrient wiki; gamification basics (logging chain, achievements, fill animations, nutrient codex)
@@ -323,13 +363,12 @@ v1 is the smallest app that is useful every day; each later version adds to the 
 **v3 — More data**
 
 - [ ] USDA FoodData Central lookup
-- [ ] Barcode (Open Food Facts) and label-photo reading
+- [ ] Barcode (Open Food Facts) and label-photo reading, also as assistant tools
 - [ ] Blood-test calibration; freezer overview with shelf life per recipe
 - [ ] Optional location-history import for sun exposure
 
 **v4 — Beyond the phone**
 
-- [ ] In-app AI photo estimate (user's own API key)
 - [ ] Desktop layout
 - [ ] Multi-device sync
 
