@@ -3,8 +3,11 @@ import { useData } from '../../app/data';
 import { useToast } from '../../app/toast';
 import { href } from '../../app/router';
 import { t } from '../../i18n';
-import { AI_MODELS, type AiModel } from '../../ai/assistant';
-import { getAiSettings, setAiModel, setApiKey } from '../../ai/client';
+import { AI_MODELS, DEFAULT_AI_MODEL, type AiModel } from '../../ai/assistant';
+import { getAiSettings, getUsage, setAiModel, setApiKey } from '../../ai/client';
+import { PRICES_AS_OF, summarize, type UsageDay } from '../../ai/pricing';
+import { addDays } from '../../lib/dates';
+import { fmtNumber, fmtTokens, fmtUsd } from '../../lib/format';
 import { isOn } from '../../settings/features';
 import { repo } from '../../storage/repo';
 import { Field, Toggle } from '../../ui/controls';
@@ -23,8 +26,10 @@ export function AssistantSettingsPage() {
   const on = isOn(d.settings.features, 'aiAssistant');
   const [saved, setSaved] = useState<{ apiKey: string; model: AiModel }>();
   const [draft, setDraft] = useState('');
+  const [usage, setUsage] = useState<UsageDay[]>();
   useEffect(() => {
     void getAiSettings().then(setSaved);
+    void getUsage().then(setUsage);
   }, []);
 
   async function saveKey(key: string) {
@@ -97,6 +102,37 @@ export function AssistantSettingsPage() {
             </span>
           </label>
         ))}
+      </div>
+
+      <h2 className="section-title">{t('ai.usageTitle')}</h2>
+      <div className="card">
+        {usage && usage.length > 0 ? (
+          <table className="usage-table">
+            <tbody>
+              {(
+                [
+                  ['ai.usageToday', d.today],
+                  ['ai.usage30', addDays(d.today, -29)],
+                  ['ai.usageAll', undefined],
+                ] as const
+              ).map(([label, from]) => {
+                const s = summarize(usage, saved?.model ?? DEFAULT_AI_MODEL, from);
+                return (
+                  <tr key={label}>
+                    <th scope="row">{t(label)}</th>
+                    <td>
+                      <strong>{fmtUsd(s.usd)}</strong>
+                      <span className="muted small block">{t('ai.usageDetail', { requests: fmtNumber(s.requests), tokens: fmtTokens(s.tokens) })}</span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        ) : (
+          <p className="muted">{t('ai.usageNone')}</p>
+        )}
+        <p className="muted small">{t('ai.usageNote', { date: PRICES_AS_OF })}</p>
       </div>
     </section>
   );

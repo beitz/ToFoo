@@ -1,10 +1,14 @@
 /** Browser glue for the assistant: the API client, its settings on the device, and error texts. */
 import { repo } from '../storage/repo';
+import { dayKey } from '../lib/dates';
 import { AI_MODELS, DEFAULT_AI_MODEL, type AiModel, type CreateMessage } from './assistant';
+import { recordUsage, type ModelTokens, type UsageDay } from './pricing';
 
 /** Device-only settings: kept in the meta table, which backups do not export. */
 const KEY_META = 'ai:apiKey';
 const MODEL_META = 'ai:model';
+/** Token counts per day and model, for the usage summary in the assistant settings. */
+const USAGE_META = 'ai:usage';
 
 export async function getAiSettings(): Promise<{ apiKey: string; model: AiModel }> {
   const [apiKey, model] = await Promise.all([repo.getMeta<string>(KEY_META), repo.getMeta<string>(MODEL_META)]);
@@ -17,6 +21,20 @@ export async function setApiKey(key: string): Promise<void> {
 
 export async function setAiModel(model: AiModel): Promise<void> {
   await repo.setMeta(MODEL_META, model);
+}
+
+export async function getUsage(): Promise<UsageDay[]> {
+  return (await repo.getMeta<UsageDay[]>(USAGE_META)) ?? [];
+}
+
+// Writes are chained so two responses arriving close together cannot overwrite each other.
+let usageWrite: Promise<void> = Promise.resolve();
+
+export function saveUsage(tokens: ModelTokens, now = new Date()): Promise<void> {
+  usageWrite = usageWrite.then(async () => {
+    await repo.setMeta(USAGE_META, recordUsage(await getUsage(), dayKey(now), tokens));
+  }).catch(() => undefined); // usage stats are a convenience; never break the chat over them
+  return usageWrite;
 }
 
 export function makeCreate(apiKey: string): CreateMessage {

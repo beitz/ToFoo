@@ -1481,3 +1481,24 @@ details.tree details {
 body:has(.composer) .toast-area {
   bottom: calc(var(--nav-h) + 84px + env(safe-area-inset-bottom));
 }
+.usage-line {
+  text-align: right;
+  margin: 0;
+}
+.usage-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.usage-table th {
+  text-align: left;
+  font-weight: normal;
+  vertical-align: top;
+  padding: 8px 8px 8px 0;
+}
+.usage-table td {
+  text-align: right;
+  padding: 8px 0;
+}
+.usage-table tr + tr > * {
+  border-top: 1px solid var(--border);
+}

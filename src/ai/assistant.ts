@@ -5,6 +5,7 @@
  */
 import type * as Beta from '@anthropic-ai/sdk/resources/beta/messages/messages';
 import { SYSTEM_PROMPT, TOOLS } from './prompt';
+import { usageOf, type ModelTokens } from './pricing';
 import { runSearchFoods, validateProposal, type Proposal, type ToolContext } from './tools';
 
 export type CreateMessage = (params: Beta.MessageCreateParamsNonStreaming) => Promise<Beta.BetaMessage>;
@@ -63,7 +64,8 @@ function textOf(content: Beta.BetaContentBlock[]): string {
 
 /**
  * Send one user message (text and/or photos) and run the model until it needs the user again.
- * Returns the updated conversation; the input is not mutated.
+ * Returns the updated conversation; the input is not mutated. `onUsage` gets the billed tokens of
+ * every API response as it arrives, so usage is counted even if a later request fails.
  */
 export async function sendMessage(
   create: CreateMessage,
@@ -71,6 +73,7 @@ export async function sendMessage(
   conversation: Conversation,
   user: { text: string; images: UserImage[] },
   ctx: ToolContext,
+  onUsage?: (tokens: ModelTokens) => void,
 ): Promise<{ conversation: Conversation; outcome: TurnOutcome }> {
   const messages = [...conversation.messages];
   const content: Beta.BetaContentBlockParam[] = [
@@ -84,6 +87,7 @@ export async function sendMessage(
 
   for (let step = 0; step < MAX_STEPS; step++) {
     const res = await create(requestParams(model, messages));
+    onUsage?.(usageOf(res, model));
     // Append the whole content (thinking and fallback blocks included) so the next request replays it unchanged.
     messages.push({ role: 'assistant', content: res.content });
     if (res.stop_reason === 'refusal') return done({ kind: 'error', reason: 'refusal' });
