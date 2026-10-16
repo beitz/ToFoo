@@ -30,12 +30,14 @@ const paths: Record<string, string> = {
   send: 'M4 12 20 4l-4 16-4.5-6.5zM11.5 13.5 20 4',
   chat: 'M4 5h16v11H9l-5 4zM8 9h8M8 12h5',
   barcode: 'M4 6v12M7 6v12M10.5 6v12M13 6v12M16.5 6v12M20 6v12',
+  star: 'M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z',
+  repeat: 'M4 12a7 7 0 0 1 12-4.9L18 9M18 4v5h-5M20 12a7 7 0 0 1-12 4.9L6 15M6 20v-5h5',
   tank: 'M8 4h8a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z',
 };
 
-export function Icon({ name, size = 20, title }: { name: keyof typeof paths | string; size?: number; title?: string }) {
+export function Icon({ name, size = 20, title, filled }: { name: keyof typeof paths | string; size?: number; title?: string; filled?: boolean }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden={title ? undefined : true} role={title ? 'img' : undefined}>
+    <svg width={size} height={size} viewBox="0 0 24 24" fill={filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden={title ? undefined : true} role={title ? 'img' : undefined}>
       {title && <title>{title}</title>}
       <path d={paths[name] ?? paths.info} />
       {(name === 'alert' || name === 'question' || name === 'info') && <circle cx="12" cy="12" r="9" />}

@@ -8,7 +8,7 @@ import type { Snapshot } from '../storage/repo';
 
 const snapshot: Snapshot = {
   profile: defaultProfile('2026-10-15'),
-  settings: defaultSettings(),
+  settings: { ...defaultSettings(), favourites: [{ source: 'BLS', version: '4.0', code: 'C133000' }, { source: 'OFF', code: '8000500319475' }] },
   recipes: [],
   batches: [],
   log: [

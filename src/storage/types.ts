@@ -78,6 +78,8 @@ export interface Settings extends Versioned {
   defaultPlan: StoragePlan;
   /** Home screen nutrient layout; unset = compact. */
   homeView?: 'compact' | 'detailed';
+  /** Foods pinned to the top of the log screen, in the order they were added. */
+  favourites?: FoodRef[];
 }
 
 export interface StoragePlan {
@@ -191,3 +193,8 @@ export interface MetaRecord {
   key: string;
   value: unknown;
 }
+
+type DistributiveOmit<T, K extends keyof T> = T extends unknown ? Omit<T, K> : never;
+
+/** A log entry before the repository gives it an id and schema version. */
+export type NewLogEntry = DistributiveOmit<LogEntry, 'id' | 'schemaVersion'>;

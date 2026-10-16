@@ -207,9 +207,9 @@ Confidence is shown as a small marker on entries and widens the uncertainty rang
 
 **Faster repeat logging** (decided 2026-10-16, needed):
 
-- **Repeat a past meal**: one tap on a meal in the diary (or under "Recent") logs it again now, with all its items, as an editable copy.
-- **Favourite foods**: pin BLS foods and saved items used all the time (oats, a certain bread), so they stay at the top of the log screen instead of dropping out of "Recent".
-- **Home-screen shortcuts**: long-press the app icon for "Log meal" and "Start fast" (web manifest `shortcuts`).
+- **Repeat a past meal**: "Log again" on a meal in the diary, or a tap under "Recent meals" on the log screen (the last three different meals with two or more items), logs it again now, with all its items, as an editable copy. Items keep their spacing (a tea half an hour after the meal stays half an hour after it, since timing matters for iron), with the last item at the current time. Recipe portions come from the batch's current stock; a batch that has run out is skipped and named in the message. One undo removes the whole copy.
+- **Favourite foods**: pin BLS foods, packaged products and saved items used all the time (oats, a certain bread) with "Add to favourites" on the amount sheet, so they stay at the top of the log screen instead of dropping out of "Recent". Stored in the settings (and so in backups).
+- **Home-screen shortcuts**: long-press the app icon for "Log meal" and "Start fast" (web manifest `shortcuts`). "Start fast" starts a fast today, with undo, and opens Home.
 
 **Water** (decided 2026-10-16): drinks can be logged as water amounts with one tap (e.g. +250 ml), and the water in foods counts too (BLS has water content per food). Shown as an amount-only or rolling gauge against a DGE guide value for water; the reference value still needs to be taken from the DGE tables with a source.
 
@@ -387,7 +387,7 @@ v1 is the smallest app that is useful every day; each later version adds to the 
 
 **v2 — Planning**
 
-- [ ] AI assistant logging: chat with photos and text, BLS foods, confirm card, user's own API key
+- [x] AI assistant logging: chat with photos and text, BLS foods, confirm card, user's own API key (built 2026-10-16, first real tests passed)
 - [ ] QR export/import for recipes; exchange-format paste import
 - [ ] Claude helper project instructions
 - [ ] Nutrient wiki; gamification basics (logging chain, achievements, fill animations, nutrient codex)
@@ -411,7 +411,7 @@ v1 is the smallest app that is useful every day; each later version adds to the 
 
 - [ ] Cooked weight per batch, log portions by grams
 - [ ] Change a dish's ingredients when logging it; swap preview in the recipe editor
-- [ ] Repeat a past meal; favourite foods; home-screen shortcuts
+- [x] Repeat a past meal; favourite foods; home-screen shortcuts (built 2026-10-16)
 - [ ] Day and range nutrient breakdown; trends and weekly look-back; calendar of day statuses
 - [ ] Water; day notes
 - [ ] Nice to have: fasting timer; "eat soon" flag for fridge portions (needs a shelf-life source)
