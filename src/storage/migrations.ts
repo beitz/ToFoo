@@ -9,7 +9,7 @@ import { CURRENT_SCHEMA_VERSION } from './types';
 type AnyRecord = Record<string, unknown> & { schemaVersion?: number };
 type Step = (r: AnyRecord) => AnyRecord;
 
-export const TABLES = ['profile', 'settings', 'recipes', 'batches', 'log', 'customFoods', 'dayStatus', 'fasts', 'sunEntries'] as const;
+export const TABLES = ['profile', 'settings', 'recipes', 'batches', 'log', 'customFoods', 'dayStatus', 'fasts', 'sunEntries', 'products'] as const;
 export type TableName = (typeof TABLES)[number];
 
 const steps: Record<TableName, Step[]> = {
@@ -23,6 +23,7 @@ const steps: Record<TableName, Step[]> = {
   dayStatus: [(r) => r],
   fasts: [(r) => r],
   sunEntries: [(r) => r],
+  products: [(r) => r],
 };
 
 export function needsMigration(record: AnyRecord): boolean {

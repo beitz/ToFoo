@@ -20,6 +20,7 @@ export const FEATURES: FeatureInfo[] = [
   { key: 'yesterdayNudge', label: 'Ask about yesterday', description: 'A gentle note when yesterday has no status.', default: true },
   { key: 'backupReminder', label: 'Backup reminder', description: 'A note when your last backup is older than the set number of days.', default: true },
   { key: 'aiAssistant', label: 'AI assistant', description: 'Log meals by chatting: photos and text, sent to Anthropic with your own API key. Set it up under Settings → AI assistant.', default: false },
+  { key: 'openFoodFacts', label: 'Open Food Facts lookup', description: 'Log packaged products by scanning or typing the barcode. Each lookup sends only the barcode to Open Food Facts; products you looked up stay on this phone.', default: false },
   { key: 'forecasts', label: 'Forecasts', description: '"Runs low in ~6 weeks" on gauges.', default: true, comingIn: 'v2' },
   { key: 'bestNextBatch', label: '"Best next batch" suggestion', description: 'Rank your recipes by the gaps they fill.', default: true, comingIn: 'v2' },
   { key: 'notifications', label: 'Notifications', description: 'Reminders on your phone.', default: false, comingIn: 'later' },

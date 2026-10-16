@@ -3,30 +3,41 @@
  */
 import type { Food, FoodDb } from '../foods/foodDb';
 import { ALL_SALT_CODES, saltCode } from '../foods/foodDb';
+import { productFood } from '../foods/products';
 import { addDays, dayRange, parseDay, utcOffsetHours } from '../lib/dates';
 import { sun as sunParams } from '../../model/parameters';
 import type { Range } from '../model/paramTypes';
 import { sunVitaminD, type SunSession } from '../model/sun';
 import type { DayStatus, FoodPart, ModelEntry } from '../model/types';
-import type { Batch, CustomFood, DayStatusRecord, Fast, FoodRef, Ingredient, LogEntry, Profile, SunEntry } from '../storage/types';
+import type { Batch, CustomFood, DayStatusRecord, Fast, FoodRef, Ingredient, LogEntry, Product, Profile, SunEntry } from '../storage/types';
 
-export interface ResolveContext {
+export interface FoodContext {
   foods: FoodDb;
+  /** Open Food Facts products by barcode. */
+  products: ReadonlyMap<string, Product>;
+}
+
+export interface ResolveContext extends FoodContext {
   batches: ReadonlyMap<string, Batch>;
   customFoods: ReadonlyMap<string, CustomFood>;
   salt: Profile['salt'];
 }
 
-export function foodForRef(ref: FoodRef, foods: FoodDb): Food | undefined {
-  return ref.source === 'BLS' ? foods.byCode.get(ref.code) : undefined;
+export function foodForRef(ref: FoodRef, ctx: FoodContext): Food | undefined {
+  if (ref.source === 'BLS') return ctx.foods.byCode.get(ref.code);
+  if (ref.source === 'OFF') {
+    const p = ctx.products.get(ref.code);
+    return p ? productFood(p, ctx.foods) : undefined;
+  }
+  return undefined;
 }
 
-/** The BLS food to use for an ingredient, with salt replaced by the kitchen default. */
-export function ingredientFood(ing: Ingredient, ctx: { foods: FoodDb; salt: Profile['salt'] }): Food | undefined {
+/** The food to use for an ingredient, with salt replaced by the kitchen default. */
+export function ingredientFood(ing: Ingredient, ctx: FoodContext & { salt: Profile['salt'] }): Food | undefined {
   if (ing.ref.source === 'BLS' && (ing.isSalt || ALL_SALT_CODES.has(ing.ref.code))) {
     return ctx.foods.byCode.get(saltCode(ctx.salt));
   }
-  return foodForRef(ing.ref, ctx.foods);
+  return foodForRef(ing.ref, ctx);
 }
 
 function partFromFood(food: Food, grams: number, preparation: FoodPart['preparation'], storage: FoodPart['storage']): FoodPart {
@@ -58,7 +69,7 @@ export function resolveEntry(e: LogEntry, ctx: ResolveContext): ModelEntry | nul
   const base = { id: e.id, label: e.label, time: e.time, dayKey: e.day, confidence: e.confidence };
   switch (e.kind) {
     case 'food': {
-      const food = foodForRef(e.ref, ctx.foods);
+      const food = foodForRef(e.ref, ctx);
       if (!food) return null;
       const f = ALL_SALT_CODES.has(food.code) ? (ctx.foods.byCode.get(saltCode(ctx.salt)) ?? food) : food;
       return { ...base, isSupplement: false, parts: [partFromFood(f, e.grams, e.preparation, 'fresh')] };

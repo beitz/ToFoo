@@ -4,9 +4,9 @@
  * so the loop can be tested without a network.
  */
 import type * as Beta from '@anthropic-ai/sdk/resources/beta/messages/messages';
-import { SYSTEM_PROMPT, TOOLS } from './prompt';
+import { SYSTEM_PROMPT, SYSTEM_PROMPT_WITH_PRODUCTS, TOOLS, TOOLS_WITH_PRODUCTS } from './prompt';
 import { usageOf, type ModelTokens } from './pricing';
-import { runSearchFoods, validateProposal, type Proposal, type ToolContext } from './tools';
+import { runLookupBarcode, runSearchFoods, validateProposal, type Proposal, type ToolContext } from './tools';
 
 export type CreateMessage = (params: Beta.MessageCreateParamsNonStreaming) => Promise<Beta.BetaMessage>;
 
@@ -40,12 +40,12 @@ export type TurnOutcome =
   | { kind: 'error'; reason: 'refusal' | 'tooLong' | 'tooManySteps' };
 
 /** Request parameters per model (fallbacks re-run a declined request on another model). */
-export function requestParams(model: AiModel, messages: Beta.BetaMessageParam[]): Beta.MessageCreateParamsNonStreaming {
+export function requestParams(model: AiModel, messages: Beta.BetaMessageParam[], withProducts = false): Beta.MessageCreateParamsNonStreaming {
   return {
     model,
     max_tokens: 16000,
-    system: SYSTEM_PROMPT,
-    tools: TOOLS,
+    system: withProducts ? SYSTEM_PROMPT_WITH_PRODUCTS : SYSTEM_PROMPT,
+    tools: withProducts ? TOOLS_WITH_PRODUCTS : TOOLS,
     messages,
     cache_control: { type: 'ephemeral' },
     output_config: { effort: 'medium' },
@@ -62,6 +62,13 @@ function textOf(content: Beta.BetaContentBlock[]): string {
     .trim();
 }
 
+/** A user message: what they typed and their photos, plus an optional note from the app (e.g. barcodes it read). */
+export interface UserMessage {
+  text: string;
+  images: UserImage[];
+  appNote?: string;
+}
+
 /**
  * Send one user message (text and/or photos) and run the model until it needs the user again.
  * Returns the updated conversation; the input is not mutated. `onUsage` gets the billed tokens of
@@ -71,7 +78,7 @@ export async function sendMessage(
   create: CreateMessage,
   model: AiModel,
   conversation: Conversation,
-  user: { text: string; images: UserImage[] },
+  user: UserMessage,
   ctx: ToolContext,
   onUsage?: (tokens: ModelTokens) => void,
 ): Promise<{ conversation: Conversation; outcome: TurnOutcome }> {
@@ -81,12 +88,14 @@ export async function sendMessage(
     ...user.images.map((img): Beta.BetaImageBlockParam => ({ type: 'image', source: { type: 'base64', media_type: img.mediaType, data: img.data } })),
   ];
   if (user.text.trim()) content.push({ type: 'text', text: user.text.trim() });
+  if (user.appNote) content.push({ type: 'text', text: user.appNote });
   messages.push({ role: 'user', content });
+  const withProducts = !!ctx.products;
 
   const done = (outcome: TurnOutcome, pendingResults: Beta.BetaToolResultBlockParam[] = []) => ({ conversation: { messages, pendingResults }, outcome });
 
   for (let step = 0; step < MAX_STEPS; step++) {
-    const res = await create(requestParams(model, messages));
+    const res = await create(requestParams(model, messages, withProducts));
     onUsage?.(usageOf(res, model));
     // Append the whole content (thinking and fallback blocks included) so the next request replays it unchanged.
     messages.push({ role: 'assistant', content: res.content });
@@ -103,8 +112,11 @@ export async function sendMessage(
       if (use.name === 'search_foods') {
         const r = runSearchFoods(use.input, ctx);
         results.push({ type: 'tool_result', tool_use_id: use.id, content: r.text, is_error: !r.ok });
+      } else if (use.name === 'lookup_barcode' && withProducts) {
+        const r = await runLookupBarcode(use.input, ctx);
+        results.push({ type: 'tool_result', tool_use_id: use.id, content: r.text, is_error: !r.ok });
       } else if (use.name === 'propose_meal') {
-        const r = validateProposal(use.input, ctx.db);
+        const r = validateProposal(use.input, ctx.db, ctx.products);
         if (r.ok) {
           proposal = r.proposal;
           proposalId = use.id;

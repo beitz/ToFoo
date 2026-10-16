@@ -44,4 +44,18 @@ describe('repository', () => {
     expect((await b.getProfile())!.sex).toBe('female');
     expect(await b.db.log.count()).toBe(1);
   });
+
+  it('keeps the chosen BLS match when a product is fetched again, and backs products up', async () => {
+    const repo = await fresh();
+    const product = { id: 'OFF:8000500319475', source: 'OFF' as const, code: '8000500319475', name: 'GiOTTO', per100: { ENERCC: 632 }, categories: [], fetchedAt: 1 };
+    await repo.saveProduct(product);
+    await repo.setProductMatch(product.id, { version: '4.0', code: 'S610000' });
+    await repo.saveProduct({ ...product, per100: { ENERCC: 630 }, fetchedAt: 2 });
+    expect(await repo.getProduct(product.id)).toMatchObject({ per100: { ENERCC: 630 }, match: { code: 'S610000' }, schemaVersion: 1 });
+    await repo.setProductMatch(product.id, null);
+    expect((await repo.getProduct(product.id))!.match).toBeUndefined();
+    const b = await fresh();
+    await b.restore(await repo.snapshot());
+    expect(await b.db.products.count()).toBe(1);
+  });
 });

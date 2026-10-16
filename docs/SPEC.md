@@ -42,14 +42,14 @@ Design targets: mobile-first (phone width), touch-friendly, light and dark mode.
 
 ## Data sources and pipeline
 
-The BLS 4.0 is the primary food database, bundled with the app; USDA is fetched on demand as a backup; manual entry covers everything else.
+The BLS 4.0 is the primary food database, bundled with the app; Open Food Facts covers packaged products by barcode; USDA is fetched on demand as a backup; manual entry covers everything else.
 
 | Source | Role | Access | Version |
 | --- | --- | --- | --- |
 | BLS 4.0 (Max Rubner-Institut) | Primary: \~7,140 foods incl. composite dishes, 138 nutrients | Bundled in the app, offline | v1 |
 | Manual entry | Special products, label values, supplements | User input | v1 |
 | USDA FoodData Central | Backup for foods missing in BLS | Online API with free key; fetched values saved locally | v3 |
-| Open Food Facts | Barcode → product identification (macros only; map to nearest BLS entry for micros) | Online API | v3 |
+| Open Food Facts | Packaged products by barcode: label values, the rest borrowed from the nearest BLS food | Opt-in online lookup (sends only the barcode); fetched products saved locally and in backups | Built 2026-10-16 (barcode only) |
 
 **BLS pipeline** (a build-time script, not runtime):
 
@@ -57,6 +57,8 @@ The BLS 4.0 is the primary food database, bundled with the app; USDA is fetched 
 2. A script converts it to compact JSON (e.g. `public/data/bls-4.0.json`): food code, German name, food group, and the nutrients the app uses, with units.
 3. Missing values stay explicitly missing (`null`), never zero. The UI shows when a food lacks data for a nutrient.
 4. The output records its BLS version. Every recipe ingredient stores `source + version + code`, so a future BLS update can be migrated with a mapping instead of silently changing old recipes.
+
+**Open Food Facts** (decided 2026-10-16). An opt-in feature ("Open Food Facts lookup", off by default). On the log screen a barcode button opens the camera (the browser's barcode reader, Chrome on Android) or takes a typed number; the product is looked up on this phone first, then at Open Food Facts. A product is a food made of two parts: the label values (energy, macros, salt, and any vitamins or minerals on the label) and, for everything else, the values of the most similar BLS food, which the user picks once per product (suggested from the product's categories) or the assistant proposes. Label values always win. In the model, label values carry the BLS provenance "label" and borrowed ones "taken over from a similar food", so their uncertainty follows the BLS rules; without a chosen BLS food the rest stays missing. Logged products are stored on the phone (and in backups) as fetched, so history stays the same when Open Food Facts edits a product, and they are found by name in the normal search afterwards without a request. Name search at Open Food Facts is not possible from a browser app today (see docs/OPEN_QUESTIONS.md), so a product is first found by its barcode. Data licence: ODbL, credited on the About page.
 
 **Licence and attribution.** BLS is CC BY 4.0. The app has an About / Data sources page and the README has a line, both containing: Max Rubner-Institut (2025): Bundeslebensmittelschlüssel (BLS), Version 4.0 — Deutsche Nährstoffdatenbank. Karlsruhe. DOI: [10.25826/Data20251217-134202-0](https://doi.org/10.25826/Data20251217-134202-0), a link to [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), and a note that the data was converted and abridged.
 
@@ -187,7 +189,7 @@ Every log entry carries a confidence level, and every day has an explicit status
 3. Manual entry: free name plus whatever nutrients are known (from a label, a supplement).
 4. Tell the AI assistant what you ate, by photo, text or both (optional, see below).
 5. Paste an entry in the ToFoo exchange format (e.g. produced by the Claude helper, see below).
-6. Later: barcode and label photo (v3).
+6. Scan a packaged product's barcode (Open Food Facts, optional). Later: label photo (v3).
 
 **Time of entry**: a new entry assumes the meal was just finished, so the timestamp defaults to now. Date and time stay one tap away for logging after the fact. Any eating pattern is supported; OMAD is the optimised path, not a requirement.
 
@@ -229,7 +231,7 @@ Logging should feel like telling a friend what you ate, not operating a database
 **Where the numbers come from** (source ladder, most concrete first):
 
 1. BLS food matching the item (e.g. "Milchbrötchen").
-2. Branded product databases (Open Food Facts via barcode or name, v3), with micronutrients borrowed from the nearest BLS food.
+2. Branded product databases: Open Food Facts by barcode (when the lookup is on), with micronutrients borrowed from the nearest BLS food.
 3. USDA FoodData Central (v3).
 4. Built from ingredients: a dish not in any database (Korean hotpot at a restaurant) becomes several BLS ingredients with estimated grams.
 5. Nearest-match guess: the closest BLS food, clearly marked.
@@ -243,7 +245,7 @@ Logging should feel like telling a friend what you ate, not operating a database
 **Technical shape**:
 
 - The app talks to the Claude API directly from the browser with the user's own key (static app, no server). The key is stored only on the device (IndexedDB), never in backups or the repo.
-- The model works through tools the app provides: `search_foods` (searches the bundled BLS locally and returns codes, names and macros per 100 g), and `propose_meal` (food codes, grams, preparation, assumptions). Questions to the user are plain chat messages. The app checks every proposed code exists in BLS and every amount is plausible before showing the card; otherwise it sends the error back to the model.
+- The model works through tools the app provides: `search_foods` (searches the bundled BLS locally and returns codes, names and macros per 100 g; with the Open Food Facts lookup on, also products saved on the phone), `lookup_barcode` (only with the lookup on: Open Food Facts by barcode, returning label values), and `propose_meal` (food or product codes, grams, preparation, assumptions; for a product also the most similar BLS food, unless the user already chose one, which wins). The app reads barcodes in the user's photos on the phone and passes the numbers to the model as text. Questions to the user are plain chat messages. The app checks every proposed code exists in BLS and every amount is plausible before showing the card; otherwise it sends the error back to the model.
 - Photos are scaled down on the phone before sending (long side ≤ 1568 px), which keeps cost and upload time low.
 - Model is selectable in the assistant settings (default the most capable; cheaper ones for lower cost). A meal costs roughly 5–15 cents with the default model and under a cent with the cheapest (estimate; check real usage in the Anthropic console).
 - The conversation is not stored; only the confirmed log entries are.
@@ -251,7 +253,7 @@ Logging should feel like telling a friend what you ate, not operating a database
 
 **Privacy**: the feature is off until the user turns it on and enters a key. The settings screen says plainly that photos and messages go to Anthropic. Nothing is sent when the feature is off.
 
-**Later steps**: Open Food Facts lookup (by barcode in a photo or by brand name) and USDA as extra assistant tools (v3); remembering corrections ("my bowl is 350 g") as portion helpers.
+**Later steps**: USDA as an extra assistant tool (v3); Open Food Facts by brand name once a browser-usable search exists; remembering corrections ("my bowl is 350 g") as portion helpers.
 
 **Bulk photo import** (later version, idea 2026-10-16): take a photo of everything eaten during the day, then log it all at once when there is time. The user picks many photos in one go; the app reads each photo's capture time from its EXIF data (`DateTimeOriginal`), groups photos taken close together into one meal, and runs each meal through the normal assistant flow, logged at that date and time. Each meal gets its own confirm card, so nothing is logged unchecked. When a photo has no capture time (some apps and pickers strip EXIF), the app falls back to the file date and shows that time as editable on the card.
 
@@ -346,6 +348,7 @@ Optional features are modules with an on/off switch, so the app can be tuned bet
 | Visible nutrients | All | Opens the nutrient visibility page |
 | Advanced numbers | Off | Show units, parameter values, sources inline |
 | AI assistant | Off | Log meals by chatting with photos and text (needs your API key) |
+| Open Food Facts lookup | Off | Log packaged products by barcode (sends only the barcode) |
 
 Settings also hold the profile, starting-level choice, salt defaults, meal window, rolling-average window, and backup options. Features are implemented behind one feature-flag module so new ones get a toggle by default.
 
@@ -361,7 +364,7 @@ All personal data stays on the phone in IndexedDB; a one-tap export file is the 
 - **Schema versioning**: every stored record has a schema version; migrations run on app start and are unit-tested.
 - **Backup**: "Export everything" writes one JSON file in the exchange format (`type: backup`) via the Android share sheet or download. "Import backup" restores it with a preview. Optional reminder when the last backup is older than N days (default 14).
 - **Model is recomputable**: tank levels are derived from the log and parameters, not stored as truth, so a parameter update or bug fix recalculates history correctly. Cache results for speed.
-- **Privacy**: no analytics, no third-party requests in v1 except loading the app itself. Later online features (USDA, Open Food Facts) are clearly marked and send only the search term or barcode. The AI assistant is opt-in, and sends the photos and messages of an assistant conversation (plus the matching BLS search results) to Anthropic, and nothing else.
+- **Privacy**: no analytics, no third-party requests in v1 except loading the app itself. Online features are opt-in and clearly marked: the Open Food Facts lookup sends only the barcode; USDA (later) only the search term. The AI assistant is opt-in, and sends the photos and messages of an assistant conversation (plus the matching BLS search results) to Anthropic, and nothing else.
 - **CSV export** (later, nice to have): daily intake per nutrient and the diary as CSV, for analysis in Excel. The JSON backup remains the backup.
 - **Phone health data** (later, low priority): the phone already tracks things like weight and activity, but a PWA in Chrome cannot read Health Connect. Options to look at: importing a Health Connect / Google Fit export file, or a small native companion.
 - **Secrets**: any future API key is entered in the app and stored only on the device, never in the repo.
@@ -393,7 +396,8 @@ v1 is the smallest app that is useful every day; each later version adds to the 
 **v3 — More data**
 
 - [ ] USDA FoodData Central lookup
-- [ ] Barcode (Open Food Facts) and label-photo reading, also as assistant tools
+- [x] Barcode (Open Food Facts), also as an assistant tool (built 2026-10-16)
+- [ ] Label-photo reading; Open Food Facts name search (blocked: no browser-usable search API)
 - [ ] Bulk photo import: many photos at once, each meal logged at its photo's capture time
 - [ ] Blood-test calibration; freezer overview with shelf life per recipe
 - [ ] Optional location-history import for sun exposure

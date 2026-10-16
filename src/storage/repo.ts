@@ -11,6 +11,7 @@ import {
   type DayStatusRecord,
   type Fast,
   type LogEntry,
+  type Product,
   type Profile,
   type Recipe,
   type Settings,
@@ -30,6 +31,7 @@ export interface Snapshot {
   dayStatus: DayStatusRecord[];
   fasts: Fast[];
   sunEntries: SunEntry[];
+  products: Product[];
 }
 
 type NewLog = DistributiveOmit<LogEntry, 'id' | 'schemaVersion'>;
@@ -161,6 +163,31 @@ export function createRepo(db: ToFooDB) {
       await db.customFoods.delete(id);
     },
 
+    // ── Open Food Facts products ──
+    async getProduct(id: string): Promise<Product | undefined> {
+      return db.products.get(id);
+    },
+    /** Save (or refresh) a product; a refresh keeps the chosen BLS match unless a new one is given. */
+    async saveProduct(product: Omit<Product, 'schemaVersion'>): Promise<Product> {
+      return db.transaction('rw', db.products, async () => {
+        const old = await db.products.get(product.id);
+        const match = product.match ?? old?.match;
+        const rec: Product = { ...product, ...(match ? { match } : {}), schemaVersion: v };
+        await db.products.put(rec);
+        return rec;
+      });
+    },
+    async setProductMatch(id: string, match: Product['match'] | null): Promise<void> {
+      await db.transaction('rw', db.products, async () => {
+        const p = await db.products.get(id);
+        if (!p) return;
+        const next: Product = { ...p, schemaVersion: v };
+        if (match) next.match = match;
+        else delete next.match;
+        await db.products.put(next);
+      });
+    },
+
     // ── Day status, fasting, sun ──
     async setDayStatus(day: string, status: DayStatusRecord['status'] | null): Promise<void> {
       if (status === null) await db.dayStatus.delete(day);
@@ -194,7 +221,7 @@ export function createRepo(db: ToFooDB) {
 
     // ── Backup ──
     async snapshot(): Promise<Snapshot> {
-      return db.transaction('r', [db.profile, db.settings, db.recipes, db.batches, db.log, db.customFoods, db.dayStatus, db.fasts, db.sunEntries], async () => ({
+      return db.transaction('r', [db.profile, db.settings, db.recipes, db.batches, db.log, db.customFoods, db.dayStatus, db.fasts, db.sunEntries, db.products], async () => ({
         profile: (await db.profile.get('profile')) ?? null,
         settings: (await db.settings.get('settings')) ?? null,
         recipes: await db.recipes.toArray(),
@@ -204,11 +231,12 @@ export function createRepo(db: ToFooDB) {
         dayStatus: await db.dayStatus.toArray(),
         fasts: await db.fasts.toArray(),
         sunEntries: await db.sunEntries.toArray(),
+        products: await db.products.toArray(),
       }));
     },
     /** Replace all personal data with the snapshot (after the user confirmed a preview). */
     async restore(s: Snapshot): Promise<void> {
-      const tables = [db.profile, db.settings, db.recipes, db.batches, db.log, db.customFoods, db.dayStatus, db.fasts, db.sunEntries];
+      const tables = [db.profile, db.settings, db.recipes, db.batches, db.log, db.customFoods, db.dayStatus, db.fasts, db.sunEntries, db.products];
       await db.transaction('rw', tables, async () => {
         await Promise.all(tables.map((t) => t.clear()));
         if (s.profile) await db.profile.put(s.profile);
@@ -220,6 +248,7 @@ export function createRepo(db: ToFooDB) {
         await db.dayStatus.bulkPut(s.dayStatus);
         await db.fasts.bulkPut(s.fasts);
         await db.sunEntries.bulkPut(s.sunEntries);
+        await db.products.bulkPut(s.products);
       });
       await runMigrations(db);
     },

@@ -9,7 +9,12 @@ import { emptyConversation, sendMessage, type AiModel, type Conversation, type T
 import { classifyError, getAiSettings, makeCreate, saveUsage } from '../../ai/client';
 import { mergeModelTokens, modelTokensCost, totalTokens, type ModelTokens } from '../../ai/pricing';
 import { prepareImage, type PreparedImage } from '../../ai/image';
-import type { Proposal, ProposedItem } from '../../ai/tools';
+import type { Proposal, ProposedItem, ProductTools } from '../../ai/tools';
+import { findProduct } from '../../foods/findProduct';
+import { productUrl } from '../../foods/openFoodFacts';
+import { productLabel } from '../../foods/products';
+import type { FoodRef, Product } from '../../storage/types';
+import { barcodesInPhoto } from '../log/barcode';
 import type { EntryConfidence } from '../../model/types';
 import { isOn } from '../../settings/features';
 import { repo } from '../../storage/repo';
@@ -78,7 +83,10 @@ function Chat({ apiKey, model, day }: { apiKey: string; model: AiModel; day: str
   const [bubbles, setBubbles] = useState<Bubble[]>([]);
   const [proposal, setProposal] = useState<Proposal>();
   const [text, setText] = useState('');
-  const [images, setImages] = useState<PreparedImage[]>([]);
+  const [images, setImages] = useState<Array<PreparedImage & { barcodes: string[] }>>([]);
+  const offOn = isOn(d.settings.features, 'openFoodFacts');
+  // Products looked up in this chat stay usable for later proposals in it.
+  const [seenProducts] = useState(() => new Map<string, Product>());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<MessageKey>();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -95,7 +103,8 @@ function Chat({ apiKey, model, day }: { apiKey: string; model: AiModel; day: str
   async function addPhotos(files: FileList | null) {
     if (!files) return;
     try {
-      const prepared = await Promise.all([...files].map(prepareImage));
+      // Barcodes are read from the full-size photo, on the phone; the assistant gets them as text.
+      const prepared = await Promise.all([...files].map(async (f) => ({ ...(await prepareImage(f)), barcodes: offOn ? await barcodesInPhoto(f) : [] })));
       setImages((imgs) => [...imgs, ...prepared]);
     } catch {
       setError('ai.error.photo');
@@ -103,7 +112,8 @@ function Chat({ apiKey, model, day }: { apiKey: string; model: AiModel; day: str
   }
 
   async function send() {
-    const msg = { text, images };
+    const barcodes = [...new Set(images.flatMap((i) => i.barcodes))];
+    const msg = { text, images, ...(barcodes.length ? { appNote: `(Barcodes the app read from the photos: ${barcodes.join(', ')})` } : {}) };
     if (busy || (!msg.text.trim() && msg.images.length === 0)) return;
     const shownProposal = proposal;
     setBusy(true);
@@ -120,7 +130,8 @@ function Chat({ apiKey, model, day }: { apiKey: string; model: AiModel; day: str
       void saveUsage(tokens);
     };
     try {
-      const ctx = { db: d.foods, index: d.searchIndex, boost: d.searchBoost };
+      const products: ProductTools | undefined = offOn ? { saved: d.productsByCode, find: (code) => findProduct(code), seen: seenProducts } : undefined;
+      const ctx = { db: d.foods, index: d.searchIndex, boost: d.searchBoost, products };
       const r = await sendMessage(create, model, conversation, msg, ctx, onUsage);
       setConversation(r.conversation);
       show(r.outcome);
@@ -247,15 +258,21 @@ function ProposalCard({ proposal, day, toast }: { proposal: Proposal; day: strin
     setSaving(true);
     const ids: string[] = [];
     for (const it of items) {
+      let ref: FoodRef = { source: 'BLS', version: d.foods.version, code: it.food.code };
+      if (it.product) {
+        await repo.saveProduct(it.product);
+        await repo.setProductMatch(it.product.id, it.product.match ?? null);
+        ref = { source: 'OFF', code: it.product.code };
+      }
       const entry = await repo.addLog({
         kind: 'food',
-        ref: { source: 'BLS', version: d.foods.version, code: it.food.code },
+        ref,
         grams: it.grams!,
         preparation: it.preparation,
         time,
         day: dayKey(new Date(time)),
         confidence,
-        label: it.food.nameEn,
+        label: it.product ? productLabel(it.product) : it.food.nameEn,
       });
       ids.push(entry.id);
     }
@@ -272,8 +289,17 @@ function ProposalCard({ proposal, day, toast }: { proposal: Proposal; day: strin
         {items.map((it, i) => (
           <li key={`${it.food.code}-${i}`} className="proposal-item">
             <div className="proposal-name">
-              <a href={href('food', it.food.code)}>{it.food.nameEn}</a>
+              {it.product ? (
+                <a href={productUrl(it.product.code)} target="_blank" rel="noreferrer">
+                  {productLabel(it.product)}
+                </a>
+              ) : (
+                <a href={href('food', it.food.code)}>{it.food.nameEn}</a>
+              )}
               <span className="muted small block">{it.note || it.food.nameDe}</span>
+              {it.product?.match && (
+                <span className="muted small block">{t('ai.microsFrom', { name: d.foods.byCode.get(it.product.match.code)?.nameEn ?? it.product.match.code })}</span>
+              )}
             </div>
             <NumberInput value={it.grams} onChange={(g) => setItems((all) => all.map((x, j) => (j === i ? { ...x, grams: g } : x)))} suffix="g" min={0} />
             <button className="icon-btn" aria-label={t('ai.removeItem', { name: it.food.nameEn })} onClick={() => setItems((all) => all.filter((_, j) => j !== i))}>

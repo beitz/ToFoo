@@ -7,17 +7,28 @@ import { formatDay, formatTime } from '../../lib/dates';
 import { search } from '../../foods/search';
 import type { Food } from '../../foods/foodDb';
 import { repo } from '../../storage/repo';
-import type { CustomFood, LogEntry } from '../../storage/types';
+import type { CustomFood, LogEntry, Product } from '../../storage/types';
+import { productLabel } from '../../foods/products';
 import { Icon } from '../../ui/Icon';
 import { isOn } from '../../settings/features';
 import { nextStorage, totalLeft, logPortion } from '../home/StockChips';
 import { AmountSheet } from './AmountSheet';
+import { BarcodeSheet } from './BarcodeSheet';
 import { CustomSheet } from './CustomSheet';
 import { ManualSheet } from './ManualSheet';
 import { defaultTimeFor } from './time';
 import { entryAmount } from './describe';
 
-type Selected = { kind: 'food'; food: Food } | { kind: 'custom'; food: CustomFood } | { kind: 'manual'; supplement: boolean } | null;
+type Selected =
+  | { kind: 'food'; food: Food }
+  | { kind: 'product'; product: Product }
+  | { kind: 'barcode' }
+  | { kind: 'custom'; food: CustomFood }
+  | { kind: 'manual'; supplement: boolean }
+  | null;
+
+/** Saved products shown under "Packaged products" when nothing is searched. */
+const RECENT_PRODUCTS = 6;
 
 /** Log a meal: search foods, pick amounts; several items in a row form one meal. Route: #/log[/day]. */
 export function LogPage({ day: dayParam, foodCode }: { day?: string; foodCode?: string }) {
@@ -41,6 +52,13 @@ export function LogPage({ day: dayParam, foodCode }: { day?: string; foodCode?: 
     if (!q) return [];
     return d.customFoods.filter((c) => c.name.toLowerCase().includes(q));
   }, [query, d.customFoods]);
+  const offOn = isOn(d.settings.features, 'openFoodFacts');
+  // Products looked up before stay on this phone and are found by name without any request.
+  const productMatches = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return [];
+    return d.products.filter((p) => `${p.name} ${p.brand ?? ''} ${p.code}`.toLowerCase().includes(q));
+  }, [query, d.products]);
   const recent = useMemo(() => [...d.recentFoods.entries()].filter(([, v]) => v > 0.3).slice(0, 8).map(([code]) => d.foods.byCode.get(code)).filter((f): f is Food => !!f), [d.recentFoods, d.foods]);
   const addedEntries = added.map((id) => d.log.find((e) => e.id === id)).filter((e): e is LogEntry => !!e);
   const stock = d.batches.filter((b) => totalLeft(b) > 0);
@@ -93,16 +111,23 @@ export function LogPage({ day: dayParam, foodCode }: { day?: string; foodCode?: 
         </a>
       )}
 
-      <div className="search-box">
-        <Icon name="search" />
-        <input
-          type="search"
-          autoFocus
-          placeholder={t('log.searchPlaceholder')}
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          aria-label={t('log.searchPlaceholder')}
-        />
+      <div className="search-row">
+        <div className="search-box">
+          <Icon name="search" />
+          <input
+            type="search"
+            autoFocus
+            placeholder={t('log.searchPlaceholder')}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            aria-label={t('log.searchPlaceholder')}
+          />
+        </div>
+        {offOn && (
+          <button className="icon-btn scan-btn" onClick={() => setSelected({ kind: 'barcode' })} aria-label={t('off.scan')} title={t('off.scan')}>
+            <Icon name="barcode" />
+          </button>
+        )}
       </div>
 
       {!query.trim() && (
@@ -167,6 +192,13 @@ export function LogPage({ day: dayParam, foodCode }: { day?: string; foodCode?: 
             </>
           )}
 
+          {offOn && d.products.length > 0 && (
+            <>
+              <h2 className="section-title">{t('off.products')}</h2>
+              <ProductList products={d.products.slice(0, RECENT_PRODUCTS)} onPick={(product) => setSelected({ kind: 'product', product })} />
+            </>
+          )}
+
           {recent.length > 0 && (
             <>
               <h2 className="section-title">{t('log.recent')}</h2>
@@ -191,22 +223,52 @@ export function LogPage({ day: dayParam, foodCode }: { day?: string; foodCode?: 
               ))}
             </ul>
           )}
+          {productMatches.length > 0 && <ProductList products={productMatches} onPick={(product) => setSelected({ kind: 'product', product })} />}
           <FoodList foods={results.map((r) => d.foods.byCode.get(r.key)!).filter(Boolean)} onPick={(food) => setSelected({ kind: 'food', food })} />
-          {results.length === 0 && customMatches.length === 0 && (
+          {results.length === 0 && customMatches.length === 0 && productMatches.length === 0 && (
             <div className="empty">
-              <p>{t('log.noResults')}</p>
-              <button className="btn btn-secondary" onClick={() => setSelected({ kind: 'manual', supplement: false })}>
-                {t('log.manual')}
-              </button>
+              <p>{t(offOn ? 'off.noResults' : 'log.noResults')}</p>
+              <div className="row wrap">
+                {offOn && (
+                  <button className="btn btn-secondary" onClick={() => setSelected({ kind: 'barcode' })}>
+                    <Icon name="barcode" /> {t('off.scan')}
+                  </button>
+                )}
+                <button className="btn btn-secondary" onClick={() => setSelected({ kind: 'manual', supplement: false })}>
+                  {t('log.manual')}
+                </button>
+              </div>
             </div>
           )}
         </>
       )}
 
       {selected?.kind === 'food' && <AmountSheet food={selected.food} day={day} time={mealTime} onClose={() => setSelected(null)} onAdded={onAdded} />}
+      {selected?.kind === 'product' && <AmountSheet product={selected.product} day={day} time={mealTime} onClose={() => setSelected(null)} onAdded={onAdded} />}
+      {selected?.kind === 'barcode' && (
+        <BarcodeSheet onFound={(product) => setSelected({ kind: 'product', product })} onManual={() => setSelected({ kind: 'manual', supplement: false })} onClose={() => setSelected(null)} />
+      )}
       {selected?.kind === 'custom' && <CustomSheet food={selected.food} day={day} time={mealTime} onClose={() => setSelected(null)} onAdded={onAdded} />}
       {selected?.kind === 'manual' && <ManualSheet supplement={selected.supplement} day={day} time={mealTime} onClose={() => setSelected(null)} onAdded={onAdded} />}
     </section>
+  );
+}
+
+function ProductList({ products, onPick }: { products: Product[]; onPick: (p: Product) => void }) {
+  return (
+    <ul className="result-list">
+      {products.map((p) => (
+        <li key={p.id}>
+          <button className="result" onClick={() => onPick(p)}>
+            <span className="result-name">{productLabel(p)}</span>
+            <span className="muted small">
+              {t('off.productTag')}
+              {p.quantity ? ` · ${p.quantity}` : ''}
+            </span>
+          </button>
+        </li>
+      ))}
+    </ul>
   );
 }
 
