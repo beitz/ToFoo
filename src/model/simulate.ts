@@ -78,6 +78,17 @@ export interface SimulationResult {
   /** Effective status per day (explicit or derived). */
   dayStatus: Record<string, DayStatus | 'pending'>;
   meals: MealSummary[];
+  /** Per-day totals, aligned with the input `days`, for reviewing any past period (model/period.ts). */
+  daily: DailyTotals[];
+}
+
+/** One day's logged amounts (no imputation): absorbed per scenario, raw intake (central). */
+export interface DailyTotals {
+  absorbed: Record<Scenario, Record<string, number>>;
+  intake: Record<string, number>;
+  supplementIntake: Record<string, number>;
+  /** Nutrients some eaten food had no data for. */
+  missing: ReadonlySet<string>;
 }
 
 export interface MealSummary {
@@ -206,7 +217,7 @@ export function tankCapacity(id: string, weightKg: number, sex: Sex | undefined,
   return undefined;
 }
 
-function classify(kind: GaugeKind, value: number, ulRatio: number | undefined, known: boolean): GaugeStatus {
+export function classify(kind: GaugeKind, value: number, ulRatio: number | undefined, known: boolean): GaugeStatus {
   if (kind === 'info') return 'info';
   if (ulRatio !== undefined && ulRatio > 1) return 'tooHigh';
   if (kind === 'limit') return value > 1 ? 'tooHigh' : known ? 'fine' : 'unknown';
@@ -470,7 +481,14 @@ export function simulate(input: SimulationInput): SimulationResult {
     });
   }
 
-  return { nutrients: results, dayStatus: statuses, meals: mealSummaries };
+  const daily: DailyTotals[] = days.map((_, i) => ({
+    absorbed: { low: totals.low[i]!.absorbed, central: totals.central[i]!.absorbed, high: totals.high[i]!.absorbed },
+    intake: totals.central[i]!.intake,
+    supplementIntake: totals.central[i]!.supplementIntake,
+    missing: totals.central[i]!.missing,
+  }));
+
+  return { nutrients: results, dayStatus: statuses, meals: mealSummaries, daily };
 }
 
 /** Ids whose intake the model tracks (for tests and food profiles). */
