@@ -14,6 +14,7 @@ import { entryAmount } from '../log/describe';
 import { EditEntrySheet } from './EditEntrySheet';
 import { SunEntrySheet } from './SunEntrySheet';
 import { sunSessionsFor } from '../../logic/resolve';
+import { logMealAgain } from '../log/logAgain';
 
 type StatusChoice = 'auto' | 'logged' | 'partial' | 'fasted';
 
@@ -88,6 +89,17 @@ export function DiaryPage({ day: dayParam }: { day?: string }) {
           <div className="meal-head">
             <strong>{formatTime(meal[0]!.time)}</strong>
             <span className="muted small">{t('diary.meal')}</span>
+            <button
+              className="btn btn-small btn-ghost meal-again"
+              aria-label={t('repeat.againLabel')}
+              onClick={async () => {
+                // The copy is logged now; show today's diary so it can be edited straight away.
+                const added = await logMealAgain(meal, Date.now(), d.batchesById, toast);
+                if (added.length && day !== d.today) navigate('diary');
+              }}
+            >
+              <Icon name="repeat" size={16} /> {t('repeat.again')}
+            </button>
           </div>
           <ul className="plain-list">
             {meal.map((e) => (

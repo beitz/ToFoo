@@ -58,4 +58,14 @@ describe('repository', () => {
     await b.restore(await repo.snapshot());
     expect(await b.db.products.count()).toBe(1);
   });
+
+  it('pins and unpins favourite foods', async () => {
+    const repo = await fresh();
+    const oats = { source: 'BLS', version: '4.0', code: 'C133000' } as const;
+    expect(await repo.toggleFavourite(oats)).toBe(true);
+    expect(await repo.toggleFavourite({ source: 'custom', id: 'x' })).toBe(true);
+    expect((await repo.getSettings())!.favourites).toEqual([oats, { source: 'custom', id: 'x' }]);
+    expect(await repo.toggleFavourite({ ...oats, version: '4.1' })).toBe(false);
+    expect((await repo.getSettings())!.favourites).toEqual([{ source: 'custom', id: 'x' }]);
+  });
 });

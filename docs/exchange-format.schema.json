@@ -328,6 +328,67 @@
                         "compact",
                         "detailed"
                       ]
+                    },
+                    "favourites": {
+                      "type": "array",
+                      "items": {
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "source": {
+                                "type": "string",
+                                "const": "BLS"
+                              },
+                              "version": {
+                                "type": "string"
+                              },
+                              "code": {
+                                "type": "string",
+                                "pattern": "^[A-Z][0-9A-Z]{6}$"
+                              }
+                            },
+                            "required": [
+                              "source",
+                              "version",
+                              "code"
+                            ]
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "source": {
+                                "type": "string",
+                                "const": "custom"
+                              },
+                              "id": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "source",
+                              "id"
+                            ]
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "source": {
+                                "type": "string",
+                                "const": "OFF"
+                              },
+                              "code": {
+                                "type": "string",
+                                "pattern": "^\\d{4,14}$"
+                              }
+                            },
+                            "required": [
+                              "source",
+                              "code"
+                            ]
+                          }
+                        ]
+                      }
                     }
                   },
                   "required": [

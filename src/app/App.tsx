@@ -8,6 +8,7 @@ import { diag, layoutSnapshot } from './diagnostics';
 import { Icon } from '../ui/Icon';
 import { AboutPage } from '../features/about/AboutPage';
 import { HomePage } from '../features/home/HomePage';
+import { FastShortcut } from '../features/home/FastShortcut';
 import { LogPage } from '../features/log/LogPage';
 import { AssistantPage } from '../features/assistant/AssistantPage';
 import { AssistantSettingsPage } from '../features/settings/AssistantSettingsPage';
@@ -71,6 +72,8 @@ function Page({ route }: { route: string[] }) {
       }
     case 'about':
       return <AboutPage />;
+    case 'fast':
+      return <FastShortcut />;
     default:
       return <HomePage />;
   }

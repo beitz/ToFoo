@@ -2,6 +2,7 @@
  * Repository: the only API the UI uses to read and write personal data.
  */
 import { newId } from '../lib/id';
+import { refKey } from '../lib/refs';
 import { db as defaultDb, runMigrations, type ToFooDB } from './db';
 import { defaultProfile, defaultSettings } from './defaults';
 import {
@@ -9,8 +10,10 @@ import {
   type Batch,
   type CustomFood,
   type DayStatusRecord,
+  type FoodRef,
   type Fast,
   type LogEntry,
+  type NewLogEntry as NewLog,
   type Product,
   type Profile,
   type Recipe,
@@ -34,8 +37,6 @@ export interface Snapshot {
   products: Product[];
 }
 
-type NewLog = DistributiveOmit<LogEntry, 'id' | 'schemaVersion'>;
-type DistributiveOmit<T, K extends keyof T> = T extends unknown ? Omit<T, K> : never;
 
 export function createRepo(db: ToFooDB) {
   const v = CURRENT_SCHEMA_VERSION;
@@ -65,6 +66,18 @@ export function createRepo(db: ToFooDB) {
     async updateSettings(patch: Partial<Omit<Settings, 'id'>>): Promise<void> {
       const s = (await db.settings.get('settings')) ?? defaultSettings();
       await db.settings.put({ ...s, ...patch, id: 'settings', schemaVersion: v });
+    },
+
+    /** Pin or unpin a food on the log screen; returns whether it is now a favourite. */
+    async toggleFavourite(ref: FoodRef): Promise<boolean> {
+      return db.transaction('rw', db.settings, async () => {
+        const s = (await db.settings.get('settings')) ?? defaultSettings();
+        const key = refKey(ref);
+        const list = s.favourites ?? [];
+        const on = list.some((r) => refKey(r) === key);
+        await db.settings.put({ ...s, favourites: on ? list.filter((r) => refKey(r) !== key) : [...list, ref], id: 'settings', schemaVersion: v });
+        return !on;
+      });
     },
 
     // ── Log ──

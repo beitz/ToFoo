@@ -18,6 +18,9 @@ import { CustomSheet } from './CustomSheet';
 import { ManualSheet } from './ManualSheet';
 import { defaultTimeFor } from './time';
 import { entryAmount } from './describe';
+import { logMealAgain, mealTitle } from './logAgain';
+import { recentMeals } from '../../logic/repeat';
+import { refKey } from '../../lib/refs';
 
 type Selected =
   | { kind: 'food'; food: Food }
@@ -59,7 +62,35 @@ export function LogPage({ day: dayParam, foodCode }: { day?: string; foodCode?: 
     if (!q) return [];
     return d.products.filter((p) => `${p.name} ${p.brand ?? ''} ${p.code}`.toLowerCase().includes(q));
   }, [query, d.products]);
-  const recent = useMemo(() => [...d.recentFoods.entries()].filter(([, v]) => v > 0.3).slice(0, 8).map(([code]) => d.foods.byCode.get(code)).filter((f): f is Food => !!f), [d.recentFoods, d.foods]);
+  const favourites = useMemo(() => {
+    const out: Array<{ key: string; pick: Selected; name: string; detail: string }> = [];
+    for (const ref of d.settings.favourites ?? []) {
+      if (ref.source === 'BLS') {
+        const food = d.foods.byCode.get(ref.code);
+        if (food) out.push({ key: refKey(ref), pick: { kind: 'food', food }, name: food.nameEn, detail: food.nameDe });
+      } else if (ref.source === 'OFF') {
+        const product = d.productsByCode.get(ref.code);
+        if (product) out.push({ key: refKey(ref), pick: { kind: 'product', product }, name: productLabel(product), detail: t('off.productTag') });
+      } else {
+        const food = d.customFoodsById.get(ref.id);
+        if (food) out.push({ key: refKey(ref), pick: { kind: 'custom', food }, name: food.name, detail: food.servingLabel });
+      }
+    }
+    return out;
+  }, [d.settings.favourites, d.foods, d.productsByCode, d.customFoodsById]);
+  const recent = useMemo(() => {
+    const pinned = new Set(favourites.map((f) => f.key));
+    return [...d.recentFoods.entries()]
+      .filter(([code, v]) => v > 0.3 && !pinned.has(`BLS:${code}`))
+      .slice(0, 8)
+      .map(([code]) => d.foods.byCode.get(code))
+      .filter((f): f is Food => !!f);
+  }, [d.recentFoods, d.foods, favourites]);
+  // The meal being logged right now is not a "recent meal" yet.
+  const pastMeals = useMemo(
+    () => recentMeals(added.length ? d.log.filter((e) => !added.includes(e.id)) : d.log, d.settings.mealWindowMinutes, d.batchesById),
+    [d.log, added, d.settings.mealWindowMinutes, d.batchesById],
+  );
   const addedEntries = added.map((id) => d.log.find((e) => e.id === id)).filter((e): e is LogEntry => !!e);
   const stock = d.batches.filter((b) => totalLeft(b) > 0);
 
@@ -72,6 +103,13 @@ export function LogPage({ day: dayParam, foodCode }: { day?: string; foodCode?: 
       void repo.deleteLog(entry.id);
       setAdded((a) => a.filter((x) => x !== entry.id));
     });
+  }
+
+  async function repeat(meal: LogEntry[]) {
+    const entries = await logMealAgain(meal, mealTime, d.batchesById, toast);
+    if (!entries.length) return;
+    setAdded((a) => [...a, ...entries.map((e) => e.id)]);
+    setMealTime(entries[entries.length - 1]!.time);
   }
 
   async function addDrink(drink: 'tea' | 'coffee') {
@@ -132,6 +170,45 @@ export function LogPage({ day: dayParam, foodCode }: { day?: string; foodCode?: 
 
       {!query.trim() && (
         <>
+          {favourites.length > 0 && (
+            <>
+              <h2 className="section-title">
+                <Icon name="star" size={16} filled /> {t('log.favourites')}
+              </h2>
+              <ul className="result-list">
+                {favourites.map((f) => (
+                  <li key={f.key}>
+                    <button className="result" onClick={() => setSelected(f.pick)}>
+                      <span className="result-name">{f.name}</span>
+                      <span className="muted small">{f.detail}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+
+          {pastMeals.length > 0 && (
+            <>
+              <h2 className="section-title">{t('log.recentMeals')}</h2>
+              <ul className="result-list">
+                {pastMeals.map((meal) => (
+                  <li key={meal[0]!.id}>
+                    <button className="result" onClick={() => void repeat(meal)}>
+                      <span className="result-name">
+                        <Icon name="repeat" size={16} /> {mealTitle(meal)}
+                      </span>
+                      <span className="muted small">
+                        {formatDay(meal[0]!.day, d.today)} · {formatTime(meal[0]!.time)}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              <p className="muted small">{t('log.recentMealsHint')}</p>
+            </>
+          )}
+
           {stock.length > 0 && (
             <>
               <h2 className="section-title">{t('stock.title')}</h2>

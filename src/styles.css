@@ -987,8 +987,19 @@ textarea:focus-visible,
 /* ── Diary, recipes ──────────────────────────────────────────── */
 .meal-head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 8px;
+}
+.meal-head .meal-again {
+  margin-left: auto;
+  min-height: 44px;
+}
+.fav-btn {
+  min-height: 44px;
+  padding-left: 0;
+}
+.fav-btn.on {
+  color: var(--accent);
 }
 .entry-row {
   display: grid;

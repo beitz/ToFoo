@@ -28,6 +28,11 @@ export default defineConfig({
         // status bar). Dark surface colour, matching the tab bar in dark mode, the owner's setting.
         background_color: '#1b221e',
         theme_color: '#2f6f4e',
+        // Long-press the app icon (docs/SPEC.md, "Faster repeat logging"). Hash routes, like the rest of the app.
+        shortcuts: [
+          { name: 'Log meal', short_name: 'Log meal', url: '/ToFoo/#/log', icons: [{ src: 'icon-192.png', sizes: '192x192', type: 'image/png' }] },
+          { name: 'Start fast', short_name: 'Start fast', url: '/ToFoo/#/fast', icons: [{ src: 'icon-192.png', sizes: '192x192', type: 'image/png' }] },
+        ],
         icons: [
           { src: 'icon-192.png', sizes: '192x192', type: 'image/png' },
           { src: 'icon-512.png', sizes: '512x512', type: 'image/png' },

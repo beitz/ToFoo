@@ -15,6 +15,7 @@ import { ConfidenceField } from './ConfidenceField';
 import { TimeField } from './TimeField';
 import { PreparationSelect } from './PreparationSelect';
 import { MatchPicker, ProductInfo } from './ProductParts';
+import { FavouriteButton } from './FavouriteButton';
 
 export interface PortionHelper {
   label: string;
@@ -70,6 +71,7 @@ export function AmountSheet({ day, time: initialTime, onClose, onAdded, ...targe
 
   return (
     <Sheet title={name} onClose={onClose}>
+      <FavouriteButton foodRef={draft ? { source: 'OFF', code: draft.code } : { source: 'BLS', version: d.foods.version, code: food.code }} />
       {draft ? (
         <ProductInfo product={draft} />
       ) : (
