@@ -5,7 +5,7 @@ import { buildIndex, type SearchIndex } from '../foods/search';
 import { dayRange, todayKey, addDays } from '../lib/dates';
 import { isOn } from '../settings/features';
 import { repo } from '../storage/repo';
-import type { Batch, CustomFood, DayStatusRecord, Fast, LogEntry, Profile, Recipe, Settings, SunEntry } from '../storage/types';
+import type { Batch, CustomFood, DayStatusRecord, Fast, LogEntry, Product, Profile, Recipe, Settings, SunEntry } from '../storage/types';
 import { resolveRequirements, type ResolvedRequirements } from '../model/requirements';
 import { simulate, type SimulationResult } from '../model/simulate';
 import type { ModelEntry } from '../model/types';
@@ -27,6 +27,10 @@ export interface AppData {
   log: LogEntry[];
   customFoods: CustomFood[];
   customFoodsById: Map<string, CustomFood>;
+  /** Open Food Facts products saved on this device, most recently used first. */
+  products: Product[];
+  /** Products by barcode. */
+  productsByCode: Map<string, Product>;
   dayStatus: DayStatusRecord[];
   fasts: Fast[];
   sunEntries: SunEntry[];
@@ -86,6 +90,7 @@ export function DataProvider({ children, fallback }: { children: ReactNode; fall
   const dayStatus = useLiveQuery(() => repo.db.dayStatus.toArray(), []);
   const fasts = useLiveQuery(() => repo.db.fasts.toArray(), []);
   const sunEntries = useLiveQuery(() => repo.db.sunEntries.toArray(), []);
+  const productList = useLiveQuery(() => repo.db.products.toArray(), []);
 
   const searchIndex = useMemo(() => (foods ? buildIndex(foods.foods.map((f) => ({ key: f.code, nameEn: f.nameEn, nameDe: f.nameDe }))) : null), [foods]);
 
@@ -96,7 +101,7 @@ export function DataProvider({ children, fallback }: { children: ReactNode; fall
   }, [theme]);
 
   const value = useMemo<AppData | null>(() => {
-    if (!foods || !searchIndex || !profile || !settings || !recipes || !batches || !log || !customFoods || !dayStatus || !fasts || !sunEntries) return null;
+    if (!foods || !searchIndex || !profile || !settings || !recipes || !batches || !log || !customFoods || !dayStatus || !fasts || !sunEntries || !productList) return null;
     const batchesById = new Map(batches.map((b) => [b.id, b]));
     const customFoodsById = new Map(customFoods.map((c) => [c.id, c]));
     const weight = currentWeight(profile);
@@ -104,7 +109,8 @@ export function DataProvider({ children, fallback }: { children: ReactNode; fall
       { birthYear: profile.birthYear, sex: profile.sex, weightKg: weight, activity: profile.activity, phytate: profile.phytate, menstruation: profile.menstruation },
       Number(today.slice(0, 4)),
     );
-    const ctx = { foods, batches: batchesById, customFoods: customFoodsById, salt: profile.salt };
+    const productsByCode = new Map(productList.map((p) => [p.code, p]));
+    const ctx = { foods, products: productsByCode, batches: batchesById, customFoods: customFoodsById, salt: profile.salt };
     const modelEntries = log.map((e) => resolveEntry(e, ctx)).filter((e): e is ModelEntry => e !== null);
     const earliestLog = log.reduce((min, e) => (e.day < min ? e.day : min), profile.modelStartDay);
     const start = earliestLog < addDays(today, -MAX_MODEL_DAYS) ? addDays(today, -MAX_MODEL_DAYS) : earliestLog;
@@ -132,10 +138,14 @@ export function DataProvider({ children, fallback }: { children: ReactNode; fall
     });
     const recentFoods = new Map<string, number>();
     let rank = 0;
-    for (let i = log.length - 1; i >= 0 && rank < 60; i--) {
+    const lastUsed = new Map<string, number>();
+    for (let i = log.length - 1; i >= 0; i--) {
       const e = log[i]!;
-      if (e.kind === 'food' && e.ref.source === 'BLS' && !recentFoods.has(e.ref.code)) recentFoods.set(e.ref.code, 1 / (1 + rank++ * 0.15));
+      if (e.kind !== 'food') continue;
+      if (e.ref.source === 'OFF' && !lastUsed.has(e.ref.code)) lastUsed.set(e.ref.code, e.time);
+      if (rank < 60 && e.ref.source === 'BLS' && !recentFoods.has(e.ref.code)) recentFoods.set(e.ref.code, 1 / (1 + rank++ * 0.15));
     }
+    const products = [...productList].sort((a, b) => (lastUsed.get(b.code) ?? b.fetchedAt) - (lastUsed.get(a.code) ?? a.fetchedAt));
     for (const r of recipes) for (const ing of r.ingredients) if (ing.ref.source === 'BLS' && !recentFoods.has(ing.ref.code)) recentFoods.set(ing.ref.code, 0.3);
     return {
       today,
@@ -150,6 +160,8 @@ export function DataProvider({ children, fallback }: { children: ReactNode; fall
       log,
       customFoods,
       customFoodsById,
+      products,
+      productsByCode,
       dayStatus,
       fasts,
       sunEntries,
@@ -160,7 +172,7 @@ export function DataProvider({ children, fallback }: { children: ReactNode; fall
       recentFoods,
       weightKg: weight ?? 70,
     };
-  }, [foods, searchIndex, profile, settings, recipes, batches, log, customFoods, dayStatus, fasts, sunEntries, today]);
+  }, [foods, searchIndex, profile, settings, recipes, batches, log, customFoods, dayStatus, fasts, sunEntries, productList, today]);
 
   if (error) return <>{fallback({ error })}</>;
   if (!value) return <>{fallback({})}</>;

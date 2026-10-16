@@ -98,7 +98,7 @@ export function RecipeEditor({ id }: { id?: string }) {
         {ingredients.map((ing, i) => {
           const food = ing.ref.source === 'BLS' ? d.foods.byCode.get(ing.ref.code) : undefined;
           return (
-            <li key={`${ing.ref.source === 'BLS' ? ing.ref.code : ing.ref.id}-${i}`} className="card ingredient">
+            <li key={`${ing.ref.source === 'custom' ? ing.ref.id : ing.ref.code}-${i}`} className="card ingredient">
               <div className="row-between">
                 <div>
                   <strong>{ing.isSalt ? t('recipes.salt') : (food?.nameEn ?? ing.name)}</strong>

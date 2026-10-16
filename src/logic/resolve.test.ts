@@ -44,7 +44,7 @@ const batch: Batch = {
   remaining: { fresh: 1, fridge: 1, freezer: 2 },
   corrections: [],
 };
-const ctx: ResolveContext = { foods, batches: new Map([['b1', batch]]), customFoods: new Map(), salt: { iodised: true, fluoridated: false } };
+const ctx: ResolveContext = { foods, products: new Map(), batches: new Map([['b1', batch]]), customFoods: new Map(), salt: { iodised: true, fluoridated: false } };
 const log = (o: Partial<LogEntry> & Pick<LogEntry, 'kind'>): LogEntry => ({ id: 'x', schemaVersion: 1, time: 0, day: '2026-10-05', confidence: 'A', label: 'x', ...o }) as LogEntry;
 
 describe('resolve', () => {

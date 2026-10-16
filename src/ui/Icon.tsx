@@ -29,6 +29,7 @@ const paths: Record<string, string> = {
   camera: 'M4 8h3l1.5-2.5h7L17 8h3v11H4zM12 10.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z',
   send: 'M4 12 20 4l-4 16-4.5-6.5zM11.5 13.5 20 4',
   chat: 'M4 5h16v11H9l-5 4zM8 9h8M8 12h5',
+  barcode: 'M4 6v12M7 6v12M10.5 6v12M13 6v12M16.5 6v12M20 6v12',
   tank: 'M8 4h8a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z',
 };
 

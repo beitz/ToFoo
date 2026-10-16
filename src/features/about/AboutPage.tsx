@@ -28,6 +28,18 @@ export function AboutPage() {
         . {t('about.blsConverted')}
       </p>
 
+      <h2>{t('about.offHeading')}</h2>
+      <p>
+        {t('about.off')}{' '}
+        <a href="https://world.openfoodfacts.org" target="_blank" rel="noreferrer">
+          openfoodfacts.org
+        </a>
+        {' · '}
+        <a href="https://opendatacommons.org/licenses/odbl/1-0/" target="_blank" rel="noreferrer">
+          ODbL
+        </a>
+      </p>
+
       <h2>{t('about.modelHeading')}</h2>
       <p>{t('about.model')}</p>
 

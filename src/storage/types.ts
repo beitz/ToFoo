@@ -6,6 +6,7 @@ import type { ActivityLevel, Menstruation, PhytateIntake, Preparation, Sex, Stor
 import type { EntryConfidence } from '../model/types';
 import type { SkinExposure } from '../model/sun';
 import type { StartingLevelChoice } from '../model/simulate';
+import type { ProductData } from '../foods/openFoodFacts';
 
 export const CURRENT_SCHEMA_VERSION = 1;
 
@@ -13,8 +14,11 @@ export interface Versioned {
   schemaVersion: number;
 }
 
-/** A reference to a food: never copied nutrient values (docs/SPEC.md). */
-export type FoodRef = { source: 'BLS'; version: string; code: string } | { source: 'custom'; id: string };
+/**
+ * A reference to a food: never copied nutrient values (docs/SPEC.md). Open Food Facts products
+ * have no versions; their fetched label values are kept in the `products` table.
+ */
+export type FoodRef = { source: 'BLS'; version: string; code: string } | { source: 'custom'; id: string } | { source: 'OFF'; code: string };
 
 export interface OutdoorSession {
   /** 0 = Sunday … 6 = Saturday. */
@@ -57,7 +61,8 @@ export type FeatureKey =
   | 'yesterdayNudge'
   | 'fillUnloggedDays'
   | 'backupReminder'
-  | 'aiAssistant';
+  | 'aiAssistant'
+  | 'openFoodFacts';
 
 export interface Settings extends Versioned {
   id: 'settings';
@@ -134,6 +139,20 @@ export type LogEntry =
   | (LogBase & { kind: 'custom'; customFoodId: string; servings: number })
   | (LogBase & { kind: 'manual'; nutrients: Record<string, number>; isSupplement: boolean })
   | (LogBase & { kind: 'drink'; drink: 'tea' | 'coffee' });
+
+/**
+ * A packaged product fetched from Open Food Facts, kept so entries stay computable offline and
+ * the same after OFF edits the product. Label values come from OFF; everything the label lacks
+ * (most vitamins and minerals) is borrowed from `match`, the closest BLS food, when one is chosen.
+ */
+export interface Product extends Versioned, ProductData {
+  /** `OFF:<barcode>`. */
+  id: string;
+  source: 'OFF';
+  match?: { version: string; code: string };
+  /** When the label values were fetched (epoch ms). */
+  fetchedAt: number;
+}
 
 /** Saved manual items and supplements. Nutrient amounts per serving. */
 export interface CustomFood extends Versioned {
