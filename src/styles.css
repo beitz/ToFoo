@@ -232,6 +232,12 @@ header.page-head:not(.row):not(.row-between) {
 .notice {
   color: var(--warn);
 }
+/* The server's own words under an error: long addresses must wrap, and the user may copy it. */
+.error-detail {
+  margin-top: 4px;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
 .disclaimer {
   margin-top: 1.5rem;
 }

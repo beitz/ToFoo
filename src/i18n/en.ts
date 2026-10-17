@@ -191,6 +191,8 @@ export const en = {
   'off.error.offline': 'No connection to Open Food Facts. Check your internet and try again.',
   'off.error.busy': 'Open Food Facts is busy right now. Try again in a minute.',
   'off.error.other': 'Open Food Facts gave an unexpected answer. Try again later.',
+  'off.error.denied': 'Open Food Facts refused the lookup. It may now require an account for this; see the details below.',
+  'off.error.detail': 'Details: {detail}',
   'off.products': 'Packaged products',
   'off.productTag': 'Packaged product',
   'off.noResults': 'No food found. For a packaged product, scan its barcode; otherwise try another word or enter it manually.',

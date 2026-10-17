@@ -241,6 +241,12 @@ describe('packaged products (Open Food Facts lookup on)', () => {
     expect((await runLookupBarcode({ barcodes: ['1'] }, ctx)).ok).toBe(false);
   });
 
+  it('passes the full error to the assistant and asks it to tell the user', async () => {
+    const p: ProductTools = { ...products(), find: async (): Promise<FindResult> => ({ kind: 'error', reason: 'denied', detail: 'HTTP 403 from world.openfoodfacts.org/api/v3/product/4008400121925: "login required"' }) };
+    const r = await runLookupBarcode({ barcodes: ['4008400121925'] }, { ...ctx, products: p });
+    expect(r.text).toContain('Error: HTTP 403 from world.openfoodfacts.org/api/v3/product/4008400121925: "login required" Tell the user this error word for word');
+  });
+
   it('does not fetch a product again that this chat already looked up', async () => {
     const p = products();
     lookups.length = 0;
