@@ -109,6 +109,11 @@ export interface ProductTools {
   find?: (barcode: string) => Promise<FindResult>;
   /** Search USDA FoodData Central by name. Absent when USDA is off. */
   searchUsda?: (query: string, kind: 'generic' | 'branded') => Promise<UsdaFindResult>;
+  /**
+   * Let the model find a product's barcode by name with Anthropic's web search on openfoodfacts.org
+   * (Open Food Facts' own name search cannot be called from a browser). Needs `find`.
+   */
+  webSearch?: boolean;
   /** Products and USDA foods looked up in this conversation, by id (filled by lookup_barcode and search_usda). */
   seen: Map<string, Product>;
 }
@@ -124,8 +129,8 @@ export interface ToolContext {
 }
 
 /** Which online sources the assistant is offered (decides the prompt and tool variant). */
-export function sourcesOf(products: ProductTools | undefined): { off: boolean; usda: boolean } {
-  return { off: !!products?.find, usda: !!products?.searchUsda };
+export function sourcesOf(products: ProductTools | undefined): { off: boolean; usda: boolean; webSearch: boolean } {
+  return { off: !!products?.find, usda: !!products?.searchUsda, webSearch: !!products?.find && !!products.webSearch };
 }
 
 const LABEL_FIELDS: Array<[string, string, string]> = [

@@ -62,12 +62,24 @@ export function requestParams(model: AiModel, messages: Beta.BetaMessageParam[],
   };
 }
 
-function textOf(content: Beta.BetaContentBlock[]): string {
-  return content
-    .filter((b): b is Beta.BetaTextBlock => b.type === 'text')
-    .map((b) => b.text)
-    .join('\n\n')
-    .trim();
+/**
+ * The visible text of a response. Text blocks that follow each other directly are one passage (a
+ * web search answer splits text at every citation); text separated by tool calls is a new paragraph.
+ */
+export function textOf(content: Beta.BetaContentBlock[]): string {
+  const parts: string[] = [];
+  let joined = false;
+  for (const b of content) {
+    if (b.type === 'text') {
+      if (joined) parts[parts.length - 1] += b.text;
+      else parts.push(b.text);
+      joined = true;
+    } else joined = false;
+  }
+  return parts
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .join('\n\n');
 }
 
 /** A user message: what they typed and their photos, plus an optional note from the app (e.g. barcodes it read). */
@@ -113,6 +125,8 @@ export async function sendMessage(
     messages.push({ role: 'assistant', content: res.content });
     if (res.stop_reason === 'refusal') return done({ kind: 'error', reason: 'refusal' });
     if (res.stop_reason === 'max_tokens' || res.stop_reason === 'model_context_window_exceeded') return done({ kind: 'error', reason: 'tooLong' });
+    // A long web search can pause; sending the conversation back as it is lets it carry on.
+    if (res.stop_reason === 'pause_turn') continue;
 
     const uses = res.content.filter((b): b is Beta.BetaToolUseBlock => b.type === 'tool_use');
     if (uses.length === 0) return done({ kind: 'reply', text: textOf(res.content) });

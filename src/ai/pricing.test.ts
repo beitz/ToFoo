@@ -48,6 +48,21 @@ describe('usageOf', () => {
   });
 });
 
+describe('web searches', () => {
+  it('counts searches under the answering model and prices them at 1 cent each', () => {
+    const usage = { input_tokens: 1000, output_tokens: 200, cache_read_input_tokens: 0, cache_creation_input_tokens: 0, cache_creation: null, iterations: null, server_tool_use: { web_search_requests: 2, web_fetch_requests: 0 } };
+    const u = usageOf({ model: 'claude-opus-5-5', usage: usage as unknown as Beta.BetaUsage }, 'claude-opus-5-5');
+    expect(u['claude-opus-5-5']).toEqual({ input: 1000, output: 200, cacheRead: 0, cacheWrite5m: 0, cacheWrite1h: 0, webSearches: 2 });
+    expect(requestCost('claude-opus-5-5', tokens({ webSearches: 3 }), 'x')).toBeCloseTo(0.03);
+  });
+
+  it('reads usage stored before searches were counted', () => {
+    const ledger = recordUsage([{ day: '2026-10-16', requests: 1, tokens: { 'claude-opus-5-5': tokens({ input: M }) } }], '2026-10-16', { 'claude-opus-5-5': tokens({ webSearches: 1 }) });
+    expect(ledger[0]!.tokens['claude-opus-5-5']!.webSearches).toBe(1);
+    expect(summarize(ledger, 'claude-opus-5-5').usd).toBeCloseTo(4.01);
+  });
+});
+
 describe('usage ledger', () => {
   const a = { 'claude-opus-5-5': tokens({ input: M }) };
   const b = { 'claude-haiku-5-5': tokens({ output: M }) };

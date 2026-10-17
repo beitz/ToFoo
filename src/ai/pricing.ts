@@ -12,6 +12,8 @@ export interface TokenCounts {
   cacheRead: number;
   cacheWrite5m: number;
   cacheWrite1h: number;
+  /** Web searches (billed per search, on top of tokens). Absent in usage stored before searches existed. */
+  webSearches?: number;
 }
 
 export const ZERO_TOKENS: TokenCounts = { input: 0, output: 0, cacheRead: 0, cacheWrite5m: 0, cacheWrite1h: 0 };
@@ -37,6 +39,11 @@ interface Price {
  * Update this table when prices change; past usage is re-priced from the stored token counts.
  */
 export const PRICES_AS_OF = '2026-10';
+/**
+ * Web search: USD 10 per 1,000 searches, plus the tokens of the results
+ * (https://platform.claude.com/docs/en/agents-and-tools/tool-use/web-search-tool, checked 2026-10-17).
+ */
+const WEB_SEARCH_USD = 10 / 1000;
 const PRICES: Record<string, Price> = {
   'claude-fable-5-1': { input: 10, output: 50, cacheRead: 0.25 },
   'claude-fable-5': { input: 10, output: 50, cacheRead: 1 },
@@ -77,17 +84,20 @@ export function requestCost(model: string, t: TokenCounts, fallbackModel: string
     t.output * perToken(rate.output) +
     t.cacheRead * perToken(rate.cacheRead) +
     t.cacheWrite5m * perToken(rate.input * 1.25) +
-    t.cacheWrite1h * perToken(rate.input * 2)
+    t.cacheWrite1h * perToken(rate.input * 2) +
+    (t.webSearches ?? 0) * WEB_SEARCH_USD
   );
 }
 
 export function addTokens(a: TokenCounts, b: TokenCounts): TokenCounts {
+  const webSearches = (a.webSearches ?? 0) + (b.webSearches ?? 0);
   return {
     input: a.input + b.input,
     output: a.output + b.output,
     cacheRead: a.cacheRead + b.cacheRead,
     cacheWrite5m: a.cacheWrite5m + b.cacheWrite5m,
     cacheWrite1h: a.cacheWrite1h + b.cacheWrite1h,
+    ...(webSearches ? { webSearches } : {}),
   };
 }
 
@@ -102,7 +112,8 @@ export const totalTokens = (t: TokenCounts): number => t.input + t.output + t.ca
 /**
  * Billed tokens per model for one API response. With a server-side fallback, `usage.iterations`
  * lists every attempt and is the source of truth (an attempt without a model ran on the requested
- * one); otherwise the top-level usage belongs to the model that answered.
+ * one); otherwise the top-level usage belongs to the model that answered. Web searches are counted
+ * once per response, under the model that answered.
  */
 export function usageOf(res: Pick<Beta.BetaMessage, 'model' | 'usage'>, requestedModel: string): ModelTokens {
   const u = res.usage;
@@ -111,13 +122,15 @@ export function usageOf(res: Pick<Beta.BetaMessage, 'model' | 'usage'>, requeste
     const write1h = x.cache_creation?.ephemeral_1h_input_tokens ?? 0;
     return { input: x.input_tokens, output: x.output_tokens, cacheRead: x.cache_read_input_tokens ?? 0, cacheWrite5m: Math.max(0, write - write1h), cacheWrite1h: write1h };
   };
+  const searches = u.server_tool_use?.web_search_requests ?? 0;
+  const withSearches: ModelTokens = searches ? { [res.model]: { ...ZERO_TOKENS, webSearches: searches } } : {};
   const attempts = (u.iterations ?? []).filter((i) => i.type === 'message' || i.type === 'fallback_message');
   if (attempts.some((i) => i.type === 'fallback_message')) {
-    let out: ModelTokens = {};
+    let out: ModelTokens = withSearches;
     for (const a of attempts) out = mergeModelTokens(out, { [a.model ?? requestedModel]: counts(a) });
     return out;
   }
-  return { [res.model]: counts(u) };
+  return mergeModelTokens({ [res.model]: counts(u) }, withSearches);
 }
 
 export function modelTokensCost(m: ModelTokens, fallbackModel: string): number {

@@ -78,6 +78,7 @@ const ERROR_TEXT: Record<string, MessageKey> = {
   rateLimit: 'ai.error.rateLimit',
   overloaded: 'ai.error.overloaded',
   network: 'ai.error.network',
+  webSearchOff: 'ai.error.webSearchOff',
   other: 'ai.error.other',
   refusal: 'ai.error.refusal',
   tooLong: 'ai.error.tooLong',
@@ -99,6 +100,7 @@ function Chat({ apiKey, model, day }: { apiKey: string; model: AiModel; day: str
   const [photoCount, setPhotoCount] = useState(0);
   const offOn = isOn(d.settings.features, 'openFoodFacts');
   const usdaOn = isOn(d.settings.features, 'usda');
+  const webSearchOn = isOn(d.settings.features, 'productWebSearch');
   // Products looked up in this chat stay usable for later proposals in it.
   const [seenProducts] = useState(() => new Map<string, Product>());
   const [busy, setBusy] = useState(false);
@@ -162,7 +164,7 @@ function Chat({ apiKey, model, day }: { apiKey: string; model: AiModel; day: str
           ? {
               saved: d.productsById,
               seen: seenProducts,
-              ...(offOn ? { find: (code: string) => findProduct(code) } : {}),
+              ...(offOn ? { find: (code: string) => findProduct(code), webSearch: webSearchOn } : {}),
               ...(usdaOn ? { searchUsda: (q: string, kind: 'generic' | 'branded') => findUsda(q, kind, 8) } : {}),
             }
           : undefined;
