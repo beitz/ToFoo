@@ -78,8 +78,9 @@ Profile inputs, grouped (all optional, all editable in settings):
 | Body | Birth year (age computed automatically) | Adult age group (25–51) | DGE age group |
 | Body | Sex | Not set: the safer value per nutrient (higher need, lower upper limit) | DGE reference values |
 | Body | Body weight (kg), with history | 70 kg | Protein need, store capacity |
-| Body | Height | Not used until set | Reserved for energy estimates |
+| Body | Height | Not used until set | Not used yet (the DGE energy equation does not need it) |
 | Body | Activity level (low / medium / high) | Medium | Energy, a few B vitamins |
+| Body | Own energy target (kcal/day) | Not set: estimated (below) | Energy gauge and amounts given as a share of energy |
 | Body | Periods (women): yes / after menopause / no, other reason | By age: periods under 51 | Iron reference value (DGE 2024) |
 | Sun and vitamin D | Location latitude | 51° N (central Germany) | Sun strength by season |
 | Sun and vitamin D | Outdoor routine | Little time outdoors | Vitamin D synthesis |
@@ -95,6 +96,8 @@ Rules for reference values:
 - Three values per nutrient where available: recommended intake, the physiological (absorbed) requirement used for tank depletion, and the tolerable upper intake level (EFSA UL where DGE gives none).
 - If DGE gives only an estimate ("Schätzwert"), store it with a lower confidence flag.
 - Pregnancy, lactation and medical conditions are out of scope.
+
+**Energy target** (decided 2026-10-17). The DGE energy guide values are the table for normal-weight people at the DGE reference body weights (men 25–50 at medium activity: 2,700 kcal). DGE derives them as resting energy expenditure × physical activity level (PAL), with the resting-energy equation of Müller et al. (2004) from weight, sex and age; DGE says individual values need adjusting and that body weight is the deciding check. So once birth year and weight are set, the app uses that same method with the person's own age and weight (PAL 1.4 / 1.6 / 1.8 for low / medium / high activity), shown to the nearest 10 kcal; before that it uses the table. The user can also set an own target in kcal (for example from a dietitian, or a planned surplus or deficit); it is marked as user-set and replaces the estimate everywhere, including the amounts DGE gives as a share of energy (saturated fat, linoleic and alpha-linolenic acid). Activity from the activity log is not added yet. The energy gauge keeps the guardrails: no rewards for eating less.
 
 ## Nutrient model
 
@@ -466,7 +469,7 @@ v1 is the smallest app that is useful every day; each later version adds to the 
 - [ ] Shopping list for the next batch; duplicate a recipe; scale a recipe when cooking (last)
 - [ ] CSV export
 - [ ] Phone health data (Health Connect), low priority; the route to automatic sleep times and steps
-- [ ] Energy in and out (calorie balance): would be nice in one app since it overlaps with nutrient tracking, but the focus stays on nutrients, not weight loss or gain. Only if it can be added cleanly, as an optional feature that keeps the gamification guardrails (no rewards for eating less).
+- [ ] Energy in and out (calorie balance; the personal energy target exists since 2026-10-17, activity energy not yet): would be nice in one app since it overlaps with nutrient tracking, but the focus stays on nutrients, not weight loss or gain. Only if it can be added cleanly, as an optional feature that keeps the gamification guardrails (no rewards for eating less).
 - [ ] Keep in mind, not needed now: user-set target per nutrient (e.g. from a doctor), clearly marked as user-set. The DGE-derived targets stay as they are.
 
 **Not planned**: social features, community recipes, coaching, ads (one user, privacy, calm by default).

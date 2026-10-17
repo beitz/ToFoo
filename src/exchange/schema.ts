@@ -47,6 +47,7 @@ export const profileSchema = z.object({
   weightHistory: z.array(z.object({ day, kg: z.number().positive() })),
   heightCm: z.number().positive().optional(),
   activity: z.enum(['low', 'medium', 'high']).optional(),
+  energyTargetKcal: z.number().positive().optional(),
   phytate: z.enum(['low', 'medium', 'high']).optional(),
   menstruation: z.enum(['menstruating', 'postmenopausal', 'none']).optional(),
   latitude: z.number().min(-90).max(90).optional(),

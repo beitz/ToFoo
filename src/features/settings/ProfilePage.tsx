@@ -9,6 +9,7 @@ import { repo } from '../../storage/repo';
 import type { Profile } from '../../storage/types';
 import { Field, NumberInput, Segmented } from '../../ui/controls';
 import { Icon } from '../../ui/Icon';
+import { EnergyTargetCard } from './EnergyTarget';
 
 export function SubPage({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -138,6 +139,9 @@ export function ProfilePage() {
           </ul>
         )}
       </div>
+
+      <h2 className="section-title">{t('profile.energy')}</h2>
+      <EnergyTargetCard />
     </SubPage>
   );
 }

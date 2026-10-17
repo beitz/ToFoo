@@ -16,6 +16,7 @@ import { LineChart } from '../../ui/LineChart';
 import { hasNoData } from '../../ui/Gauge';
 import { StatusBadge } from '../../ui/status';
 import { Icon } from '../../ui/Icon';
+import { energyBasisText } from '../settings/EnergyTarget';
 
 export function NutrientPage({ id }: { id: string }) {
   const d = useData();
@@ -102,6 +103,14 @@ export function NutrientPage({ id }: { id: string }) {
                 ? ` ${t('nutrient.knownDays', { known: r.knownDays, days: r.windowDays })}`
                 : ''}
           </p>
+        )}
+        {id === 'ENERCC' && (
+          <>
+            <p className="small">{t('energy.today', { eaten: fmtNumber(d.model.daily.at(-1)?.intake.ENERCC ?? 0), target: fmtNumber(d.requirements.energy.kcal) })}</p>
+            <p className="small muted">
+              {energyBasisText(d.requirements.energy)} <a href={href('settings', 'profile')}>{t('energy.change')}</a>
+            </p>
+          </>
         )}
         {isTank && req && <TankTrendNote r={r} need={req.physiological} startedEmpty={d.profile.startingLevel === 'empty'} />}
         {r.missingDataDays > 0 && <p className="small notice">{t('nutrient.missingData', { n: r.missingDataDays })}</p>}

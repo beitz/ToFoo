@@ -1,5 +1,5 @@
 import { referenceValues, infoOnly } from '../../model/reference-values';
-import { nutrientParams } from '../../model/parameters';
+import { energyNeed, nutrientParams } from '../../model/parameters';
 import type { ActivityLevel, AgeGroup, AmountSpec, ByAge, Confidence, Menstruation, PhytateIntake, ReferenceKind, Sex, UpperLimit } from './paramTypes';
 import { AGE_GROUPS } from './paramTypes';
 
@@ -12,6 +12,27 @@ export interface ModelProfile {
   phytate?: PhytateIntake;
   /** Women only; not set: menstruating under 51, postmenopausal from 51. */
   menstruation?: Menstruation;
+  /** The user's own energy target (kcal/day); replaces the estimate when set. */
+  energyTargetKcal?: number;
+}
+
+/** Where the energy reference comes from: the user's own number, the personal estimate, or the DGE table. */
+export type EnergyBasis = 'own' | 'estimate' | 'guide';
+
+export interface EnergyTarget {
+  /** kcal/day used for the energy gauge and for amounts given as a share of energy. */
+  kcal: number;
+  basis: EnergyBasis;
+  /** Personal estimate (REE × PAL); only when age and weight are known. */
+  estimate?: EnergyEstimate;
+  /** The DGE guide value for the age group and activity level. */
+  guideKcal: number;
+}
+
+export interface EnergyEstimate {
+  kcal: number;
+  reeKcal: number;
+  pal: number;
 }
 
 export const PROFILE_DEFAULTS = {
@@ -44,6 +65,7 @@ export interface ResolvedRequirements {
   defaultsUsed: Array<'age' | 'sex' | 'weight' | 'activity'>;
   /** Under 19: values for 19–24 are used, outside the app's scope. */
   underAge: boolean;
+  energy: EnergyTarget;
 }
 
 export function ageGroupFor(age: number): AgeGroup {
@@ -80,6 +102,19 @@ function amountFor(spec: AmountSpec, sex: Sex | undefined, group: AgeGroup, ctx:
   }
 }
 
+/**
+ * Energy need from age, sex, weight and activity: resting energy expenditure (Müller et al. 2004,
+ * the equation behind the DGE guide values) × PAL. An unset sex takes the lower value, like the table.
+ */
+export function estimateEnergyNeed(sex: Sex | undefined, ageYears: number, weightKg: number, activity: ActivityLevel): EnergyEstimate {
+  const c = energyNeed.ree.value;
+  const reeFor = (s: Sex) => (c.weightKg * weightKg + (s === 'male' ? c.male : 0) + c.ageYears * ageYears + c.intercept) * energyNeed.kcalPerMJ;
+  const reeKcal = sex ? reeFor(sex) : Math.min(reeFor('male'), reeFor('female'));
+  const pal = energyNeed.pal.value[activity];
+  const step = energyNeed.roundToKcal;
+  return { kcal: Math.round((reeKcal * pal) / step) * step, reeKcal: Math.round(reeKcal / step) * step, pal };
+}
+
 export function resolveRequirements(profile: ModelProfile, currentYear: number): ResolvedRequirements {
   const defaultsUsed: ResolvedRequirements['defaultsUsed'] = [];
   let ageGroup = PROFILE_DEFAULTS.ageGroup;
@@ -99,11 +134,20 @@ export function resolveRequirements(profile: ModelProfile, currentYear: number):
 
   const energyRef = referenceValues.find((r) => r.nutrient === 'ENERCC');
   const ctx = { weightKg, activity, phytate, menstruation, energyKcal: 0 };
-  ctx.energyKcal = energyRef ? amountFor(energyRef.amount, profile.sex, ageGroup, ctx) : 2000;
+  const guideKcal = energyRef ? amountFor(energyRef.amount, profile.sex, ageGroup, ctx) : 2000;
+  // The estimate needs the person's own age and weight; with defaults the DGE table is the better guess.
+  const estimate = profile.birthYear && profile.weightKg ? estimateEnergyNeed(profile.sex, currentYear - profile.birthYear, weightKg, activity) : undefined;
+  const own = profile.energyTargetKcal && profile.energyTargetKcal > 0 ? profile.energyTargetKcal : undefined;
+  const energy: EnergyTarget = own
+    ? { kcal: own, basis: 'own', estimate, guideKcal }
+    : estimate
+      ? { kcal: estimate.kcal, basis: 'estimate', estimate, guideKcal }
+      : { kcal: guideKcal, basis: 'guide', guideKcal };
+  ctx.energyKcal = energy.kcal;
 
   const byNutrient = new Map<string, Requirement>();
   for (const ref of referenceValues) {
-    const recommended = amountFor(ref.amount, profile.sex, ageGroup, ctx);
+    const recommended = ref.nutrient === 'ENERCC' ? energy.kcal : amountFor(ref.amount, profile.sex, ageGroup, ctx);
     let physiological: number;
     let derived = false;
     if (ref.physiological) {
@@ -123,9 +167,9 @@ export function resolveRequirements(profile: ModelProfile, currentYear: number):
       upperLimit: ref.upperLimit
         ? { value: ref.upperLimit.value, basis: ref.upperLimit.basis, scope: ref.upperLimit.scope, safeLevel: ref.upperLimit.safeLevel }
         : undefined,
-      confidence: ref.confidence,
-      source: ref.source,
+      confidence: ref.nutrient === 'ENERCC' && energy.basis === 'estimate' ? energyNeed.ree.confidence : ref.confidence,
+      source: ref.nutrient === 'ENERCC' && energy.basis === 'estimate' ? energyNeed.ree.source : ref.source,
     });
   }
-  return { byNutrient, infoOnly: new Set(infoOnly.map((i) => i.nutrient)), ageGroup, defaultsUsed, underAge };
+  return { byNutrient, infoOnly: new Set(infoOnly.map((i) => i.nutrient)), ageGroup, defaultsUsed, underAge, energy };
 }

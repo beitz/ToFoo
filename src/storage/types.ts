@@ -41,6 +41,8 @@ export interface Profile extends Versioned {
   weightHistory: Array<{ day: string; kg: number }>;
   heightCm?: number;
   activity?: ActivityLevel;
+  /** Own energy target in kcal/day; not set: estimated from age, sex, weight and activity. */
+  energyTargetKcal?: number;
   phytate?: PhytateIntake;
   /** Women only, for the iron reference value. */
   menstruation?: Menstruation;

@@ -92,6 +92,10 @@
                         "high"
                       ]
                     },
+                    "energyTargetKcal": {
+                      "type": "number",
+                      "exclusiveMinimum": 0
+                    },
                     "phytate": {
                       "type": "string",
                       "enum": [

@@ -109,7 +109,7 @@ export function DataProvider({ children, fallback }: { children: ReactNode; fall
     const customFoodsById = new Map(customFoods.map((c) => [c.id, c]));
     const weight = currentWeight(profile);
     const requirements = resolveRequirements(
-      { birthYear: profile.birthYear, sex: profile.sex, weightKg: weight, activity: profile.activity, phytate: profile.phytate, menstruation: profile.menstruation },
+      { birthYear: profile.birthYear, sex: profile.sex, weightKg: weight, activity: profile.activity, phytate: profile.phytate, menstruation: profile.menstruation, energyTargetKcal: profile.energyTargetKcal },
       Number(today.slice(0, 4)),
     );
     const productsById = new Map(productList.map((p) => [p.id, p]));

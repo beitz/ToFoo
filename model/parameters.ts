@@ -14,6 +14,7 @@
  * environment; values that rest only on them say "not re-checked".
  */
 import type {
+  ActivityLevel,
   Cited,
   NutrientParams,
   Preparation,
@@ -328,6 +329,42 @@ export const referenceWeightKg: Valued<{ male: number; female: number; unknown: 
   value: { male: 70, female: 60, unknown: 70 },
   source: 'Modelling convention: capacities above are quoted for a 70 kg adult (iron: 70 kg men, 60 kg women)',
   confidence: 'high',
+};
+
+// ── Energy need (personal estimate) ─────────────────────────────────────────────
+
+/**
+ * Personal energy need = resting energy expenditure × physical activity level, the factorial method
+ * behind the DGE energy guide values. With the DGE reference weights and mid-group ages this
+ * reproduces the DGE table for 19–64 (checked on 2026-10-17: every value within rounding to 100 kcal).
+ */
+export const energyNeed: {
+  ree: Valued<{ weightKg: number; male: number; ageYears: number; intercept: number }>;
+  pal: Valued<Record<ActivityLevel, number>>;
+  kcalPerMJ: number;
+  roundToKcal: number;
+} = {
+  /** REE (MJ/day) = weight × kg + male × (1 if male) + age × years + intercept. */
+  ree: {
+    value: { weightKg: 0.047, male: 1.009, ageYears: -0.01452, intercept: 3.21 },
+    source:
+      'Müller MJ et al. (2004): World Health Organization equations have shortcomings for predicting resting energy expenditure… Am J Clin Nutr 80(5):1379–90, equation with weight, sex and age; used by DGE/ÖGE/SGE for the energy guide values (Ann Nutr Metab 2015;66:219–223, ref. 6)',
+    url: 'https://doi.org/10.1093/ajcn/80.5.1379',
+    confidence: 'medium',
+    note: 'Coefficients from secondary sources (the original was not reachable); one of them prints the intercept as 3.31, but 3.21 reproduces the DGE table and 3.31 does not (see docs/OPEN_QUESTIONS.md). An estimate for groups: individual REE differs by about ±200 kcal; Müller et al. found larger deviations in underweight people. Height is not part of this equation.',
+  },
+  /** Activity level → PAL, as in the DGE table columns. */
+  pal: {
+    value: { low: 1.4, medium: 1.6, high: 1.8 },
+    source: 'DGE/ÖGE Referenzwerte für die Nährstoffzufuhr, 3. Auflage 2025, Energie (Richtwerte für PAL 1.4 / 1.6 / 1.8)',
+    url: 'https://www.dge.de/wissenschaft/referenzwerte/energie/',
+    confidence: 'high',
+    note: 'Low = mostly sitting, medium = sitting with some walking or standing, high = mostly standing or walking. Sport adds on top; later from the activity log.',
+  },
+  /** Unit conversion (thermochemical calorie), not physiology. */
+  kcalPerMJ: 1000 / 4.184,
+  /** Shown to the nearest 10 kcal: the estimate is not more precise than that. */
+  roundToKcal: 10,
 };
 
 // ── Iron (rule type "iron") ─────────────────────────────────────────────────────
