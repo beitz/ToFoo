@@ -1504,9 +1504,29 @@ details.tree details {
 }
 .composer-photos {
   margin-bottom: 6px;
+  /* Room above for the remove buttons, which overhang the thumbnails. */
+  padding: 14px 14px 0 0;
+  gap: 12px;
+  overflow-x: auto;
 }
 .composer-photo {
   position: relative;
+  flex: none;
+}
+.composer-photo-time {
+  display: block;
+  text-align: center;
+  font-size: 0.7rem;
+  white-space: nowrap;
+}
+.composer-note {
+  max-width: 608px;
+  margin: 0 auto 6px;
+}
+.proposal-done {
+  gap: 8px;
+  align-items: center;
+  color: var(--text-muted);
 }
 .composer-photo img {
   width: 56px;

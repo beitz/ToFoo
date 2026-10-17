@@ -20,10 +20,12 @@ ${withProducts ? BRANDED_WITH_PRODUCTS : BRANDED_BLS_ONLY}
 - Mixed dishes (restaurant meals, a hotpot, a bowl): use a matching BLS dish if there is one, otherwise split it into ingredients with estimated grams. Include what changes the result most: cooking oil, sauces, broth that was actually eaten.
 - Amounts: use what the user said, label weights, counts of standard items, and visual cues (plate size, cutlery, hands, packaging). Think about the portion one person ate, not the whole shared dish.
 - Ask when the answer would noticeably change the result (an unknown main food, a portion that could easily be double or half, whether shared food was all eaten). Ask one short question at a time and offer a default the user can just accept, e.g. "About one bowl, roughly 400 ml?". Do not ask about details that barely matter. If a clearer photo or a photo of the packaging would help, say so. If the user cannot know, estimate and record the assumption.
+- Several meals at once: the user may send many photos from the past days plus a note, to log everything in one go. The app puts a line before each photo with its number and capture time. Group the photos into meals by time and content: photos minutes apart of the same table are one meal; the same food at different times (yogurt in the morning and in the evening) is two. Also include meals the user only describes in words. Before proposing, ask everything that matters in one message, as a short numbered list with a default for each, and say how you grouped the photos (e.g. "Photos 2–5: Korean BBQ, Thu 19:40"). Then propose all meals in one response, one propose_meal call per meal.
+- Meal time: set time to when the meal was eaten, as local "YYYY-MM-DD HH:MM": the capture time of its first photo, or what the user said ("yesterday lunch" means a plausible lunch time that day). A "file date" may be when the photo was saved rather than taken; ask if it looks off. Leave time empty for a single meal eaten just now or on the day the chat was opened for. The app tells you the current time.
+- Cards: each proposal is shown as a card with an id (M1, M2, …). The user can log each card, edit it, or keep chatting. To change an open card, call propose_meal with the whole corrected meal and replaces set to its id; the app swaps the card. The app tells you which cards were logged; never propose those again.
 - preparation: "asListed" when the BLS food already matches how it was eaten (cooked entries, bread, dishes, sweets); otherwise raw, boiled, steamed, baked or fried.
 - confidence: "B" only when the food is clear and the amount comes from a label, a count of standard items or weighing; otherwise "C".
 - assumptions: short phrases the user should see, e.g. "ate about a quarter of the shared pot".
-- If the user corrects something after a proposal, call propose_meal again with the whole corrected meal.
 
 Style: brief, friendly, plain text (no headings or tables). Answer in the language the user writes in.`;
 }
@@ -67,7 +69,7 @@ function tools(withProducts: boolean): BetaTool[] {
     {
       name: 'propose_meal',
       description:
-        'Show the user the meal to log. The app displays the items with their grams for the user to check and confirm; nothing is logged until they do. Call it again with the complete meal after any correction.',
+        'Show the user one meal to log, as a card with the items, grams and time for the user to check and confirm; nothing is logged until they do. For several meals, call it once per meal in the same response. After a correction, call it again with the complete meal and replaces set to the card id.',
       strict: true,
       input_schema: {
         type: 'object',
@@ -76,8 +78,10 @@ function tools(withProducts: boolean): BetaTool[] {
           items: { type: 'array', items },
           assumptions: { type: 'array', items: { type: 'string' } },
           confidence: { type: 'string', enum: ['B', 'C'] },
+          time: { type: 'string', description: 'When it was eaten, local "YYYY-MM-DD HH:MM" (e.g. "2026-10-15 19:40"); empty for the chat\'s default time.' },
+          replaces: { type: 'string', description: 'Id of the open card this corrects (e.g. "M2"); empty for a new meal.' },
         },
-        required: ['summary', 'items', 'assumptions', 'confidence'],
+        required: ['summary', 'items', 'assumptions', 'confidence', 'time', 'replaces'],
         additionalProperties: false,
       },
     },

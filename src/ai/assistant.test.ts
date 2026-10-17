@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type * as Beta from '@anthropic-ai/sdk/resources/beta/messages/messages';
 import type { Food } from '../foods/foodDb';
 import { buildIndex } from '../foods/search';
-import { emptyConversation, requestParams, sendMessage, type CreateMessage } from './assistant';
+import { appNote, emptyConversation, requestParams, sendMessage, type CreateMessage } from './assistant';
 import { describeFood, MAX_ITEM_GRAMS, runLookupBarcode, runSearchFoods, validateProposal, type ProductTools, type ToolContext } from './tools';
 import type { Product } from '../storage/types';
 import type { FindResult } from '../foods/findProduct';
@@ -91,7 +91,7 @@ describe('sendMessage', () => {
     expect(outcome.kind).toBe('proposal');
     if (outcome.kind === 'proposal') {
       expect(outcome.text).toBe('Looks like one milk roll.');
-      expect(outcome.proposal.items[0]?.food.code).toBe('D7A5400');
+      expect(outcome.proposals[0]!.items[0]?.food.code).toBe('D7A5400');
     }
     // Second request carries the search result for t1.
     const second = api.requests[1]!.messages;
@@ -145,6 +145,56 @@ describe('sendMessage', () => {
     const conv = emptyConversation();
     await sendMessage(scripted(reply([text('Hi')], 'end_turn')).create, 'claude-opus-5-5', conv, { text: 'hi', images: [] }, ctx);
     expect(conv.messages).toEqual([]);
+  });
+});
+
+describe('several meals at once', () => {
+  const now = new Date(2026, 9, 17, 9, 30).getTime();
+  const meal = (summary: string, time: string, replaces = '') => ({ summary, items: [{ code: 'D7A5400', grams: 60, preparation: 'asListed', note: '' }], assumptions: [], confidence: 'C', time, replaces });
+
+  it('labels each photo with its capture time and shows all proposals of a response as numbered cards', async () => {
+    const api = scripted(reply([text('Here are both.'), toolUse('a', 'propose_meal', meal('Yogurt', '2026-10-16 08:10')), toolUse('b', 'propose_meal', meal('Yogurt', '2026-10-16 21:05'))], 'tool_use'));
+    const img = (label: string) => ({ mediaType: 'image/jpeg' as const, data: 'AAAA', label });
+    const { conversation, outcome } = await sendMessage(api.create, 'claude-opus-5-5', emptyConversation(), { text: 'yogurt twice', images: [img('Photo 1: taken …'), img('Photo 2: taken …')], appNote: '(Now: …)' }, { ...ctx, now });
+    expect((api.requests[0]!.messages[0]!.content as Beta.BetaContentBlockParam[]).map((b) => b.type)).toEqual(['text', 'image', 'text', 'image', 'text', 'text']);
+    expect(outcome.kind === 'proposal' && outcome.proposals.map((p) => [p.id, p.time])).toEqual([
+      ['M1', new Date(2026, 9, 16, 8, 10).getTime()],
+      ['M2', new Date(2026, 9, 16, 21, 5).getTime()],
+    ]);
+    expect(conversation.cards).toBe(2);
+    expect(conversation.pendingResults.map((r) => r.content)).toEqual(['Shown to the user as card M1. Not logged yet; their reply follows.', 'Shown to the user as card M2. Not logged yet; their reply follows.']);
+
+    // A correction names the card it replaces and gets the next number.
+    const next = scripted(reply([toolUse('c', 'propose_meal', meal('Yogurt', '2026-10-16 21:05', 'M2'))], 'tool_use'));
+    const after = await sendMessage(next.create, 'claude-opus-5-5', conversation, { text: 'the evening one was bigger', images: [] }, { ...ctx, now });
+    expect(after.outcome.kind === 'proposal' && after.outcome.proposals.map((p) => [p.id, p.replaces])).toEqual([['M3', 'M2']]);
+  });
+
+  it('shows no cards when one proposal of a batch is invalid, and asks for all again', async () => {
+    const api = scripted(reply([toolUse('a', 'propose_meal', meal('Ok', '2026-10-16 08:10')), toolUse('b', 'propose_meal', meal('Later', '2026-10-18 08:00'))], 'tool_use'), reply([text('Fixing.')], 'end_turn'));
+    const { outcome, conversation } = await sendMessage(api.create, 'claude-opus-5-5', emptyConversation(), { text: 'x', images: [] }, { ...ctx, now });
+    const results = api.requests[1]!.messages[2]!.content as Beta.BetaToolResultBlockParam[];
+    expect(results.map((r) => [r.tool_use_id, r.is_error])).toEqual([['b', true], ['a', true]]);
+    expect(String(results[0]!.content)).toContain('is in the future');
+    expect(String(results[1]!.content)).toContain('Call propose_meal again for this meal too');
+    expect(outcome.kind).toBe('reply');
+    expect(conversation.cards).toBe(0);
+  });
+
+  it('checks meal times', () => {
+    const v = (time: string) => validateProposal(meal('x', time), db, undefined, now);
+    expect(v('').ok && (v('') as { proposal: object }).proposal).not.toHaveProperty('time');
+    expect(!v('yesterday').ok && (v('yesterday') as { error: string }).error).toContain('not a valid local time');
+    expect(v('2026-02-31 12:00').ok).toBe(false);
+    expect(!v('2025-01-01 12:00').ok && (v('2025-01-01 12:00') as { error: string }).error).toContain('more than a year ago');
+    expect(v('2026-10-17 09:35').ok).toBe(true);
+  });
+
+  it('tells the assistant the time, the chat day, card states and barcodes', () => {
+    expect(appNote({ now, day: '2026-10-16', today: '2026-10-17', logged: ['M1'], open: ['M2', 'M3'], barcodes: ['4008400121925'] })).toBe(
+      '(Now: Sat 2026-10-17 09:30. The user opened this chat for 2026-10-16. Cards already logged: M1. Cards still open: M2, M3. Barcodes the app read from the photos: 4008400121925.)',
+    );
+    expect(appNote({ now, day: '2026-10-17', today: '2026-10-17', logged: [], open: [], barcodes: [] })).toBe('(Now: Sat 2026-10-17 09:30.)');
   });
 });
 
@@ -219,7 +269,7 @@ describe('packaged products (Open Food Facts lookup on)', () => {
       reply([toolUse('t2', 'propose_meal', { summary: 'Giotto', items: [{ code: 'OFF:4008400121925', grams: 4.3, preparation: 'asListed', note: '', micros_from: 'S450000' }], assumptions: [], confidence: 'B' })], 'tool_use'),
     );
     const { outcome } = await sendMessage(api.create, 'claude-opus-5-5', emptyConversation(), { text: 'one ball', images: [], appNote: '(Barcodes the app read from the photos: 4008400121925)' }, { ...ctx, products: products() });
-    expect(outcome.kind === 'proposal' && outcome.proposal.items[0]!.product?.code).toBe('4008400121925');
+    expect(outcome.kind === 'proposal' && outcome.proposals[0]!.items[0]!.product?.code).toBe('4008400121925');
     expect(api.requests[0]!.tools!.map((t) => (t as { name: string }).name)).toEqual(['search_foods', 'lookup_barcode', 'propose_meal']);
     expect(JSON.stringify(api.requests[0]!.messages[0]!.content)).toContain('Barcodes the app read');
     expect(requestParams('claude-opus-5-5', []).tools!.map((t) => (t as { name: string }).name)).toEqual(['search_foods', 'propose_meal']);

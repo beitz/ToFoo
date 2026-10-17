@@ -11,6 +11,7 @@ import type { FindResult } from '../foods/findProduct';
 import { normalizeBarcode } from '../foods/openFoodFacts';
 import { barcodeOf, isProductCode, productFood, productId, productLabel } from '../foods/products';
 import { normalize, search, type SearchIndex } from '../foods/search';
+import { parseLocalDateTime } from './photoTime';
 import { fmtNumber } from '../lib/format';
 import type { Preparation } from '../model/paramTypes';
 import type { RawValue } from '../model/types';
@@ -29,6 +30,9 @@ const PRODUCTS_PER_QUERY = 4;
  * unit slip (ml vs. l, g vs. kg) than a meal, so the model is asked to check it.
  */
 export const MAX_ITEM_GRAMS = 3000;
+/** Sanity limits for a proposed meal time: clock skew ahead, about a year back. */
+const FUTURE_SLACK_MS = 10 * 60_000;
+const MAX_PAST_MS = 400 * 86_400_000;
 
 export const searchInput = z.object({ queries: z.array(z.string()).min(1) });
 export const lookupInput = z.object({ barcodes: z.array(z.string()).min(1) });
@@ -49,6 +53,10 @@ export const proposalInput = z.object({
     .min(1),
   assumptions: z.array(z.string()),
   confidence: z.enum(['B', 'C']),
+  /** Local "YYYY-MM-DD HH:MM" when the meal was eaten; empty for the chat's default time. */
+  time: z.string().optional(),
+  /** Id of the open card this proposal replaces (e.g. "M2"); empty for a new meal. */
+  replaces: z.string().optional(),
 });
 
 export type ProposalInput = z.infer<typeof proposalInput>;
@@ -67,6 +75,10 @@ export interface Proposal {
   items: ProposedItem[];
   assumptions: string[];
   confidence: 'B' | 'C';
+  /** When it was eaten (epoch ms); absent means the chat's default time. */
+  time?: number;
+  /** Card id this one replaces. */
+  replaces?: string;
 }
 
 function fmt(v: RawValue | undefined): string {
@@ -98,6 +110,8 @@ export interface ToolContext {
   boost?: (code: string) => number;
   /** Absent when the Open Food Facts lookup is off. */
   products?: ProductTools;
+  /** Current time, for checking proposed meal times (injected to keep this pure). */
+  now?: number;
 }
 
 const LABEL_FIELDS: Array<[string, string, string]> = [
@@ -177,7 +191,12 @@ function knownProduct(code: string, products: ProductTools | undefined): Product
  * every amount plausible. A product needs a similar BLS food for its micronutrients unless the
  * user already chose one, which always wins.
  */
-export function validateProposal(input: unknown, db: Pick<FoodDb, 'byCode'> & { version?: string }, products?: ProductTools): { ok: true; proposal: Proposal } | { ok: false; error: string } {
+export function validateProposal(
+  input: unknown,
+  db: Pick<FoodDb, 'byCode'> & { version?: string },
+  products?: ProductTools,
+  now?: number,
+): { ok: true; proposal: Proposal } | { ok: false; error: string } {
   const parsed = proposalInput.safeParse(input);
   if (!parsed.success) return { ok: false, error: `Invalid input: ${parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}` };
   const problems: string[] = [];
@@ -204,7 +223,13 @@ export function validateProposal(input: unknown, db: Pick<FoodDb, 'byCode'> & { 
     if (!(it.grams > 0) || it.grams > MAX_ITEM_GRAMS) problems.push(`${it.code}: ${it.grams} g is not plausible (expected more than 0 and at most ${MAX_ITEM_GRAMS} g).`);
     if (food && it.grams > 0 && it.grams <= MAX_ITEM_GRAMS) items.push({ food, grams: Math.round(it.grams * 10) / 10, preparation: it.preparation, note: it.note.trim(), ...(product ? { product } : {}) });
   }
+  const timeText = parsed.data.time?.trim() ?? '';
+  const time = timeText ? parseLocalDateTime(timeText) : undefined;
+  if (timeText && time === undefined) problems.push(`time "${timeText}" is not a valid local time; write it as YYYY-MM-DD HH:MM, or leave it empty.`);
+  else if (time !== undefined && now !== undefined && time > now + FUTURE_SLACK_MS) problems.push(`time ${timeText} is in the future.`);
+  else if (time !== undefined && now !== undefined && time < now - MAX_PAST_MS) problems.push(`time ${timeText} is more than a year ago; check the year.`);
   if (problems.length) return { ok: false, error: `${problems.join('\n')}\nFix these and call propose_meal again.` };
+  const replaces = parsed.data.replaces?.trim();
   return {
     ok: true,
     proposal: {
@@ -212,6 +237,8 @@ export function validateProposal(input: unknown, db: Pick<FoodDb, 'byCode'> & { 
       items,
       assumptions: parsed.data.assumptions.map((a) => a.trim()).filter(Boolean),
       confidence: parsed.data.confidence,
+      ...(time !== undefined ? { time } : {}),
+      ...(replaces ? { replaces } : {}),
     },
   };
 }

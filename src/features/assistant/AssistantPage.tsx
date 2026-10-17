@@ -3,13 +3,14 @@ import { useData } from '../../app/data';
 import { useToast } from '../../app/toast';
 import { href, navigate } from '../../app/router';
 import { t, type MessageKey } from '../../i18n';
-import { dayKey } from '../../lib/dates';
+import { dayKey, formatTime } from '../../lib/dates';
 import { fmtNumber, fmtTokens, fmtUsd } from '../../lib/format';
-import { emptyConversation, sendMessage, type AiModel, type Conversation, type TurnOutcome } from '../../ai/assistant';
+import { appNote, emptyConversation, sendMessage, type AiModel, type Conversation, type ShownProposal, type TurnOutcome } from '../../ai/assistant';
 import { classifyError, getAiSettings, makeCreate, saveUsage } from '../../ai/client';
 import { mergeModelTokens, modelTokensCost, totalTokens, type ModelTokens } from '../../ai/pricing';
 import { prepareImage, type PreparedImage } from '../../ai/image';
-import type { Proposal, ProposedItem, ProductTools } from '../../ai/tools';
+import { photoLabel, readPhotoTime, type PhotoTime } from '../../ai/photoTime';
+import type { ProposedItem, ProductTools } from '../../ai/tools';
 import { findProduct } from '../../foods/findProduct';
 import { productUrl } from '../../foods/openFoodFacts';
 import { productLabel } from '../../foods/products';
@@ -24,7 +25,15 @@ import { ConfidenceField } from '../log/ConfidenceField';
 import { TimeField } from '../log/TimeField';
 import { defaultTimeFor } from '../log/time';
 
-type Bubble = { role: 'user'; text: string; previews: string[] } | { role: 'assistant'; text: string };
+type Bubble = { role: 'user'; text: string; previews: string[] } | { role: 'assistant'; text: string } | { role: 'card'; id: string };
+type ComposerPhoto = PreparedImage & { barcodes: string[]; time: PhotoTime };
+interface Card {
+  proposal: ShownProposal;
+  logged: boolean;
+}
+
+/** Photos per message: enough for a couple of days of meals; each one adds to the cost of every request in the chat. */
+const MAX_PHOTOS = 20;
 
 /** Log a meal by chatting: photos and/or text in, a checked list of BLS foods out. Route: #/assistant[/day]. */
 export function AssistantPage({ day: dayParam }: { day?: string }) {
@@ -81,9 +90,14 @@ function Chat({ apiKey, model, day }: { apiKey: string; model: AiModel; day: str
   const toast = useToast();
   const [conversation, setConversation] = useState<Conversation>(emptyConversation);
   const [bubbles, setBubbles] = useState<Bubble[]>([]);
-  const [proposal, setProposal] = useState<Proposal>();
+  const [cards, setCards] = useState<ReadonlyMap<string, Card>>(new Map());
+  // Cards can be logged while the assistant is thinking, so its answer is matched against the latest state.
+  const cardsRef = useRef(cards);
+  cardsRef.current = cards;
   const [text, setText] = useState('');
-  const [images, setImages] = useState<Array<PreparedImage & { barcodes: string[] }>>([]);
+  const [images, setImages] = useState<ComposerPhoto[]>([]);
+  /** Photos sent so far, so numbers stay unique across the chat. */
+  const [photoCount, setPhotoCount] = useState(0);
   const offOn = isOn(d.settings.features, 'openFoodFacts');
   // Products looked up in this chat stay usable for later proposals in it.
   const [seenProducts] = useState(() => new Map<string, Product>());
@@ -98,28 +112,41 @@ function Chat({ apiKey, model, day }: { apiKey: string; model: AiModel; day: str
 
   useEffect(() => {
     endRef.current?.scrollIntoView?.({ block: 'end', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
-  }, [bubbles.length, proposal, busy]);
+  }, [bubbles.length, busy]);
 
   async function addPhotos(files: FileList | null) {
     if (!files) return;
+    setError(undefined);
+    const picked = [...files].slice(0, Math.max(0, MAX_PHOTOS - images.length));
+    if (picked.length < files.length) setError('ai.error.tooManyPhotos');
     try {
-      // Barcodes are read from the full-size photo, on the phone; the assistant gets them as text.
-      const prepared = await Promise.all([...files].map(async (f) => ({ ...(await prepareImage(f)), barcodes: offOn ? await barcodesInPhoto(f) : [] })));
-      setImages((imgs) => [...imgs, ...prepared]);
+      // Capture time and barcodes come from the original file, on the phone (scaling drops EXIF);
+      // the assistant gets them as text.
+      const prepared = await Promise.all(
+        picked.map(async (f): Promise<ComposerPhoto> => ({ ...(await prepareImage(f)), barcodes: offOn ? await barcodesInPhoto(f) : [], time: await readPhotoTime(f) })),
+      );
+      // Oldest first, photos without a time last: the order the meals happened in.
+      setImages((imgs) => [...imgs, ...prepared].sort((a, b) => (a.time.time ?? Infinity) - (b.time.time ?? Infinity)));
     } catch {
       setError('ai.error.photo');
     }
   }
 
   async function send() {
-    const barcodes = [...new Set(images.flatMap((i) => i.barcodes))];
-    const msg = { text, images, ...(barcodes.length ? { appNote: `(Barcodes the app read from the photos: ${barcodes.join(', ')})` } : {}) };
-    if (busy || (!msg.text.trim() && msg.images.length === 0)) return;
-    const shownProposal = proposal;
+    if (busy || (!text.trim() && images.length === 0)) return;
+    const all = [...cards.values()];
+    const note = appNote({
+      now: Date.now(),
+      day,
+      today: d.today,
+      logged: all.filter((c) => c.logged).map((c) => c.proposal.id),
+      open: all.filter((c) => !c.logged).map((c) => c.proposal.id),
+      barcodes: [...new Set(images.flatMap((i) => i.barcodes))],
+    });
+    const labelled = images.map((img, i) => ({ ...img, label: photoLabel(photoCount + i + 1, img.time) }));
+    const msg = { text, images: labelled, appNote: note };
     setBusy(true);
     setError(undefined);
-    // A new message makes the shown proposal stale; the assistant answers with a new one if needed.
-    setProposal(undefined);
     setBubbles((b) => [...b, { role: 'user', text: msg.text.trim(), previews: msg.images.map((i) => i.preview) }]);
     setText('');
     setImages([]);
@@ -131,16 +158,16 @@ function Chat({ apiKey, model, day }: { apiKey: string; model: AiModel; day: str
     };
     try {
       const products: ProductTools | undefined = offOn ? { saved: d.productsByCode, find: (code) => findProduct(code), seen: seenProducts } : undefined;
-      const ctx = { db: d.foods, index: d.searchIndex, boost: d.searchBoost, products };
+      const ctx = { db: d.foods, index: d.searchIndex, boost: d.searchBoost, products, now: Date.now() };
       const r = await sendMessage(create, model, conversation, msg, ctx, onUsage);
       setConversation(r.conversation);
+      setPhotoCount((n) => n + msg.images.length);
       show(r.outcome);
     } catch (e) {
       // Nothing was added to the conversation: put the message back so a tap on Send retries it.
       setBubbles((b) => b.slice(0, -1));
       setText(msg.text);
-      setImages(msg.images);
-      setProposal(shownProposal);
+      setImages(images);
       setError(ERROR_TEXT[await classifyError(e)]);
     } finally {
       setBusy(false);
@@ -152,16 +179,41 @@ function Chat({ apiKey, model, day }: { apiKey: string; model: AiModel; day: str
       setError(ERROR_TEXT[outcome.reason]);
       return;
     }
-    if (outcome.text) setBubbles((b) => [...b, { role: 'assistant', text: outcome.text }]);
-    setProposal(outcome.kind === 'proposal' ? outcome.proposal : undefined);
+    const added: Bubble[] = outcome.text ? [{ role: 'assistant', text: outcome.text }] : [];
+    if (outcome.kind === 'proposal') {
+      // A correction replaces its open card: the old one goes, the new one appears at the end.
+      const replaced = new Set(outcome.proposals.map((p) => p.replaces).filter((id): id is string => !!id && cardsRef.current.get(id)?.logged === false));
+      setCards((all) => {
+        const next = new Map([...all].filter(([id]) => !replaced.has(id)));
+        for (const p of outcome.proposals) next.set(p.id, { proposal: p, logged: false });
+        return next;
+      });
+      setBubbles((b) => [...b.filter((x) => !(x.role === 'card' && replaced.has(x.id))), ...added, ...outcome.proposals.map((p): Bubble => ({ role: 'card', id: p.id }))]);
+    } else setBubbles((b) => [...b, ...added]);
   }
+
+  function setLogged(id: string, logged: boolean) {
+    setCards((all) => {
+      const card = all.get(id);
+      return card ? new Map(all).set(id, { ...card, logged }) : all;
+    });
+  }
+
+  // Everything proposed in this chat is logged: back to the log.
+  useEffect(() => {
+    if (cards.size > 0 && [...cards.values()].every((c) => c.logged)) navigate();
+  }, [cards]);
+
+  const timedOut = images.filter((i) => i.time.source !== 'photo').length;
 
   return (
     <>
       <div className="chat" aria-live="polite">
         <div className="bubble bubble-assistant">{t('ai.intro')}</div>
         {bubbles.map((b, i) =>
-          b.role === 'user' ? (
+          b.role === 'card' ? (
+            cards.has(b.id) && <ProposalCard key={b.id} card={cards.get(b.id)!} day={day} toast={toast} onLogged={(v) => setLogged(b.id, v)} />
+          ) : b.role === 'user' ? (
             <div key={i} className="bubble bubble-user">
               {b.previews.length > 0 && (
                 <div className="bubble-photos">
@@ -178,7 +230,6 @@ function Chat({ apiKey, model, day }: { apiKey: string; model: AiModel; day: str
             </div>
           ),
         )}
-        {proposal && <ProposalCard key={bubbles.length} proposal={proposal} day={day} toast={toast} />}
         {busy && <div className="bubble bubble-assistant muted">{t('ai.thinking')}</div>}
         {error && (
           <div className="card notice-card" role="alert">
@@ -195,6 +246,7 @@ function Chat({ apiKey, model, day }: { apiKey: string; model: AiModel; day: str
             {images.map((img, i) => (
               <div key={i} className="composer-photo">
                 <img src={img.preview} alt={t('ai.photo')} />
+                <span className="composer-photo-time small">{photoTimeShort(img.time)}</span>
                 <button className="icon-btn" aria-label={t('ai.removePhoto')} onClick={() => setImages((all) => all.filter((_, j) => j !== i))}>
                   <Icon name="close" size={16} />
                 </button>
@@ -202,6 +254,7 @@ function Chat({ apiKey, model, day }: { apiKey: string; model: AiModel; day: str
             ))}
           </div>
         )}
+        {timedOut > 0 && <p className="composer-note muted small">{t('ai.photoTimesMissing', { n: timedOut })}</p>}
         <div className="composer-row">
           <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={(e) => void addPhotos(e.target.files).then(() => (e.target.value = ''))} />
           <button className="icon-btn composer-btn" aria-label={t('ai.addPhoto')} onClick={() => fileRef.current?.click()} disabled={busy}>
@@ -240,12 +293,20 @@ function UsageLine({ chat, turn, model }: { chat: ModelTokens; turn: ModelTokens
   );
 }
 
-/** The meal the assistant proposes: check, adjust grams, remove items, then log. */
-function ProposalCard({ proposal, day, toast }: { proposal: Proposal; day: string; toast: ReturnType<typeof useToast> }) {
+/** Capture time under a photo thumbnail: "Thu 19:42", "≈ Thu 19:42" from the file date, or "–". */
+function photoTimeShort(pt: PhotoTime): string {
+  if (pt.time === undefined) return '–';
+  const s = `${new Date(pt.time).toLocaleDateString('en-GB', { weekday: 'short' })} ${formatTime(pt.time)}`;
+  return pt.source === 'photo' ? s : `≈ ${s}`;
+}
+
+/** One meal the assistant proposes: check, adjust grams and time, remove items, then log. */
+function ProposalCard({ card, day, toast, onLogged }: { card: Card; day: string; toast: ReturnType<typeof useToast>; onLogged: (logged: boolean) => void }) {
+  const { proposal } = card;
   const d = useData();
   const [items, setItems] = useState<Array<Omit<ProposedItem, 'grams'> & { grams: number | undefined }>>(proposal.items);
   const [confidence, setConfidence] = useState<EntryConfidence>(proposal.confidence);
-  const [time, setTime] = useState(() => defaultTimeFor(day, d.today));
+  const [time, setTime] = useState(() => proposal.time ?? defaultTimeFor(day, d.today));
   const [saving, setSaving] = useState(false);
   const valid = items.length > 0 && items.every((i) => i.grams && i.grams > 0);
   const kcal = items.reduce((sum, i) => {
@@ -257,34 +318,56 @@ function ProposalCard({ proposal, day, toast }: { proposal: Proposal; day: strin
     if (!valid || saving) return;
     setSaving(true);
     const ids: string[] = [];
-    for (const it of items) {
-      let ref: FoodRef = { source: 'BLS', version: d.foods.version, code: it.food.code };
-      if (it.product) {
-        await repo.saveProduct(it.product);
-        await repo.setProductMatch(it.product.id, it.product.match ?? null);
-        ref = { source: 'OFF', code: it.product.code };
+    try {
+      for (const it of items) {
+        let ref: FoodRef = { source: 'BLS', version: d.foods.version, code: it.food.code };
+        if (it.product) {
+          await repo.saveProduct(it.product);
+          await repo.setProductMatch(it.product.id, it.product.match ?? null);
+          ref = { source: 'OFF', code: it.product.code };
+        }
+        const entry = await repo.addLog({
+          kind: 'food',
+          ref,
+          grams: it.grams!,
+          preparation: it.preparation,
+          time,
+          day: dayKey(new Date(time)),
+          confidence,
+          label: it.product ? productLabel(it.product) : it.food.nameEn,
+        });
+        ids.push(entry.id);
       }
-      const entry = await repo.addLog({
-        kind: 'food',
-        ref,
-        grams: it.grams!,
-        preparation: it.preparation,
-        time,
-        day: dayKey(new Date(time)),
-        confidence,
-        label: it.product ? productLabel(it.product) : it.food.nameEn,
-      });
-      ids.push(entry.id);
+    } finally {
+      setSaving(false);
     }
     toast(t('ai.logged'), async () => {
       for (const id of ids) await repo.deleteLog(id);
+      onLogged(false);
     });
-    navigate();
+    onLogged(true);
+  }
+
+  const title = proposal.summary || t('ai.proposal');
+  if (card.logged) {
+    return (
+      <div className="card proposal-done row">
+        <Icon name="check" size={18} />
+        <span>
+          {t('ai.cardLogged', { name: title, when: `${new Date(time).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}, ${formatTime(time)}` })}
+        </span>
+      </div>
+    );
   }
 
   return (
     <div className="card proposal">
-      <strong>{proposal.summary || t('ai.proposal')}</strong>
+      <div className="row-between">
+        <strong>{title}</strong>
+        <span className="muted small" title={t('ai.cardId')}>
+          {proposal.id}
+        </span>
+      </div>
       <ul className="plain-list">
         {items.map((it, i) => (
           <li key={`${it.food.code}-${i}`} className="proposal-item">
