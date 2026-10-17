@@ -16,10 +16,12 @@ import {
   validateProposal,
   validateSleepProposal,
   validateActivityProposal,
+  validateWaterProposal,
   type JournalProposal,
   type Proposal,
   type SleepProposal,
   type ActivityProposal,
+  type WaterProposal,
   type ToolContext,
 } from './tools';
 
@@ -50,9 +52,11 @@ export interface Conversation {
   sleeps?: number;
   /** Activity cards shown so far; the next one gets id A(activities + 1). */
   activities?: number;
+  /** Water cards shown so far; the next one gets id W(waters + 1). */
+  waters?: number;
 }
 
-export const emptyConversation = (): Conversation => ({ messages: [], pendingResults: [], cards: 0, notes: 0, sleeps: 0, activities: 0 });
+export const emptyConversation = (): Conversation => ({ messages: [], pendingResults: [], cards: 0, notes: 0, sleeps: 0, activities: 0, waters: 0 });
 
 export interface UserImage {
   mediaType: 'image/jpeg' | 'image/png' | 'image/webp';
@@ -70,10 +74,12 @@ export type ShownNote = JournalProposal & { id: string };
 export type ShownSleep = SleepProposal & { id: string };
 /** An activity as shown: with its card id (A1, A2, …). */
 export type ShownActivity = ActivityProposal & { id: string };
+/** Plain water as shown: with its card id (W1, W2, …). */
+export type ShownWater = WaterProposal & { id: string };
 
 export type TurnOutcome =
   | { kind: 'reply'; text: string }
-  | { kind: 'proposal'; text: string; proposals: ShownProposal[]; notes: ShownNote[]; sleeps: ShownSleep[]; activities: ShownActivity[] }
+  | { kind: 'proposal'; text: string; proposals: ShownProposal[]; notes: ShownNote[]; sleeps: ShownSleep[]; activities: ShownActivity[]; waters: ShownWater[] }
   | { kind: 'error'; reason: 'refusal' | 'tooLong' | 'tooManySteps' };
 
 /** Request parameters per model (fallbacks re-run a declined request on another model). */
@@ -144,13 +150,14 @@ export async function sendMessage(
   if (user.text.trim()) content.push({ type: 'text', text: user.text.trim() });
   if (user.appNote) content.push({ type: 'text', text: user.appNote });
   messages.push({ role: 'user', content });
-  const sources = sourcesOf(ctx.products, ctx.journal, ctx.sleep, ctx.activity);
+  const sources = sourcesOf(ctx.products, ctx.journal, ctx.sleep, ctx.activity, ctx.water);
 
   let cards = conversation.cards;
   let notes = conversation.notes ?? 0;
   let sleeps = conversation.sleeps ?? 0;
   let activities = conversation.activities ?? 0;
-  const done = (outcome: TurnOutcome, pendingResults: Beta.BetaToolResultBlockParam[] = []) => ({ conversation: { messages, pendingResults, cards, notes, sleeps, activities }, outcome });
+  let waters = conversation.waters ?? 0;
+  const done = (outcome: TurnOutcome, pendingResults: Beta.BetaToolResultBlockParam[] = []) => ({ conversation: { messages, pendingResults, cards, notes, sleeps, activities, waters }, outcome });
 
   for (let step = 0; step < MAX_STEPS; step++) {
     const res = await create(requestParams(model, messages, sources));
@@ -170,6 +177,7 @@ export async function sendMessage(
     const notesProposed: Array<{ id: string; proposal: JournalProposal }> = [];
     const sleepsProposed: Array<{ id: string; proposal: SleepProposal }> = [];
     const activitiesProposed: Array<{ id: string; proposal: ActivityProposal }> = [];
+    const watersProposed: Array<{ id: string; proposal: WaterProposal }> = [];
     let rejected = false;
     for (const use of uses) {
       if (use.name === 'search_foods') {
@@ -209,25 +217,34 @@ export async function sendMessage(
           rejected = true;
           results.push({ type: 'tool_result', tool_use_id: use.id, content: r.error, is_error: true });
         }
+      } else if (use.name === 'propose_water' && sources.water) {
+        const r = validateWaterProposal(use.input, ctx.now);
+        if (r.ok) watersProposed.push({ id: use.id, proposal: r.proposal });
+        else {
+          rejected = true;
+          results.push({ type: 'tool_result', tool_use_id: use.id, content: r.error, is_error: true });
+        }
       } else {
         results.push({ type: 'tool_result', tool_use_id: use.id, content: `Unknown tool ${use.name}.`, is_error: true });
       }
     }
 
     // Cards are shown all together or not at all, so the user never sees half a batch.
-    if ((proposals.length || notesProposed.length || sleepsProposed.length || activitiesProposed.length) && !rejected) {
+    if ((proposals.length || notesProposed.length || sleepsProposed.length || activitiesProposed.length || watersProposed.length) && !rejected) {
       const shown = proposals.map(({ proposal }): ShownProposal => ({ ...proposal, id: `M${++cards}` }));
       const shownNotes = notesProposed.map(({ proposal }): ShownNote => ({ ...proposal, id: `J${++notes}` }));
       const shownSleeps = sleepsProposed.map(({ proposal }): ShownSleep => ({ ...proposal, id: `S${++sleeps}` }));
       const shownActivities = activitiesProposed.map(({ proposal }): ShownActivity => ({ ...proposal, id: `A${++activities}` }));
+      const shownWaters = watersProposed.map(({ proposal }): ShownWater => ({ ...proposal, id: `W${++waters}` }));
       const shownResult = (id: string, card: string, verb: string): Beta.BetaToolResultBlockParam => ({ type: 'tool_result', tool_use_id: id, content: `Shown to the user as card ${card}. Not ${verb} yet; their reply follows.` });
       const shownResults = [
         ...proposals.map(({ id }, i) => shownResult(id, shown[i]!.id, 'logged')),
         ...notesProposed.map(({ id }, i) => shownResult(id, shownNotes[i]!.id, 'saved')),
         ...sleepsProposed.map(({ id }, i) => shownResult(id, shownSleeps[i]!.id, 'saved')),
         ...activitiesProposed.map(({ id }, i) => shownResult(id, shownActivities[i]!.id, 'saved')),
+        ...watersProposed.map(({ id }, i) => shownResult(id, shownWaters[i]!.id, 'saved')),
       ];
-      return done({ kind: 'proposal', text: textOf(res.content), proposals: shown, notes: shownNotes, sleeps: shownSleeps, activities: shownActivities }, [...results, ...shownResults]);
+      return done({ kind: 'proposal', text: textOf(res.content), proposals: shown, notes: shownNotes, sleeps: shownSleeps, activities: shownActivities, waters: shownWaters }, [...results, ...shownResults]);
     }
     for (const { id } of proposals) {
       results.push({ type: 'tool_result', tool_use_id: id, content: 'Not shown: another proposal in this response had errors. Call propose_meal again for this meal too.', is_error: true });
@@ -237,6 +254,9 @@ export async function sendMessage(
     }
     for (const { id } of sleepsProposed) {
       results.push({ type: 'tool_result', tool_use_id: id, content: 'Not shown: another proposal in this response had errors. Call propose_sleep again for this sleep too.', is_error: true });
+    }
+    for (const { id } of watersProposed) {
+      results.push({ type: 'tool_result', tool_use_id: id, content: 'Not shown: another proposal in this response had errors. Call propose_water again for this water too.', is_error: true });
     }
     for (const { id } of activitiesProposed) {
       results.push({ type: 'tool_result', tool_use_id: id, content: 'Not shown: another proposal in this response had errors. Call propose_activity again for this activity too.', is_error: true });

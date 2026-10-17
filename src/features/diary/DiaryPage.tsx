@@ -7,7 +7,7 @@ import { addDays, formatDay, formatTime, parseDay } from '../../lib/dates';
 import { fmtAmount } from '../../lib/format';
 import { groupMeals } from '../../model/simulate';
 import { repo } from '../../storage/repo';
-import type { ActivityRecord, JournalEntry, LogEntry, SleepRecord, SunEntry } from '../../storage/types';
+import type { ActivityRecord, JournalEntry, LogEntry, SleepRecord, SunEntry, WaterRecord } from '../../storage/types';
 import { Icon } from '../../ui/Icon';
 import { Segmented } from '../../ui/controls';
 import { entryAmount } from '../log/describe';
@@ -26,6 +26,11 @@ import { spanText } from '../sleep/format';
 import { ActivitySheet } from '../activity/ActivitySheet';
 import { activityName } from '../activity/ActivityForm';
 import { useActivities } from '../activity/useActivities';
+import { WaterCard } from '../water/WaterCard';
+import { WaterSheet } from '../water/WaterSheet';
+import { useWater } from '../water/useWater';
+import { waterText } from '../water/format';
+import { waterTarget } from '../../logic/water';
 
 type StatusChoice = 'auto' | 'logged' | 'partial' | 'fasted' | 'filled' | 'excluded';
 
@@ -47,6 +52,9 @@ export function DiaryPage({ day: dayParam }: { day?: string }) {
   const activities = useActivities(day) ?? [];
   // An activity being edited, or 'new' for one being added.
   const [activitySheet, setActivitySheet] = useState<ActivityRecord | 'new' | null>(null);
+  const waterOn = isOn(d.settings.features, 'water');
+  const water = useWater(day) ?? [];
+  const [waterSheet, setWaterSheet] = useState<WaterRecord | null>(null);
 
   const entries = d.log.filter((e) => e.day === day);
   const meals = groupMeals(entries, d.settings.mealWindowMinutes);
@@ -207,6 +215,27 @@ export function DiaryPage({ day: dayParam }: { day?: string }) {
         </p>
       )}
 
+      {waterOn && (
+        <>
+          <WaterCard day={day} />
+          {water.length > 0 && (
+            <ul className="plain-list water-list">
+              {water.map((w) => (
+                <li key={w.id}>
+                  <button className="entry-row" onClick={() => setWaterSheet(w)}>
+                    <span className="entry-label">{t('water.entry', { time: formatTime(w.time), amount: waterText(w.ml) })}</span>
+                    <span className="entry-edit">
+                      <Icon name="edit" size={16} />
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="muted small">{t('water.guide', { target: waterText(waterTarget(d.requirements.ageGroup)) })}</p>
+        </>
+      )}
+
       <h2 className="section-title">
         <Icon name="sun" /> {t('diary.outside')}
       </h2>
@@ -249,6 +278,7 @@ export function DiaryPage({ day: dayParam }: { day?: string }) {
           onClose={() => setSleepSheet(null)}
         />
       )}
+      {waterSheet && <WaterSheet record={waterSheet} defaultTime={waterSheet.time} onClose={() => setWaterSheet(null)} />}
       {activitySheet && (
         <ActivitySheet
           activity={activitySheet === 'new' ? undefined : activitySheet}

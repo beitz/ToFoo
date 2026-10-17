@@ -91,7 +91,8 @@ Still open:
 ## Later versions
 
 - [ ] **Shelf life per storage type** (fridge, freezer) for the "eat soon" flag and the freezer overview: find a citable food-safety source (e.g. BfR, USDA FSIS cold storage chart). Feature review 2026-10-16.
-- [ ] **Water reference value:** take the DGE guide value for total water (drinks + food) with its source before adding the water gauge. Feature review 2026-10-16.
+- [x] **Water reference value:** DGE guide values for water (Richtwerte, derived 2000), drinks + water in solid food per age group, in `model/reference-values.ts` (`waterGuide`); checked against the DGE page 2026-10-17. Feature review 2026-10-16.
+- [ ] **Water lost or gained in cooking:** the water count uses the BLS water content of each food as logged. Foods logged raw but eaten cooked (rice, pasta, lentils logged dry, recipe ingredients) miss the water they took up in the pot, so the count is low on such days; the planned cooked pot weight for batches would fix most of it. 2026-10-17.
 - [ ] **Insights and chance patterns:** with one person, a few weeks of data and many things to compare, some patterns will appear by chance. Decide before building Insights how the app guards against that: a minimum number of days per comparison, always showing the counts, and maybe a simple check computed by the app (for example, how often a pattern this strong shows up with the days shuffled). 2026-10-17.
 - [ ] **Activity energy cost:** if energy burned is ever estimated, take the values from a sourced table (e.g. the Adult Compendium of Physical Activities, 2024 update) into `model/`, with ranges; not before the energy in and out feature. 2026-10-17.
 - [ ] **Health Connect export:** check whether Android's Health Connect export file can be read in the browser, and which data it holds (sleep sessions, steps, exercise), as the route to automatic sleep times and steps without a native app. 2026-10-17.

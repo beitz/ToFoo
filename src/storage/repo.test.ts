@@ -110,6 +110,18 @@ describe('repository', () => {
     expect(await b.db.activities.where('day').equals('2026-10-15').toArray()).toEqual([removed]);
   });
 
+  it('adds, edits, deletes and restores water, and backs it up', async () => {
+    const repo = await fresh();
+    const w = await repo.addWater({ time: 10, day: '2026-10-15', ml: 250 });
+    await repo.updateWater({ ...w, ml: 500 });
+    const removed = await repo.deleteWater(w.id);
+    expect(await repo.db.water.count()).toBe(0);
+    await repo.restoreWater(removed!);
+    const b = await fresh();
+    await b.restore(await repo.snapshot());
+    expect(await b.db.water.toArray()).toEqual([{ ...w, ml: 500 }]);
+  });
+
   it('pins and unpins favourite foods', async () => {
     const repo = await fresh();
     const oats = { source: 'BLS', version: '4.0', code: 'C133000' } as const;

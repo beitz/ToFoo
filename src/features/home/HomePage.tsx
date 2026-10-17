@@ -17,6 +17,7 @@ import { Field, Segmented, Sheet } from '../../ui/controls';
 import type { NutrientResult } from '../../model/simulate';
 import { Prompts } from './Prompts';
 import { SleepQuestion } from '../sleep/SleepQuestion';
+import { WaterCard } from '../water/WaterCard';
 import { SleepButton } from '../sleep/SleepButton';
 import { StockChips } from './StockChips';
 import { attentionCounts, COLLAPSED_BY_DEFAULT, groupNutrients, type HomeGrouping } from './grouping';
@@ -105,6 +106,7 @@ export function HomePage() {
 
       {isOn(d.settings.features, 'sleep') && <SleepQuestion />}
       <Prompts />
+      {isOn(d.settings.features, 'water') && <WaterCard day={today} compact />}
 
       <div className="section-title home-gauges-head">
         <h2>{t('home.gauges')}</h2>

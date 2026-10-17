@@ -43,6 +43,7 @@ const paths: Record<string, string> = {
   journal: 'M6 3.5h9l3.5 3.5v13.5H6zM15 3.5V7h3.5M9 11h6M9 14.5h6M9 18h3.5',
   bed: 'M3 6v13M3 15h18v4M21 15v-2a2 2 0 0 0-2-2h-8v4M5 11h4v3.5H5z',
   activity: 'M22 12h-4l-3 9L9 3l-3 9H2',
+  drop: 'M12 3.5C9 7.5 6 10.7 6 14a6 6 0 0 0 12 0c0-3.3-3-6.5-6-10.5z',
   tank: 'M8 4h8a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z',
 };
 

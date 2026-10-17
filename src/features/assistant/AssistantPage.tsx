@@ -5,7 +5,7 @@ import { href, navigate } from '../../app/router';
 import { t, type MessageKey } from '../../i18n';
 import { dayKey, formatDay, formatTime } from '../../lib/dates';
 import { fmtNumber, fmtTokens, fmtUsd } from '../../lib/format';
-import { appNote, emptyConversation, sendMessage, type AiModel, type Conversation, type ShownNote, type ShownProposal, type ShownSleep, type ShownActivity, type TurnOutcome } from '../../ai/assistant';
+import { appNote, emptyConversation, sendMessage, type AiModel, type Conversation, type ShownNote, type ShownProposal, type ShownSleep, type ShownActivity, type ShownWater, type TurnOutcome } from '../../ai/assistant';
 import { classifyError, getAiSettings, makeCreate, saveUsage } from '../../ai/client';
 import { mergeModelTokens, modelTokensCost, totalTokens, type ModelTokens } from '../../ai/pricing';
 import { prepareImage, type PreparedImage } from '../../ai/image';
@@ -21,20 +21,22 @@ import { barcodesInPhoto } from '../log/barcode';
 import type { EntryConfidence } from '../../model/types';
 import { isOn } from '../../settings/features';
 import { repo } from '../../storage/repo';
-import { NumberInput } from '../../ui/controls';
+import { Field, NumberInput } from '../../ui/controls';
 import { Icon } from '../../ui/Icon';
 import { ConfidenceField } from '../log/ConfidenceField';
 import { TimeField } from '../log/TimeField';
 import { defaultTimeFor } from '../log/time';
 import { sleepProblem } from '../sleep/SleepSheet';
 import { durationText, spanText } from '../sleep/format';
+import { waterText } from '../water/format';
+import { waterProblem } from '../water/WaterSheet';
 import { ActivityForm, activityName, DEFAULT_ACTIVITY_SKIN, recordOf, type ActivityDraft } from '../activity/ActivityForm';
 
 type Bubble = { role: 'user'; text: string; previews: string[] } | { role: 'assistant'; text: string } | { role: 'card'; id: string };
 type ComposerPhoto = PreparedImage & { barcodes: string[]; time: PhotoTime };
-/** A proposed meal (M1, …), journal entry (J1, …), sleep (S1, …) or activity (A1, …), and whether the user logged or saved it. */
-type Card = { kind: 'meal'; proposal: ShownProposal; logged: boolean } | { kind: 'note'; note: ShownNote; logged: boolean } | { kind: 'sleep'; sleep: ShownSleep; logged: boolean } | { kind: 'activity'; activity: ShownActivity; logged: boolean };
-const cardOf = (c: Card) => (c.kind === 'meal' ? c.proposal : c.kind === 'note' ? c.note : c.kind === 'sleep' ? c.sleep : c.activity);
+/** A proposed meal (M1, …), journal entry (J1, …), sleep (S1, …), activity (A1, …) or water (W1, …), and whether the user logged or saved it. */
+type Card = { kind: 'meal'; proposal: ShownProposal; logged: boolean } | { kind: 'note'; note: ShownNote; logged: boolean } | { kind: 'sleep'; sleep: ShownSleep; logged: boolean } | { kind: 'activity'; activity: ShownActivity; logged: boolean } | { kind: 'water'; water: ShownWater; logged: boolean };
+const cardOf = (c: Card) => (c.kind === 'meal' ? c.proposal : c.kind === 'note' ? c.note : c.kind === 'sleep' ? c.sleep : c.kind === 'activity' ? c.activity : c.water);
 const cardId = (c: Card) => cardOf(c).id;
 /** Undoes one saved card. */
 type Undo = () => Promise<void>;
@@ -218,6 +220,7 @@ function Chat({ apiKey, model, day }: { apiKey: string; model: AiModel; day: str
         journal: isOn(d.settings.features, 'journal'),
         sleep: isOn(d.settings.features, 'sleep'),
         activity: isOn(d.settings.features, 'activity'),
+        water: isOn(d.settings.features, 'water'),
       };
       const r = await sendMessage(create, model, conversation, msg, ctx, onUsage);
       setConversation(r.conversation);
@@ -249,6 +252,7 @@ function Chat({ apiKey, model, day }: { apiKey: string; model: AiModel; day: str
         ...outcome.notes.map((n): Card => ({ kind: 'note', note: n, logged: false })),
         ...outcome.sleeps.map((s): Card => ({ kind: 'sleep', sleep: s, logged: false })),
         ...outcome.activities.map((a): Card => ({ kind: 'activity', activity: a, logged: false })),
+        ...outcome.waters.map((w): Card => ({ kind: 'water', water: w, logged: false })),
       ];
       const replaced = new Set(shown.map((c) => cardOf(c).replaces).filter((id): id is string => !!id && cardsRef.current.get(id)?.logged === false));
       setCards((all) => {
@@ -334,6 +338,7 @@ function Chat({ apiKey, model, day }: { apiKey: string; model: AiModel; day: str
           {isOn(d.settings.features, 'journal') && ` ${t('ai.introJournal')}`}
           {isOn(d.settings.features, 'sleep') && ` ${t('ai.introSleep')}`}
           {isOn(d.settings.features, 'activity') && ` ${t('ai.introActivity')}`}
+          {isOn(d.settings.features, 'water') && ` ${t('ai.introWater')}`}
         </div>
         {bubbles.map((b, i) =>
           b.role === 'card' ? (
@@ -538,6 +543,7 @@ function CardView({ card, ...rest }: CardProps<Card>) {
   if (card.kind === 'meal') return <ProposalCard card={card} {...rest} />;
   if (card.kind === 'sleep') return <SleepCard card={card} {...rest} />;
   if (card.kind === 'activity') return <ActivityCard card={card} {...rest} />;
+  if (card.kind === 'water') return <WaterProposalCard card={card} {...rest} />;
   return <NoteCard card={card} {...rest} />;
 }
 
@@ -599,6 +605,73 @@ function SleepCard({ card, toast, onLogged, register }: CardProps<Extract<Card, 
         </span>
         <button className="btn btn-primary" disabled={!!problem || saving} onClick={() => void saveOne()}>
           {t('ai.saveSleep')}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** Plain water the assistant proposes: check or adjust the amount and time, then save. */
+function WaterProposalCard({ card, day, toast, onLogged, register }: CardProps<Extract<Card, { kind: 'water' }>>) {
+  const { water } = card;
+  const d = useData();
+  const [ml, setMl] = useState<number | undefined>(water.ml);
+  const [time, setTime] = useState(() => water.time ?? defaultTimeFor(day, d.today));
+  const [saving, setSaving] = useState(false);
+  const problem = waterProblem(ml);
+
+  async function save(): Promise<Undo | undefined> {
+    if (problem || !ml || saving) return;
+    setSaving(true);
+    try {
+      const added = await repo.addWater({ ml: Math.round(ml), time, day: dayKey(new Date(time)) });
+      onLogged(true);
+      return async () => {
+        await repo.deleteWater(added.id);
+        onLogged(false);
+      };
+    } finally {
+      setSaving(false);
+    }
+  }
+  useRegister(water.id, card.logged ? undefined : save, register);
+
+  async function saveOne() {
+    const undo = await save();
+    if (undo && ml) toast(t('water.added', { amount: waterText(ml) }), undo);
+  }
+
+  if (card.logged) {
+    return (
+      <div className="card proposal-done row">
+        <Icon name="check" size={18} />
+        <span>
+          {t('ai.waterSaved', { amount: waterText(ml ?? 0), when: `${formatDay(dayKey(new Date(time)))}, ${formatTime(time)}` })} <a href={href('diary', dayKey(new Date(time)))}>{t('edit.inDiary')}</a>
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="card proposal">
+      <div className="row-between">
+        <strong className="journal-label">
+          <Icon name="drop" size={18} /> {t('water.title')}
+        </strong>
+        <span className="muted small" title={t('ai.cardId')}>
+          {water.id}
+        </span>
+      </div>
+      <Field label={t('water.amount')}>{(id) => <NumberInput id={id} value={ml} onChange={setMl} suffix="ml" min={0} />}</Field>
+      <TimeField value={time} onChange={setTime} />
+      <div className="sheet-actions">
+        {problem && (
+          <span className="notice small" role="alert">
+            {problem}
+          </span>
+        )}
+        <button className="btn btn-primary" disabled={!!problem || saving} onClick={() => void saveOne()}>
+          {t('ai.saveWater')}
         </button>
       </div>
     </div>
