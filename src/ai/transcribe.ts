@@ -18,7 +18,7 @@ export const MAX_AUDIO_BYTES = 25 * 1024 * 1024;
  * names and mixed German and English. Not an instruction; the model only transcribes.
  */
 export const TRANSCRIBE_PROMPT =
-  'Someone describing what they ate for a food diary, in German or English or both, often looking at their meal photos. Food names, brands, amounts in grams, times of day.';
+  'Someone telling their food diary about the last day or two, in German or English or both, often looking at their photos: what they ate and drank (food names, brands, amounts in grams, times of day), how they slept, how they felt and what they did.';
 /** The same for journal entries: how the day went, how they feel, sleep, symptoms, food. */
 export const JOURNAL_TRANSCRIBE_PROMPT =
   'Someone speaking a personal journal entry, in German or English or both: how their day went, how they feel, sleep, energy, symptoms, food, times of day.';

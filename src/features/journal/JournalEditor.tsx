@@ -5,6 +5,7 @@ import { Icon } from '../../ui/Icon';
 import { TimeField } from '../log/TimeField';
 import { RecordingTime } from '../assistant/RecordingTime';
 import { appendText, useDictation } from '../assistant/useDictation';
+import { VoiceFailed } from '../assistant/VoiceFailed';
 
 /**
  * Writing a journal entry: plain text (no fields to fill in), the microphone when voice input is
@@ -28,8 +29,8 @@ export function JournalEditor({
 }) {
   const [error, setError] = useState<MessageKey>();
   const area = useRef<HTMLTextAreaElement>(null);
-  const dictation = useDictation({ onText: (added) => onText((old) => appendText(old, added)), onError: setError, prompt: JOURNAL_TRANSCRIBE_PROMPT });
-  const busy = dictation.recording || dictation.transcribing;
+  const dictation = useDictation({ onText: (added, continued) => onText((old) => appendText(old, added, continued)), onError: setError, prompt: JOURNAL_TRANSCRIBE_PROMPT });
+  const busy = dictation.busy;
   useEffect(() => {
     onBusy?.(busy);
   }, [busy, onBusy]);
@@ -76,6 +77,7 @@ export function JournalEditor({
           ) : null}
         </div>
       )}
+      {dictation.failed && <VoiceFailed onRetry={dictation.retry} onDrop={dictation.drop} />}
       {error && (
         <p className="notice small" role="alert">
           {t(error)}

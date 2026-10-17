@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useData } from '../../app/data';
 import { useToast } from '../../app/toast';
 import { href, navigate } from '../../app/router';
@@ -12,6 +12,7 @@ import { prepareImage, type PreparedImage } from '../../ai/image';
 import { photoLabel, readPhotoTime, type PhotoTime } from '../../ai/photoTime';
 import { appendText, useDictation } from './useDictation';
 import { RecordingTime } from './RecordingTime';
+import { VoiceFailed } from './VoiceFailed';
 import type { ProposedItem, ProductTools } from '../../ai/tools';
 import { findProduct, findUsda } from '../../foods/findProduct';
 import { productLabel, productPageUrl, productRef } from '../../foods/products';
@@ -31,9 +32,18 @@ type ComposerPhoto = PreparedImage & { barcodes: string[]; time: PhotoTime };
 /** A proposed meal (M1, …) or journal entry (J1, …), and whether the user logged or saved it. */
 type Card = { kind: 'meal'; proposal: ShownProposal; logged: boolean } | { kind: 'note'; note: ShownNote; logged: boolean };
 const cardId = (c: Card) => (c.kind === 'meal' ? c.proposal.id : c.note.id);
+/** Undoes one saved card. */
+type Undo = () => Promise<void>;
+/** Saves a card as it is shown (with the user's edits); undefined if it cannot be saved as it is. */
+type Saver = () => Promise<Undo | undefined>;
 
 /** Photos per message: enough for a couple of days of meals; each one adds to the cost of every request in the chat. */
-const MAX_PHOTOS = 20;
+const MAX_PHOTOS = 50;
+/**
+ * Photo data per chat: every request carries the whole chat, photos included, and the API takes at
+ * most 32 MB per request; the rest is left for the text. A scaled photo is about 0.2–0.5 MB.
+ */
+const MAX_PHOTO_BYTES = 24 * 1024 * 1024;
 
 /** Log a meal by chatting: photos and/or text in, a checked list of BLS foods out. Route: #/assistant[/day]. */
 export function AssistantPage({ day: dayParam }: { day?: string }) {
@@ -95,10 +105,20 @@ function Chat({ apiKey, model, day }: { apiKey: string; model: AiModel; day: str
   // Cards can be logged while the assistant is thinking, so its answer is matched against the latest state.
   const cardsRef = useRef(cards);
   cardsRef.current = cards;
+  /** How each open card saves itself, for "Log all". */
+  const savers = useRef(new Map<string, Saver>());
+  const register = useCallback((id: string, save: Saver | undefined) => {
+    if (save) savers.current.set(id, save);
+    else savers.current.delete(id);
+  }, []);
+  const [savingAll, setSavingAll] = useState(false);
   const [text, setText] = useState('');
   const [images, setImages] = useState<ComposerPhoto[]>([]);
-  /** Photos sent so far, so numbers stay unique across the chat. */
+  /** Photos sent so far, so numbers stay unique across the chat, and their size (base64 characters). */
   const [photoCount, setPhotoCount] = useState(0);
+  const [photoBytes, setPhotoBytes] = useState(0);
+  /** Some of the text in the box was dictated: the assistant is told to expect misheard words. */
+  const [dictated, setDictated] = useState(false);
   const offOn = isOn(d.settings.features, 'openFoodFacts');
   const usdaOn = isOn(d.settings.features, 'usda');
   const webSearchOn = isOn(d.settings.features, 'productWebSearch');
@@ -113,7 +133,13 @@ function Chat({ apiKey, model, day }: { apiKey: string; model: AiModel; day: str
   const [chatTokens, setChatTokens] = useState<ModelTokens>({});
   const [turnTokens, setTurnTokens] = useState<ModelTokens>({});
   // Voice input (opt-in, OpenAI key): record, then the transcript lands in the text box.
-  const dictation = useDictation({ onText: (added) => setText((old) => appendText(old, added)), onError: setError });
+  const dictation = useDictation({
+    onText: (added, continued) => {
+      setText((old) => appendText(old, added, continued));
+      setDictated(true);
+    },
+    onError: setError,
+  });
   const { recording, transcribing } = dictation;
   /** Index of the photo shown large, for looking at photos while talking about them. */
   const [viewing, setViewing] = useState<number>();
@@ -130,9 +156,12 @@ function Chat({ apiKey, model, day }: { apiKey: string; model: AiModel; day: str
     try {
       // Capture time and barcodes come from the original file, on the phone (scaling drops EXIF);
       // the assistant gets them as text.
-      const prepared = await Promise.all(
+      const all = await Promise.all(
         picked.map(async (f): Promise<ComposerPhoto> => ({ ...(await prepareImage(f)), barcodes: offOn ? await barcodesInPhoto(f) : [], time: await readPhotoTime(f) })),
       );
+      let room = MAX_PHOTO_BYTES - photoBytes - images.reduce((n, i) => n + i.data.length, 0);
+      const prepared = all.filter((img) => (room -= img.data.length) >= 0);
+      if (prepared.length < all.length) setError('ai.error.chatFull');
       // Oldest first, photos without a time last: the order the meals happened in.
       setImages((imgs) => [...imgs, ...prepared].sort((a, b) => (a.time.time ?? Infinity) - (b.time.time ?? Infinity)));
     } catch {
@@ -150,6 +179,7 @@ function Chat({ apiKey, model, day }: { apiKey: string; model: AiModel; day: str
       logged: all.filter((c) => c.logged).map(cardId),
       open: all.filter((c) => !c.logged).map(cardId),
       barcodes: [...new Set(images.flatMap((i) => i.barcodes))],
+      dictated: dictated && !!text.trim(),
     });
     const labelled = images.map((img, i) => ({ ...img, label: photoLabel(photoCount + i + 1, img.time) }));
     const msg = { text, images: labelled, appNote: note };
@@ -158,6 +188,7 @@ function Chat({ apiKey, model, day }: { apiKey: string; model: AiModel; day: str
     setBubbles((b) => [...b, { role: 'user', text: msg.text.trim(), previews: msg.images.map((i) => i.preview) }]);
     setText('');
     setImages([]);
+    setDictated(false);
     setTurnTokens({});
     const onUsage = (tokens: ModelTokens) => {
       setChatTokens((c) => mergeModelTokens(c, tokens));
@@ -178,12 +209,14 @@ function Chat({ apiKey, model, day }: { apiKey: string; model: AiModel; day: str
       const r = await sendMessage(create, model, conversation, msg, ctx, onUsage);
       setConversation(r.conversation);
       setPhotoCount((n) => n + msg.images.length);
+      setPhotoBytes((n) => n + msg.images.reduce((sum, i) => sum + i.data.length, 0));
       show(r.outcome);
     } catch (e) {
       // Nothing was added to the conversation: put the message back so a tap on Send retries it.
       setBubbles((b) => b.slice(0, -1));
       setText(msg.text);
       setImages(images);
+      setDictated(dictated);
       setError(ERROR_TEXT[await classifyError(e)]);
     } finally {
       setBusy(false);
@@ -224,6 +257,27 @@ function Chat({ apiKey, model, day }: { apiKey: string; model: AiModel; day: str
   }, [cards]);
 
   const timedOut = images.filter((i) => i.time.source !== 'photo').length;
+  const openCards = [...cards.values()].filter((c) => !c.logged).map(cardId);
+
+  /** Save every open card as shown, in the order shown, with one undo for all of them. */
+  async function logAll() {
+    if (savingAll) return;
+    setSavingAll(true);
+    const undos: Undo[] = [];
+    try {
+      for (const id of openCards) {
+        const undo = await savers.current.get(id)?.();
+        if (undo) undos.push(undo);
+      }
+    } finally {
+      setSavingAll(false);
+    }
+    if (undos.length === 0) return;
+    const skipped = openCards.length - undos.length;
+    toast(skipped ? t('ai.loggedSome', { n: undos.length, total: openCards.length }) : t('ai.loggedAll', { n: undos.length }), async () => {
+      for (const undo of undos) await undo();
+    });
+  }
 
   async function toggleRecording() {
     if (!recording) setError(undefined);
@@ -251,6 +305,8 @@ function Chat({ apiKey, model, day }: { apiKey: string; model: AiModel; day: str
       <p className="composer-note muted small" role="status">
         {t('voice.transcribing')}
       </p>
+    ) : dictation.failed ? (
+      <VoiceFailed onRetry={dictation.retry} onDrop={dictation.drop} />
     ) : null;
 
   return (
@@ -263,7 +319,7 @@ function Chat({ apiKey, model, day }: { apiKey: string; model: AiModel; day: str
         </div>
         {bubbles.map((b, i) =>
           b.role === 'card' ? (
-            cards.has(b.id) && <CardView key={b.id} card={cards.get(b.id)!} day={day} toast={toast} onLogged={(v) => setLogged(b.id, v)} />
+            cards.has(b.id) && <CardView key={b.id} card={cards.get(b.id)!} day={day} toast={toast} onLogged={(v) => setLogged(b.id, v)} register={register} />
           ) : b.role === 'user' ? (
             <div key={i} className="bubble bubble-user">
               {b.previews.length > 0 && (
@@ -280,6 +336,13 @@ function Chat({ apiKey, model, day }: { apiKey: string; model: AiModel; day: str
               {b.text}
             </div>
           ),
+        )}
+        {openCards.length >= 2 && !busy && (
+          <div className="log-all">
+            <button className="btn btn-primary" disabled={savingAll} onClick={() => void logAll()}>
+              {t('ai.logAll', { n: openCards.length })}
+            </button>
+          </div>
         )}
         {busy && <div className="bubble bubble-assistant muted">{t('ai.thinking')}</div>}
         {error && (
@@ -336,7 +399,7 @@ function Chat({ apiKey, model, day }: { apiKey: string; model: AiModel; day: str
             className="icon-btn composer-btn composer-send"
             aria-label={t('ai.send')}
             onClick={() => void send()}
-            disabled={busy || recording || transcribing || (!text.trim() && images.length === 0)}
+            disabled={busy || dictation.busy || (!text.trim() && images.length === 0)}
           >
             <Icon name="send" />
           </button>
@@ -437,33 +500,53 @@ function photoTimeShort(pt: PhotoTime): string {
   return pt.source === 'photo' ? s : `≈ ${s}`;
 }
 
-type CardProps<C extends Card> = { card: C; day: string; toast: ReturnType<typeof useToast>; onLogged: (logged: boolean) => void };
+type CardProps<C extends Card> = {
+  card: C;
+  day: string;
+  toast: ReturnType<typeof useToast>;
+  onLogged: (logged: boolean) => void;
+  register: (id: string, save: Saver | undefined) => void;
+};
+
+/** Keep the chat's "Log all" pointed at this card's latest save (with the user's edits) while it is open. */
+function useRegister(id: string, save: Saver | undefined, register: CardProps<Card>['register']) {
+  useEffect(() => {
+    register(id, save);
+  });
+  useEffect(() => () => register(id, undefined), [id, register]);
+}
 
 function CardView({ card, ...rest }: CardProps<Card>) {
   return card.kind === 'meal' ? <ProposalCard card={card} {...rest} /> : <NoteCard card={card} {...rest} />;
 }
 
 /** A journal entry the assistant proposes: check or edit the words and time, then save. */
-function NoteCard({ card, day, toast, onLogged }: CardProps<Extract<Card, { kind: 'note' }>>) {
+function NoteCard({ card, day, toast, onLogged, register }: CardProps<Extract<Card, { kind: 'note' }>>) {
   const { note } = card;
   const d = useData();
   const [text, setText] = useState(note.text);
   const [time, setTime] = useState(() => note.time ?? defaultTimeFor(day, d.today));
   const [saving, setSaving] = useState(false);
 
-  async function save() {
+  async function save(): Promise<Undo | undefined> {
     if (!text.trim() || saving) return;
     setSaving(true);
     try {
       const added = await repo.addJournal({ time, day: dayKey(new Date(time)), text: text.trim() });
-      toast(t('journal.saved'), async () => {
+      onLogged(true);
+      return async () => {
         await repo.deleteJournal(added.id);
         onLogged(false);
-      });
-      onLogged(true);
+      };
     } finally {
       setSaving(false);
     }
+  }
+  useRegister(note.id, card.logged ? undefined : save, register);
+
+  async function saveOne() {
+    const undo = await save();
+    if (undo) toast(t('journal.saved'), undo);
   }
 
   if (card.logged) {
@@ -491,7 +574,7 @@ function NoteCard({ card, day, toast, onLogged }: CardProps<Extract<Card, { kind
       <textarea className="note-text" rows={3} value={text} aria-label={t('ai.noteTitle')} onChange={(e) => setText(e.target.value)} />
       <TimeField value={time} onChange={setTime} />
       <div className="sheet-actions">
-        <button className="btn btn-primary" disabled={!text.trim() || saving} onClick={() => void save()}>
+        <button className="btn btn-primary" disabled={!text.trim() || saving} onClick={() => void saveOne()}>
           {t('ai.saveNote')}
         </button>
       </div>
@@ -500,7 +583,7 @@ function NoteCard({ card, day, toast, onLogged }: CardProps<Extract<Card, { kind
 }
 
 /** One meal the assistant proposes: check, adjust grams and time, remove items, then log. */
-function ProposalCard({ card, day, toast, onLogged }: CardProps<Extract<Card, { kind: 'meal' }>>) {
+function ProposalCard({ card, day, toast, onLogged, register }: CardProps<Extract<Card, { kind: 'meal' }>>) {
   const { proposal } = card;
   const d = useData();
   const [items, setItems] = useState<Array<Omit<ProposedItem, 'grams'> & { grams: number | undefined }>>(proposal.items);
@@ -513,7 +596,7 @@ function ProposalCard({ card, day, toast, onLogged }: CardProps<Extract<Card, { 
     return typeof v === 'number' && i.grams ? sum + (v * i.grams) / 100 : sum;
   }, 0);
 
-  async function log() {
+  async function save(): Promise<Undo | undefined> {
     if (!valid || saving) return;
     setSaving(true);
     const ids: string[] = [];
@@ -540,11 +623,17 @@ function ProposalCard({ card, day, toast, onLogged }: CardProps<Extract<Card, { 
     } finally {
       setSaving(false);
     }
-    toast(t('ai.logged'), async () => {
+    onLogged(true);
+    return async () => {
       for (const id of ids) await repo.deleteLog(id);
       onLogged(false);
-    });
-    onLogged(true);
+    };
+  }
+  useRegister(proposal.id, card.logged ? undefined : save, register);
+
+  async function log() {
+    const undo = await save();
+    if (undo) toast(t('ai.logged'), undo);
   }
 
   const title = proposal.summary || t('ai.proposal');

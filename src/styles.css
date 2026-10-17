@@ -2102,3 +2102,19 @@ body:has(.fab-stack) .toast-area {
   align-items: center;
   gap: 4px;
 }
+.voice-failed {
+  max-width: 608px;
+  margin: 0 auto 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+.voice-failed .row {
+  gap: 4px;
+}
+.log-all {
+  display: flex;
+  justify-content: flex-end;
+}
