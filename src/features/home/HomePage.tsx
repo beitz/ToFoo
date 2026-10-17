@@ -6,7 +6,7 @@ import { t, type MessageKey } from '../../i18n';
 import { addDays, formatDay } from '../../lib/dates';
 import { isOn } from '../../settings/features';
 import { repo } from '../../storage/repo';
-import { CompactGauge, Gauge } from '../../ui/Gauge';
+import { CompactGauge, GaugeRow } from '../../ui/Gauge';
 import { Icon } from '../../ui/Icon';
 import { statusLabel } from '../../ui/status';
 import { NUTRIENT_BY_ID, NUTRIENTS } from '../../model/nutrients';
@@ -31,13 +31,12 @@ export function HomePage() {
   const { model, settings, today } = d;
   const [fastSheet, setFastSheet] = useState(false);
   const [fastStart, setFastStart] = useState(today);
+  const [legendOpen, setLegendOpen] = useState(false);
   const showRange = isOn(settings.features, 'uncertaintyRanges');
-  const advanced = isOn(settings.features, 'advancedNumbers');
   const hidden = new Set(settings.hiddenNutrients);
   const todayStatus = model.dayStatus[today];
   const todayEntries = d.log.filter((e) => e.day === today);
 
-  const view = settings.homeView ?? 'compact';
   const macros = MACRO_ROW.map((id) => (hidden.has(id) ? undefined : model.nutrients.get(id))).filter((r): r is NutrientResult => !!r);
   const grouping: HomeGrouping = settings.homeGrouping ?? 'status';
   const groups = useMemo(
@@ -84,52 +83,43 @@ export function HomePage() {
     toast(t('home.fastStarted'), () => repo.deleteFast(f.id));
   }
 
-  const statusText = d.activeFast
-    ? t('home.fastingSince', { day: formatDay(d.activeFast.startDay, today) })
-    : todayEntries.length
-      ? t('home.entriesToday', { n: todayEntries.length })
-      : todayStatus === 'fasted'
-        ? t('day.fasted')
-        : t('home.nothingYet');
+  const statusText = todayEntries.length ? t('home.logToday', { n: todayEntries.length }) : todayStatus === 'fasted' ? t('day.fasted') : t('home.nothingYet');
 
   return (
     <section>
       <header className="page-head">
         <h1>{t('app.name')}</h1>
-        <span className="muted">{new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
+        <span className="muted">
+          {new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
+          {!d.activeFast && ` · ${statusText}`}
+        </span>
       </header>
-
-      <div className="card today">
-        <div className="today-status">
-          <span className="muted small">{t('home.today')}</span>
-          <strong>{statusText}</strong>
-        </div>
-        <div className="today-actions">
-          <a className="btn btn-primary btn-big" href={href('log')}>
-            <Icon name="plus" /> {t('home.logMeal')}
-          </a>
-          <button className={`btn btn-secondary${d.activeFast ? ' on' : ''}`} onClick={toggleFast} aria-pressed={!!d.activeFast}>
-            <Icon name="moon" /> {d.activeFast ? t('home.endFast') : t('home.fasting')}
-          </button>
-        </div>
-        <StockChips />
-      </div>
+      {d.activeFast && (
+        <p className="home-fasting">
+          <Icon name="moon" size={16} /> {t('home.fastingSince', { day: formatDay(d.activeFast.startDay, today) })}
+        </p>
+      )}
+      <StockChips />
 
       <Prompts />
 
-      <div className="section-title row-between">
+      <div className="section-title home-gauges-head">
         <h2>{t('home.gauges')}</h2>
-        <Segmented
-          label={t('home.view')}
-          value={view}
-          onChange={(v) => void repo.updateSettings({ homeView: v })}
-          options={[
-            { value: 'compact', label: t('home.viewCompact') },
-            { value: 'detailed', label: t('home.viewDetailed') },
-          ]}
-        />
+        <button
+          className="icon-btn"
+          aria-label={t('home.legendTitle')}
+          aria-expanded={legendOpen}
+          aria-controls="home-legend"
+          onClick={() => setLegendOpen((o) => !o)}
+        >
+          <Icon name="info" />
+        </button>
       </div>
-      <p className="muted small home-legend">{t('home.legend')}</p>
+      {legendOpen && (
+        <p className="muted small home-legend" id="home-legend">
+          {t('home.legend')}
+        </p>
+      )}
       {(weightDefault || sexDefault) && (
         <p className="muted small">
           {weightDefault ? '* ' : ''}
@@ -157,15 +147,11 @@ export function HomePage() {
       />
       {groups.map((g) => {
         const grid = (
-          <div className={view === 'compact' ? 'cgauge-grid' : 'gauge-grid'} id={`group-${g.key}`}>
+          <div className="nrow-list" id={`group-${g.key}`}>
             {g.items.map((r) => {
               const defaultBased = weightDefault && (r.kind === 'tank' || r.kind === 'balance' || PER_KG.has(r.id));
               const open = () => navigate('nutrient', r.id);
-              return view === 'compact' ? (
-                <CompactGauge key={r.id} result={r} defaultBased={defaultBased} onClick={open} />
-              ) : (
-                <Gauge key={r.id} result={r} showRange={showRange} advanced={advanced} defaultBased={defaultBased} onClick={open} />
-              );
+              return <GaugeRow key={r.id} result={r} showRange={showRange} defaultBased={defaultBased} onClick={open} />;
             })}
           </div>
         );
@@ -221,6 +207,20 @@ export function HomePage() {
         </div>
       )}
       <p className="muted small disclaimer">{t('home.disclaimer')}</p>
+      <div className="fab-stack">
+        <button
+          className={`fab fab-small${d.activeFast ? ' on' : ''}`}
+          onClick={toggleFast}
+          aria-pressed={!!d.activeFast}
+          aria-label={d.activeFast ? t('home.endFast') : t('home.startFast')}
+          title={d.activeFast ? t('home.endFast') : t('home.startFast')}
+        >
+          <Icon name="moon" />
+        </button>
+        <a className="fab" href={href('log')} aria-label={t('home.logMeal')} title={t('home.logMeal')}>
+          <Icon name="plus" size={28} />
+        </a>
+      </div>
       {fastSheet && (
         <Sheet title={t('home.fasting')} onClose={() => setFastSheet(false)}>
           <Field label={t('home.fastSince')} hint={t('home.fastHint')}>

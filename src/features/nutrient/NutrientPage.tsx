@@ -5,7 +5,8 @@ import { t, type MessageKey } from '../../i18n';
 import { fmtAmount, fmtFill, fmtNumber, fmtPercent } from '../../lib/format';
 import { NUTRIENT_BY_ID } from '../../model/nutrients';
 import { tankTrend, type NutrientResult } from '../../model/simulate';
-import { nutrientParams, statusThresholds, storage } from '../../../model/parameters';
+import { nutrientParams, statusThresholds, storage, trendDisplay } from '../../../model/parameters';
+import { trendOf } from '../../model/trend';
 import { referenceValues } from '../../../model/reference-values';
 import { portionGrams } from '../../model/ranking';
 import { isOn } from '../../settings/features';
@@ -13,7 +14,7 @@ import { NON_SINGLE_FOOD_GROUPS } from '../../foods/foodDb';
 import { diverseTop } from '../../foods/variety';
 import { infoId, NUTRIENT_INFO_SOURCES } from '../../i18n/nutrientInfo.en';
 import { LineChart } from '../../ui/LineChart';
-import { hasNoData } from '../../ui/Gauge';
+import { hasNoData, trendArrows, trendLabel } from '../../ui/Gauge';
 import { StatusBadge } from '../../ui/status';
 import { Icon } from '../../ui/Icon';
 import { energyBasisText } from '../settings/EnergyTarget';
@@ -54,6 +55,7 @@ export function NutrientPage({ id }: { id: string }) {
   const model = storage[id];
   const isTank = r.kind === 'tank';
   const noData = hasNoData(r);
+  const trend = r.status === 'unknown' ? null : trendOf(r);
   const scale = (v: number) => v * 100;
   const history = r.history.slice(-120).map((p) => ({ ...p, low: scale(p.low), central: scale(p.central), high: scale(p.high) }));
   const guides =
@@ -86,6 +88,14 @@ export function NutrientPage({ id }: { id: string }) {
               : fmtPercent(r.value.central)}
           {showRange && !noData && r.kind !== 'info' && r.value.high - r.value.low > 0.02 && <span className="muted range"> ({fmtPercent(r.value.low)}–{fmtPercent(r.value.high)})</span>}
         </p>
+        {trend && !noData && (
+          <p className="small trend-line">
+            <span className={`trend trend-${trend.better === true ? 'better' : trend.better === false ? 'worse' : 'neutral'}`} aria-hidden>
+              {trendArrows(trend)}
+            </span>{' '}
+            {t('nutrient.trendLine', { label: trendLabel(trend), days: trendDisplay.lookbackDays.value })}
+          </p>
+        )}
         <p className="small">
           {r.kind === 'tank'
             ? t('nutrient.tankExplain')
