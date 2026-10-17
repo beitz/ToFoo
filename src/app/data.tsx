@@ -11,6 +11,7 @@ import { resolveRequirements, type ResolvedRequirements } from '../model/require
 import { simulate, type SimulationResult } from '../model/simulate';
 import type { ModelEntry } from '../model/types';
 import { currentWeight, explicitDayStatus, resolveEntry, sunByDay, activeFast } from '../logic/resolve';
+import { activitySun } from '../logic/activity';
 import { measuredStores } from '../logic/lab';
 
 /** Longest history the model simulates (performance guard). */
@@ -95,6 +96,8 @@ export function DataProvider({ children, fallback }: { children: ReactNode; fall
   const fasts = useLiveQuery(() => repo.db.fasts.toArray(), []);
   const sunEntries = useLiveQuery(() => repo.db.sunEntries.toArray(), []);
   const productList = useLiveQuery(() => repo.db.products.toArray(), []);
+  // Only outside activities matter to the model (time in the sun); the rest stays out of it.
+  const activities = useLiveQuery(() => repo.db.activities.toArray(), []);
 
   const searchIndex = useMemo(() => (foods ? buildIndex(foods.foods.map((f) => ({ key: f.code, nameEn: f.nameEn, nameDe: f.nameDe }))) : null), [foods]);
 
@@ -105,7 +108,7 @@ export function DataProvider({ children, fallback }: { children: ReactNode; fall
   }, [theme]);
 
   const value = useMemo<AppData | null>(() => {
-    if (!foods || !searchIndex || !profile || !settings || !recipes || !batches || !log || !customFoods || !dayStatus || !fasts || !sunEntries || !productList) return null;
+    if (!foods || !searchIndex || !profile || !settings || !recipes || !batches || !log || !customFoods || !dayStatus || !fasts || !sunEntries || !productList || !activities) return null;
     const batchesById = new Map(batches.map((b) => [b.id, b]));
     const customFoodsById = new Map(customFoods.map((c) => [c.id, c]));
     const weight = currentWeight(profile);
@@ -134,7 +137,7 @@ export function DataProvider({ children, fallback }: { children: ReactNode; fall
         longWindowDays: settings.longWindowDays,
         mealWindowMinutes: settings.mealWindowMinutes,
       },
-      sunByDay: sunByDay(days, profile, sunEntries),
+      sunByDay: sunByDay(days, profile, [...sunEntries, ...(isOn(f, 'activity') ? activitySun(activities) : [])]),
       startingLevel: profile.startingLevel,
       customStartLevels: profile.customStartLevels,
       measuredStores: measuredStores(profile.labResults),
@@ -178,7 +181,7 @@ export function DataProvider({ children, fallback }: { children: ReactNode; fall
       recentFoods,
       weightKg: weight ?? 70,
     };
-  }, [foods, searchIndex, profile, settings, recipes, batches, log, customFoods, dayStatus, fasts, sunEntries, productList, today]);
+  }, [foods, searchIndex, profile, settings, recipes, batches, log, customFoods, dayStatus, fasts, sunEntries, productList, activities, today]);
 
   if (error) return <>{fallback({ error })}</>;
   if (!value) return <>{fallback({})}</>;

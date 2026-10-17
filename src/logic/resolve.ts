@@ -123,7 +123,10 @@ export function explicitDayStatus(records: readonly DayStatusRecord[], fasts: re
   return out;
 }
 
-export function sunSessionsFor(day: string, profile: Profile, extra: readonly SunEntry[]): SunSession[] {
+/** Time outside on one day beyond the routine: logged time outside, or an outside activity. */
+export type ExtraSun = Pick<SunEntry, 'day' | 'startHour' | 'minutes' | 'skin'>;
+
+export function sunSessionsFor(day: string, profile: Profile, extra: readonly ExtraSun[]): SunSession[] {
   const weekday = parseDay(day).getDay();
   const routine = profile.outdoorRoutine ?? [
     { weekdays: [0, 1, 2, 3, 4, 5, 6], startHour: sunParams.defaultRoutine.value.startHour, minutes: sunParams.defaultRoutine.value.minutesPerDay, skin: sunParams.defaultRoutine.value.skin },
@@ -135,7 +138,7 @@ export function sunSessionsFor(day: string, profile: Profile, extra: readonly Su
 
 export const DEFAULT_LATITUDE = 51;
 
-export function sunByDay(days: readonly string[], profile: Profile, extra: readonly SunEntry[]): Record<string, Range> {
+export function sunByDay(days: readonly string[], profile: Profile, extra: readonly ExtraSun[]): Record<string, Range> {
   const out: Record<string, Range> = {};
   for (const d of days) {
     const [y, m, day] = d.split('-').map(Number) as [number, number, number];

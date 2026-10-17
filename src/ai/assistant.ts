@@ -15,9 +15,11 @@ import {
   validateJournalProposal,
   validateProposal,
   validateSleepProposal,
+  validateActivityProposal,
   type JournalProposal,
   type Proposal,
   type SleepProposal,
+  type ActivityProposal,
   type ToolContext,
 } from './tools';
 
@@ -46,9 +48,11 @@ export interface Conversation {
   notes: number;
   /** Sleep cards shown so far; the next one gets id S(sleeps + 1). */
   sleeps?: number;
+  /** Activity cards shown so far; the next one gets id A(activities + 1). */
+  activities?: number;
 }
 
-export const emptyConversation = (): Conversation => ({ messages: [], pendingResults: [], cards: 0, notes: 0, sleeps: 0 });
+export const emptyConversation = (): Conversation => ({ messages: [], pendingResults: [], cards: 0, notes: 0, sleeps: 0, activities: 0 });
 
 export interface UserImage {
   mediaType: 'image/jpeg' | 'image/png' | 'image/webp';
@@ -64,10 +68,12 @@ export type ShownProposal = Proposal & { id: string };
 export type ShownNote = JournalProposal & { id: string };
 /** A sleep as shown: with its card id (S1, S2, …). */
 export type ShownSleep = SleepProposal & { id: string };
+/** An activity as shown: with its card id (A1, A2, …). */
+export type ShownActivity = ActivityProposal & { id: string };
 
 export type TurnOutcome =
   | { kind: 'reply'; text: string }
-  | { kind: 'proposal'; text: string; proposals: ShownProposal[]; notes: ShownNote[]; sleeps: ShownSleep[] }
+  | { kind: 'proposal'; text: string; proposals: ShownProposal[]; notes: ShownNote[]; sleeps: ShownSleep[]; activities: ShownActivity[] }
   | { kind: 'error'; reason: 'refusal' | 'tooLong' | 'tooManySteps' };
 
 /** Request parameters per model (fallbacks re-run a declined request on another model). */
@@ -138,12 +144,13 @@ export async function sendMessage(
   if (user.text.trim()) content.push({ type: 'text', text: user.text.trim() });
   if (user.appNote) content.push({ type: 'text', text: user.appNote });
   messages.push({ role: 'user', content });
-  const sources = sourcesOf(ctx.products, ctx.journal, ctx.sleep);
+  const sources = sourcesOf(ctx.products, ctx.journal, ctx.sleep, ctx.activity);
 
   let cards = conversation.cards;
   let notes = conversation.notes ?? 0;
   let sleeps = conversation.sleeps ?? 0;
-  const done = (outcome: TurnOutcome, pendingResults: Beta.BetaToolResultBlockParam[] = []) => ({ conversation: { messages, pendingResults, cards, notes, sleeps }, outcome });
+  let activities = conversation.activities ?? 0;
+  const done = (outcome: TurnOutcome, pendingResults: Beta.BetaToolResultBlockParam[] = []) => ({ conversation: { messages, pendingResults, cards, notes, sleeps, activities }, outcome });
 
   for (let step = 0; step < MAX_STEPS; step++) {
     const res = await create(requestParams(model, messages, sources));
@@ -162,6 +169,7 @@ export async function sendMessage(
     const proposals: Array<{ id: string; proposal: Proposal }> = [];
     const notesProposed: Array<{ id: string; proposal: JournalProposal }> = [];
     const sleepsProposed: Array<{ id: string; proposal: SleepProposal }> = [];
+    const activitiesProposed: Array<{ id: string; proposal: ActivityProposal }> = [];
     let rejected = false;
     for (const use of uses) {
       if (use.name === 'search_foods') {
@@ -194,23 +202,32 @@ export async function sendMessage(
           rejected = true;
           results.push({ type: 'tool_result', tool_use_id: use.id, content: r.error, is_error: true });
         }
+      } else if (use.name === 'propose_activity' && sources.activity) {
+        const r = validateActivityProposal(use.input, ctx.now);
+        if (r.ok) activitiesProposed.push({ id: use.id, proposal: r.proposal });
+        else {
+          rejected = true;
+          results.push({ type: 'tool_result', tool_use_id: use.id, content: r.error, is_error: true });
+        }
       } else {
         results.push({ type: 'tool_result', tool_use_id: use.id, content: `Unknown tool ${use.name}.`, is_error: true });
       }
     }
 
     // Cards are shown all together or not at all, so the user never sees half a batch.
-    if ((proposals.length || notesProposed.length || sleepsProposed.length) && !rejected) {
+    if ((proposals.length || notesProposed.length || sleepsProposed.length || activitiesProposed.length) && !rejected) {
       const shown = proposals.map(({ proposal }): ShownProposal => ({ ...proposal, id: `M${++cards}` }));
       const shownNotes = notesProposed.map(({ proposal }): ShownNote => ({ ...proposal, id: `J${++notes}` }));
       const shownSleeps = sleepsProposed.map(({ proposal }): ShownSleep => ({ ...proposal, id: `S${++sleeps}` }));
+      const shownActivities = activitiesProposed.map(({ proposal }): ShownActivity => ({ ...proposal, id: `A${++activities}` }));
       const shownResult = (id: string, card: string, verb: string): Beta.BetaToolResultBlockParam => ({ type: 'tool_result', tool_use_id: id, content: `Shown to the user as card ${card}. Not ${verb} yet; their reply follows.` });
       const shownResults = [
         ...proposals.map(({ id }, i) => shownResult(id, shown[i]!.id, 'logged')),
         ...notesProposed.map(({ id }, i) => shownResult(id, shownNotes[i]!.id, 'saved')),
         ...sleepsProposed.map(({ id }, i) => shownResult(id, shownSleeps[i]!.id, 'saved')),
+        ...activitiesProposed.map(({ id }, i) => shownResult(id, shownActivities[i]!.id, 'saved')),
       ];
-      return done({ kind: 'proposal', text: textOf(res.content), proposals: shown, notes: shownNotes, sleeps: shownSleeps }, [...results, ...shownResults]);
+      return done({ kind: 'proposal', text: textOf(res.content), proposals: shown, notes: shownNotes, sleeps: shownSleeps, activities: shownActivities }, [...results, ...shownResults]);
     }
     for (const { id } of proposals) {
       results.push({ type: 'tool_result', tool_use_id: id, content: 'Not shown: another proposal in this response had errors. Call propose_meal again for this meal too.', is_error: true });
@@ -220,6 +237,9 @@ export async function sendMessage(
     }
     for (const { id } of sleepsProposed) {
       results.push({ type: 'tool_result', tool_use_id: id, content: 'Not shown: another proposal in this response had errors. Call propose_sleep again for this sleep too.', is_error: true });
+    }
+    for (const { id } of activitiesProposed) {
+      results.push({ type: 'tool_result', tool_use_id: id, content: 'Not shown: another proposal in this response had errors. Call propose_activity again for this activity too.', is_error: true });
     }
     messages.push({ role: 'user', content: results });
   }

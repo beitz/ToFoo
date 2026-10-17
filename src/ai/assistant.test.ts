@@ -3,7 +3,7 @@ import type * as Beta from '@anthropic-ai/sdk/resources/beta/messages/messages';
 import type { Food } from '../foods/foodDb';
 import { buildIndex } from '../foods/search';
 import { appNote, emptyConversation, requestParams, sendMessage, textOf, type CreateMessage } from './assistant';
-import { describeFood, MAX_ITEM_GRAMS, runLookupBarcode, runSearchFoods, runSearchUsda, validateJournalProposal, validateProposal, validateSleepProposal, type ProductTools, type ToolContext } from './tools';
+import { describeFood, MAX_ITEM_GRAMS, runLookupBarcode, runSearchFoods, runSearchUsda, validateJournalProposal, validateProposal, validateSleepProposal, validateActivityProposal, type ProductTools, type ToolContext } from './tools';
 import type { Product } from '../storage/types';
 import type { FindResult } from '../foods/findProduct';
 
@@ -478,5 +478,56 @@ describe('sleep', () => {
       ok: true,
       proposal: { start: new Date(2026, 9, 17, 14, 0).getTime(), end: new Date(2026, 9, 17, 14, 40).getTime(), replaces: 'S1' },
     });
+  });
+});
+
+describe('activity', () => {
+  const now = new Date(2026, 9, 17, 20, 0).getTime();
+  const activity = (o: Partial<{ kind: string; name: string; start: string; minutes: number; intensity: string; outside: boolean; skin: string; replaces: string }> = {}) => ({
+    kind: 'walk',
+    name: '',
+    start: '2026-10-17 12:30',
+    minutes: 40,
+    intensity: '',
+    outside: true,
+    skin: '',
+    replaces: '',
+    ...o,
+  });
+
+  it('offers propose_activity only with activity on, and keeps exercise out of the journal then', () => {
+    const names = (on: boolean) => (requestParams('claude-opus-5-5', [], { activity: on }).tools ?? []).map((t) => ('name' in t ? t.name : ''));
+    expect(names(false)).not.toContain('propose_activity');
+    expect(names(true)).toContain('propose_activity');
+    expect(String(requestParams('claude-opus-5-5', [], { journal: true }).system)).toContain('exercise,');
+    expect(String(requestParams('claude-opus-5-5', [], { journal: true, activity: true }).system)).not.toContain('exercise,');
+  });
+
+  it('shows an activity card next to a meal', async () => {
+    const api = scripted(reply([toolUse('a', 'propose_activity', activity({ kind: 'other', name: 'Football', minutes: 90, intensity: 'hard' }))], 'tool_use'));
+    const { conversation, outcome } = await sendMessage(api.create, 'claude-opus-5-5', emptyConversation(), { text: 'played football for 90 minutes at half twelve', images: [] }, { ...ctx, now, activity: true });
+    expect(outcome.kind === 'proposal' && outcome.activities).toEqual([
+      { id: 'A1', kind: 'other', name: 'Football', start: new Date(2026, 9, 17, 12, 30).getTime(), minutes: 90, intensity: 'hard', outside: true },
+    ]);
+    expect(conversation.activities).toBe(1);
+  });
+
+  it('ignores propose_activity while activity is off', async () => {
+    const api = scripted(reply([toolUse('a', 'propose_activity', activity())], 'tool_use'), reply([{ type: 'text', text: 'ok' } as Beta.BetaTextBlock], 'end_turn'));
+    const { outcome } = await sendMessage(api.create, 'claude-opus-5-5', emptyConversation(), { text: 'walked', images: [] }, { ...ctx, now });
+    expect(outcome.kind).toBe('reply');
+  });
+
+  it('checks activities: start time, minutes, and keeps skin only outside', () => {
+    expect(validateActivityProposal(activity({ start: '' }), now)).toMatchObject({ ok: false });
+    expect(validateActivityProposal(activity({ start: '2026-10-18 08:00' }), now)).toMatchObject({ ok: false });
+    expect(validateActivityProposal(activity({ minutes: 0 }), now)).toMatchObject({ ok: false });
+    expect(validateActivityProposal(activity({ minutes: 17 * 60 }), now)).toMatchObject({ ok: false });
+    expect(validateActivityProposal(activity({ kind: 'swim' }), now)).toMatchObject({ ok: false });
+    expect(validateActivityProposal(activity({ outside: false, skin: 'armsLegs', minutes: 44.6, replaces: 'A1' }), now)).toEqual({
+      ok: true,
+      proposal: { kind: 'walk', start: new Date(2026, 9, 17, 12, 30).getTime(), minutes: 45, outside: false, replaces: 'A1' },
+    });
+    expect(validateActivityProposal(activity({ skin: 'armsLegs' }), now)).toMatchObject({ ok: true, proposal: { skin: 'armsLegs' } });
   });
 });

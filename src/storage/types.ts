@@ -86,7 +86,8 @@ export type FeatureKey =
   | 'productWebSearch'
   | 'voiceInput'
   | 'journal'
-  | 'sleep';
+  | 'sleep'
+  | 'activity';
 
 export interface Settings extends Versioned {
   id: 'settings';
@@ -244,6 +245,34 @@ export interface SleepRecord extends Versioned {
   end?: number;
   /** Local calendar day the sleep ended (YYYY-MM-DD): a night belongs to the morning after it. */
   day: string;
+}
+
+export const ACTIVITY_KINDS = ['walk', 'run', 'cycling', 'strength', 'other'] as const;
+export type ActivityKind = (typeof ACTIVITY_KINDS)[number];
+export const INTENSITIES = ['easy', 'moderate', 'hard'] as const;
+export type Intensity = (typeof INTENSITIES)[number];
+
+/**
+ * One activity (docs/SPEC.md, "Activity"): what, when, how long, roughly how hard, and whether it
+ * was outside. No energy burned (that needs a sourced table of activity energy costs).
+ */
+export interface ActivityRecord extends Versioned {
+  id: string;
+  kind: ActivityKind;
+  /** The user's own name for it ("football", "yoga"), if any. */
+  name?: string;
+  /** Epoch ms it started. */
+  time: number;
+  /** Local calendar day of `time` (YYYY-MM-DD). */
+  day: string;
+  minutes: number;
+  intensity?: Intensity;
+  outside: boolean;
+  /**
+   * When outside: counts toward the vitamin D sun estimate, with this much skin showing. Missing when
+   * it is already part of the outdoor routine (so it is not counted twice) or was inside.
+   */
+  sunSkin?: SkinExposure;
 }
 
 export interface MetaRecord {

@@ -15,6 +15,7 @@ import {
   type Fast,
   type JournalEntry,
   type SleepRecord,
+  type ActivityRecord,
   type LogEntry,
   type NewLogEntry as NewLog,
   type Product,
@@ -40,6 +41,7 @@ export interface Snapshot {
   products: Product[];
   journal: JournalEntry[];
   sleep: SleepRecord[];
+  activities: ActivityRecord[];
 }
 
 
@@ -302,6 +304,27 @@ export function createRepo(db: ToFooDB) {
       await db.sleep.put(r);
     },
 
+    // ── Activities ──
+    async addActivity(a: Omit<ActivityRecord, 'id' | 'schemaVersion'>): Promise<ActivityRecord> {
+      const rec: ActivityRecord = { ...a, id: newId(), schemaVersion: v };
+      await db.activities.put(rec);
+      return rec;
+    },
+    async updateActivity(a: ActivityRecord): Promise<void> {
+      await db.activities.put({ ...a, schemaVersion: v });
+    },
+    /** Delete an activity; returns it so the UI can offer undo via restoreActivity. */
+    async deleteActivity(id: string): Promise<ActivityRecord | undefined> {
+      return db.transaction('rw', db.activities, async () => {
+        const old = await db.activities.get(id);
+        await db.activities.delete(id);
+        return old;
+      });
+    },
+    async restoreActivity(a: ActivityRecord): Promise<void> {
+      await db.activities.put(a);
+    },
+
     // ── Meta ──
     async getMeta<T>(key: string): Promise<T | undefined> {
       return (await db.meta.get(key))?.value as T | undefined;
@@ -312,7 +335,7 @@ export function createRepo(db: ToFooDB) {
 
     // ── Backup ──
     async snapshot(): Promise<Snapshot> {
-      return db.transaction('r', [db.profile, db.settings, db.recipes, db.batches, db.log, db.customFoods, db.dayStatus, db.fasts, db.sunEntries, db.products, db.journal, db.sleep], async () => ({
+      return db.transaction('r', [db.profile, db.settings, db.recipes, db.batches, db.log, db.customFoods, db.dayStatus, db.fasts, db.sunEntries, db.products, db.journal, db.sleep, db.activities], async () => ({
         profile: (await db.profile.get('profile')) ?? null,
         settings: (await db.settings.get('settings')) ?? null,
         recipes: await db.recipes.toArray(),
@@ -325,11 +348,12 @@ export function createRepo(db: ToFooDB) {
         products: await db.products.toArray(),
         journal: await db.journal.toArray(),
         sleep: await db.sleep.toArray(),
+        activities: await db.activities.toArray(),
       }));
     },
     /** Replace all personal data with the snapshot (after the user confirmed a preview). */
     async restore(s: Snapshot): Promise<void> {
-      const tables = [db.profile, db.settings, db.recipes, db.batches, db.log, db.customFoods, db.dayStatus, db.fasts, db.sunEntries, db.products, db.journal, db.sleep];
+      const tables = [db.profile, db.settings, db.recipes, db.batches, db.log, db.customFoods, db.dayStatus, db.fasts, db.sunEntries, db.products, db.journal, db.sleep, db.activities];
       await db.transaction('rw', tables, async () => {
         await Promise.all(tables.map((t) => t.clear()));
         if (s.profile) await db.profile.put(s.profile);
@@ -344,6 +368,7 @@ export function createRepo(db: ToFooDB) {
         await db.products.bulkPut(s.products);
         await db.journal.bulkPut(s.journal);
         await db.sleep.bulkPut(s.sleep);
+        await db.activities.bulkPut(s.activities);
       });
       await runMigrations(db);
     },

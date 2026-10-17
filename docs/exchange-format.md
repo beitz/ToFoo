@@ -32,16 +32,18 @@ Everything personal, as stored on the device. Written by Settings → Backup →
     "profile": { "id": "profile", "schemaVersion": 1, "…": "…" },
     "settings": { "id": "settings", "schemaVersion": 1, "…": "…" },
     "recipes": [], "batches": [], "log": [], "customFoods": [],
-    "dayStatus": [], "fasts": [], "sunEntries": [], "products": [], "journal": [], "sleep": []
+    "dayStatus": [], "fasts": [], "sunEntries": [], "products": [], "journal": [], "sleep": [], "activities": []
   }
 }
 ```
 
-Each record has a `schemaVersion`; older records are migrated on import. `products` may be missing in backups from before the Open Food Facts lookup, `journal` in backups from before the journal, and `sleep` in backups from before sleep; each then counts as empty.
+Each record has a `schemaVersion`; older records are migrated on import. `products` may be missing in backups from before the Open Food Facts lookup, `journal` in backups from before the journal, `sleep` in backups from before sleep, and `activities` in backups from before activities; each then counts as empty.
 
 Journal entries (`data.journal[]`): `id`, `schemaVersion`, `time` (epoch ms the entry is about), `day` (the local `YYYY-MM-DD` of `time`) and `text` (what the user wrote, plain text).
 
 Sleep (`data.sleep[]`): `id`, `schemaVersion`, `start` (epoch ms the user fell asleep), `end` (epoch ms they woke up; missing while they are asleep) and `day` (the local `YYYY-MM-DD` the sleep ended, or started while it is going: a night belongs to the morning after it). No quality rating.
+
+Activities (`data.activities[]`): `id`, `schemaVersion`, `kind` (`walk`, `run`, `cycling`, `strength` or `other`), optional `name` (the user's own word, e.g. "Football"), `time` (epoch ms it started), `day` (local `YYYY-MM-DD` it started), `minutes`, optional `intensity` (`easy`, `moderate` or `hard`), `outside` (boolean) and `sunSkin` (uncovered skin, same values as the sun routine's `skin`; present only when the activity counts toward the vitamin D sun estimate).
 
 Products (`data.products[]`) are foods from online databases as fetched: Open Food Facts products (data licence ODbL) and USDA FoodData Central foods (public domain). Fields: `id` (`OFF:<barcode>` or `USDA:<fdcId>`), `source` (`"OFF"` or `"USDA"`), `code` (barcode or FoodData Central id), `usdaType` (USDA only: `Foundation`, `SR Legacy`, `Survey (FNDDS)` or `Branded`), `name`, optional `brand`, `quantity`, `serving` (`{ label, grams }`), `per100` (values per 100 g, or per 100 ml if `perMl`, by BLS component code in BLS units: label values, or the USDA database values for USDA generic foods; a nutrient without a value is absent, not 0), `categories`, optional `lastModified`, `fetchedAt`, and optional `match` (`{ version, code }`: the BLS food whose values fill in what the source lacks).
 

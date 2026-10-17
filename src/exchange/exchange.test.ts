@@ -52,6 +52,10 @@ const snapshot: Snapshot = {
     { id: 's1', schemaVersion: 1, start: 1, end: 6, day: '2026-10-15' },
     { id: 's2', schemaVersion: 1, start: 7, day: '2026-10-15' },
   ],
+  activities: [
+    { id: 'a1', schemaVersion: 1, kind: 'walk', time: 8, day: '2026-10-15', minutes: 40, intensity: 'easy', outside: true, sunSkin: 'faceHands' },
+    { id: 'a2', schemaVersion: 1, kind: 'other', name: 'Yoga', time: 9, day: '2026-10-15', minutes: 30, outside: false },
+  ],
 };
 
 describe('exchange format', () => {
@@ -65,12 +69,13 @@ describe('exchange format', () => {
     }
   });
 
-  it('reads backups made before products, the journal and sleep existed', () => {
-    const { products: _products, journal: _journal, sleep: _sleep, ...older } = snapshot;
+  it('reads backups made before products, the journal, sleep and activities existed', () => {
+    const { products: _products, journal: _journal, sleep: _sleep, activities: _activities, ...older } = snapshot;
     const parsed = parseExchange(JSON.stringify(buildBackup({ ...older, log: snapshot.log.slice(0, 2) } as Snapshot, '0.1.0', new Date())));
     expect(parsed.ok && parsed.value.type === 'backup' && parsed.value.data.products).toEqual([]);
     expect(parsed.ok && parsed.value.type === 'backup' && parsed.value.data.journal).toEqual([]);
     expect(parsed.ok && parsed.value.type === 'backup' && parsed.value.data.sleep).toEqual([]);
+    expect(parsed.ok && parsed.value.type === 'backup' && parsed.value.data.activities).toEqual([]);
   });
 
   it('rejects invalid input with a clear message, never partially', () => {

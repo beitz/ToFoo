@@ -14,11 +14,14 @@ import { normalize, search, type SearchIndex } from '../foods/search';
 import { parseLocalDateTime } from './photoTime';
 import { fmtNumber } from '../lib/format';
 import { MAX_SLEEP_MS } from '../logic/sleep';
+import { MAX_ACTIVITY_MINUTES } from '../logic/activity';
 import type { Preparation } from '../model/paramTypes';
 import type { RawValue } from '../model/types';
-import type { Product } from '../storage/types';
+import type { SkinExposure } from '../model/sun';
+import { ACTIVITY_KINDS, INTENSITIES, type ActivityKind, type Intensity, type Product } from '../storage/types';
 
 export const PREPARATIONS = ['asListed', 'raw', 'boiled', 'steamed', 'baked', 'fried'] as const satisfies readonly Preparation[];
+const SKIN_EXPOSURES = ['faceHands', 'faceHandsForearms', 'faceHandsArms', 'armsLegs', 'mostOfBody'] as const satisfies readonly SkinExposure[];
 
 /** Results per search query: enough to choose from, small enough to keep requests cheap. */
 const RESULTS_PER_QUERY = 8;
@@ -97,6 +100,33 @@ export interface SleepProposal {
   replaces?: string;
 }
 
+export const activityProposalInput = z.object({
+  kind: z.enum(ACTIVITY_KINDS),
+  /** The user's own word for it ("Football", "Yoga"); empty when the kind says it all. */
+  name: z.string().optional(),
+  /** Local "YYYY-MM-DD HH:MM" it started. */
+  start: z.string(),
+  minutes: z.number(),
+  intensity: z.union([z.literal(''), z.enum(INTENSITIES)]).optional(),
+  outside: z.boolean(),
+  /** Skin uncovered outside, when the user said ("in shorts and T-shirt"); empty for the default. */
+  skin: z.union([z.literal(''), z.enum(SKIN_EXPOSURES)]).optional(),
+  /** Id of the open activity card this replaces (e.g. "A1"); empty for a new one. */
+  replaces: z.string().optional(),
+});
+
+/** An activity the assistant proposes, for the user to check. */
+export interface ActivityProposal {
+  kind: ActivityKind;
+  name?: string;
+  start: number;
+  minutes: number;
+  intensity?: Intensity;
+  outside: boolean;
+  skin?: SkinExposure;
+  replaces?: string;
+}
+
 /** Longest proposed journal entry: a few paragraphs, not a transcript of the whole chat. */
 const MAX_JOURNAL_CHARS = 4000;
 
@@ -165,11 +195,18 @@ export interface ToolContext {
   journal?: boolean;
   /** Sleep is on: the assistant may propose sleeps. */
   sleep?: boolean;
+  /** Activity is on: the assistant may propose activities. */
+  activity?: boolean;
 }
 
 /** Which online sources the assistant is offered (decides the prompt and tool variant). */
-export function sourcesOf(products: ProductTools | undefined, journal = false, sleep = false): { off: boolean; usda: boolean; webSearch: boolean; journal: boolean; sleep: boolean } {
-  return { off: !!products?.find, usda: !!products?.searchUsda, webSearch: !!products?.find && !!products.webSearch, journal, sleep };
+export function sourcesOf(
+  products: ProductTools | undefined,
+  journal = false,
+  sleep = false,
+  activity = false,
+): { off: boolean; usda: boolean; webSearch: boolean; journal: boolean; sleep: boolean; activity: boolean } {
+  return { off: !!products?.find, usda: !!products?.searchUsda, webSearch: !!products?.find && !!products.webSearch, journal, sleep, activity };
 }
 
 const LABEL_FIELDS: Array<[string, string, string]> = [
@@ -317,6 +354,35 @@ export function validateSleepProposal(input: unknown, now?: number): { ok: true;
   if (problems.length || start.time === undefined || end.time === undefined) return { ok: false, error: `${problems.join('\n')}\nFix these and call propose_sleep again.` };
   const replaces = parsed.data.replaces?.trim();
   return { ok: true, proposal: { start: start.time, end: end.time, ...(replaces ? { replaces } : {}) } };
+}
+
+/** Check a `propose_activity` call: a plausible start time and a length within one waking day. */
+export function validateActivityProposal(input: unknown, now?: number): { ok: true; proposal: ActivityProposal } | { ok: false; error: string } {
+  const parsed = activityProposalInput.safeParse(input);
+  if (!parsed.success) return { ok: false, error: `Invalid input: ${parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}` };
+  const problems: string[] = [];
+  const { kind, minutes, intensity, outside, skin } = parsed.data;
+  const start = checkTime(parsed.data.start, now);
+  if (start.problem) problems.push(`start: ${start.problem}`);
+  else if (start.time === undefined) problems.push('start is empty; give the time it started (estimate from what the user said).');
+  if (!(minutes > 0)) problems.push('minutes must be more than 0.');
+  else if (minutes > MAX_ACTIVITY_MINUTES) problems.push(`minutes is ${minutes}, more than ${MAX_ACTIVITY_MINUTES / 60} hours; check the number.`);
+  if (problems.length || start.time === undefined) return { ok: false, error: `${problems.join('\n')}\nFix these and call propose_activity again.` };
+  const name = parsed.data.name?.trim();
+  const replaces = parsed.data.replaces?.trim();
+  return {
+    ok: true,
+    proposal: {
+      kind,
+      ...(name ? { name } : {}),
+      start: start.time,
+      minutes: Math.round(minutes),
+      ...(intensity ? { intensity } : {}),
+      outside,
+      ...(outside && skin ? { skin } : {}),
+      ...(replaces ? { replaces } : {}),
+    },
+  };
 }
 
 /** A product the assistant may use: looked up in this conversation or saved on this phone. */

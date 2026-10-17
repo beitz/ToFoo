@@ -156,6 +156,21 @@ export const sleepRecordSchema = z
   .object({ id: z.string(), ...versioned, start: z.number(), end: z.number().optional(), day })
   .describe('One sleep: fell asleep (start) and woke up (end, missing while asleep), epoch ms; day is the local day it ended');
 
+export const activitySchema = z
+  .object({
+    id: z.string(),
+    ...versioned,
+    kind: z.enum(['walk', 'run', 'cycling', 'strength', 'other']),
+    name: z.string().optional(),
+    time: z.number(),
+    day,
+    minutes: z.number().nonnegative(),
+    intensity: z.enum(['easy', 'moderate', 'hard']).optional(),
+    outside: z.boolean(),
+    sunSkin: skin.optional(),
+  })
+  .describe('One activity: what, when (epoch ms), how long, roughly how hard, outside or not; sunSkin when it counts toward the vitamin D sun estimate');
+
 const header = {
   format: z.literal('tofoo', { error: 'not a ToFoo file (expected "format": "tofoo")' }),
   formatVersion: z.number().int().positive(),
@@ -179,6 +194,7 @@ export const backupSchema = z.object({
     products: z.array(productSchema).default([]),
     journal: z.array(journalEntrySchema).default([]),
     sleep: z.array(sleepRecordSchema).default([]),
+    activities: z.array(activitySchema).default([]),
   }),
 });
 
