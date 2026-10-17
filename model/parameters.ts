@@ -642,6 +642,17 @@ export const startingLevels = {
   } satisfies Valued<number>,
 };
 
+/** Stores this slow are headlined by their daily balance instead of their (guessed) fill level. */
+export const slowStore = {
+  minDays: {
+    value: 100,
+    source: 'Modelling choice',
+    confidence: 'assumption',
+    note:
+      'Store size ÷ absorbed need per day. A store holding months to years of need (iron, B12, vitamin A, folate, iodine) barely moves within weeks, so its fill level mostly reflects the starting guess; what the log can tell is whether intake covers the need. Vitamin D (~2 months) stays a tank.',
+  } satisfies Valued<number>,
+};
+
 export const statusThresholds = {
   tank: {
     value: { low: 0.2, gettingLow: 0.4 },

@@ -2,7 +2,7 @@
  * The nutrient model: log entries → meals → absorbed amounts → tanks and rolling averages,
  * run three times (low / central / high). Pure: everything it needs is passed in.
  */
-import { nutrientParams, referenceWeightKg, startingLevels, statusThresholds, storage, uncertainty } from '../../model/parameters';
+import { nutrientParams, referenceWeightKg, slowStore, startingLevels, statusThresholds, storage, uncertainty } from '../../model/parameters';
 import { absorbIronParts, absorbMeal, drinkTimingWeight, ironStatusFactor, type MealComposition } from './absorption';
 import { entryIntake, isCoffee, isTea, TRACKED_IDS, type EntryIntake } from './intake';
 import { MODEL_NUTRIENT_IDS } from './nutrients';
@@ -34,7 +34,8 @@ export interface SimulationInput {
 }
 
 export type GaugeStatus = 'fine' | 'gettingLow' | 'low' | 'tooHigh' | 'unknown' | 'info';
-export type GaugeKind = 'tank' | 'rolling' | 'limit' | 'info';
+/** 'balance': a slow store (months to years of need), headlined by its daily balance; its fill level is secondary. */
+export type GaugeKind = 'tank' | 'balance' | 'rolling' | 'limit' | 'info';
 
 export interface HistoryPoint {
   day: string;
@@ -54,12 +55,15 @@ export interface NutrientResult {
   id: string;
   kind: GaugeKind;
   status: GaugeStatus;
-  /** Tank: fill level 0–1. Rolling: average absorbed ÷ requirement. Limit: intake ÷ limit. Info: average intake. */
+  /** Tank: fill level 0–1. Rolling / balance: average absorbed ÷ requirement. Limit: intake ÷ limit. Info: average intake. */
   value: Range;
-  /** Tank capacity and level in absolute (absorbed) units. */
+  /** Tank and balance: store capacity and level in absolute (absorbed) units, and the fill level 0–1. */
   capacity?: number;
   level?: Range;
-  /** Tank: average net change per day over the window (absorbed + sun − need, central), before clamping. */
+  store?: Range;
+  /** Balance: fill level over time (for tanks this is `history`). */
+  storeHistory?: HistoryPoint[];
+  /** Tank and balance: average net change per day over the window (absorbed + sun − need, central), before clamping. */
   netPerDay?: number;
   /** Average per day over the window: absorbed (central) and raw intake (central). */
   averageAbsorbed: number;
@@ -311,8 +315,9 @@ export function simulate(input: SimulationInput): SimulationResult {
     const model = storage[id];
     const isInfo = req.infoOnly.has(id) || !r;
     const isTank = !isInfo && (model?.kind === 'tank' || model?.kind === 'tankDays');
-    const kind: GaugeKind = isInfo ? 'info' : r!.limitOnly ? 'limit' : isTank ? 'tank' : 'rolling';
     const physiological = r?.physiological ?? 0;
+    const storeDays = isTank && physiological > 0 ? (tankCapacity(id, input.weightKg, input.sex, physiological) ?? 0) / physiological : 0;
+    const kind: GaugeKind = isInfo ? 'info' : r!.limitOnly ? 'limit' : isTank ? (storeDays >= slowStore.minDays.value ? 'balance' : 'tank') : 'rolling';
     const windowDays =
       model?.kind === 'rolling' && model.window === 'short' ? settings.shortWindowDays : settings.longWindowDays;
 
@@ -403,7 +408,11 @@ export function simulate(input: SimulationInput): SimulationResult {
       contributors,
     };
 
-    if (kind === 'tank') {
+    // Balance: absorbed (plus sun) at reference iron stores, so it says what the diet covers whatever the store guess.
+    const sunAt = (s: Scenario, i: number) => (id === 'VITD' && settings.sun ? (input.sunByDay?.[days[i]!]?.[s] ?? 0) : 0);
+    const referenceInflow = Object.fromEntries(SCENARIOS.map((s) => [s, inflow[s].map((v, i) => v + sunAt(s, i))])) as Record<Scenario, number[]>;
+    let storePart: Pick<NutrientResult, 'capacity' | 'level' | 'store' | 'storeHistory' | 'netPerDay'> = {};
+    if (kind === 'tank' || kind === 'balance') {
       const capacity = tankCapacity(id, input.weightKg, input.sex, physiological) ?? 1;
       const refWeight = referenceWeightKg.value[input.sex ?? 'unknown'];
       const startFraction =
@@ -418,8 +427,8 @@ export function simulate(input: SimulationInput): SimulationResult {
       for (const s of SCENARIOS) {
         let l = startFraction * capacity;
         const series: number[] = [];
-        days.forEach((d, i) => {
-          const sunUg = id === 'VITD' && settings.sun ? (input.sunByDay?.[d]?.[s] ?? 0) : 0;
+        days.forEach((_, i) => {
+          const sunUg = sunAt(s, i);
           if (adaptIron) {
             // Stores scale with body weight; the ferritin relation is for a reference-sized adult.
             const factor = ironStatusFactor((l / capacity) * (tankCapacity(id, refWeight, input.sex, physiological) ?? capacity), s);
@@ -436,27 +445,31 @@ export function simulate(input: SimulationInput): SimulationResult {
         history.push({ day: days[i]!, low: Math.min(...vals), central: levels.central[i]! / capacity, high: Math.max(...vals) });
       }
       // Net change per day (central) over the window, for "filling / going down" and time to the fine zone.
-      const sunCentral = (i: number) => (id === 'VITD' && settings.sun ? (input.sunByDay?.[days[i]!]?.central ?? 0) : 0);
-      const netPerDay = win.length ? win.reduce((a, i) => a + inflow.central[i]! + sunCentral(i) - physiological, 0) / win.length : undefined;
+      const netPerDay = win.length ? win.reduce((a, i) => a + inflow.central[i]! + sunAt('central', i) - physiological, 0) / win.length : undefined;
       const value = { low: level.low / capacity, central: level.central / capacity, high: level.high / capacity };
       const lo = Math.min(value.low, value.central, value.high);
       const hi = Math.max(value.low, value.central, value.high);
-      results.set(id, {
-        ...base,
-        averageAbsorbed: mean(inflow.central, win),
-        status: classify('tank', value.central, ulRatio, true),
-        value: { low: lo, central: value.central, high: hi },
-        capacity,
-        level,
-        netPerDay,
-        history,
-      });
-      continue;
+      const store = { low: lo, central: value.central, high: hi };
+      if (kind === 'tank') {
+        results.set(id, {
+          ...base,
+          averageAbsorbed: mean(inflow.central, win),
+          status: classify('tank', value.central, ulRatio, true),
+          value: store,
+          capacity,
+          level,
+          store,
+          netPerDay,
+          history,
+        });
+        continue;
+      }
+      storePart = { capacity, level, store, storeHistory: history, netPerDay };
     }
 
     // Rolling, limit and info.
     const denom = kind === 'limit' ? (r?.recommended ?? 1) : kind === 'info' ? 1 : physiological || 1;
-    const source = kind === 'limit' || kind === 'info' ? null : inflow;
+    const source = kind === 'limit' || kind === 'info' ? null : kind === 'balance' ? referenceInflow : inflow;
     // Prefix sums make every window average O(1).
     const knownMask = days.map((d) => (known(d) ? 1 : 0));
     const includedMask = included.map((x) => (x ? 1 : 0));
@@ -487,9 +500,10 @@ export function simulate(input: SimulationInput): SimulationResult {
     const value = { low: Math.min(v.low, v.central, v.high), central: v.central, high: Math.max(v.low, v.central, v.high) };
     results.set(id, {
       ...base,
-      status: classify(kind, value.central, ulRatio, knownInWindow > 0),
+      status: classify(kind === 'balance' ? 'rolling' : kind, value.central, ulRatio, knownInWindow > 0),
       value,
       history,
+      ...storePart,
     });
   }
 
@@ -510,7 +524,7 @@ export type TankTrend = { direction: 'filling'; daysToFine?: number } | { direct
  * "getting low" zone, when it is below that and filling.
  */
 export function tankTrend(r: Pick<NutrientResult, 'kind' | 'capacity' | 'level' | 'netPerDay'>): TankTrend | null {
-  if (r.kind !== 'tank' || !r.capacity || !r.level || r.netPerDay === undefined) return null;
+  if ((r.kind !== 'tank' && r.kind !== 'balance') || !r.capacity || !r.level || r.netPerDay === undefined) return null;
   if (r.netPerDay < 0) return { direction: 'draining' };
   if (r.netPerDay === 0) return { direction: 'steady' };
   const gap = statusThresholds.tank.value.gettingLow * r.capacity - r.level.central;

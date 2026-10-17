@@ -139,7 +139,7 @@ export function HomePage() {
       )}
       <div className={view === 'compact' ? 'cgauge-grid' : 'gauge-grid'}>
         {gauges.map((r) => {
-          const defaultBased = weightDefault && (r.kind === 'tank' || PER_KG.has(r.id));
+          const defaultBased = weightDefault && (r.kind === 'tank' || r.kind === 'balance' || PER_KG.has(r.id));
           const open = () => navigate('nutrient', r.id);
           return view === 'compact' ? (
             <CompactGauge key={r.id} result={r} defaultBased={defaultBased} onClick={open} />
