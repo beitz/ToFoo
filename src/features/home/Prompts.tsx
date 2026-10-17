@@ -5,6 +5,8 @@ import { href, navigate } from '../../app/router';
 import { t } from '../../i18n';
 import { addDays, daysBetween } from '../../lib/dates';
 import { isOn } from '../../settings/features';
+import { NUTRIENT_BY_ID } from '../../model/nutrients';
+import { testHintText } from '../nutrient/testHint';
 import { repo } from '../../storage/repo';
 import { NumberInput, Segmented } from '../../ui/controls';
 
@@ -49,7 +51,26 @@ export function Prompts() {
     );
   }
 
-  // 2. Backup reminder
+  // 2. A slow store whose intake has been low for weeks: only a blood test shows the real level.
+  for (const r of d.model.nutrients.values()) {
+    const text = testHintText(r, NUTRIENT_BY_ID.get(r.id)?.name ?? r.id);
+    if (!text || dismissed(`testHint:${r.id}`) || d.settings.hiddenNutrients.includes(r.id)) continue;
+    return (
+      <div className="card prompt">
+        <p>{text}</p>
+        <div className="prompt-actions">
+          <a className="btn btn-small" href={href('nutrient', r.id)}>
+            {t('prompt.testHintDetails')}
+          </a>
+          <button className="btn btn-small btn-ghost" onClick={() => dismiss(`testHint:${r.id}`)}>
+            {t('common.later')}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // 3. Backup reminder
   const lastBackup = m.get('lastBackupDay') as string | undefined;
   const dueSince = lastBackup ?? d.profile.modelStartDay;
   if (isOn(f, 'backupReminder') && d.log.length >= 5 && daysBetween(dueSince, d.today) >= d.settings.backupReminderDays && !dismissed('backup')) {
@@ -68,7 +89,7 @@ export function Prompts() {
     );
   }
 
-  // 3. Profile questions, one at a time
+  // 4. Profile questions, one at a time
   const p = d.profile;
   if (!p.weightHistory.length && !dismissed('weight')) {
     return (

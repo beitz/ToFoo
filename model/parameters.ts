@@ -642,6 +642,20 @@ export const startingLevels = {
   } satisfies Valued<number>,
 };
 
+/**
+ * Blood tests that set a store's level: store amount (nutrient units, absorbed) = value × storePerUnit.
+ * Only markers with a sourced conversion are listed; others are open questions (docs/OPEN_QUESTIONS.md).
+ */
+export const labMarkers: Record<string, Valued<{ nutrient: string; unit: string; storePerUnit: number }>> = {
+  ferritin: {
+    value: { nutrient: 'FE', unit: 'µg/L', storePerUnit: iron.statusAdaptation.value.storeMgPerFerritin },
+    source: 'Bothwell TH et al. (1979) Iron metabolism in man; IOM (2001) DRI micronutrients, ch. 9: 1 µg/L serum ferritin ≈ 8 mg storage iron',
+    url: 'https://doi.org/10.17226/10026',
+    confidence: 'medium',
+    note: 'Same rule as the iron-status adaptation. Ferritin rises with inflammation or infection, so a value taken while ill overstates the store.',
+  },
+};
+
 /** Stores this slow are headlined by their daily balance instead of their (guessed) fill level. */
 export const slowStore = {
   minDays: {
@@ -650,6 +664,13 @@ export const slowStore = {
     confidence: 'assumption',
     note:
       'Store size ÷ absorbed need per day. A store holding months to years of need (iron, B12, vitamin A, folate, iodine) barely moves within weeks, so its fill level mostly reflects the starting guess; what the log can tell is whether intake covers the need. Vitamin D (~2 months) stays a tank.',
+  } satisfies Valued<number>,
+  /** A slow store's balance this many days in a row in the "low" zone suggests checking the real level with a blood test. */
+  testHintDays: {
+    value: 42,
+    source: 'Modelling choice',
+    confidence: 'assumption',
+    note: 'Six weeks: long enough that a few poor days don\'t trigger it, short enough to matter before a store this size runs down. A food log cannot see the store itself.',
   } satisfies Valued<number>,
 };
 

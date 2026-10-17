@@ -57,6 +57,7 @@ export const profileSchema = z.object({
   exclusions: z.object({ groups: z.array(z.string()), foods: z.array(z.string()) }),
   startingLevel: z.enum(['empty', 'average', 'custom']),
   customStartLevels: z.record(z.string(), z.number().min(0).max(1)).optional(),
+  labResults: z.array(z.object({ id: z.string(), marker: z.string(), value: z.number().nonnegative(), day })).optional(),
   modelStartDay: day,
   onboarded: z.boolean(),
 });
