@@ -43,7 +43,9 @@ export function makeCreate(apiKey: string): CreateMessage {
     // The user's own key, used only from their own device: the documented case for browser access.
     ({ default: Anthropic }) => new Anthropic({ apiKey, dangerouslyAllowBrowser: true, maxRetries: 2 }),
   );
-  return async (params) => (await client).beta.messages.create(params);
+  // Streamed and collected: a long answer (many cards at once) would hit the SDK's time limit for
+  // a single unstreamed request.
+  return async (params) => (await client).beta.messages.stream(params).finalMessage();
 }
 
 export type AiErrorKind = 'auth' | 'rateLimit' | 'overloaded' | 'network' | 'webSearchOff' | 'other';

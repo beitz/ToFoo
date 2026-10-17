@@ -196,6 +196,14 @@ describe('several meals at once', () => {
     );
     expect(appNote({ now, day: '2026-10-17', today: '2026-10-17', logged: [], open: [], barcodes: [] })).toBe('(Now: Sat 2026-10-17 09:30.)');
   });
+
+  it('warns that dictated text may have misheard words', () => {
+    expect(appNote({ now, day: '2026-10-17', today: '2026-10-17', logged: [], open: [], barcodes: [], dictated: true })).toContain('spoken and turned into text');
+  });
+
+  it('leaves room for many cards in one answer', () => {
+    expect(requestParams('claude-opus-5-5', []).max_tokens).toBeGreaterThanOrEqual(32000);
+  });
 });
 
 describe('requestParams', () => {

@@ -15,8 +15,11 @@ export const AI_MODELS = ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-
 export type AiModel = (typeof AI_MODELS)[number];
 export const DEFAULT_AI_MODEL: AiModel = 'claude-opus-5-5';
 
-/** Tool rounds per user message before giving up: a normal meal needs one to three, a batch of meals a few more. */
-const MAX_STEPS = 12;
+/**
+ * Tool rounds per user message before giving up: a normal meal needs one to three; a long message
+ * covering a day or two (searches, barcodes, a correction after a rejected proposal) needs more.
+ */
+const MAX_STEPS = 20;
 
 export interface Conversation {
   messages: Beta.BetaMessageParam[];
@@ -55,7 +58,9 @@ export type TurnOutcome =
 export function requestParams(model: AiModel, messages: Beta.BetaMessageParam[], sources: PromptSources = {}): Beta.MessageCreateParamsNonStreaming {
   return {
     model,
-    max_tokens: 16000,
+    // Streamed (src/ai/client.ts), so a long answer has room: a day or two of meals and journal
+    // entries is many cards in one response.
+    max_tokens: 64000,
     system: systemPromptFor(sources),
     tools: toolsFor(sources),
     messages,
@@ -192,10 +197,12 @@ export async function sendMessage(
 
 /**
  * The app's note on each user message: the current time and the chat's day (so "yesterday" and
- * photo times can be placed), cards already logged or still open, and barcodes read from photos.
+ * photo times can be placed), cards already logged or still open, barcodes read from photos, and
+ * whether the text was dictated.
  */
-export function appNote(o: { now: number; day: string; today: string; logged: string[]; open: string[]; barcodes: string[] }): string {
+export function appNote(o: { now: number; day: string; today: string; logged: string[]; open: string[]; barcodes: string[]; dictated?: boolean }): string {
   const parts = [`Now: ${fmtLocalDateTime(o.now)}.`];
+  if (o.dictated) parts.push('The text was spoken and turned into text by a speech model: expect misheard words, especially food and brand names, and corrections the user made while talking.');
   if (o.day !== o.today) parts.push(`The user opened this chat for ${o.day}.`);
   if (o.logged.length) parts.push(`Cards already logged: ${o.logged.join(', ')}.`);
   if (o.open.length) parts.push(`Cards still open: ${o.open.join(', ')}.`);
