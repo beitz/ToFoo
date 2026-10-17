@@ -4,7 +4,7 @@ Oct 14, 2026 · @Tobias Beitz
 
 ## Overview and goals
 
-ToFoo is a personal nutrition app that tracks every nutrient the data allows (macronutrients, vitamins, minerals, essential amino acids, essential fatty acids) and estimates how full the body's stores are, so the user can plan the next batch-cooked dish to fill the gaps. It is built for one user first: someone who cooks one batch, freezes portions, usually eats one meal a day (OMAD) but not always, and wants to understand what the food actually does.
+ToFoo is a personal nutrition app that tracks every nutrient the data allows (macronutrients, vitamins, minerals, essential amino acids, essential fatty acids) and estimates how full the body's stores are, so the user can plan the next batch-cooked dish to fill the gaps. It is built for one user first: someone who cooks one batch, freezes portions, usually eats one meal a day (OMAD) but not always, and wants to understand what the food actually does. Alongside food it can keep a journal, sleep and activity (optional), so the assistant can look for patterns between how the user feels and what they ate, slept and did.
 
 What makes it different from existing trackers:
 
@@ -220,7 +220,7 @@ Confidence is shown as a small marker on entries and widens the uncertainty rang
 
 **Water** (decided 2026-10-16): drinks can be logged as water amounts with one tap (e.g. +250 ml), and the water in foods counts too (BLS has water content per food). Shown as an amount-only or rolling gauge against a DGE guide value for water; the reference value still needs to be taken from the DGE tables with a source.
 
-**Day notes** (decided 2026-10-16): a free-text note per day in the diary ("ate out, guessed amounts", "felt tired"), stored with the day, included in backups and exports. No symptom tracking or correlations.
+**Journal** (replaces the day notes decided 2026-10-16): free-text entries at any time, see "Journal, sleep and activity".
 
 **Supplements** are loggable items with their own nutrient values (manual entry, confidence A when taken from the label). Drinks such as coffee and tea are logged on their own when drunk (time defaults to now, editable); the model applies them to meals around them by timing.
 
@@ -266,6 +266,24 @@ Logging should feel like telling a friend what you ate, not operating a database
 **Bulk photo import** (built 2026-10-17): take photos of what you eat, then log a day or two at once when there is time. In the same assistant chat, the user picks many photos (up to 20 per message) and adds a note, including meals with no photo ("pasta on Wednesday evening"). The app reads each photo's capture time on the phone from its EXIF data (`DateTimeOriginal`, with the time-zone offset when present) before scaling it down, sorts the photos oldest first and gives the assistant a line per photo with its number and time. When a photo has no capture time (some pickers and messaging apps strip EXIF), the app uses the file date and says so, or marks the time unknown when the file date is just the moment of picking; the thumbnails show which (≈ file date, – unknown). The assistant groups photos into meals by time and content (rather than a fixed time gap: yogurt in the morning and in the evening is two meals, ten BBQ photos are one), asks all its open questions in one numbered message with defaults, then proposes every meal at once. Each meal gets its own confirm card (numbered M1, M2, …) with the time it proposed, editable; each is logged on its own, and a correction replaces just its card. Each message also tells the assistant the current time, the day the chat was opened for, and which cards are logged.
 
 **Voice input** (built 2026-10-17, opt-in setting "Voice input"): a microphone button in the assistant chat, for talking instead of typing, including while looking through the chosen photos in a full-screen viewer (tap a thumbnail; swipe or arrows to move, the mic stays at hand). The recording goes to OpenAI's transcription API (`gpt-4o-transcribe`) with the user's own OpenAI key, kept on the phone like the Anthropic key and out of backups; the text lands in the chat box to check and edit before sending. Why OpenAI: the Claude API takes no audio, the phone keyboard's dictation was unreliable for the owner (mishearing, no punctuation, often not starting), and on-device Whisper in the browser means a large download, slow transcription on a phone and weaker mixed German/English. Cost: about $0.006 per minute of speech. Nothing is sent until the user taps the microphone; recordings are not stored.
+
+## Journal, sleep and activity
+
+Food alone does not explain how the user feels, so a few low-friction records sit next to the food log, in one place, to look for patterns across all of them (owner's request, 2026-10-17). Each is an optional module with its own toggle, and none of them takes over Home: the food log and the gauges stay the main screen. Each can be logged by tapping and by telling the assistant ("slept from 1 to 8, walked 40 min to work, headache since noon"), which proposes the entries on a confirm card, as it does for meals. Logging stays a few seconds: no required fields, sensible defaults, times default to now.
+
+**Journal** (decided 2026-10-17, replaces day notes): write anything at any time ("ate out, guessed amounts", "tired all afternoon", "headache since noon"), as many entries a day as wanted, each with its own time (now, editable). Plain text, no tags or categories to pick; the assistant reads the words later. Voice input works here as in the assistant chat. Entries appear in the diary at their time between meals, and are included in backups and the CSV export. This reverses the 2026-10-16 note "no symptom tracking or correlations": correlations are now wanted, done by Insights below. Maybe later: an optional one-tap "how do you feel" score (1–5) with an entry, which gives Insights a number to compare instead of only words.
+
+**Sleep** (decided 2026-10-17): one record per night, when the user went to sleep and woke up; no sleep quality (owner's decision). Ways to log, fastest first:
+
+1. "Going to sleep" and "I'm up" buttons, also as home-screen shortcuts (long-press the app icon), one tap each, with undo.
+2. A morning question on Home when the app is first opened after waking: "Slept 23:40 to 07:10?", prefilled from the buttons or from the usual times; one tap to confirm, or adjust.
+3. The assistant or the diary, for nights logged after the fact.
+
+Automatic detection (face-down phone, being at home at night) is not possible in a web app: Chrome stops a page's motion sensors and location as soon as it is not on screen, so it would need the app open with the screen on all night. If automatic sleep times are wanted later, they come from Android itself (sleep sessions recorded by the phone's bedtime or sleep detection, a watch, or another app, in Health Connect) through the phone health data import (Later).
+
+**Activity** (decided 2026-10-17): a simple log of what (walk, run, cycling, strength, other, or free text), when, how long, and roughly how hard (easy / moderate / hard). An activity marked "outside" can count toward the vitamin D sun estimate for that day, unless it is already part of the outdoor routine, so a walk is logged once for both. No steps (a web app cannot count them in the background), no GPS tracks, no social features. Energy burned is not estimated now; that belongs to the later energy in and out feature and needs a sourced table of activity energy costs. Can grow later, for example steps and workouts from Health Connect.
+
+**Insights** (decided 2026-10-17, built last, once there are a few weeks of data): "Look for patterns" asks the assistant to compare the journal with food, nutrients, sleep, activity and day statuses over a chosen period, or to answer a question ("why am I tired on Mondays?"). Same rule as for meals: the AI chooses what to compare, the app computes the numbers. The model gets tools to read journal entries and to query the data (for example, days whose journal mentions a headache against the other days: sleep length, caffeine, a food the day before), and every number in its answer comes from those tools. Delayed effects (the day before, the last week) are part of what it compares. Answers are possible patterns with their counts ("headache on 4 of the 6 days after less than 6 h sleep, 3 of 25 otherwise"), never causes or medical advice: with one person and a few weeks of data many apparent patterns are chance, so each answer says how many days it rests on. The result is a chat, so the user can dig deeper ("show me those days") or stop at the summary. Runs only when asked, with the user's Anthropic key; it sends the journal text and the summaries the model asks for to Anthropic, which the setting says plainly.
 
 ## Exchange format, QR codes and the Claude helper
 
@@ -361,6 +379,10 @@ Optional features are modules with an on/off switch, so the app can be tuned bet
 | Open Food Facts lookup | Off | Log packaged products by barcode (sends only the barcode) |
 | USDA FoodData Central | Off | Search the US food database by name (sends only the search words) |
 | Find products by name | On | With the assistant and Open Food Facts on: find a product from a front-of-pack photo via web search on openfoodfacts.org (through Anthropic) |
+| Journal | On | Free-text entries at any time, in the diary |
+| Sleep | Off | Sleep and wake times: buttons, shortcuts, morning question |
+| Activity | Off | Simple activity log; outdoor activity feeds the sun estimate |
+| Insights | Off | With the assistant on: look for patterns across journal, food, sleep and activity (sends the journal text to Anthropic) |
 
 Settings also hold the profile, starting-level choice, salt defaults, meal window, rolling-average window, and backup options. Features are implemented behind one feature-flag module so new ones get a toggle by default.
 
@@ -372,13 +394,13 @@ Settings also hold the profile, starting-level choice, salt defaults, meal windo
 
 All personal data stays on the phone in IndexedDB; a one-tap export file is the backup, and nothing personal ever goes into the public repo.
 
-- **Storage**: recipes, batches, freezer stock, log, profile, settings in IndexedDB, behind a repository layer (so sync can be added in v4). Request persistent storage from the browser so Android does not clear it.
+- **Storage**: recipes, batches, freezer stock, log, journal, sleep and activity, profile, settings in IndexedDB, behind a repository layer (so sync can be added in v4). Request persistent storage from the browser so Android does not clear it.
 - **Schema versioning**: every stored record has a schema version; migrations run on app start and are unit-tested.
 - **Backup**: "Export everything" writes one JSON file in the exchange format (`type: backup`) via the Android share sheet or download. "Import backup" restores it with a preview. Optional reminder when the last backup is older than N days (default 14).
 - **Model is recomputable**: tank levels are derived from the log and parameters, not stored as truth, so a parameter update or bug fix recalculates history correctly. Cache results for speed.
-- **Privacy**: no analytics, no third-party requests in v1 except loading the app itself. Online features are opt-in and clearly marked: the Open Food Facts lookup sends only the barcode; USDA FoodData Central only the search words. The AI assistant is opt-in, and sends the photos and messages of an assistant conversation (plus the matching BLS search results) to Anthropic, and nothing else; its product web searches run at Anthropic, limited to openfoodfacts.org.
+- **Privacy**: no analytics, no third-party requests in v1 except loading the app itself. Online features are opt-in and clearly marked: the Open Food Facts lookup sends only the barcode; USDA FoodData Central only the search words. The AI assistant is opt-in, and sends the photos and messages of an assistant conversation (plus the matching BLS search results) to Anthropic, and nothing else; its product web searches run at Anthropic, limited to openfoodfacts.org. Insights (opt-in) send journal entries and data summaries to Anthropic only when the user asks for an analysis.
 - **CSV export** (later, nice to have): daily intake per nutrient and the diary as CSV, for analysis in Excel. The JSON backup remains the backup.
-- **Phone health data** (later, low priority): the phone already tracks things like weight and activity, but a PWA in Chrome cannot read Health Connect. Options to look at: importing a Health Connect / Google Fit export file, or a small native companion.
+- **Phone health data** (later, low priority): the phone already tracks things like weight, activity, steps and (with bedtime or sleep detection, or a watch) sleep, but a PWA in Chrome cannot read Health Connect. Options to look at: importing a Health Connect / Google Fit export file, or a small native companion.
 - **Secrets**: any future API key is entered in the app and stored only on the device, never in the repo.
 
 ## Roadmap
@@ -428,14 +450,21 @@ v1 is the smallest app that is useful every day; each later version adds to the 
 - [x] Day and range nutrient breakdown; calendar of day statuses (built 2026-10-16)
 - [x] Edit a logged entry, including replacing its food by search or barcode (built 2026-10-17)
 - [ ] Trends and weekly look-back
-- [ ] Water; day notes
+- [ ] Water
 - [ ] Nice to have: fasting timer; "eat soon" flag for fridge portions (needs a shelf-life source)
+
+**Journal, sleep and activity** (owner's request 2026-10-17), in this order:
+
+- [ ] Journal: free-text entries at any time, in the diary, also through the assistant and voice (replaces day notes)
+- [ ] Sleep: "Going to sleep" / "I'm up" buttons and shortcuts, morning question, assistant
+- [ ] Activity: simple log (what, when, how long, how hard, outside); outdoor time feeds the sun estimate
+- [ ] Insights: the assistant looks for patterns across journal, food, sleep and activity, numbers computed by the app
 
 **Later, no version yet**:
 
 - [ ] Shopping list for the next batch; duplicate a recipe; scale a recipe when cooking (last)
 - [ ] CSV export
-- [ ] Phone health data (Health Connect), low priority
+- [ ] Phone health data (Health Connect), low priority; the route to automatic sleep times and steps
 - [ ] Energy in and out (calorie balance): would be nice in one app since it overlaps with nutrient tracking, but the focus stays on nutrients, not weight loss or gain. Only if it can be added cleanly, as an optional feature that keeps the gamification guardrails (no rewards for eating less).
 - [ ] Keep in mind, not needed now: user-set target per nutrient (e.g. from a doctor), clearly marked as user-set. The DGE-derived targets stay as they are.
 
