@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { absorbByRule, absorbIron, absorbMeal, drinkTimingWeight, fatFactor, interpolateLog, ironStatusFactor, type MealComposition } from './absorption';
 import { entryIntake } from './intake';
-import { nutrientParams, startingLevels } from '../../model/parameters';
+import { nutrientParams, startingLevels, statusThresholds } from '../../model/parameters';
 import { resolveRequirements } from './requirements';
 import { retentionFactor } from './retention';
-import { drinkKind, effectiveDayStatus, groupMeals, simulate, type SimulationInput } from './simulate';
+import { drinkKind, effectiveDayStatus, groupMeals, simulate, tankTrend, type SimulationInput } from './simulate';
 import { clearSkyUvIndex, solarElevation, sunVitaminD } from './sun';
 import { DEFAULT_MODEL_SETTINGS, type ModelEntry } from './types';
 
@@ -282,6 +282,27 @@ describe('simulation', () => {
     expect(fasting.value.central).toBeLessThan(start);
     expect(unlogged.value.central).toBeCloseTo(start, 2); // neutral imputation
     expect(unlogged.value.low).toBeLessThan(unlogged.value.central); // but the range widens
+  });
+
+  it('an empty iron store on a good diet reads low but filling, with the time to the fine zone', () => {
+    const d = days('2026-10-15', 3);
+    const entries = d.map((day, i) => manual(`f${i}`, day, 12, { FE: 16 }));
+    const res = simulate(baseInput(d, entries, { startingLevel: 'empty' })).nutrients.get('FE')!;
+    expect(res.status).toBe('low');
+    expect(res.value.central).toBeGreaterThan(0);
+    expect(res.netPerDay).toBeGreaterThan(0);
+    const trend = tankTrend(res);
+    expect(trend?.direction).toBe('filling');
+    // Gap to the "getting low" line ÷ net gain per day.
+    const days_ = trend?.direction === 'filling' ? trend.daysToFine! : 0;
+    expect(days_ * res.netPerDay!).toBeCloseTo(statusThresholds.tank.value.gettingLow * res.capacity! - res.level!.central, 5);
+  });
+
+  it('a store with nothing eaten is going down', () => {
+    const d = days('2026-10-01', 10);
+    const res = simulate(baseInput(d, [])).nutrients.get('FE')!;
+    expect(tankTrend(res)).toEqual({ direction: 'draining' });
+    expect(tankTrend(simulate(baseInput(d, [])).nutrients.get('MG')!)).toBeNull(); // not a tank
   });
 
   it('caps tanks at capacity', () => {

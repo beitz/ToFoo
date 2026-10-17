@@ -59,6 +59,8 @@ export interface NutrientResult {
   /** Tank capacity and level in absolute (absorbed) units. */
   capacity?: number;
   level?: Range;
+  /** Tank: average net change per day over the window (absorbed + sun − need, central), before clamping. */
+  netPerDay?: number;
   /** Average per day over the window: absorbed (central) and raw intake (central). */
   averageAbsorbed: number;
   averageIntake: number;
@@ -433,6 +435,9 @@ export function simulate(input: SimulationInput): SimulationResult {
         const vals = SCENARIOS.map((s) => levels[s][i]! / capacity);
         history.push({ day: days[i]!, low: Math.min(...vals), central: levels.central[i]! / capacity, high: Math.max(...vals) });
       }
+      // Net change per day (central) over the window, for "filling / going down" and time to the fine zone.
+      const sunCentral = (i: number) => (id === 'VITD' && settings.sun ? (input.sunByDay?.[days[i]!]?.central ?? 0) : 0);
+      const netPerDay = win.length ? win.reduce((a, i) => a + inflow.central[i]! + sunCentral(i) - physiological, 0) / win.length : undefined;
       const value = { low: level.low / capacity, central: level.central / capacity, high: level.high / capacity };
       const lo = Math.min(value.low, value.central, value.high);
       const hi = Math.max(value.low, value.central, value.high);
@@ -443,6 +448,7 @@ export function simulate(input: SimulationInput): SimulationResult {
         value: { low: lo, central: value.central, high: hi },
         capacity,
         level,
+        netPerDay,
         history,
       });
       continue;
@@ -495,6 +501,20 @@ export function simulate(input: SimulationInput): SimulationResult {
   }));
 
   return { nutrients: results, dayStatus: statuses, meals: mealSummaries, daily };
+}
+
+export type TankTrend = { direction: 'filling'; daysToFine?: number } | { direction: 'draining' } | { direction: 'steady' };
+
+/**
+ * Where a tank is heading at the recent net rate. `daysToFine` is how long until it leaves the
+ * "getting low" zone, when it is below that and filling.
+ */
+export function tankTrend(r: Pick<NutrientResult, 'kind' | 'capacity' | 'level' | 'netPerDay'>): TankTrend | null {
+  if (r.kind !== 'tank' || !r.capacity || !r.level || r.netPerDay === undefined) return null;
+  if (r.netPerDay < 0) return { direction: 'draining' };
+  if (r.netPerDay === 0) return { direction: 'steady' };
+  const gap = statusThresholds.tank.value.gettingLow * r.capacity - r.level.central;
+  return gap > 0 ? { direction: 'filling', daysToFine: gap / r.netPerDay } : { direction: 'filling' };
 }
 
 /** Ids whose intake the model tracks (for tests and food profiles). */

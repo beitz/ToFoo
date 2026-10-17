@@ -1,6 +1,6 @@
 import type { NutrientResult } from '../model/simulate';
 import { NUTRIENT_BY_ID } from '../model/nutrients';
-import { fmtAmount, fmtPercent } from '../lib/format';
+import { fmtAmount, fmtFill, fmtPercent } from '../lib/format';
 import { STATUS_ICON, StatusBadge, statusLabel } from './status';
 import { Icon } from './Icon';
 import { t } from '../i18n';
@@ -32,7 +32,7 @@ function gaugeLabel(r: NutrientResult): string {
   return r.kind === 'info'
     ? `${fmtAmount(r.id, r.averageIntake)}/day`
     : r.kind === 'tank'
-      ? t('gauge.full', { pct: fmtPercent(r.value.central) })
+      ? t('gauge.full', { pct: fmtFill(r.value.central) })
       : fmtPercent(r.value.central);
 }
 
@@ -44,7 +44,7 @@ export function CompactGauge({ result: r, onClick, defaultBased, variant = 'row'
   const def = NUTRIENT_BY_ID.get(r.id);
   const name = def?.short ?? r.id;
   // Cells are narrow: no "full" / "/day" suffixes there.
-  const cellValue = r.kind === 'info' ? fmtAmount(r.id, r.averageIntake) : fmtPercent(r.value.central);
+  const cellValue = r.kind === 'info' ? fmtAmount(r.id, r.averageIntake) : r.kind === 'tank' ? fmtFill(r.value.central) : fmtPercent(r.value.central);
   const noData = r.status === 'unknown' || hasNoData(r);
   const value = noData ? '–' : variant === 'cell' ? cellValue : gaugeLabel(r);
   const icon = <Icon name={STATUS_ICON[r.status]} size={14} />;

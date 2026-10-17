@@ -2,8 +2,9 @@ import { useMemo } from 'react';
 import { useData } from '../../app/data';
 import { href } from '../../app/router';
 import { t, type MessageKey } from '../../i18n';
-import { fmtAmount, fmtPercent } from '../../lib/format';
+import { fmtAmount, fmtFill, fmtNumber, fmtPercent } from '../../lib/format';
 import { NUTRIENT_BY_ID } from '../../model/nutrients';
+import { tankTrend, type NutrientResult } from '../../model/simulate';
 import { nutrientParams, statusThresholds, storage } from '../../../model/parameters';
 import { referenceValues } from '../../../model/reference-values';
 import { portionGrams } from '../../model/ranking';
@@ -75,7 +76,7 @@ export function NutrientPage({ id }: { id: string }) {
           {noData
             ? '–'
             : r.kind === 'tank'
-            ? t('gauge.full', { pct: fmtPercent(r.value.central) })
+            ? t('gauge.full', { pct: fmtFill(r.value.central) })
             : r.kind === 'info'
               ? `${fmtAmount(id, r.averageIntake)}/${t('nutrient.day')}`
               : fmtPercent(r.value.central)}
@@ -96,6 +97,7 @@ export function NutrientPage({ id }: { id: string }) {
             {r.knownDays < r.windowDays && r.kind !== 'tank' ? ` ${t('nutrient.knownDays', { known: r.knownDays, days: r.windowDays })}` : ''}
           </p>
         )}
+        {isTank && req && <TankTrendNote r={r} need={req.physiological} startedEmpty={d.profile.startingLevel === 'empty'} />}
         {r.missingDataDays > 0 && <p className="small notice">{t('nutrient.missingData', { n: r.missingDataDays })}</p>}
         {r.ulRatio !== undefined && req?.upperLimit && (
           <p className={`small${r.ulRatio > 1 ? ' notice' : ' muted'}`}>
@@ -236,6 +238,45 @@ function NutrientInfo({ id }: { id: string }) {
           </p>
         )}
       </div>
+    </>
+  );
+}
+
+/** Rough duration for "about …": days, then weeks, months, years. */
+function fmtDuration(days: number): string {
+  if (days < 1.5) return t('duration.day');
+  if (days < 14) return t('duration.days', { n: Math.round(days) });
+  if (days < 60) return t('duration.weeks', { n: Math.round(days / 7) });
+  if (days < 730) return t('duration.months', { n: Math.round(days / 30.44) });
+  return t('duration.years', { n: fmtNumber(days / 365.25, 1) });
+}
+
+/**
+ * Whether a store is filling or going down at the recent rate, so a low tank on a good diet
+ * doesn't read as "you eat too little" (e.g. after starting empty).
+ */
+function TankTrendNote({ r, need, startedEmpty }: { r: NutrientResult; need: number; startedEmpty: boolean }) {
+  const trend = tankTrend(r);
+  if (!trend || r.netPerDay === undefined || r.value.central >= 1) return null;
+  const low = r.status === 'low' || r.status === 'gettingLow';
+  // Absorbed = need + net change, so the two numbers always explain the direction (vitamin D includes sun).
+  const vars = { absorbed: fmtAmount(r.id, Math.max(0, need + r.netPerDay)), need: fmtAmount(r.id, need) };
+  const text =
+    trend.direction === 'draining'
+      ? t(r.level!.central > 0 ? 'nutrient.trendDraining' : 'nutrient.trendEmpty', vars)
+      : trend.direction === 'steady'
+        ? t('nutrient.trendSteady', vars)
+        : trend.daysToFine !== undefined
+          ? t('nutrient.trendFillingTime', { ...vars, time: fmtDuration(trend.daysToFine) })
+          : t('nutrient.trendFilling', vars);
+  return (
+    <>
+      <p className="small">{text}</p>
+      {low && startedEmpty && trend.direction === 'filling' && (
+        <p className="small">
+          {t('nutrient.startedEmpty')} <a href={href('settings', 'start')}>{t('nutrient.changeStart')}</a>
+        </p>
+      )}
     </>
   );
 }
