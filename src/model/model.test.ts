@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { absorbByRule, absorbIron, absorbMeal, drinkTimingWeight, fatFactor, interpolateLog, ironStatusFactor, type MealComposition } from './absorption';
 import { entryIntake } from './intake';
 import { nutrientParams, startingLevels, statusThresholds } from '../../model/parameters';
-import { resolveRequirements } from './requirements';
+import { estimateEnergyNeed, resolveRequirements } from './requirements';
+import { referenceValues } from '../../model/reference-values';
 import { retentionFactor } from './retention';
 import { drinkKind, effectiveDayStatus, groupMeals, simulate, tankTrend, type SimulationInput } from './simulate';
 import { clearSkyUvIndex, solarElevation, sunVitaminD } from './sun';
@@ -90,6 +91,49 @@ describe('requirements', () => {
     expect(male30.byNutrient.get('ZN')!.recommended).toBe(14);
     const low = resolveRequirements({ sex: 'female', phytate: 'low' }, 2026);
     expect(low.byNutrient.get('ZN')!.recommended).toBe(7);
+  });
+});
+
+describe('energy target', () => {
+  it('uses the DGE table until age and weight are known', () => {
+    const r = resolveRequirements({ sex: 'male' }, 2026);
+    expect(r.energy).toEqual({ kcal: 2700, basis: 'guide', guideKcal: 2700 });
+    expect(r.byNutrient.get('ENERCC')!.recommended).toBe(2700);
+  });
+
+  it('estimates the need from age, sex, weight and activity (Müller 2004 × PAL)', () => {
+    // (0.047 × 80 + 1.009 − 0.01452 × 30 + 3.21) MJ = 7.543 MJ = 1,803 kcal; × 1.6 = 2,885 kcal.
+    expect(male30.energy.basis).toBe('estimate');
+    expect(male30.energy.estimate).toEqual({ kcal: 2880, reeKcal: 1800, pal: 1.6 });
+    expect(male30.byNutrient.get('ENERCC')!.recommended).toBe(2880);
+    expect(male30.byNutrient.get('ENERCC')!.source).toContain('Müller');
+    expect(male30.energy.guideKcal).toBe(2700);
+  });
+
+  it('reproduces the DGE table at the reference weights for 19–64', () => {
+    const spec = referenceValues.find((r) => r.nutrient === 'ENERCC')!.amount;
+    if (spec.type !== 'energy') throw new Error('energy spec');
+    const refWeight = { male: [70.8, 70.7, 68.7], female: [60.5, 60.0, 58.2] }; // DGE Referenzmaße
+    const midAge = [22, 38, 58];
+    for (const sex of ['male', 'female'] as const)
+      for (const activity of ['low', 'medium', 'high'] as const)
+        midAge.forEach((age, i) => {
+          const est = estimateEnergyNeed(sex, age, refWeight[sex][i]!, activity).kcal;
+          expect(Math.abs(est - spec[sex][activity][i]!)).toBeLessThanOrEqual(50);
+        });
+  });
+
+  it('takes the lower estimate when sex is not set', () => {
+    expect(estimateEnergyNeed(undefined, 40, 70, 'medium').kcal).toBe(estimateEnergyNeed('female', 40, 70, 'medium').kcal);
+  });
+
+  it('lets an own target replace the estimate, including energy-percent amounts', () => {
+    const own = resolveRequirements({ sex: 'male', birthYear: 1996, weightKg: 80, energyTargetKcal: 2000 }, 2026);
+    expect(own.energy).toMatchObject({ kcal: 2000, basis: 'own', guideKcal: 2700 });
+    expect(own.energy.estimate?.kcal).toBe(2880);
+    expect(own.byNutrient.get('ENERCC')!.recommended).toBe(2000);
+    // Saturated fat: at most 10 % of energy, 9 kcal/g.
+    expect(own.byNutrient.get('FASAT')!.recommended).toBeCloseTo(2000 * 0.1 / 9);
   });
 });
 

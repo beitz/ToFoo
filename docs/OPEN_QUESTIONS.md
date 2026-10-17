@@ -49,6 +49,7 @@ Still open:
 - [ ] **Not reachable for re-checking** (paper bodies, not abstracts): the vitamin C points at 500 / 1250 mg (Levine 1996), the Monsen formula and the Holick MED yield.
 - [ ] **Salt 6 g and saturated fat 10 %:** from DGE position papers, not the reference value tables; not re-checked.
 - [ ] **No USDA retention factors** for vitamins D, E, K, pantothenic acid and biotin: no cooking loss is modelled for them.
+- [ ] **Energy equation coefficients (Müller et al. 2004):** taken from secondary sources because the original article was not reachable; one secondary source prints the intercept as 3.31 MJ instead of 3.21. 3.21 reproduces the DGE energy table for 19–64 within rounding, 3.31 overshoots it, so 3.21 is used. Check against the original paper when it is reachable. Height is not used; the BMI-specific Müller equations (better for underweight) are not used either. 2026-10-17.
 
 ## Model assumptions (no good source yet)
 
