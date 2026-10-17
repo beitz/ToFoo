@@ -16,7 +16,7 @@ Questions and assumptions that need an answer or a better source. Each model val
 
 - [ ] **Tank vs rolling average.** Proposed tanks: B12, vitamin A, vitamin D, iron, folate, iodine. Zinc is a rolling average (no mobilisable store). Everything else is rolling: 7-day window for energy, macronutrients, amino acids, B vitamins, sodium, potassium; 14-day window for vitamins C/E/K, calcium, magnesium, phosphorus, trace elements, essential fatty acids.
 - [ ] **Default visible nutrients:** all (as in the spec). Chromium has weak evidence and might be hidden by default.
-- [ ] **Status thresholds:** tanks low < 20 %, getting low < 40 %; rolling averages low < 70 %, getting low < 90 % of the requirement.
+- [ ] **Status thresholds:** tanks low < 20 %, getting low < 40 %; rolling averages and slow-store balances low < 70 %, getting low < 90 % of the requirement.
 - [ ] **Day status:** a past day with at least one entry counts as "logged" unless marked "partly logged". Today counts only once something is logged or it is marked fasted.
 
 ## Source check (2026-10-15)
@@ -63,6 +63,7 @@ Still open:
 - [ ] **Iron adaptation:** measured for total dietary iron, applied to non-heme only; heme absorption is not adapted. The low scenario (half the effect) is an assumption.
 - [ ] **Uncertainty widths:** amounts ±5 % (A), ±25 % (B), ±50 % (C); BLS values ±0–30 % by provenance.
 - [ ] **"Average" starting level** = tanks 60 % full.
+- [ ] **Slow-store cut-off:** stores holding ≥ 100 days of the absorbed need are headlined by their 14-day balance, not their fill level (iron, B12, vitamin A, folate, iodine; not vitamin D).
 - [ ] **Vitamin C** absorption at 3000 mg (extrapolated beyond Levine 1996).
 - [ ] **Vitamin K typical absorption** (0.5): EFSA says an average cannot be estimated; only affects the absorbed amount shown.
 

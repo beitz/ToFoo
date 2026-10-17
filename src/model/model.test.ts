@@ -204,7 +204,10 @@ describe('tea, coffee and iron status', () => {
     const entries = d.map((day) => manual(`fe-${day}`, day, 12, { FE: 12 }));
     const res = simulate(baseInput(d, entries, { startingLevel: 'empty' }));
     const reference = res.meals.reduce((a, m) => a + (m.absorbed.FE ?? 0), 0) / d.length;
-    expect(res.nutrients.get('FE')!.averageAbsorbed).toBeGreaterThan(reference * 2);
+    const fe = res.nutrients.get('FE')!;
+    // The store fills with adapted absorption; the daily balance stays at reference stores.
+    expect(fe.netPerDay! + male30.byNutrient.get('FE')!.physiological).toBeGreaterThan(reference * 2);
+    expect(fe.averageAbsorbed).toBeCloseTo(reference, 6);
   });
 });
 
@@ -267,7 +270,7 @@ describe('simulation', () => {
     const spread = d.flatMap((day, i) => [7, 11, 15, 19].map((h) => manual(`s${i}-${h}`, day, h, { VITB12: 2 })));
     const a = simulate(baseInput(d, omad, { startingLevel: 'empty' })).nutrients.get('VITB12')!;
     const b = simulate(baseInput(d, spread, { startingLevel: 'empty' })).nutrients.get('VITB12')!;
-    expect(a.kind).toBe('tank');
+    expect(a.kind).toBe('balance');
     expect(a.level!.central).toBeLessThan(b.level!.central);
   });
 
@@ -279,17 +282,30 @@ describe('simulation', () => {
     const fasting = simulate(baseInput(d, [], { ...imputing, dayStatus: fasted })).nutrients.get('FE')!;
     const unlogged = simulate(baseInput(d, [], imputing)).nutrients.get('FE')!;
     const start = startingLevels.averageFraction.value;
-    expect(fasting.value.central).toBeLessThan(start);
-    expect(unlogged.value.central).toBeCloseTo(start, 2); // neutral imputation
-    expect(unlogged.value.low).toBeLessThan(unlogged.value.central); // but the range widens
+    expect(fasting.store!.central).toBeLessThan(start);
+    expect(unlogged.store!.central).toBeCloseTo(start, 2); // neutral imputation
+    expect(unlogged.store!.low).toBeLessThan(unlogged.store!.central); // but the range widens
   });
 
-  it('an empty iron store on a good diet reads low but filling, with the time to the fine zone', () => {
+  it('slow stores are headlined by their daily balance; vitamin D stays a tank', () => {
+    const d = days('2026-10-15', 3);
+    // With vitamin C, 16 mg non-heme iron is absorbed at the Monsen maximum (8 %): above a man's need.
+    const entries = d.map((day, i) => manual(`f${i}`, day, 12, { FE: 16, VITC: 200, VITD: 1 }));
+    const res = simulate(baseInput(d, entries, { startingLevel: 'empty' })).nutrients;
+    const fe = res.get('FE')!;
+    expect(fe.kind).toBe('balance');
+    expect(fe.value.central).toBeCloseTo(fe.averageAbsorbed / male30.byNutrient.get('FE')!.physiological, 6);
+    expect(fe.status).toBe('fine'); // the diet covers the need, though the store started empty
+    expect(fe.store!.central).toBeLessThan(0.01);
+    expect(fe.storeHistory!.length).toBe(3);
+    expect(res.get('VITD')!.kind).toBe('tank');
+  });
+
+  it('an empty iron store on a good diet is filling, with the time to the fine zone', () => {
     const d = days('2026-10-15', 3);
     const entries = d.map((day, i) => manual(`f${i}`, day, 12, { FE: 16 }));
     const res = simulate(baseInput(d, entries, { startingLevel: 'empty' })).nutrients.get('FE')!;
-    expect(res.status).toBe('low');
-    expect(res.value.central).toBeGreaterThan(0);
+    expect(res.store!.central).toBeGreaterThan(0);
     expect(res.netPerDay).toBeGreaterThan(0);
     const trend = tankTrend(res);
     expect(trend?.direction).toBe('filling');
@@ -309,8 +325,8 @@ describe('simulation', () => {
     const d = days('2026-01-01', 10);
     const entries = d.map((day, i) => manual(`f${i}`, day, 12, { FOL: 100_000 }));
     const res = simulate(baseInput(d, entries, { startingLevel: 'average' })).nutrients.get('FOL')!;
-    expect(res.value.central).toBeLessThanOrEqual(1);
-    expect(res.value.central).toBeGreaterThan(0.9);
+    expect(res.store!.central).toBeLessThanOrEqual(1);
+    expect(res.store!.central).toBeGreaterThan(0.9);
   });
 
   it('flags supplements above the magnesium upper limit, but not magnesium from food', () => {
@@ -371,8 +387,8 @@ describe('simulation', () => {
 
     // Tanks can't skip a day: a left-out day drains like a filled-in one, not like a fast.
     const fe = (dayStatus: SimulationInput['dayStatus']) => simulate(baseInput(d, entries, { dayStatus })).nutrients.get('FE')!;
-    expect(fe({ [d[3]!]: 'excluded' }).value).toEqual(fe({ [d[3]!]: 'filled' }).value);
-    expect(fe({ [d[3]!]: 'excluded' }).value.central).toBeGreaterThan(fe({}).value.central);
+    expect(fe({ [d[3]!]: 'excluded' }).store).toEqual(fe({ [d[3]!]: 'filled' }).store);
+    expect(fe({ [d[3]!]: 'excluded' }).store!.central).toBeGreaterThan(fe({}).store!.central);
   });
 
   it('without imputation: today alone, still empty, has no data yet', () => {

@@ -89,7 +89,7 @@ export function Gauge({ result: r, showRange, advanced, onClick, defaultBased }:
   const label = noData ? '–' : gaugeLabel(r);
   const range =
     showRange && r.kind !== 'info' && !noData && hi - lo > 0.02 ? `${fmtPercent(r.value.low)}–${fmtPercent(r.value.high)}` : null;
-  const kindLabel = r.kind === 'tank' ? t('gauge.kindTank') : r.kind === 'info' ? t('gauge.kindInfo') : t('gauge.kindRolling', { days: r.windowDays });
+  const kindLabel = r.kind === 'tank' ? t('gauge.kindTank') : r.kind === 'balance' ? t('gauge.kindBalance', { days: r.windowDays }) : r.kind === 'info' ? t('gauge.kindInfo') : t('gauge.kindRolling', { days: r.windowDays });
 
   return (
     <button className={`gauge gauge-${r.kind} gauge-${r.status}`} onClick={onClick} aria-label={`${def?.name ?? r.id}: ${label}`}>

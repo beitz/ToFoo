@@ -85,6 +85,8 @@ export function NutrientPage({ id }: { id: string }) {
         <p className="small">
           {r.kind === 'tank'
             ? t('nutrient.tankExplain')
+            : r.kind === 'balance'
+              ? t('nutrient.balanceExplain', { days: r.windowDays })
             : r.kind === 'limit'
               ? t('nutrient.limitExplain', { days: r.windowDays })
               : r.kind === 'info'
@@ -110,6 +112,35 @@ export function NutrientPage({ id }: { id: string }) {
           </p>
         )}
       </div>
+
+      {r.kind === 'balance' && r.store && req && (
+        <>
+          <h2 className="section-title">{t('nutrient.storeTitle')}</h2>
+          <div className="card">
+            <p className="big-number">
+              {t('gauge.full', { pct: fmtFill(r.store.central) })}
+              {showRange && r.store.high - r.store.low > 0.02 && <span className="muted range"> ({fmtPercent(r.store.low)}–{fmtPercent(r.store.high)})</span>}
+            </p>
+            <p className="small muted">{t('nutrient.storeExplain', { start: t(`start.${d.profile.startingLevel}` as MessageKey) })}</p>
+            <TankTrendNote r={r} need={req.physiological} startedEmpty={d.profile.startingLevel === 'empty'} />
+            {id === 'FE' && isOn(d.settings.features, 'absorption') && <p className="small muted">{t('nutrient.ironReference')}</p>}
+            {r.storeHistory && r.storeHistory.length > 1 && (
+              <>
+                <LineChart
+                  points={r.storeHistory.slice(-120).map((p) => ({ ...p, low: scale(p.low), central: scale(p.central), high: scale(p.high) }))}
+                  guides={[{ value: 100, label: '100%' }, { value: statusThresholds.tank.value.gettingLow * 100, label: fmtPercent(statusThresholds.tank.value.gettingLow) }]}
+                  showRange={showRange}
+                  format={(v) => `${Math.round(v)}%`}
+                />
+                <p className="muted small">{t('nutrient.historyStore')}</p>
+              </>
+            )}
+            <p className="small">
+              <a href={href('settings', 'start')}>{t('nutrient.changeStart')}</a>
+            </p>
+          </div>
+        </>
+      )}
 
       <NutrientInfo id={id} />
 
@@ -257,8 +288,11 @@ function fmtDuration(days: number): string {
  */
 function TankTrendNote({ r, need, startedEmpty }: { r: NutrientResult; need: number; startedEmpty: boolean }) {
   const trend = tankTrend(r);
-  if (!trend || r.netPerDay === undefined || r.value.central >= 1) return null;
-  const low = r.status === 'low' || r.status === 'gettingLow';
+  const fill = r.store?.central ?? r.value.central;
+  if (!trend || r.netPerDay === undefined || fill >= 1) return null;
+  const low = fill < statusThresholds.tank.value.gettingLow;
+  // "Not because you eat too little" only holds when the diet covers the need (a tank's status is its fill level).
+  const dietCovers = r.kind === 'tank' || r.value.central >= 1;
   // Absorbed = need + net change, so the two numbers always explain the direction (vitamin D includes sun).
   const vars = { absorbed: fmtAmount(r.id, Math.max(0, need + r.netPerDay)), need: fmtAmount(r.id, need) };
   const text =
@@ -272,9 +306,15 @@ function TankTrendNote({ r, need, startedEmpty }: { r: NutrientResult; need: num
   return (
     <>
       <p className="small">{text}</p>
-      {low && startedEmpty && trend.direction === 'filling' && (
+      {low && startedEmpty && dietCovers && trend.direction === 'filling' && (
         <p className="small">
-          {t('nutrient.startedEmpty')} <a href={href('settings', 'start')}>{t('nutrient.changeStart')}</a>
+          {t('nutrient.startedEmpty')}
+          {r.kind === 'tank' && (
+            <>
+              {' '}
+              <a href={href('settings', 'start')}>{t('nutrient.changeStart')}</a>
+            </>
+          )}
         </p>
       )}
     </>

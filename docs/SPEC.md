@@ -104,6 +104,7 @@ Each meal's nutrients pass through cooking/storage losses and absorption, and la
 
 - **Tank nutrients** (store for weeks to years, e.g. B12, vitamin A, vitamin D, iron, likely folate, zinc, iodine): a level in absorbed units, filled by meals, drained by the daily absorbed requirement, capped by a capacity scaled by body weight.
 - **Rolling-average nutrients** (stored for days or not at all, e.g. vitamin C, most B vitamins, potassium, magnesium, macronutrients, fibre, essential amino acids, essential fatty acids): average absorbed intake over a configurable window (default 7 and 14 days) against the requirement.
+- **Slow stores are shown by their daily balance** (decided 2026-10-17): a store holding more than ~100 days of the absorbed need (iron, B12, vitamin A, folate, iodine; vitamin D at ~2 months stays a tank) barely moves within weeks, and its fill level mostly reflects the starting guess. Home and the status show the 14-day balance instead: absorbed (at moderate iron stores for iron) against the need, like a rolling average, so the log answers "does my diet cover this?". The store is still simulated and shown on the nutrient screen as a "Store estimate" (fill level, filling or going down, time out of the low zone, history), marked as depending on the starting level until a blood test can calibrate it.
 - Which nutrient is which, its capacity and its window live in the parameter file, each with a cited source. Claude Code researches these; it never invents them.
 
 **Scope: everything the data allows.** The model covers every nutrient the BLS provides with usable data: energy and macronutrients (protein, fat, carbohydrates, sugar, fibre), vitamins, minerals and trace elements, the essential amino acids, and essential fatty acids (omega-3 and omega-6). Which ones appear on the dashboard is a display choice (see settings), not a model limit.
@@ -140,7 +141,7 @@ A simple synthesis estimate added to the vitamin D tank, from latitude, date (se
 
 The user chooses at setup (changeable later, with a one-line pro/con each):
 
-- **Empty**: safest for someone who suspects poor intake. Big stores (iron, B12, vitamin A) then read "low" for months to years even on a good diet, so the nutrient screen says whether a store is filling or going down at the recent rate and, when it is low but filling, roughly how long until it leaves the low zone, and that the low reading comes from the empty start. A store with anything in it never reads "0 % full" (it shows "<1 %").
+- **Empty**: safest for someone who suspects poor intake. Big stores (iron, B12, vitamin A) then sit near empty for months to years even on a good diet; they are headlined by their daily balance (see "Two kinds of nutrient"), and the store estimate says whether a store is filling or going down at the recent rate and, when it is low but filling, roughly how long until it leaves the low zone, and that the low reading comes from the empty start. A store with anything in it never reads "0 % full" (it shows "<1 %").
 - **Average**: realistic for a typical diet; may be too optimistic.
 - **Custom per nutrient**: for users with an idea of their status.
 - **From blood test** (v3): most accurate, recalibrates tanks to measured values.
