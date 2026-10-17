@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type * as Beta from '@anthropic-ai/sdk/resources/beta/messages/messages';
 import type { Food } from '../foods/foodDb';
 import { buildIndex } from '../foods/search';
-import { appNote, emptyConversation, requestParams, sendMessage, type CreateMessage } from './assistant';
+import { appNote, emptyConversation, requestParams, sendMessage, textOf, type CreateMessage } from './assistant';
 import { describeFood, MAX_ITEM_GRAMS, runLookupBarcode, runSearchFoods, runSearchUsda, validateProposal, type ProductTools, type ToolContext } from './tools';
 import type { Product } from '../storage/types';
 import type { FindResult } from '../foods/findProduct';
@@ -273,6 +273,45 @@ describe('packaged products (Open Food Facts lookup on)', () => {
     expect(api.requests[0]!.tools!.map((t) => (t as { name: string }).name)).toEqual(['search_foods', 'lookup_barcode', 'propose_meal']);
     expect(JSON.stringify(api.requests[0]!.messages[0]!.content)).toContain('Barcodes the app read');
     expect(requestParams('claude-opus-5-5', []).tools!.map((t) => (t as { name: string }).name)).toEqual(['search_foods', 'propose_meal']);
+  });
+
+  it('finds a barcode by name with web search, then looks it up; carries on after a paused search', async () => {
+    const search = { type: 'server_tool_use', id: 's1', name: 'web_search', input: { query: 'Ferrero Giotto 38,7 g' } } as Beta.BetaServerToolUseBlock;
+    const found = {
+      type: 'web_search_tool_result',
+      tool_use_id: 's1',
+      content: [{ type: 'web_search_result', url: 'https://world.openfoodfacts.org/product/4008400121925/giotto-ferrero', title: 'Giotto - Ferrero - 38,7 g', encrypted_content: 'x', page_age: null }],
+    } as unknown as Beta.BetaWebSearchToolResultBlock;
+    const api = scripted(
+      reply([search], 'pause_turn'),
+      reply([found, toolUse('t1', 'lookup_barcode', { barcodes: ['4008400121925'] })], 'tool_use'),
+      reply([toolUse('t2', 'propose_meal', { summary: 'Giotto', items: [{ code: 'OFF:4008400121925', grams: 4.3, preparation: 'asListed', note: '', micros_from: 'S450000' }], assumptions: [], confidence: 'B' })], 'tool_use'),
+    );
+    const { conversation, outcome } = await sendMessage(api.create, 'claude-opus-5-5', emptyConversation(), { text: 'one ball', images: [] }, { ...ctx, products: { ...products(), webSearch: true } });
+    expect(outcome.kind === 'proposal' && outcome.proposals[0]!.items[0]!.product?.code).toBe('4008400121925');
+    const tools = api.requests[0]!.tools!;
+    expect(tools.map((t) => (t as { name: string }).name)).toEqual(['search_foods', 'lookup_barcode', 'web_search', 'propose_meal']);
+    expect(tools[2]).toMatchObject({ type: 'web_search_20250305', allowed_domains: ['openfoodfacts.org'] });
+    expect(api.requests[0]!.system).toContain('web_search');
+    // After the pause the same conversation goes back unchanged, ending with the paused search.
+    expect(api.requests[1]!.messages.at(-1)).toEqual({ role: 'assistant', content: [search] });
+    // Search blocks stay in the history, so the next request can replay them.
+    expect(JSON.stringify(conversation.messages)).toContain('web_search_tool_result');
+  });
+
+  it('offers web search only together with the lookup', () => {
+    const names = (sources: Parameters<typeof requestParams>[2]) => requestParams('claude-opus-5-5', [], sources).tools!.map((t) => (t as { name: string }).name);
+    expect(names({ off: true })).not.toContain('web_search');
+    expect(names({ webSearch: true })).not.toContain('web_search');
+    expect(names({ off: true, webSearch: true })).toContain('web_search');
+    expect(requestParams('claude-opus-5-5', [], { webSearch: true }).system).not.toContain('web_search');
+  });
+});
+
+describe('textOf', () => {
+  it('joins text split by citations, and starts a new paragraph after a tool call', () => {
+    const cited = { type: 'text', text: 'Giotto by Ferrero', citations: [] } as unknown as Beta.BetaTextBlock;
+    expect(textOf([text('Found it: '), cited, text('.'), toolUse('t', 'search_foods', {}), text(' Which size? ')])).toBe('Found it: Giotto by Ferrero.\n\nWhich size?');
   });
 });
 

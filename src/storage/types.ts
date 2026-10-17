@@ -69,7 +69,8 @@ export type FeatureKey =
   | 'backupReminder'
   | 'aiAssistant'
   | 'openFoodFacts'
-  | 'usda';
+  | 'usda'
+  | 'productWebSearch';
 
 export interface Settings extends Versioned {
   id: 'settings';

@@ -54,6 +54,17 @@ export function AssistantSettingsPage() {
         <p className="muted small">{t('ai.privacy')}</p>
       </div>
 
+      <h2 className="section-title">{t('ai.productsTitle')}</h2>
+      <div className="card">
+        <Toggle
+          checked={isOn(d.settings.features, 'productWebSearch')}
+          onChange={(v) => repo.updateSettings({ features: { ...d.settings.features, productWebSearch: v } })}
+          label={t('ai.webSearch')}
+        />
+        <p className="muted small">{t('ai.webSearchHint')}</p>
+        {!isOn(d.settings.features, 'openFoodFacts') && <p className="muted small">{t('ai.webSearchNeedsOff')}</p>}
+      </div>
+
       <h2 className="section-title">{t('ai.key')}</h2>
       <div className="card">
         {saved?.apiKey ? (

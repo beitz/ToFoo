@@ -46,7 +46,7 @@ export function makeCreate(apiKey: string): CreateMessage {
   return async (params) => (await client).beta.messages.create(params);
 }
 
-export type AiErrorKind = 'auth' | 'rateLimit' | 'overloaded' | 'network' | 'other';
+export type AiErrorKind = 'auth' | 'rateLimit' | 'overloaded' | 'network' | 'webSearchOff' | 'other';
 
 /** The SDK is already loaded when a request has failed, so importing it here costs nothing. */
 export async function classifyError(e: unknown): Promise<AiErrorKind> {
@@ -58,6 +58,8 @@ export async function classifyError(e: unknown): Promise<AiErrorKind> {
   }
   if (e instanceof Anthropic.AuthenticationError || e instanceof Anthropic.PermissionDeniedError) return 'auth';
   if (e instanceof Anthropic.RateLimitError) return 'rateLimit';
+  // An organization admin can turn web search off in the Anthropic console; requests offering it then fail.
+  if (e instanceof Anthropic.BadRequestError && /web search/i.test(e.message)) return 'webSearchOff';
   if (e instanceof Anthropic.APIConnectionError) return 'network';
   if (e instanceof Anthropic.APIError && (e.status ?? 0) >= 500) return 'overloaded';
   return 'other';
