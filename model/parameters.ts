@@ -206,7 +206,7 @@ export const nutrientParams: Record<string, NutrientParams> = {
 // ── Body stores: tank vs rolling average ────────────────────────────────────────
 
 /**
- * Tanks: long stores (weeks to years). Rolling: stored for days or not at all.
+ * Tanks: long stores (a full store covers about 2 months of need for vitamin D up to about 3 years for B12). Rolling: stored for days or not at all.
  * The tank / rolling split is a proposal (docs/OPEN_QUESTIONS.md) for the user to confirm.
  */
 export const storage: Record<string, StorageModel> = {

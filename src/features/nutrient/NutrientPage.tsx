@@ -5,6 +5,7 @@ import { t, type MessageKey } from '../../i18n';
 import { fmtAmount, fmtFill, fmtNumber, fmtPercent } from '../../lib/format';
 import { NUTRIENT_BY_ID } from '../../model/nutrients';
 import { tankTrend, type NutrientResult } from '../../model/simulate';
+import type { Range } from '../../model/paramTypes';
 import { nutrientParams, statusThresholds, storage, trendDisplay } from '../../../model/parameters';
 import { trendOf } from '../../model/trend';
 import { referenceValues } from '../../../model/reference-values';
@@ -97,6 +98,7 @@ export function NutrientPage({ id }: { id: string }) {
           </p>
         )}
         <p className="small">
+          {(r.kind === 'tank' || r.kind === 'balance') && r.storeDays && `${storeLastsText(r.storeDays)} `}
           {r.kind === 'tank'
             ? t('nutrient.tankExplain')
             : r.kind === 'balance'
@@ -287,6 +289,14 @@ function NutrientInfo({ id }: { id: string }) {
       </div>
     </>
   );
+}
+
+/** How long a full store would cover the need with nothing eaten, with its sourced range. */
+function storeLastsText(days: Range): string {
+  const low = fmtDuration(days.low);
+  const high = fmtDuration(days.high);
+  const central = fmtDuration(days.central);
+  return low === high ? t('nutrient.storeLasts', { central }) : t('nutrient.storeLastsRange', { central, low, high });
 }
 
 /** Rough duration for "about …": days, then weeks, months, years. */
