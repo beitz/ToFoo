@@ -289,6 +289,35 @@ Automatic detection (face-down phone, being at home at night) is not possible in
 
 **Insights** (decided 2026-10-17, built last, once there are a few weeks of data): "Look for patterns" asks the assistant to compare the journal with food, nutrients, sleep, activity and day statuses over a chosen period, or to answer a question ("why am I tired on Mondays?"). Same rule as for meals: the AI chooses what to compare, the app computes the numbers. The model gets tools to read journal entries and to query the data (for example, days whose journal mentions a headache against the other days: sleep length, caffeine, a food the day before), and every number in its answer comes from those tools. Delayed effects (the day before, the last week) are part of what it compares. Answers are possible patterns with their counts ("headache on 4 of the 6 days after less than 6 h sleep, 3 of 25 otherwise"), never causes or medical advice: with one person and a few weeks of data many apparent patterns are chance, so each answer says how many days it rests on. The result is a chat, so the user can dig deeper ("show me those days") or stop at the summary. Runs only when asked, with the user's Anthropic key; it sends the journal text and the summaries the model asks for to Anthropic, which the setting says plainly.
 
+## AI recipe ideas
+
+"What should I cook next?" answered by the assistant, with ideas that fit the user's gaps, habits and preferences, each with one line on why it is suggested (owner's idea, 2026-10-17; details proposed, nothing built). Optional, off by default, needs the AI assistant and the user's own Anthropic key.
+
+**Flow**:
+
+1. "Recipe ideas" on Home (next to "Foods that fill your gaps") or in the recipe book asks for a few ideas (default 3). Nothing is sent until the user taps it; the app never asks the model in the background.
+2. Each idea is a card: name, the one-line reason ("Iron and folate have been low for two weeks; one portion covers about half of both"), portions, ingredients with grams, short steps, and the app's own numbers for one portion (what it covers of the current gaps, and anything it pushes towards a limit).
+3. On a card: "Save to recipes" (it becomes a normal recipe, ready to cook as a batch), "Another idea", or keep chatting ("no oven", "faster", "with what's in the photo of my fridge"), and the assistant revises it, as it does for meals.
+
+**Same core rule as for meals**: the AI chooses dishes, ingredients and grams; it never supplies nutrient values. Ingredients must be BLS codes (or saved products and USDA foods, as in logging), checked by the app before a card is shown. The app computes each portion's nutrients from the database, with the usual retention factors for how it is cooked and stored, and shows them on the card. The reason line is grounded the same way: the model gets the numbers from a tool and may only quote them, and the app shows the coverage it computed itself next to the line, so a reason that does not match the numbers is visible. It does not claim health effects beyond "covers X % of your need".
+
+**What the model sees** (only when asked): current status per nutrient (low, getting low, enough, too much, with percentages), the recipes in the book and how often each was cooked lately, recent meals (to suggest what the user actually eats, with some variety), freezer and fridge stock, the food exclusions, and the preferences text. Tools:
+
+- `search_foods` and the other food-search tools of the assistant.
+- `rank_foods`: the app's existing "foods that fill your gaps" ranking, so ideas start from foods that really close the gaps instead of the model's memory of nutrition tables.
+- `check_recipe`: ingredients and grams in, the app's per-portion nutrients, gap coverage and limit warnings out; the model calls it before proposing and adjusts the recipe until it does what the reason line says.
+- `propose_recipe`: one idea for a card (name, reason, portions, ingredients, steps, which gaps it targets). The app rejects an idea that contains an excluded food or a code that does not exist, and sends the error back.
+
+**Preferences**: a free-text field "Cooking preferences" in the assistant settings, written by the user and sent with every request for ideas: diet, likes and dislikes, kitchen equipment, how much time and effort, budget, where they shop, the usual batch size ("one big pot, 6 portions, most of it frozen"). Food exclusions in the profile stay the hard filter, checked by the app; the text is guidance for the model, which can miss it, so it is not an allergy safeguard (the app makes no allergy-safety claims). Maybe later: "Not for me" on a card adds a short note to the preferences, so the same kind of idea does not come back.
+
+**Fits batch cooking**: by default ideas are batch recipes sized to the usual pot and storage plan, and the computed numbers include the losses of that plan (freezer portions). An idea can also be one of the user's own recipes ("cook your lentil curry again: it covers your iron gap"), which overlaps the planned "best next batch" ranking; that ranking then becomes a tool of the model rather than a separate feature.
+
+**Relation to "Foods that fill your gaps"**: proposed to keep the row, smaller, under the ideas: it works without a key, offline and at no cost, it is the ranking the model uses as a tool, and it is the only suggestion when the assistant is off. Open question for the owner: drop it once ideas exist, if it adds nothing.
+
+**Expansions, later**: improve an existing recipe ("add 100 g spinach to the curry: iron 40 % → 65 % of need"), which is the planned swap preview offered by the assistant; a snack or single side to close a gap today; ideas from a photo of the fridge or a shopping receipt; a shopping list from a saved idea (with the planned shopping list); a few ideas for the week as the weekly recap's "one suggestion for the next batch".
+
+**Cost and privacy**: one request for three ideas costs roughly as much as a logged meal (a few cents with the default model, shown in the usage display). It sends the nutrient statuses, recipe and recent food names, stock and the preferences text to Anthropic, only when the user asks, which the setting says plainly.
+
 ## Exchange format, QR codes and the Claude helper
 
 One versioned JSON format ("ToFoo exchange format") is used for QR codes, pasted entries, and backups, so every import path shares one parser and one validator.
@@ -316,6 +345,7 @@ The home screen answers "how am I doing, and what do I eat next?" at a glance, w
 2. **Nutrient gauges** (the main content): energy and macronutrients first in one row, then one gauge per visible nutrient, sorted by urgency (low and too-high first). Two layouts, switchable on the dashboard: compact (default; a dense two-column list with a thin bar per nutrient) and detailed (cards). Each gauge shows level, range and a status colour: fine / getting low / low / too high. Tank and rolling-average nutrients are visually distinct but look related. **Readable at a glance** (decided 2026-10-17): one line above the list says how to read the numbers (plain percent = share of the daily need, on average lately; "full" = a store's fill level; "of max" = share of an upper limit), and limit gauges say "of max". **Grouping switch**: by status (default; collapsible headings "Too much – eat less of these", "Low – eat more of these", "A bit low", "Enough", the last collapsed by default), by type (vitamins, minerals, protein and amino acids, fats, carbohydrates; each heading counts what needs attention, e.g. "6 low · 2 getting low") or none (one list sorted by urgency). Open and closed headings are remembered.
 3. **Foods that fill your gaps**: one horizontal row of single foods from the BLS, ranked by how many urgent gaps they close at once without pushing anything over its upper limit, respecting food exclusions. Tap a food for its nutrient profile.
 4. **Best next batch** (once the recipe book has recipes): the same ranking applied to the user's own recipes. Hidden while the book is empty.
+5. **Recipe ideas** (proposed 2026-10-17, with the assistant on): ask the assistant for a few recipes that fit the gaps and the user's preferences, each with a reason line; see AI recipe ideas.
 
 **Tap a gauge** to expand: history chart, forecast (if on), contributing foods, the wiki summary, a short explanation (what the nutrient does, what too little and too much mean, with source), and good sources from the BLS (varied: one food per BLS subgroup and main name word, e.g. one liver, one mushroom). "All foods, ranked" opens the full list: per portion or per 100 g, filter by name and food group, optional "one per kind of food", exclusions applied.
 
@@ -387,6 +417,7 @@ Optional features are modules with an on/off switch, so the app can be tuned bet
 | Sleep | Off | Sleep and wake times: buttons, shortcuts, morning question |
 | Activity | Off | Simple activity log; outdoor activity feeds the sun estimate |
 | Insights | Off | With the assistant on: look for patterns across journal, food, sleep and activity (sends the journal text to Anthropic) |
+| Recipe ideas | Off | With the assistant on: recipe suggestions for your gaps and preferences (sends nutrient statuses, recipe and food names, and your preferences text to Anthropic when you ask) |
 
 Settings also hold the profile, starting-level choice, salt defaults, meal window, rolling-average window, and backup options. Features are implemented behind one feature-flag module so new ones get a toggle by default.
 
@@ -402,7 +433,7 @@ All personal data stays on the phone in IndexedDB; a one-tap export file is the 
 - **Schema versioning**: every stored record has a schema version; migrations run on app start and are unit-tested.
 - **Backup**: "Export everything" writes one JSON file in the exchange format (`type: backup`) via the Android share sheet or download. "Import backup" restores it with a preview. Optional reminder when the last backup is older than N days (default 14).
 - **Model is recomputable**: tank levels are derived from the log and parameters, not stored as truth, so a parameter update or bug fix recalculates history correctly. Cache results for speed.
-- **Privacy**: no analytics, no third-party requests in v1 except loading the app itself. Online features are opt-in and clearly marked: the Open Food Facts lookup sends only the barcode; USDA FoodData Central only the search words. The AI assistant is opt-in, and sends the photos and messages of an assistant conversation (plus the matching BLS search results) to Anthropic, and nothing else; its product web searches run at Anthropic, limited to openfoodfacts.org. Insights (opt-in) send journal entries and data summaries to Anthropic only when the user asks for an analysis.
+- **Privacy**: no analytics, no third-party requests in v1 except loading the app itself. Online features are opt-in and clearly marked: the Open Food Facts lookup sends only the barcode; USDA FoodData Central only the search words. The AI assistant is opt-in, and sends the photos and messages of an assistant conversation (plus the matching BLS search results) to Anthropic, and nothing else; its product web searches run at Anthropic, limited to openfoodfacts.org. Insights (opt-in) send journal entries and data summaries to Anthropic only when the user asks for an analysis. Recipe ideas (opt-in) send nutrient statuses, recipe and recent food names, stock and the preferences text to Anthropic only when the user asks for ideas.
 - **CSV export** (later, nice to have): daily intake per nutrient and the diary as CSV, for analysis in Excel. The JSON backup remains the backup.
 - **Phone health data** (later, low priority): the phone already tracks things like weight, activity, steps and (with bedtime or sleep detection, or a watch) sleep, but a PWA in Chrome cannot read Health Connect. Options to look at: importing a Health Connect / Google Fit export file, or a small native companion.
 - **Secrets**: any future API key is entered in the app and stored only on the device, never in the repo.
@@ -463,6 +494,11 @@ v1 is the smallest app that is useful every day; each later version adds to the 
 - [ ] Sleep: "Going to sleep" / "I'm up" buttons and shortcuts, morning question, assistant
 - [ ] Activity: simple log (what, when, how long, how hard, outside); outdoor time feeds the sun estimate
 - [ ] Insights: the assistant looks for patterns across journal, food, sleep and activity, numbers computed by the app
+
+**AI recipe ideas** (owner's idea 2026-10-17; not ordered against the journal work yet):
+
+- [ ] Recipe ideas from the assistant: cards with a reason line and the app's own portion numbers, save to recipes; cooking preferences text; exclusions as a hard filter
+- [ ] Later: improve an existing recipe, a snack for today, ideas from a fridge photo, a shopping list from an idea
 
 **Later, no version yet**:
 

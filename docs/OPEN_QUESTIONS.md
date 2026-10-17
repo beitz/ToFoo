@@ -19,6 +19,8 @@ Questions and assumptions that need an answer or a better source. Each model val
 - [ ] **Status thresholds:** tanks low < 20 %, getting low < 40 %; rolling averages and slow-store balances low < 70 %, getting low < 90 % of the requirement.
 - [ ] **Day status:** a past day with at least one entry counts as "logged" unless marked "partly logged". Today counts only once something is logged or it is marked fasted.
 
+- [ ] **Recipe ideas vs "Foods that fill your gaps"** (2026-10-17): proposed to keep the food row, smaller, under the AI recipe ideas (no key, offline, free, and the model's ranking tool). Alternative: drop it once ideas exist.
+
 ## Source check (2026-10-15)
 
 With full internet access, the values were compared with the primary sources: the DGE reference value pages (all nutrients, 3rd edition 2025, plus erratum 1/2026), the EFSA UL overview (version 11, Aug 2025), PubMed abstracts of the cited studies, the IOM Dietary Reference Intakes (full text) and the USDA retention data file.
