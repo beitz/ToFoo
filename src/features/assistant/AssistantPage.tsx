@@ -274,8 +274,11 @@ function Chat({ apiKey, model, day }: { apiKey: string; model: AiModel; day: str
             placeholder={t('ai.placeholder')}
             aria-label={t('ai.placeholder')}
             onChange={(e) => setText(e.target.value)}
+            enterKeyHint="enter"
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
+              // On a phone keyboard Enter is the only way to start a new line, so only the send
+              // button sends there; with a real keyboard Enter sends and Shift+Enter breaks the line.
+              if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing && !touchKeyboard()) {
                 e.preventDefault();
                 void send();
               }
@@ -288,6 +291,11 @@ function Chat({ apiKey, model, day }: { apiKey: string; model: AiModel; day: str
       </div>
     </>
   );
+}
+
+/** A touch screen without a fine pointer: the keyboard is on screen. */
+function touchKeyboard(): boolean {
+  return window.matchMedia?.('(pointer: coarse)').matches ?? false;
 }
 
 /** What this chat has cost so far, from the token counts the API reports (an estimate at list prices). */
