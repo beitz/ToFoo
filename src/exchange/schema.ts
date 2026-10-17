@@ -20,7 +20,9 @@ const blsRef = z.object({ source: z.literal('BLS'), version: z.string(), code: z
 const customRef = z.object({ source: z.literal('custom'), id: z.string() });
 const barcode = z.string().regex(/^\d{4,14}$/, 'expected a barcode (4 to 14 digits)');
 const offRef = z.object({ source: z.literal('OFF'), code: barcode });
-const foodRef = z.discriminatedUnion('source', [blsRef, customRef, offRef]);
+const fdcId = z.string().regex(/^\d{1,10}$/, 'expected a FoodData Central id (digits)');
+const usdaRef = z.object({ source: z.literal('USDA'), code: fdcId });
+const foodRef = z.discriminatedUnion('source', [blsRef, customRef, offRef, usdaRef]);
 
 const plan = z.object({ fresh: z.number().int().nonnegative(), fridge: z.number().int().nonnegative(), freezer: z.number().int().nonnegative().nullable() });
 const planResolved = z.object({ fresh: z.number().int().nonnegative(), fridge: z.number().int().nonnegative(), freezer: z.number().int().nonnegative() });
@@ -126,20 +128,21 @@ export const productSchema = z
   .object({
     id: z.string(),
     ...versioned,
-    source: z.literal('OFF'),
-    code: barcode,
+    source: z.enum(['OFF', 'USDA']),
+    code: z.string().regex(/^\d{1,14}$/, 'expected a barcode (Open Food Facts) or a FoodData Central id (USDA)'),
+    usdaType: z.enum(['Foundation', 'SR Legacy', 'Survey (FNDDS)', 'Branded']).optional().describe('USDA only: the FoodData Central data type'),
     name: z.string().min(1),
     brand: z.string().optional(),
     quantity: z.string().optional(),
     serving: z.object({ label: z.string(), grams: z.number().positive() }).optional(),
-    per100: nutrients.describe('Label values per 100 g (per 100 ml if perMl) by BLS component code, in BLS units. A nutrient not on the label is absent.'),
+    per100: nutrients.describe('Values per 100 g (per 100 ml if perMl) by BLS component code, in BLS units: label values, or USDA database values for USDA generic foods. A nutrient without a value is absent.'),
     perMl: z.boolean().optional(),
     categories: z.array(z.string()),
     lastModified: z.number().optional(),
-    match: z.object({ version: z.string(), code: blsRef.shape.code }).optional().describe('BLS food that supplies the nutrients the label lacks'),
+    match: z.object({ version: z.string(), code: blsRef.shape.code }).optional().describe('BLS food that supplies the nutrients the source lacks'),
     fetchedAt: z.number(),
   })
-  .describe('A packaged product from Open Food Facts (ODbL), as fetched');
+  .describe('A food from an online database, as fetched: a packaged product from Open Food Facts (ODbL) or a food from USDA FoodData Central (public domain)');
 
 export const dayStatusSchema = z.object({ day, ...versioned, status: z.enum(['logged', 'partial', 'fasted']) });
 export const fastSchema = z.object({ id: z.string(), ...versioned, startDay: day, endDay: day.optional() });

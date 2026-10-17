@@ -15,6 +15,7 @@ const snapshot: Snapshot = {
     { id: '1', schemaVersion: 1, time: 1, day: '2026-10-15', confidence: 'A', label: 'Hafer', kind: 'food', ref: { source: 'BLS', version: '4.0', code: 'C133000' }, grams: 60.5, preparation: 'asListed' },
     { id: '2', schemaVersion: 1, time: 2, day: '2026-10-15', confidence: 'C', label: 'Tea', kind: 'drink', drink: 'tea' },
     { id: '3', schemaVersion: 1, time: 3, day: '2026-10-15', confidence: 'A', label: 'Giotto', kind: 'food', ref: { source: 'OFF', code: '8000500319475' }, grams: 4.3, preparation: 'asListed' },
+    { id: '4', schemaVersion: 1, time: 4, day: '2026-10-15', confidence: 'C', label: 'Kimchi', kind: 'food', ref: { source: 'USDA', code: '170392' }, grams: 50, preparation: 'asListed' },
   ],
   customFoods: [],
   dayStatus: [{ day: '2026-10-14', status: 'fasted', schemaVersion: 1 }],
@@ -33,6 +34,18 @@ const snapshot: Snapshot = {
       match: { version: '4.0', code: 'S610000' },
       fetchedAt: 1,
     },
+    {
+      id: 'USDA:170392',
+      schemaVersion: 1,
+      source: 'USDA',
+      usdaType: 'SR Legacy',
+      code: '170392',
+      name: 'Cabbage, kimchi',
+      serving: { label: '1 cup', grams: 150 },
+      per100: { ENERCC: 15, NA: 498, VITB6: 213 },
+      categories: ['Vegetables and Vegetable Products', 'Cabbage'],
+      fetchedAt: 2,
+    },
   ],
 };
 
@@ -43,7 +56,7 @@ describe('exchange format', () => {
     expect(parsed.ok).toBe(true);
     if (parsed.ok && parsed.value.type === 'backup') {
       expect(parsed.value.data).toEqual(snapshot);
-      expect(backupSummary(parsed.value)[0]).toEqual(['Log entries', 3]);
+      expect(backupSummary(parsed.value)[0]).toEqual(['Log entries', 4]);
     }
   });
 

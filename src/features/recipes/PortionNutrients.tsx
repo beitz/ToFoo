@@ -24,7 +24,7 @@ export function PortionNutrients({ recipe, storage = 'fresh' }: { recipe: Recipe
       remaining: { fresh: 1, fridge: 0, freezer: 0 },
       corrections: [],
     };
-    const ctx = { foods: d.foods, products: d.productsByCode, batches: new Map(), customFoods: new Map(), salt: recipe.saltOverride ?? d.profile.salt };
+    const ctx = { foods: d.foods, products: d.productsById, batches: new Map(), customFoods: new Map(), salt: recipe.saltOverride ?? d.profile.salt };
     const parts = batchParts(batch, 1, storage, ctx);
     const res = entryIntake({ id: 'p', label: recipe.name, time: 0, dayKey: d.today, confidence: 'A', isSupplement: false, parts }, 'central', { retention: true });
     return NUTRIENTS.map((n) => {
@@ -33,7 +33,7 @@ export function PortionNutrients({ recipe, storage = 'fresh' }: { recipe: Recipe
       const pct = req && !req.limitOnly && req.recommended > 0 ? amount / req.recommended : undefined;
       return { id: n.id, name: n.name, amount, pct, missing: res.missing.includes(n.id) };
     });
-  }, [recipe, storage, d.foods, d.productsByCode, d.profile.salt, d.requirements, d.today]);
+  }, [recipe, storage, d.foods, d.productsById, d.profile.salt, d.requirements, d.today]);
   const sorted = [...rows].sort((a, b) => (b.pct ?? -1) - (a.pct ?? -1));
   const shown = all ? rows : sorted.filter((r) => r.pct !== undefined).slice(0, 10);
   const energy = rows.find((r) => r.id === 'ENERCC');

@@ -40,6 +40,18 @@ export function AboutPage() {
         </a>
       </p>
 
+      <h2>{t('about.usdaHeading')}</h2>
+      <p>
+        {t('about.usda')}{' '}
+        <a href="https://fdc.nal.usda.gov" target="_blank" rel="noreferrer">
+          fdc.nal.usda.gov
+        </a>
+        {' · '}
+        <a href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank" rel="noreferrer">
+          CC0 1.0
+        </a>
+      </p>
+
       <h2>{t('about.modelHeading')}</h2>
       <p>{t('about.model')}</p>
 

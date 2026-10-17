@@ -1,6 +1,6 @@
 /**
- * System prompt and tool definitions for the AI assistant, in two fixed variants (with and without
- * the Open Food Facts lookup), each kept stable so prompt caching works.
+ * System prompt and tool definitions for the AI assistant, in fixed variants (with or without the
+ * Open Food Facts lookup and USDA), each kept stable so prompt caching works.
  */
 import type { BetaTool } from '@anthropic-ai/sdk/resources/beta/messages/messages';
 import { PREPARATIONS } from './tools';
@@ -9,15 +9,25 @@ const BRANDED_BLS_ONLY = `- Branded or unknown products: choose the closest gene
 
 const BRANDED_WITH_PRODUCTS = `- Packaged products can be looked up by barcode in Open Food Facts with lookup_barcode, which returns the label values. Barcodes the app read from the user's photos are given to you in the message; you may also read the digits printed under a barcode in a photo, or the user may type them. Products the user logged before are also listed by search_foods, with codes like OFF:4008400121925. Use the product's OFF: code in propose_meal and set micros_from to the BLS code of the most similar generic food (from search_foods; a filled hazelnut praline for a Giotto, for example), which supplies the vitamins and minerals the label lacks. If the product already has a similar food chosen by the user, micros_from can be empty. Do not guess barcodes. When there is no barcode or the product is not found, choose the closest generic BLS food instead. Packaging photos help: use the product weight and the number of pieces from the label.`;
 
-function systemPrompt(withProducts: boolean): string {
-  return `You help the user log what they ate in ToFoo, a personal nutrition diary. The user lives in Germany. The food database is the German Bundeslebensmittelschlüssel (BLS 4.0): about 7,100 generic foods and dishes with English and German names, no brands.${withProducts ? ' Packaged products can also be looked up by barcode in Open Food Facts.' : ''}
+const USDA = `- When no BLS food fits a single food or ingredient well (foods common outside Germany, a specific variety), search USDA FoodData Central with search_usda, in English. Its generic foods (branded: false; codes like USDA:168462) have their own full nutrient data: use the USDA: code in propose_meal and set micros_from to the BLS code of the most similar food if one is close (it fills the few gaps, such as iodine), else leave it empty. For a US packaged product, search with branded: true; micros_from is then required, as for a label. Prefer a fitting BLS food over USDA, and split mixed dishes into BLS ingredients rather than taking a USDA dish, unless the USDA dish matches closely. USDA foods the user logged before are also listed by search_foods. Each USDA search is an online request, so search only when the BLS has nothing good.`;
+
+export interface PromptSources {
+  /** Open Food Facts barcode lookup on. */
+  off?: boolean;
+  /** USDA FoodData Central on. */
+  usda?: boolean;
+}
+
+function systemPrompt({ off = false, usda = false }: PromptSources): string {
+  const extra = [off && ' Packaged products can also be looked up by barcode in Open Food Facts.', usda && ' Foods the BLS lacks can be searched in USDA FoodData Central.'].filter(Boolean).join('');
+  return `You help the user log what they ate in ToFoo, a personal nutrition diary. The user lives in Germany. The food database is the German Bundeslebensmittelschlüssel (BLS 4.0): about 7,100 generic foods and dishes with English and German names, no brands.${extra}
 
 Your job: work out which foods the user ate and how many grams of each, then call propose_meal. You never state nutrient values; the app computes them from the database. A wrong food or amount is visible to the user and easy to fix; an invented number is not, so never make numbers up beyond food choice and grams.
 
 How to work:
 - Find foods with search_foods. Search short, generic terms, in English and German (e.g. ["milk roll", "Milchbrötchen"]); send several queries in one call. Only use codes that search_foods returned.
-${withProducts ? BRANDED_WITH_PRODUCTS : BRANDED_BLS_ONLY}
-- Mixed dishes (restaurant meals, a hotpot, a bowl): use a matching BLS dish if there is one, otherwise split it into ingredients with estimated grams. Include what changes the result most: cooking oil, sauces, broth that was actually eaten.
+${off ? BRANDED_WITH_PRODUCTS : BRANDED_BLS_ONLY}
+${usda ? `${USDA}\n` : ''}- Mixed dishes (restaurant meals, a hotpot, a bowl): use a matching BLS dish if there is one, otherwise split it into ingredients with estimated grams. Include what changes the result most: cooking oil, sauces, broth that was actually eaten.
 - Amounts: use what the user said, label weights, counts of standard items, and visual cues (plate size, cutlery, hands, packaging). Think about the portion one person ate, not the whole shared dish.
 - Ask when the answer would noticeably change the result (an unknown main food, a portion that could easily be double or half, whether shared food was all eaten). Ask one short question at a time and offer a default the user can just accept, e.g. "About one bowl, roughly 400 ml?". Do not ask about details that barely matter. If a clearer photo or a photo of the packaging would help, say so. If the user cannot know, estimate and record the assumption.
 - Several meals at once: the user may send many photos from the past days plus a note, to log everything in one go. The app puts a line before each photo with its number and capture time. Group the photos into meals by time and content: photos minutes apart of the same table are one meal; the same food at different times (yogurt in the morning and in the evening) is two. Also include meals the user only describes in words. Before proposing, ask everything that matters in one message, as a short numbered list with a default for each, and say how you grouped the photos (e.g. "Photos 2–5: Korean BBQ, Thu 19:40"). Then propose all meals in one response, one propose_meal call per meal.
@@ -30,8 +40,39 @@ ${withProducts ? BRANDED_WITH_PRODUCTS : BRANDED_BLS_ONLY}
 Style: brief, friendly, plain text (no headings or tables). Answer in the language the user writes in.`;
 }
 
-export const SYSTEM_PROMPT = systemPrompt(false);
-export const SYSTEM_PROMPT_WITH_PRODUCTS = systemPrompt(true);
+const key = ({ off = false, usda = false }: PromptSources) => `${off ? 1 : 0}${usda ? 1 : 0}`;
+const prompts = new Map<string, string>();
+const toolSets = new Map<string, BetaTool[]>();
+
+/** The system prompt for these sources (the same string every time, for prompt caching). */
+export function systemPromptFor(sources: PromptSources = {}): string {
+  const k = key(sources);
+  if (!prompts.has(k)) prompts.set(k, systemPrompt(sources));
+  return prompts.get(k)!;
+}
+
+/** The tool definitions for these sources (the same objects every time). */
+export function toolsFor(sources: PromptSources = {}): BetaTool[] {
+  const k = key(sources);
+  if (!toolSets.has(k)) toolSets.set(k, tools(sources));
+  return toolSets.get(k)!;
+}
+
+const SEARCH_USDA: BetaTool = {
+  name: 'search_usda',
+  description:
+    'Search USDA FoodData Central (an online request; English words only). branded: false searches generic foods (full nutrient data), true searches US packaged products (label values only). Each query returns up to 8 foods as "USDA:id | name | USDA data type | serving | energy and macros per 100 g | similar BLS food if the user chose one".',
+  strict: true,
+  input_schema: {
+    type: 'object',
+    properties: {
+      queries: { type: 'array', items: { type: 'string' }, description: 'Up to 3 search terms, e.g. ["gochujang"].' },
+      branded: { type: 'boolean', description: 'true for US packaged products, false for generic foods.' },
+    },
+    required: ['queries', 'branded'],
+    additionalProperties: false,
+  },
+};
 
 const LOOKUP_BARCODE: BetaTool = {
   name: 'lookup_barcode',
@@ -48,16 +89,18 @@ const LOOKUP_BARCODE: BetaTool = {
   },
 };
 
-function tools(withProducts: boolean): BetaTool[] {
+function tools({ off = false, usda = false }: PromptSources): BetaTool[] {
+  const withProducts = off || usda;
+  const codeHelp = off && usda ? 'BLS code from search_foods, or an OFF: or USDA: code from lookup_barcode, search_usda or search_foods.' : off ? 'BLS code from search_foods, or OFF: product code from lookup_barcode or search_foods.' : usda ? 'BLS code from search_foods, or USDA: code from search_usda or search_foods.' : 'BLS code from search_foods.';
   const items = {
     type: 'object',
     properties: {
-      code: { type: 'string', description: withProducts ? 'BLS code from search_foods, or OFF: product code from lookup_barcode or search_foods.' : 'BLS code from search_foods.' },
+      code: { type: 'string', description: codeHelp },
       grams: { type: 'number', description: 'Grams eaten (for drinks, ml ≈ g).' },
       preparation: { type: 'string', enum: [...PREPARATIONS] },
       note: { type: 'string', description: 'What this item stands for, if not obvious from the food name (e.g. "Giotto, 1 ball"); empty otherwise.' },
       ...(withProducts
-        ? { micros_from: { type: 'string', description: 'For OFF: products only: BLS code of the most similar generic food, for the nutrients the label lacks. Empty for BLS foods.' } }
+        ? { micros_from: { type: 'string', description: `For ${off && usda ? 'OFF: and USDA: codes' : off ? 'OFF: products' : 'USDA: foods'} only: BLS code of the most similar generic food, for the nutrients the source lacks${usda ? ' (may be empty for USDA generic foods)' : ''}. Empty for BLS foods.` } }
         : {}),
     },
     required: ['code', 'grams', 'preparation', 'note', ...(withProducts ? ['micros_from'] : [])],
@@ -65,7 +108,8 @@ function tools(withProducts: boolean): BetaTool[] {
   };
   return [
     SEARCH_FOODS,
-    ...(withProducts ? [LOOKUP_BARCODE] : []),
+    ...(off ? [LOOKUP_BARCODE] : []),
+    ...(usda ? [SEARCH_USDA] : []),
     {
       name: 'propose_meal',
       description:
@@ -103,5 +147,3 @@ const SEARCH_FOODS: BetaTool = {
   },
 };
 
-export const TOOLS = tools(false);
-export const TOOLS_WITH_PRODUCTS = tools(true);

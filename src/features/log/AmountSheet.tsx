@@ -3,7 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { useData } from '../../app/data';
 import { t } from '../../i18n';
 import type { Food } from '../../foods/foodDb';
-import { productFood, productLabel } from '../../foods/products';
+import { productFood, productLabel, productRef } from '../../foods/products';
 import { fmtNumber } from '../../lib/format';
 import { dayKey } from '../../lib/dates';
 import type { Preparation } from '../../model/paramTypes';
@@ -24,7 +24,7 @@ export interface PortionHelper {
 
 type Target = { food: Food; product?: undefined } | { product: Product; food?: undefined };
 
-/** Pick an amount of a BLS food or an Open Food Facts product and log it. */
+/** Pick an amount of a BLS food or a product (Open Food Facts or USDA) and log it. */
 export function AmountSheet({ day, time: initialTime, onClose, onAdded, ...target }: Target & { day: string; time: number; onClose: () => void; onAdded: (e: LogEntry) => void }) {
   const d = useData();
   const product = target.product;
@@ -56,7 +56,7 @@ export function AmountSheet({ day, time: initialTime, onClose, onAdded, ...targe
     if (draft) {
       await repo.saveProduct(draft);
       await repo.setProductMatch(draft.id, draft.match ?? null);
-      ref = { source: 'OFF', code: draft.code };
+      ref = productRef(draft);
     }
     const entry = await repo.addLog({ kind: 'food', ref, grams, preparation: prep, time, day: time ? dayKey(new Date(time)) : day, confidence, label: name });
     await repo.setMeta(`lastGrams:${food.code}`, grams);
@@ -71,7 +71,7 @@ export function AmountSheet({ day, time: initialTime, onClose, onAdded, ...targe
 
   return (
     <Sheet title={name} onClose={onClose}>
-      <FavouriteButton foodRef={draft ? { source: 'OFF', code: draft.code } : { source: 'BLS', version: d.foods.version, code: food.code }} />
+      <FavouriteButton foodRef={draft ? productRef(draft) : { source: 'BLS', version: d.foods.version, code: food.code }} />
       {draft ? (
         <ProductInfo product={draft} />
       ) : (

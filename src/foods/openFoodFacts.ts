@@ -81,14 +81,14 @@ export const NUTRIMENT_IDS: Readonly<Record<string, string>> = {
 const FROM_GRAMS: Record<string, number> = { g: 1, mg: 1e3, µg: 1e6 };
 
 /** kJ per kcal (thermochemical calorie), for labels that give only kJ. */
-const KJ_PER_KCAL = 4.184;
+export const KJ_PER_KCAL = 4.184;
 /**
  * Sanity limits for label values, not physiological numbers: no food has more than 100 g of a
  * nutrient per 100 g, or more energy than pure fat (9 kcal/g, Regulation (EU) No 1169/2011,
  * Annex XIV). Values outside are typing errors on Open Food Facts and are dropped.
  */
-const MAX_KCAL_PER_100G = 900;
-const MAX_GRAMS_PER_100G = 100;
+export const MAX_KCAL_PER_100G = 900;
+export const MAX_GRAMS_PER_100G = 100;
 
 /** The fields a lookup asks for (keeps the response small). */
 export const FIELDS = [

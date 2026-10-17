@@ -9,6 +9,8 @@ import type { Food } from '../../foods/foodDb';
 import { repo } from '../../storage/repo';
 import type { CustomFood, LogEntry, Product } from '../../storage/types';
 import { productLabel } from '../../foods/products';
+import { UsdaResults } from './UsdaResults';
+import { ProductList, productTag } from './ProductList';
 import { Icon } from '../../ui/Icon';
 import { isOn } from '../../settings/features';
 import { nextStorage, totalLeft, logPortion } from '../home/StockChips';
@@ -56,6 +58,7 @@ export function LogPage({ day: dayParam, foodCode }: { day?: string; foodCode?: 
     return d.customFoods.filter((c) => c.name.toLowerCase().includes(q));
   }, [query, d.customFoods]);
   const offOn = isOn(d.settings.features, 'openFoodFacts');
+  const usdaOn = isOn(d.settings.features, 'usda');
   // Products looked up before stay on this phone and are found by name without any request.
   const productMatches = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -68,16 +71,16 @@ export function LogPage({ day: dayParam, foodCode }: { day?: string; foodCode?: 
       if (ref.source === 'BLS') {
         const food = d.foods.byCode.get(ref.code);
         if (food) out.push({ key: refKey(ref), pick: { kind: 'food', food }, name: food.nameEn, detail: food.nameDe });
-      } else if (ref.source === 'OFF') {
-        const product = d.productsByCode.get(ref.code);
-        if (product) out.push({ key: refKey(ref), pick: { kind: 'product', product }, name: productLabel(product), detail: t('off.productTag') });
-      } else {
+      } else if (ref.source === 'OFF' || ref.source === 'USDA') {
+        const product = d.productsById.get(refKey(ref));
+        if (product) out.push({ key: refKey(ref), pick: { kind: 'product', product }, name: productLabel(product), detail: productTag(product) });
+      } else if (ref.source === 'custom') {
         const food = d.customFoodsById.get(ref.id);
         if (food) out.push({ key: refKey(ref), pick: { kind: 'custom', food }, name: food.name, detail: food.servingLabel });
       }
     }
     return out;
-  }, [d.settings.favourites, d.foods, d.productsByCode, d.customFoodsById]);
+  }, [d.settings.favourites, d.foods, d.productsById, d.customFoodsById]);
   const recent = useMemo(() => {
     const pinned = new Set(favourites.map((f) => f.key));
     return [...d.recentFoods.entries()]
@@ -269,9 +272,9 @@ export function LogPage({ day: dayParam, foodCode }: { day?: string; foodCode?: 
             </>
           )}
 
-          {offOn && d.products.length > 0 && (
+          {(offOn || usdaOn) && d.products.length > 0 && (
             <>
-              <h2 className="section-title">{t('off.products')}</h2>
+              <h2 className="section-title">{t(usdaOn ? 'products.saved' : 'off.products')}</h2>
               <ProductList products={d.products.slice(0, RECENT_PRODUCTS)} onPick={(product) => setSelected({ kind: 'product', product })} />
             </>
           )}
@@ -317,6 +320,7 @@ export function LogPage({ day: dayParam, foodCode }: { day?: string; foodCode?: 
               </div>
             </div>
           )}
+          {usdaOn && <UsdaResults key={query.trim()} query={query.trim()} onPick={(product) => setSelected({ kind: 'product', product })} />}
         </>
       )}
 
@@ -328,24 +332,6 @@ export function LogPage({ day: dayParam, foodCode }: { day?: string; foodCode?: 
       {selected?.kind === 'custom' && <CustomSheet food={selected.food} day={day} time={mealTime} onClose={() => setSelected(null)} onAdded={onAdded} />}
       {selected?.kind === 'manual' && <ManualSheet supplement={selected.supplement} day={day} time={mealTime} onClose={() => setSelected(null)} onAdded={onAdded} />}
     </section>
-  );
-}
-
-function ProductList({ products, onPick }: { products: Product[]; onPick: (p: Product) => void }) {
-  return (
-    <ul className="result-list">
-      {products.map((p) => (
-        <li key={p.id}>
-          <button className="result" onClick={() => onPick(p)}>
-            <span className="result-name">{productLabel(p)}</span>
-            <span className="muted small">
-              {t('off.productTag')}
-              {p.quantity ? ` · ${p.quantity}` : ''}
-            </span>
-          </button>
-        </li>
-      ))}
-    </ul>
   );
 }
 

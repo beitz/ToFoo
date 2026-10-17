@@ -22,7 +22,7 @@ export interface FoodDb {
   provenanceCodes: Record<string, string>;
 }
 
-function sumDerived(per100: Record<string, RawValue>, parts: readonly string[]): RawValue {
+export function sumDerived(per100: Record<string, RawValue>, parts: readonly string[]): RawValue {
   let total = 0;
   let any = false;
   for (const p of parts) {
