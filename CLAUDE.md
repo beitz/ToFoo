@@ -47,7 +47,7 @@ CI (`.github/workflows/deploy.yml`) runs data → typecheck → test → build o
 7. **Storage records carry `schemaVersion`;** migrations are pure functions with tests.
 8. **Feature toggles** go through `src/settings/features.ts`; new optional features get a toggle.
 9. **UI:** mobile-first (check at 360–412 px width), touch targets ≥ 44 px, status never by colour alone, light and dark mode, undo instead of confirm for everyday actions, respect `prefers-reduced-motion`.
-10. **Privacy:** no analytics, no third-party requests except opt-in features the user turns on (the AI assistant, which talks to Anthropic with the user's own key; the Open Food Facts lookup, which sends only a barcode). Nothing personal in the repo; API keys stay on the device and out of backups.
+10. **Privacy:** no analytics, no third-party requests except opt-in features the user turns on (the AI assistant, which talks to Anthropic with the user's own key; the Open Food Facts lookup, which sends only a barcode; voice input, which sends recordings to OpenAI with the user's own key). Nothing personal in the repo; API keys stay on the device and out of backups.
 11. Food names: English is the primary display and search language, German second (both from BLS).
 12. Keep `docs/SPEC.md`, `docs/OPEN_QUESTIONS.md` and the exchange-format docs current when decisions change.
 
