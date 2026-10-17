@@ -63,6 +63,8 @@ export interface NutrientResult {
   capacity?: number;
   level?: Range;
   store?: Range;
+  /** Tank and balance: how many days a full store covers the need with no intake (sourced capacity range ÷ need). */
+  storeDays?: Range;
   /** Tank: day of the blood test the store was set from, if any. */
   measuredOn?: string;
   /** Balance: days in a row (up to today) the balance has been in the "low" zone, with something logged in each window. */
@@ -215,17 +217,22 @@ function mealComposition(intakes: EntryIntake[]): MealComposition {
 }
 
 export function tankCapacity(id: string, weightKg: number, sex: Sex | undefined, physiological: number): number | undefined {
+  return tankCapacityRange(id, weightKg, sex, physiological)?.central;
+}
+
+/** Store capacity with its sourced low / high ends, in absorbed units, scaled to body weight. */
+export function tankCapacityRange(id: string, weightKg: number, sex: Sex | undefined, physiological: number): Range | undefined {
   const model = storage[id];
   if (!model) return undefined;
   const refW = referenceWeightKg.value[sex ?? 'unknown'];
   const scale = weightKg / refW;
+  const times = (r: Range, k: number): Range => ({ low: r.low * k, central: r.central * k, high: r.high * k });
   if (model.kind === 'tank') {
     const bySex = model.capacity.bySex;
     // Unknown sex: the smaller store is the safer assumption.
-    const range = bySex ? (sex ? bySex[sex] : bySex.female) : model.capacity.value;
-    return range.central * scale;
+    return times(bySex ? (sex ? bySex[sex] : bySex.female) : model.capacity.value, scale);
   }
-  if (model.kind === 'tankDays') return model.capacityDays.value.central * physiological * scale;
+  if (model.kind === 'tankDays') return times(model.capacityDays.value, physiological * scale);
   return undefined;
 }
 
@@ -422,9 +429,11 @@ export function simulate(input: SimulationInput): SimulationResult {
     // Balance: absorbed (plus sun) at reference iron stores, so it says what the diet covers whatever the store guess.
     const sunAt = (s: Scenario, i: number) => (id === 'VITD' && settings.sun ? (input.sunByDay?.[days[i]!]?.[s] ?? 0) : 0);
     const referenceInflow = Object.fromEntries(SCENARIOS.map((s) => [s, inflow[s].map((v, i) => v + sunAt(s, i))])) as Record<Scenario, number[]>;
-    let storePart: Pick<NutrientResult, 'capacity' | 'level' | 'store' | 'netPerDay'> = {};
+    let storePart: Pick<NutrientResult, 'capacity' | 'level' | 'store' | 'netPerDay' | 'storeDays'> = {};
     if (kind === 'tank' || kind === 'balance') {
       const capacity = tankCapacity(id, input.weightKg, input.sex, physiological) ?? 1;
+      const capRange = tankCapacityRange(id, input.weightKg, input.sex, physiological);
+      const coverDays = capRange && physiological > 0 ? { low: capRange.low / physiological, central: capRange.central / physiological, high: capRange.high / physiological } : undefined;
       const refWeight = referenceWeightKg.value[input.sex ?? 'unknown'];
       const startFraction =
         input.startingLevel === 'empty'
@@ -472,12 +481,13 @@ export function simulate(input: SimulationInput): SimulationResult {
           level,
           store,
           netPerDay,
+          storeDays: coverDays,
           history,
           measuredOn: measuredIdx >= 0 ? measured!.day : undefined,
         });
         continue;
       }
-      storePart = { capacity, level, store, netPerDay };
+      storePart = { capacity, level, store, netPerDay, storeDays: coverDays };
     }
 
     // Rolling, limit and info.

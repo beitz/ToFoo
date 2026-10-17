@@ -308,6 +308,18 @@ describe('simulation', () => {
     expect(res.status).toBe('fine');
   });
 
+  it('says how long a full store covers the need, from the sourced capacity range', () => {
+    const res = simulate(baseInput(days('2026-03-01', 3), [], { weightKg: 70 })).nutrients;
+    // B12: 2–3 mg pool (IOM) ÷ 2 µg/day absorbed need.
+    const b12 = res.get('VITB12')!.storeDays!;
+    expect(b12.low).toBeCloseTo(1000);
+    expect(b12.central).toBeCloseTo(1250);
+    expect(b12.high).toBeCloseTo(1500);
+    // Vitamin D is given in days of need directly.
+    expect(res.get('VITD')!.storeDays).toEqual({ low: 30, central: 60, high: 120 });
+    expect(res.get('VITC')!.storeDays).toBeUndefined();
+  });
+
   it('shows B12 saturation: OMAD of 8 µg/day fills the tank less than 4 × 2 µg', () => {
     const d = days('2026-01-01', 60);
     const omad = d.map((day, i) => manual(`o${i}`, day, 18, { VITB12: 8 }));
