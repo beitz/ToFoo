@@ -9,7 +9,7 @@ import { z } from 'zod';
 import type { Food, FoodDb } from '../foods/foodDb';
 import type { FindResult, UsdaFindResult } from '../foods/findProduct';
 import { normalizeBarcode } from '../foods/openFoodFacts';
-import { hasOwnMicros, isProductCode, productFood, productLabel } from '../foods/products';
+import { hasOwnMicros, isProductCode, productFood, productId, productLabel } from '../foods/products';
 import { normalize, search, type SearchIndex } from '../foods/search';
 import { parseLocalDateTime } from './photoTime';
 import { fmtNumber } from '../lib/format';
@@ -193,7 +193,9 @@ export async function runLookupBarcode(input: unknown, ctx: ToolContext): Promis
       lines.push(`${raw}: not a valid barcode (check the digits; the last one is a check digit).`);
       continue;
     }
-    const r = await find(code);
+    // A product already looked up in this chat is not fetched again.
+    const seen = ctx.products.seen.get(productId(code));
+    const r: FindResult = seen ? { kind: 'found', product: seen } : await find(code);
     if (r.kind === 'found') {
       ctx.products.seen.set(r.product.id, r.product);
       lines.push(describeProduct(r.product, ctx.db));

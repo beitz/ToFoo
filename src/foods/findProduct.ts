@@ -3,6 +3,7 @@
  * Facts) or USDA foods by name. A fetched food is not saved until it is logged, so lookups that
  * lead nowhere leave nothing behind.
  */
+import { createRateLimiter } from '../lib/rateLimit';
 import { repo } from '../storage/repo';
 import { CURRENT_SCHEMA_VERSION, type Product } from '../storage/types';
 import { lookupBarcode, type LookupResult, type ProductData } from './openFoodFacts';
@@ -19,10 +20,18 @@ export function toUsdaProduct(food: UsdaFood, match?: Product['match'], now = Da
   return { ...food, id: productId(food.code, 'USDA'), source: 'USDA', fetchedAt: now, ...(match ? { match } : {}), schemaVersion: CURRENT_SCHEMA_VERSION };
 }
 
+/**
+ * Open Food Facts allows 15 product reads per minute per IP address and may block an address that
+ * goes over (https://openfoodfacts.github.io/openfoodfacts-server/api/, checked 2026-10-17). A batch
+ * of photos can bring more barcodes than that, so lookups beyond it wait instead.
+ */
+const offLimiter = createRateLimiter(15, 60_000);
+
 /** `refresh`: fetch again even if saved (keeps the chosen BLS match). */
 export async function findProduct(code: string, opts: { refresh?: boolean; fetchImpl?: typeof fetch } = {}): Promise<FindResult> {
   const saved = await repo.getProduct(productId(code));
   if (saved && !opts.refresh) return { kind: 'found', product: saved };
+  await offLimiter.take();
   const r = await lookupBarcode(code, opts.fetchImpl);
   if (r.kind !== 'found') return r;
   return { kind: 'found', product: toProduct(r.product, saved?.match) };
