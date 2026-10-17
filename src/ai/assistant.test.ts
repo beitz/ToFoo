@@ -3,7 +3,7 @@ import type * as Beta from '@anthropic-ai/sdk/resources/beta/messages/messages';
 import type { Food } from '../foods/foodDb';
 import { buildIndex } from '../foods/search';
 import { appNote, emptyConversation, requestParams, sendMessage, textOf, type CreateMessage } from './assistant';
-import { describeFood, MAX_ITEM_GRAMS, runLookupBarcode, runSearchFoods, runSearchUsda, validateProposal, type ProductTools, type ToolContext } from './tools';
+import { describeFood, MAX_ITEM_GRAMS, runLookupBarcode, runSearchFoods, runSearchUsda, validateJournalProposal, validateProposal, type ProductTools, type ToolContext } from './tools';
 import type { Product } from '../storage/types';
 import type { FindResult } from '../foods/findProduct';
 
@@ -401,5 +401,42 @@ describe('USDA FoodData Central (on)', () => {
     expect(requestParams('claude-opus-5-5', [], { off: true, usda: true }).tools!.map((t) => (t as { name: string }).name)).toEqual(['search_foods', 'lookup_barcode', 'search_usda', 'propose_meal']);
     // The same objects every time, so the prompt cache keeps working.
     expect(requestParams('claude-opus-5-5', [], { usda: true }).system).toBe(requestParams('claude-opus-5-5', [], { usda: true }).system);
+  });
+});
+
+describe('journal entries', () => {
+  const now = new Date(2026, 9, 17, 20, 0).getTime();
+  const entry = (text: string, time = '', replaces = '') => ({ text, time, replaces });
+
+  it('offers propose_journal_entry only with the journal on', () => {
+    const names = (journal: boolean) => (requestParams('claude-opus-5-5', [], { journal }).tools ?? []).map((t) => ('name' in t ? t.name : ''));
+    expect(names(false)).not.toContain('propose_journal_entry');
+    expect(names(true)).toContain('propose_journal_entry');
+    expect(String(requestParams('claude-opus-5-5', [], { journal: true }).system)).toContain('do not interpret');
+    expect(String(requestParams('claude-opus-5-5', [], { journal: false }).system)).not.toContain('propose_journal_entry');
+  });
+
+  it('shows a journal card next to a meal card, and owes both results', async () => {
+    const meal = { summary: 'Milk roll', items: [{ code: 'D7A5400', grams: 60, preparation: 'asListed', note: '' }], assumptions: [], confidence: 'C', time: '', replaces: '' };
+    const api = scripted(reply([toolUse('m', 'propose_meal', meal), toolUse('j', 'propose_journal_entry', entry(' Tired after lunch. ', '2026-10-17 14:30'))], 'tool_use'));
+    const { conversation, outcome } = await sendMessage(api.create, 'claude-opus-5-5', emptyConversation(), { text: 'a roll, then tired', images: [] }, { ...ctx, now, journal: true });
+    expect(outcome.kind === 'proposal' && outcome.proposals.map((p) => p.id)).toEqual(['M1']);
+    expect(outcome.kind === 'proposal' && outcome.notes).toEqual([{ id: 'J1', text: 'Tired after lunch.', time: new Date(2026, 9, 17, 14, 30).getTime() }]);
+    expect(conversation.notes).toBe(1);
+    expect(conversation.pendingResults.map((r) => r.content)).toEqual(['Shown to the user as card M1. Not logged yet; their reply follows.', 'Shown to the user as card J1. Not saved yet; their reply follows.']);
+  });
+
+  it('refuses journal entries when the journal is off', async () => {
+    const api = scripted(reply([toolUse('j', 'propose_journal_entry', entry('Headache'))], 'tool_use'), reply([text('Ok.')], 'end_turn'));
+    const { outcome } = await sendMessage(api.create, 'claude-opus-5-5', emptyConversation(), { text: 'headache', images: [] }, { ...ctx, now });
+    expect(outcome.kind).toBe('reply');
+    expect(String((api.requests[1]!.messages[2]!.content as Beta.BetaToolResultBlockParam[])[0]!.content)).toContain('Unknown tool');
+  });
+
+  it('checks journal entries: text, length and time', () => {
+    expect(validateJournalProposal(entry('  '), now)).toMatchObject({ ok: false });
+    expect(validateJournalProposal(entry('x'.repeat(5000)), now)).toMatchObject({ ok: false });
+    expect(validateJournalProposal(entry('Slept badly', '2026-10-18 07:00'), now)).toMatchObject({ ok: false });
+    expect(validateJournalProposal(entry('Slept badly', '', 'J2'), now)).toEqual({ ok: true, proposal: { text: 'Slept badly', replaces: 'J2' } });
   });
 });

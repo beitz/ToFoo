@@ -84,6 +84,7 @@ export const en = {
 
   // Home
   'home.logMeal': 'Log meal',
+  'home.journal': 'Write in journal',
   'home.fasting': 'Fasting',
   'home.endFast': 'End fast',
   'home.fastStarted': 'Fast started. Every day counts as fasted until you log a meal.',
@@ -332,6 +333,10 @@ export const en = {
   'ai.error.tooManyPhotos': 'Up to 20 photos per message. Send these first, then add the rest.',
   'ai.photoTimesMissing': '{n} without a capture time in the photo: ≈ is the file date, – is unknown. Tell the assistant if a time is wrong.',
   'ai.cardLogged': 'Logged: {name} · {when}',
+  'ai.noteTitle': 'Journal entry',
+  'ai.saveNote': 'Save to journal',
+  'ai.noteSaved': 'Saved to your journal · {when}',
+  'ai.introJournal': 'You can also tell me how you feel or slept, or anything else for your journal; I will show it to you before it is saved.',
   'ai.cardId': 'Card number, for telling the assistant which meal to change',
   'ai.settingsTitle': 'AI assistant',
   'ai.settingsIntro': 'Log meals by telling an assistant what you ate, with photos or text. It picks foods from the BLS database (and, with the Open Food Facts lookup on, packaged products by barcode or by the name on the pack) and estimates amounts; all nutrient values still come from those databases. You check every meal before it is logged.',
@@ -389,6 +394,18 @@ export const en = {
   'entry.drink': 'lowers iron from meals around it',
 
   // Diary
+  'journal.title': 'Journal',
+  'journal.write': 'Write in journal',
+  'journal.editTitle': 'Journal entry',
+  'journal.entry': 'Journal',
+  'journal.entryShort': 'Journal entry',
+  'journal.placeholder': 'Write anything: how you feel, how you slept, what happened…',
+  'journal.speak': 'Speak',
+  'journal.saved': 'Saved to your journal.',
+  'journal.updated': 'Journal entry saved.',
+  'journal.deleted': 'Journal entry deleted.',
+  'journal.empty': 'Nothing written yet. Your entries stay on this phone, are part of your backups, and show in the diary between your meals.',
+  'journal.showOlder': 'Show {n} older days',
   'diary.prev': 'Previous day',
   'diary.calendar': 'Calendar',
   'diary.dayNutrients': 'Nutrients this day',

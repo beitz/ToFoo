@@ -18,6 +18,10 @@ const WEB_SEARCH = `- A package without a readable barcode (only the front, bran
 
 const USDA = `- When no BLS food fits a single food or ingredient well (foods common outside Germany, a specific variety), search USDA FoodData Central with search_usda, in English. Its generic foods (branded: false; codes like USDA:168462) have their own full nutrient data: use the USDA: code in propose_meal and set micros_from to the BLS code of the most similar food if one is close (it fills the few gaps, such as iodine), else leave it empty. For a US packaged product, search with branded: true; micros_from is then required, as for a label. Prefer a fitting BLS food over USDA, and split mixed dishes into BLS ingredients rather than taking a USDA dish, unless the USDA dish matches closely. USDA foods the user logged before are also listed by search_foods. Each USDA search is an online request, so search only when the BLS has nothing good.`;
 
+// The journal (docs/SPEC.md, "Journal"): the assistant only passes on the user's words, for
+// patterns to be looked for later; it never interprets them.
+const JOURNAL = `- Journal: the user keeps a free-text journal in ToFoo, to look for patterns later between how they feel and what they ate, slept and did. When the user tells you something worth keeping there that is not a food (how they feel or slept, energy, mood, symptoms such as a headache, stress, exercise, events such as "ate out, guessed amounts"), propose it with propose_journal_entry in their own words: tidy the wording lightly, keep their language, add nothing, and do not interpret, explain or diagnose. One entry per moment it is about, with time set to when it happened (empty for now, or the day the chat was opened for). Do not repeat what a meal card already shows. If the user only tells you journal things, propose just the entry and do not ask about food. To change an open journal card, call propose_journal_entry again with replaces set to its id (J1, J2, …).`;
+
 export interface PromptSources {
   /** Open Food Facts barcode lookup on. */
   off?: boolean;
@@ -25,10 +29,18 @@ export interface PromptSources {
   usda?: boolean;
   /** Web search on openfoodfacts.org to find barcodes by product name (only together with `off`). */
   webSearch?: boolean;
+  /** The journal is on: the assistant may propose journal entries. */
+  journal?: boolean;
 }
 
-function systemPrompt({ off = false, usda = false, webSearch = false }: PromptSources): string {
-  const extra = [off && ' Packaged products can also be looked up by barcode in Open Food Facts.', usda && ' Foods the BLS lacks can be searched in USDA FoodData Central.'].filter(Boolean).join('');
+function systemPrompt({ off = false, usda = false, webSearch = false, journal = false }: PromptSources): string {
+  const extra = [
+    off && ' Packaged products can also be looked up by barcode in Open Food Facts.',
+    usda && ' Foods the BLS lacks can be searched in USDA FoodData Central.',
+    journal && ' The user can also tell you things for their journal.',
+  ]
+    .filter(Boolean)
+    .join('');
   return `You help the user log what they ate in ToFoo, a personal nutrition diary. The user lives in Germany. The food database is the German Bundeslebensmittelschlüssel (BLS 4.0): about 7,100 generic foods and dishes with English and German names, no brands.${extra}
 
 Your job: work out which foods the user ate and how many grams of each, then call propose_meal. You never state nutrient values; the app computes them from the database. A wrong food or amount is visible to the user and easy to fix; an invented number is not, so never make numbers up beyond food choice and grams.
@@ -36,7 +48,7 @@ Your job: work out which foods the user ate and how many grams of each, then cal
 How to work:
 - Find foods with search_foods. Search short, generic terms, in English and German (e.g. ["milk roll", "Milchbrötchen"]); send several queries in one call. Only use codes that search_foods returned.
 ${off ? BRANDED_WITH_PRODUCTS : BRANDED_BLS_ONLY}
-${off && webSearch ? `${WEB_SEARCH}\n` : ''}${usda ? `${USDA}\n` : ''}- Mixed dishes (restaurant meals, a hotpot, a bowl): use a matching BLS dish if there is one, otherwise split it into ingredients with estimated grams. Include what changes the result most: cooking oil, sauces, broth that was actually eaten.
+${off && webSearch ? `${WEB_SEARCH}\n` : ''}${usda ? `${USDA}\n` : ''}${journal ? `${JOURNAL}\n` : ''}- Mixed dishes (restaurant meals, a hotpot, a bowl): use a matching BLS dish if there is one, otherwise split it into ingredients with estimated grams. Include what changes the result most: cooking oil, sauces, broth that was actually eaten.
 - Amounts: use what the user said, label weights, counts of standard items, and visual cues (plate size, cutlery, hands, packaging). Think about the portion one person ate, not the whole shared dish.
 - Ask when the answer would noticeably change the result (an unknown main food, a portion that could easily be double or half, whether shared food was all eaten). Ask one short question at a time and offer a default the user can just accept, e.g. "About one bowl, roughly 400 ml?". Do not ask about details that barely matter. Do not ask for more photos (barcode, label, packaging) when you can work with what you have: the user often cannot take them. If one would clearly change the result, mention it once alongside your proposal, not instead of it. If the user cannot know, estimate and record the assumption.
 - Several meals at once: the user may send many photos from the past days plus a note, to log everything in one go. The app puts a line before each photo with its number and capture time. Group the photos into meals by time and content: photos minutes apart of the same table are one meal; the same food at different times (yogurt in the morning and in the evening) is two. Also include meals the user only describes in words. Before proposing, ask everything that matters in one message, as a short numbered list with a default for each, and say how you grouped the photos (e.g. "Photos 2–5: Korean BBQ, Thu 19:40"). Then propose all meals in one response, one propose_meal call per meal.
@@ -49,7 +61,7 @@ ${off && webSearch ? `${WEB_SEARCH}\n` : ''}${usda ? `${USDA}\n` : ''}- Mixed di
 Style: brief, friendly, plain text (no headings or tables). Answer in the language the user writes in.`;
 }
 
-const key = ({ off = false, usda = false, webSearch = false }: PromptSources) => `${off ? 1 : 0}${usda ? 1 : 0}${off && webSearch ? 1 : 0}`;
+const key = ({ off = false, usda = false, webSearch = false, journal = false }: PromptSources) => `${off ? 1 : 0}${usda ? 1 : 0}${off && webSearch ? 1 : 0}${journal ? 1 : 0}`;
 const prompts = new Map<string, string>();
 const toolSets = new Map<string, BetaToolUnion[]>();
 
@@ -112,7 +124,7 @@ export const WEB_SEARCH_TOOL: BetaWebSearchTool20250305 = {
   user_location: { type: 'approximate', country: 'DE' },
 };
 
-function tools({ off = false, usda = false, webSearch = false }: PromptSources): BetaToolUnion[] {
+function tools({ off = false, usda = false, webSearch = false, journal = false }: PromptSources): BetaToolUnion[] {
   const withProducts = off || usda;
   const codeHelp = off && usda ? 'BLS code from search_foods, or an OFF: or USDA: code from lookup_barcode, search_usda or search_foods.' : off ? 'BLS code from search_foods, or OFF: product code from lookup_barcode or search_foods.' : usda ? 'BLS code from search_foods, or USDA: code from search_usda or search_foods.' : 'BLS code from search_foods.';
   const items = {
@@ -153,8 +165,26 @@ function tools({ off = false, usda = false, webSearch = false }: PromptSources):
         additionalProperties: false,
       },
     },
+    ...(journal ? [PROPOSE_JOURNAL_ENTRY] : []),
   ];
 }
+
+const PROPOSE_JOURNAL_ENTRY: BetaTool = {
+  name: 'propose_journal_entry',
+  description:
+    "Show the user one journal entry to save, as a card with the text and time for the user to check and confirm; nothing is saved until they do. The user's own words, lightly tidied, nothing added. After a correction, call it again with replaces set to the card id.",
+  strict: true,
+  input_schema: {
+    type: 'object',
+    properties: {
+      text: { type: 'string', description: 'The entry, in the user\'s words and language, e.g. "Tired all afternoon, headache since noon."' },
+      time: { type: 'string', description: 'When it happened, local "YYYY-MM-DD HH:MM"; empty for now or the chat\'s day.' },
+      replaces: { type: 'string', description: 'Id of the open journal card this corrects (e.g. "J1"); empty for a new entry.' },
+    },
+    required: ['text', 'time', 'replaces'],
+    additionalProperties: false,
+  },
+};
 
 const SEARCH_FOODS: BetaTool = {
   name: 'search_foods',

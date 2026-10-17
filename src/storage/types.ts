@@ -84,7 +84,8 @@ export type FeatureKey =
   | 'openFoodFacts'
   | 'usda'
   | 'productWebSearch'
-  | 'voiceInput';
+  | 'voiceInput'
+  | 'journal';
 
 export interface Settings extends Versioned {
   id: 'settings';
@@ -218,6 +219,16 @@ export interface SunEntry extends Versioned {
   startHour: number;
   minutes: number;
   skin: SkinExposure;
+}
+
+/** A free-text journal entry: anything the user wants to write down, at any time (docs/SPEC.md, "Journal"). */
+export interface JournalEntry extends Versioned {
+  id: string;
+  /** Epoch ms the entry is about (defaults to when it was written). */
+  time: number;
+  /** Local calendar day of `time` (YYYY-MM-DD). */
+  day: string;
+  text: string;
 }
 
 export interface MetaRecord {

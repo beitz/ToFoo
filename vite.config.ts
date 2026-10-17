@@ -32,6 +32,7 @@ export default defineConfig({
         shortcuts: [
           { name: 'Log meal', short_name: 'Log meal', url: '/ToFoo/#/log', icons: [{ src: 'icon-192.png', sizes: '192x192', type: 'image/png' }] },
           { name: 'Start fast', short_name: 'Start fast', url: '/ToFoo/#/fast', icons: [{ src: 'icon-192.png', sizes: '192x192', type: 'image/png' }] },
+          { name: 'Write in journal', short_name: 'Journal', url: '/ToFoo/#/journal', icons: [{ src: 'icon-192.png', sizes: '192x192', type: 'image/png' }] },
         ],
         icons: [
           { src: 'icon-192.png', sizes: '192x192', type: 'image/png' },

@@ -65,6 +65,24 @@ export const proposalInput = z.object({
 
 export type ProposalInput = z.infer<typeof proposalInput>;
 
+export const journalProposalInput = z.object({
+  text: z.string(),
+  /** Local "YYYY-MM-DD HH:MM" the entry is about; empty for now (or the chat's day). */
+  time: z.string().optional(),
+  /** Id of the open journal card this replaces (e.g. "J1"); empty for a new entry. */
+  replaces: z.string().optional(),
+});
+
+/** A journal entry the assistant proposes (the user's words, for the user to check). */
+export interface JournalProposal {
+  text: string;
+  time?: number;
+  replaces?: string;
+}
+
+/** Longest proposed journal entry: a few paragraphs, not a transcript of the whole chat. */
+const MAX_JOURNAL_CHARS = 4000;
+
 export interface ProposedItem {
   food: Food;
   grams: number;
@@ -126,11 +144,13 @@ export interface ToolContext {
   products?: ProductTools;
   /** Current time, for checking proposed meal times (injected to keep this pure). */
   now?: number;
+  /** The journal is on: the assistant may propose journal entries. */
+  journal?: boolean;
 }
 
 /** Which online sources the assistant is offered (decides the prompt and tool variant). */
-export function sourcesOf(products: ProductTools | undefined): { off: boolean; usda: boolean; webSearch: boolean } {
-  return { off: !!products?.find, usda: !!products?.searchUsda, webSearch: !!products?.find && !!products.webSearch };
+export function sourcesOf(products: ProductTools | undefined, journal = false): { off: boolean; usda: boolean; webSearch: boolean; journal: boolean } {
+  return { off: !!products?.find, usda: !!products?.searchUsda, webSearch: !!products?.find && !!products.webSearch, journal };
 }
 
 const LABEL_FIELDS: Array<[string, string, string]> = [
@@ -234,6 +254,32 @@ export async function runSearchUsda(input: unknown, ctx: ToolContext): Promise<{
   return { ok: true, text: blocks.join('\n\n') };
 }
 
+/** Parse a proposed local time and check it is plausible (not in the future, not years back). */
+function checkTime(text: string | undefined, now: number | undefined): { time?: number; problem?: string } {
+  const timeText = text?.trim() ?? '';
+  if (!timeText) return {};
+  const time = parseLocalDateTime(timeText);
+  if (time === undefined) return { problem: `time "${timeText}" is not a valid local time; write it as YYYY-MM-DD HH:MM, or leave it empty.` };
+  if (now !== undefined && time > now + FUTURE_SLACK_MS) return { problem: `time ${timeText} is in the future.` };
+  if (now !== undefined && time < now - MAX_PAST_MS) return { problem: `time ${timeText} is more than a year ago; check the year.` };
+  return { time };
+}
+
+/** Check a `propose_journal_entry` call: some text, of a sane length, at a plausible time. */
+export function validateJournalProposal(input: unknown, now?: number): { ok: true; proposal: JournalProposal } | { ok: false; error: string } {
+  const parsed = journalProposalInput.safeParse(input);
+  if (!parsed.success) return { ok: false, error: `Invalid input: ${parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}` };
+  const problems: string[] = [];
+  const text = parsed.data.text.trim();
+  if (!text) problems.push('text is empty.');
+  if (text.length > MAX_JOURNAL_CHARS) problems.push(`text is ${text.length} characters; keep an entry under ${MAX_JOURNAL_CHARS}, or split it.`);
+  const { time, problem } = checkTime(parsed.data.time, now);
+  if (problem) problems.push(problem);
+  if (problems.length) return { ok: false, error: `${problems.join('\n')}\nFix these and call propose_journal_entry again.` };
+  const replaces = parsed.data.replaces?.trim();
+  return { ok: true, proposal: { text, ...(time !== undefined ? { time } : {}), ...(replaces ? { replaces } : {}) } };
+}
+
 /** A product the assistant may use: looked up in this conversation or saved on this phone. */
 function knownProduct(code: string, products: ProductTools | undefined): Product | undefined {
   return products?.seen.get(code) ?? products?.saved.get(code);
@@ -278,11 +324,8 @@ export function validateProposal(
     if (!(it.grams > 0) || it.grams > MAX_ITEM_GRAMS) problems.push(`${it.code}: ${it.grams} g is not plausible (expected more than 0 and at most ${MAX_ITEM_GRAMS} g).`);
     if (food && it.grams > 0 && it.grams <= MAX_ITEM_GRAMS) items.push({ food, grams: Math.round(it.grams * 10) / 10, preparation: it.preparation, note: it.note.trim(), ...(product ? { product } : {}) });
   }
-  const timeText = parsed.data.time?.trim() ?? '';
-  const time = timeText ? parseLocalDateTime(timeText) : undefined;
-  if (timeText && time === undefined) problems.push(`time "${timeText}" is not a valid local time; write it as YYYY-MM-DD HH:MM, or leave it empty.`);
-  else if (time !== undefined && now !== undefined && time > now + FUTURE_SLACK_MS) problems.push(`time ${timeText} is in the future.`);
-  else if (time !== undefined && now !== undefined && time < now - MAX_PAST_MS) problems.push(`time ${timeText} is more than a year ago; check the year.`);
+  const { time, problem } = checkTime(parsed.data.time, now);
+  if (problem) problems.push(problem);
   if (problems.length) return { ok: false, error: `${problems.join('\n')}\nFix these and call propose_meal again.` };
   const replaces = parsed.data.replaces?.trim();
   return {

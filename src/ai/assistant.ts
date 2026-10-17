@@ -7,7 +7,7 @@ import type * as Beta from '@anthropic-ai/sdk/resources/beta/messages/messages';
 import { systemPromptFor, toolsFor, type PromptSources } from './prompt';
 import { usageOf, type ModelTokens } from './pricing';
 import { fmtLocalDateTime } from './photoTime';
-import { runLookupBarcode, runSearchFoods, runSearchUsda, sourcesOf, validateProposal, type Proposal, type ToolContext } from './tools';
+import { runLookupBarcode, runSearchFoods, runSearchUsda, sourcesOf, validateJournalProposal, validateProposal, type JournalProposal, type Proposal, type ToolContext } from './tools';
 
 export type CreateMessage = (params: Beta.MessageCreateParamsNonStreaming) => Promise<Beta.BetaMessage>;
 
@@ -27,9 +27,11 @@ export interface Conversation {
   pendingResults: Beta.BetaToolResultBlockParam[];
   /** Cards shown so far; the next one gets id M(cards + 1). */
   cards: number;
+  /** Journal cards shown so far; the next one gets id J(notes + 1). */
+  notes: number;
 }
 
-export const emptyConversation = (): Conversation => ({ messages: [], pendingResults: [], cards: 0 });
+export const emptyConversation = (): Conversation => ({ messages: [], pendingResults: [], cards: 0, notes: 0 });
 
 export interface UserImage {
   mediaType: 'image/jpeg' | 'image/png' | 'image/webp';
@@ -41,10 +43,12 @@ export interface UserImage {
 
 /** A proposal as shown: with the card id the assistant uses to refer to it. */
 export type ShownProposal = Proposal & { id: string };
+/** A journal entry as shown: with its card id (J1, J2, …). */
+export type ShownNote = JournalProposal & { id: string };
 
 export type TurnOutcome =
   | { kind: 'reply'; text: string }
-  | { kind: 'proposal'; text: string; proposals: ShownProposal[] }
+  | { kind: 'proposal'; text: string; proposals: ShownProposal[]; notes: ShownNote[] }
   | { kind: 'error'; reason: 'refusal' | 'tooLong' | 'tooManySteps' };
 
 /** Request parameters per model (fallbacks re-run a declined request on another model). */
@@ -113,10 +117,11 @@ export async function sendMessage(
   if (user.text.trim()) content.push({ type: 'text', text: user.text.trim() });
   if (user.appNote) content.push({ type: 'text', text: user.appNote });
   messages.push({ role: 'user', content });
-  const sources = sourcesOf(ctx.products);
+  const sources = sourcesOf(ctx.products, ctx.journal);
 
   let cards = conversation.cards;
-  const done = (outcome: TurnOutcome, pendingResults: Beta.BetaToolResultBlockParam[] = []) => ({ conversation: { messages, pendingResults, cards }, outcome });
+  let notes = conversation.notes ?? 0;
+  const done = (outcome: TurnOutcome, pendingResults: Beta.BetaToolResultBlockParam[] = []) => ({ conversation: { messages, pendingResults, cards, notes }, outcome });
 
   for (let step = 0; step < MAX_STEPS; step++) {
     const res = await create(requestParams(model, messages, sources));
@@ -133,6 +138,7 @@ export async function sendMessage(
 
     const results: Beta.BetaToolResultBlockParam[] = [];
     const proposals: Array<{ id: string; proposal: Proposal }> = [];
+    const notesProposed: Array<{ id: string; proposal: JournalProposal }> = [];
     let rejected = false;
     for (const use of uses) {
       if (use.name === 'search_foods') {
@@ -151,23 +157,33 @@ export async function sendMessage(
           rejected = true;
           results.push({ type: 'tool_result', tool_use_id: use.id, content: r.error, is_error: true });
         }
+      } else if (use.name === 'propose_journal_entry' && sources.journal) {
+        const r = validateJournalProposal(use.input, ctx.now);
+        if (r.ok) notesProposed.push({ id: use.id, proposal: r.proposal });
+        else {
+          rejected = true;
+          results.push({ type: 'tool_result', tool_use_id: use.id, content: r.error, is_error: true });
+        }
       } else {
         results.push({ type: 'tool_result', tool_use_id: use.id, content: `Unknown tool ${use.name}.`, is_error: true });
       }
     }
 
     // Cards are shown all together or not at all, so the user never sees half a batch.
-    if (proposals.length && !rejected) {
+    if ((proposals.length || notesProposed.length) && !rejected) {
       const shown = proposals.map(({ proposal }): ShownProposal => ({ ...proposal, id: `M${++cards}` }));
-      const shownResults = proposals.map(({ id }, i): Beta.BetaToolResultBlockParam => ({
-        type: 'tool_result',
-        tool_use_id: id,
-        content: `Shown to the user as card ${shown[i]!.id}. Not logged yet; their reply follows.`,
-      }));
-      return done({ kind: 'proposal', text: textOf(res.content), proposals: shown }, [...results, ...shownResults]);
+      const shownNotes = notesProposed.map(({ proposal }): ShownNote => ({ ...proposal, id: `J${++notes}` }));
+      const shownResults = [
+        ...proposals.map(({ id }, i): Beta.BetaToolResultBlockParam => ({ type: 'tool_result', tool_use_id: id, content: `Shown to the user as card ${shown[i]!.id}. Not logged yet; their reply follows.` })),
+        ...notesProposed.map(({ id }, i): Beta.BetaToolResultBlockParam => ({ type: 'tool_result', tool_use_id: id, content: `Shown to the user as card ${shownNotes[i]!.id}. Not saved yet; their reply follows.` })),
+      ];
+      return done({ kind: 'proposal', text: textOf(res.content), proposals: shown, notes: shownNotes }, [...results, ...shownResults]);
     }
     for (const { id } of proposals) {
       results.push({ type: 'tool_result', tool_use_id: id, content: 'Not shown: another proposal in this response had errors. Call propose_meal again for this meal too.', is_error: true });
+    }
+    for (const { id } of notesProposed) {
+      results.push({ type: 'tool_result', tool_use_id: id, content: 'Not shown: another proposal in this response had errors. Call propose_journal_entry again for this entry too.', is_error: true });
     }
     messages.push({ role: 'user', content: results });
   }

@@ -220,7 +220,7 @@ Confidence is shown as a small marker on entries and widens the uncertainty rang
 
 - **Repeat a past meal**: "Log again" on a meal in the diary, or a tap under "Recent meals" on the log screen (the last three different meals with two or more items), logs it again now, with all its items, as an editable copy. Items keep their spacing (a tea half an hour after the meal stays half an hour after it, since timing matters for iron), with the last item at the current time. Recipe portions come from the batch's current stock; a batch that has run out is skipped and named in the message. One undo removes the whole copy.
 - **Favourite foods**: pin BLS foods, packaged products and saved items used all the time (oats, a certain bread) with "Add to favourites" on the amount sheet, so they stay at the top of the log screen instead of dropping out of "Recent". Stored in the settings (and so in backups).
-- **Home-screen shortcuts**: long-press the app icon for "Log meal" and "Start fast" (web manifest `shortcuts`). "Start fast" starts a fast today, with undo, and opens Home.
+- **Home-screen shortcuts**: long-press the app icon for "Log meal", "Start fast" and "Write in journal" (web manifest `shortcuts`). "Start fast" starts a fast today, with undo, and opens Home.
 
 **Water** (decided 2026-10-16): drinks can be logged as water amounts with one tap (e.g. +250 ml), and the water in foods counts too (BLS has water content per food). Shown as an amount-only or rolling gauge against a DGE guide value for water; the reference value still needs to be taken from the DGE tables with a source.
 
@@ -275,7 +275,7 @@ Logging should feel like telling a friend what you ate, not operating a database
 
 Food alone does not explain how the user feels, so a few low-friction records sit next to the food log, in one place, to look for patterns across all of them (owner's request, 2026-10-17). Each is an optional module with its own toggle, and none of them takes over Home: the food log and the gauges stay the main screen. Each can be logged by tapping and by telling the assistant ("slept from 1 to 8, walked 40 min to work, headache since noon"), which proposes the entries on a confirm card, as it does for meals. Logging stays a few seconds: no required fields, sensible defaults, times default to now.
 
-**Journal** (decided 2026-10-17, replaces day notes): write anything at any time ("ate out, guessed amounts", "tired all afternoon", "headache since noon"), as many entries a day as wanted, each with its own time (now, editable). Plain text, no tags or categories to pick; the assistant reads the words later. Voice input works here as in the assistant chat. Entries appear in the diary at their time between meals, and are included in backups and the CSV export. This reverses the 2026-10-16 note "no symptom tracking or correlations": correlations are now wanted, done by Insights below. Maybe later: an optional one-tap "how do you feel" score (1–5) with an entry, which gives Insights a number to compare instead of only words.
+**Journal** (decided 2026-10-17, replaces day notes; built 2026-10-17): write anything at any time ("ate out, guessed amounts", "tired all afternoon", "headache since noon"), as many entries a day as wanted, each with its own time (now, editable). Plain text, no tags or categories to pick; the assistant reads the words later. Voice input works here as in the assistant chat (with a journal hint for the speech model instead of the food one). Entries appear in the diary at their time between meals (entries with no meal between them share one card); tap one to edit or delete it, with undo. Ways to write, fastest first: the pen button on Home or the "Write in journal" home-screen shortcut (both open the journal page, ready to type, with all entries below, newest first); "Journal entry" in the diary, for any day; or telling the assistant, which proposes the entry in the user's own words on a card (J1, J2, …) to check and save, next to any meal cards, without interpreting it. Entries are stored on the phone and included in backups (`data.journal`), and later in the CSV export. This reverses the 2026-10-16 note "no symptom tracking or correlations": correlations are now wanted, done by Insights below. Maybe later: an optional one-tap "how do you feel" score (1–5) with an entry, which gives Insights a number to compare instead of only words.
 
 **Sleep** (decided 2026-10-17): one record per night, when the user went to sleep and woke up; no sleep quality (owner's decision). Ways to log, fastest first:
 
@@ -413,7 +413,7 @@ Optional features are modules with an on/off switch, so the app can be tuned bet
 | Open Food Facts lookup | Off | Log packaged products by barcode (sends only the barcode) |
 | USDA FoodData Central | Off | Search the US food database by name (sends only the search words) |
 | Find products by name | On | With the assistant and Open Food Facts on: find a product from a front-of-pack photo via web search on openfoodfacts.org (through Anthropic) |
-| Journal | On | Free-text entries at any time, in the diary |
+| Journal | On | Free-text entries at any time: pen button on Home, diary, assistant |
 | Sleep | Off | Sleep and wake times: buttons, shortcuts, morning question |
 | Activity | Off | Simple activity log; outdoor activity feeds the sun estimate |
 | Insights | Off | With the assistant on: look for patterns across journal, food, sleep and activity (sends the journal text to Anthropic) |
@@ -490,7 +490,7 @@ v1 is the smallest app that is useful every day; each later version adds to the 
 
 **Journal, sleep and activity** (owner's request 2026-10-17), in this order:
 
-- [ ] Journal: free-text entries at any time, in the diary, also through the assistant and voice (replaces day notes)
+- [x] Journal: free-text entries at any time, in the diary, also through the assistant and voice (replaces day notes) (built 2026-10-17)
 - [ ] Sleep: "Going to sleep" / "I'm up" buttons and shortcuts, morning question, assistant
 - [ ] Activity: simple log (what, when, how long, how hard, outside); outdoor time feeds the sun estimate
 - [ ] Insights: the assistant looks for patterns across journal, food, sleep and activity, numbers computed by the app
