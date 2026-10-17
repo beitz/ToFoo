@@ -183,25 +183,56 @@ export function parseProduct(raw: unknown, fallbackCode = ''): ProductData | nul
 export type LookupResult =
   | { kind: 'found'; product: ProductData }
   | { kind: 'notFound' }
-  | { kind: 'error'; reason: 'offline' | 'busy' | 'other' };
+  /** `detail`: what actually happened (status, address, the server's own words), shown to the user so a problem can be traced. */
+  | { kind: 'error'; reason: 'offline' | 'busy' | 'denied' | 'other'; detail: string };
+
+/** Longest server text quoted in an error detail. */
+const MAX_DETAIL_TEXT = 300;
+
+/** The readable text of an error response: an HTML page without its markup and scripts, or a JSON message. Pure. */
+export function responseText(body: string): string {
+  try {
+    const j = JSON.parse(body) as Record<string, unknown>;
+    const r = (j.result ?? {}) as Record<string, unknown>;
+    const msg = [j.status_verbose, r.name, j.error, j.message].find((v): v is string => typeof v === 'string' && v.trim() !== '');
+    if (msg) return msg.trim().slice(0, MAX_DETAIL_TEXT);
+  } catch {
+    // not JSON
+  }
+  const text = body
+    .replace(/<(script|style)[^>]*>[\s\S]*?<\/\1>/gi, ' ')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return text.length > MAX_DETAIL_TEXT ? `${text.slice(0, MAX_DETAIL_TEXT)}…` : text;
+}
 
 /** Look up one barcode (already normalised). Sends only the barcode. */
 export async function lookupBarcode(code: string, fetchImpl: typeof fetch = (input, init) => fetch(input, init)): Promise<LookupResult> {
+  const path = `/api/v3/product/${encodeURIComponent(code)}`;
+  const where = `world.openfoodfacts.org${path}`;
   let res: Response;
   try {
     // No custom headers: they would need a CORS preflight, and browsers do not let apps set User-Agent.
-    res = await fetchImpl(`${OFF_SITE}/api/v3/product/${encodeURIComponent(code)}?fields=${FIELDS}`);
-  } catch {
-    return { kind: 'error', reason: 'offline' };
+    res = await fetchImpl(`${OFF_SITE}${path}?fields=${FIELDS}`);
+  } catch (e) {
+    // A refused cross-origin answer looks the same as no connection to the page ("Failed to fetch").
+    return { kind: 'error', reason: 'offline', detail: `No answer from ${where} (${e instanceof Error ? e.message : String(e)}).` };
   }
   if (res.status === 404) return { kind: 'notFound' };
-  if (res.status === 429 || res.status >= 500) return { kind: 'error', reason: 'busy' };
-  if (!res.ok) return { kind: 'error', reason: 'other' };
+  if (!res.ok) {
+    const text = responseText(await res.text().catch(() => ''));
+    const detail = `HTTP ${res.status}${res.statusText ? ` ${res.statusText}` : ''} from ${where}${text ? `: "${text}"` : ''}`;
+    const reason = res.status === 429 || res.status >= 500 ? 'busy' : res.status === 401 || res.status === 403 ? 'denied' : 'other';
+    return { kind: 'error', reason, detail };
+  }
   try {
     const body = (await res.json()) as { product?: unknown };
     const product = parseProduct(body.product, code);
     return product ? { kind: 'found', product } : { kind: 'notFound' };
-  } catch {
-    return { kind: 'error', reason: 'other' };
+  } catch (e) {
+    return { kind: 'error', reason: 'other', detail: `Unreadable answer from ${where} (${e instanceof Error ? e.message : String(e)}).` };
   }
 }

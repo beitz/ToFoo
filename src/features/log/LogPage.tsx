@@ -10,6 +10,8 @@ import { repo } from '../../storage/repo';
 import type { CustomFood, LogEntry, Product } from '../../storage/types';
 import { productLabel } from '../../foods/products';
 import { UsdaResults } from './UsdaResults';
+import { FoodList } from './FoodList';
+import { EditEntrySheet } from '../diary/EditEntrySheet';
 import { ProductList, productTag } from './ProductList';
 import { Icon } from '../../ui/Icon';
 import { isOn } from '../../settings/features';
@@ -46,6 +48,7 @@ export function LogPage({ day: dayParam, foodCode }: { day?: string; foodCode?: 
     return food ? { kind: 'food', food } : null;
   });
   const [added, setAdded] = useState<string[]>([]);
+  const [editing, setEditing] = useState<LogEntry | null>(null);
   const [mealTime, setMealTime] = useState(() => defaultTimeFor(day, d.today));
 
   const results = useMemo(
@@ -134,9 +137,14 @@ export function LogPage({ day: dayParam, foodCode }: { day?: string; foodCode?: 
           <strong>{t('log.thisMeal')}</strong>
           <ul className="plain-list">
             {addedEntries.map((e) => (
-              <li key={e.id} className="row-between">
-                <span>{e.label}</span>
-                <span className="muted small">{entryAmount(e, d)}</span>
+              <li key={e.id}>
+                <button className="entry-row" onClick={() => setEditing(e)}>
+                  <span className="entry-label">{e.label}</span>
+                  <span className="muted small">{entryAmount(e, d)}</span>
+                  <span className="entry-edit">
+                    <Icon name="edit" size={16} />
+                  </span>
+                </button>
               </li>
             ))}
           </ul>
@@ -330,25 +338,8 @@ export function LogPage({ day: dayParam, foodCode }: { day?: string; foodCode?: 
         <BarcodeSheet onFound={(product) => setSelected({ kind: 'product', product })} onManual={() => setSelected({ kind: 'manual', supplement: false })} onClose={() => setSelected(null)} />
       )}
       {selected?.kind === 'custom' && <CustomSheet food={selected.food} day={day} time={mealTime} onClose={() => setSelected(null)} onAdded={onAdded} />}
+      {editing && <EditEntrySheet entry={editing} onClose={() => setEditing(null)} />}
       {selected?.kind === 'manual' && <ManualSheet supplement={selected.supplement} day={day} time={mealTime} onClose={() => setSelected(null)} onAdded={onAdded} />}
     </section>
-  );
-}
-
-export function FoodList({ foods, onPick }: { foods: Food[]; onPick: (f: Food) => void }) {
-  const d = useData();
-  return (
-    <ul className="result-list">
-      {foods.map((f) => (
-        <li key={f.code}>
-          <button className="result" onClick={() => onPick(f)}>
-            <span className="result-name">{f.nameEn}</span>
-            <span className="muted small">
-              {f.nameDe} · {d.foods.groups[f.group]?.en}
-            </span>
-          </button>
-        </li>
-      ))}
-    </ul>
   );
 }

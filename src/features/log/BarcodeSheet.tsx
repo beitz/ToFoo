@@ -10,16 +10,20 @@ import { barcodesInPhoto, canDetectBarcodes, detectBarcodes } from './barcode';
 /** How often the live camera view is checked for a barcode. */
 const SCAN_INTERVAL_MS = 250;
 
-type Status = { kind: 'idle' } | { kind: 'looking'; code: string } | { kind: 'notFound'; code: string } | { kind: 'error'; message: MessageKey };
+type Status = { kind: 'idle' } | { kind: 'looking'; code: string } | { kind: 'notFound'; code: string } | { kind: 'error'; message: MessageKey; detail?: string };
 
-const LOOKUP_ERRORS: Record<'offline' | 'busy' | 'other', MessageKey> = {
+const LOOKUP_ERRORS: Record<'offline' | 'busy' | 'denied' | 'other', MessageKey> = {
   offline: 'off.error.offline',
   busy: 'off.error.busy',
+  denied: 'off.error.denied',
   other: 'off.error.other',
 };
 
-/** Scan or type a barcode, then find the product on this phone or at Open Food Facts. */
-export function BarcodeSheet({ onFound, onManual, onClose }: { onFound: (p: Product) => void; onManual: () => void; onClose: () => void }) {
+/**
+ * Scan or type a barcode, then find the product on this phone or at Open Food Facts. Without
+ * `onManual` (changing a logged entry) an unknown product offers no manual entry.
+ */
+export function BarcodeSheet({ onFound, onManual, onClose }: { onFound: (p: Product) => void; onManual?: () => void; onClose: () => void }) {
   const [typed, setTyped] = useState('');
   const [status, setStatus] = useState<Status>({ kind: 'idle' });
   const [camera, setCamera] = useState<'starting' | 'on' | 'failed' | 'unsupported'>(() => (canDetectBarcodes() && typeof navigator.mediaDevices?.getUserMedia === 'function' ? 'starting' : 'unsupported'));
@@ -36,7 +40,7 @@ export function BarcodeSheet({ onFound, onManual, onClose }: { onFound: (p: Prod
       const r = await findProduct(code);
       if (r.kind === 'found') onFound(r.product);
       else if (r.kind === 'notFound') setStatus({ kind: 'notFound', code });
-      else setStatus({ kind: 'error', message: LOOKUP_ERRORS[r.reason] });
+      else setStatus({ kind: 'error', message: LOOKUP_ERRORS[r.reason], detail: r.detail });
     } finally {
       busy.current = false;
     }
@@ -100,15 +104,18 @@ export function BarcodeSheet({ onFound, onManual, onClose }: { onFound: (p: Prod
       {status.kind === 'error' && (
         <p className="notice" role="alert">
           <Icon name="alert" size={16} /> {t(status.message)}
+          {status.detail && <span className="muted small block error-detail">{t('off.error.detail', { detail: status.detail })}</span>}
         </p>
       )}
       {status.kind === 'notFound' && (
         <div className="card notice-card" role="alert">
-          <p>{t('off.notFound', { code: status.code })}</p>
+          <p>{t(onManual ? 'off.notFound' : 'off.notFoundEdit', { code: status.code })}</p>
           <div className="row">
-            <button className="btn btn-secondary" onClick={onManual}>
-              {t('log.manual')}
-            </button>
+            {onManual && (
+              <button className="btn btn-secondary" onClick={onManual}>
+                {t('log.manual')}
+              </button>
+            )}
             <button className="btn btn-ghost" onClick={() => setStatus({ kind: 'idle' })}>
               {t('off.scanAnother')}
             </button>

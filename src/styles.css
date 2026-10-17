@@ -232,6 +232,12 @@ header.page-head:not(.row):not(.row-between) {
 .notice {
   color: var(--warn);
 }
+/* The server's own words under an error: long addresses must wrap, and the user may copy it. */
+.error-detail {
+  margin-top: 4px;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
 .disclaimer {
   margin-top: 1.5rem;
 }
@@ -1013,7 +1019,9 @@ textarea:focus-visible,
 }
 .entry-row {
   display: grid;
-  grid-template-columns: 1fr auto auto;
+  grid-template-columns: 1fr;
+  grid-auto-columns: auto;
+  grid-auto-flow: column;
   align-items: center;
   gap: 8px;
   width: 100%;
@@ -1028,6 +1036,19 @@ textarea:focus-visible,
 }
 .entry-label {
   overflow-wrap: anywhere;
+}
+.entry-edit {
+  display: inline-flex;
+  color: var(--text-muted);
+}
+.replaced-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+.food-picker .search-row {
+  margin-bottom: 8px;
 }
 .conf {
   display: inline-flex;
