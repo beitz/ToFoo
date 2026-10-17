@@ -59,6 +59,20 @@ describe('repository', () => {
     expect(await b.db.products.count()).toBe(1);
   });
 
+  it('adds, edits, deletes and restores journal entries, and backs them up', async () => {
+    const repo = await fresh();
+    const e = await repo.addJournal({ time: 10, day: '2026-10-15', text: 'Headache since noon' });
+    expect(e.schemaVersion).toBe(1);
+    await repo.updateJournal({ ...e, text: 'Headache since noon, better after a walk' });
+    expect((await repo.db.journal.get(e.id))!.text).toBe('Headache since noon, better after a walk');
+    const removed = await repo.deleteJournal(e.id);
+    expect(await repo.db.journal.count()).toBe(0);
+    await repo.restoreJournal(removed!);
+    const b = await fresh();
+    await b.restore(await repo.snapshot());
+    expect(await b.db.journal.where('day').equals('2026-10-15').toArray()).toEqual([removed]);
+  });
+
   it('pins and unpins favourite foods', async () => {
     const repo = await fresh();
     const oats = { source: 'BLS', version: '4.0', code: 'C133000' } as const;

@@ -16,6 +16,7 @@ import { AssistantPage } from '../features/assistant/AssistantPage';
 import { AssistantSettingsPage } from '../features/settings/AssistantSettingsPage';
 import { UsdaSettingsPage } from '../features/settings/UsdaSettingsPage';
 import { DiaryPage } from '../features/diary/DiaryPage';
+import { JournalPage } from '../features/journal/JournalPage';
 import { RecipesPage } from '../features/recipes/RecipesPage';
 import { RecipeEditor } from '../features/recipes/RecipeEditor';
 import { RecipeView } from '../features/recipes/RecipeView';
@@ -40,6 +41,8 @@ function Page({ route }: { route: string[] }) {
       return <AssistantPage key={b} day={b} />;
     case 'diary':
       return <DiaryPage day={b} />;
+    case 'journal':
+      return <JournalPage />;
     case 'recipes':
       if (b === 'new') return <RecipeEditor key="new" />;
       if (b && c === 'edit') return <RecipeEditor key={b} id={b} />;

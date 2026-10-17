@@ -7,7 +7,7 @@ import { addDays, formatDay, formatTime } from '../../lib/dates';
 import { fmtAmount } from '../../lib/format';
 import { groupMeals } from '../../model/simulate';
 import { repo } from '../../storage/repo';
-import type { LogEntry, SunEntry } from '../../storage/types';
+import type { JournalEntry, LogEntry, SunEntry } from '../../storage/types';
 import { Icon } from '../../ui/Icon';
 import { Segmented } from '../../ui/controls';
 import { entryAmount } from '../log/describe';
@@ -16,6 +16,10 @@ import { SunEntrySheet } from './SunEntrySheet';
 import { sunSessionsFor } from '../../logic/resolve';
 import { logMealAgain } from '../log/logAgain';
 import { isOn } from '../../settings/features';
+import { JournalRow } from '../journal/JournalPage';
+import { JournalSheet } from '../journal/JournalSheet';
+import { useJournal } from '../journal/useJournal';
+import { defaultTimeFor } from '../log/time';
 
 type StatusChoice = 'auto' | 'logged' | 'partial' | 'fasted' | 'filled' | 'excluded';
 
@@ -25,9 +29,24 @@ export function DiaryPage({ day: dayParam }: { day?: string }) {
   const day = dayParam && /^\d{4}-\d{2}-\d{2}$/.test(dayParam) && dayParam <= d.today ? dayParam : d.today;
   const [editing, setEditing] = useState<LogEntry | null>(null);
   const [addingSun, setAddingSun] = useState(false);
+  // A journal entry being edited, or 'new' for one being written.
+  const [journalSheet, setJournalSheet] = useState<JournalEntry | 'new' | null>(null);
+  const journalOn = isOn(d.settings.features, 'journal');
+  const notes = useJournal(day) ?? [];
 
   const entries = d.log.filter((e) => e.day === day);
   const meals = groupMeals(entries, d.settings.mealWindowMinutes);
+  // Meals and journal entries in one timeline, so "tired after lunch" sits after the lunch;
+  // journal entries with no meal between them share a card.
+  type Item = { kind: 'meal'; time: number; meal: LogEntry[] } | { kind: 'notes'; time: number; notes: JournalEntry[] };
+  const timeline: Item[] = [];
+  const sorted = [...meals.map((meal) => ({ time: meal[0]!.time, meal })), ...notes.map((note) => ({ time: note.time, note }))].sort((a, b) => a.time - b.time);
+  for (const x of sorted) {
+    const last = timeline[timeline.length - 1];
+    if ('meal' in x) timeline.push({ kind: 'meal', time: x.time, meal: x.meal });
+    else if (last?.kind === 'notes') last.notes.push(x.note);
+    else timeline.push({ kind: 'notes', time: x.time, notes: [x.note] });
+  }
   const explicit = d.dayStatus.find((s) => s.day === day)?.status;
   const choice: StatusChoice = explicit ?? 'auto';
   const effective = d.model.dayStatus[day] ?? 'unknown';
@@ -93,46 +112,36 @@ export function DiaryPage({ day: dayParam }: { day?: string }) {
         <p className="muted small">{t(choice === 'auto' && isOn(d.settings.features, 'fillUnloggedDays') ? 'diary.hint.autoFilled' : (`diary.hint.${choice}` as MessageKey))}</p>
       </div>
 
-      <a className="btn btn-primary btn-block" href={href('log', day)}>
-        <Icon name="plus" /> {t('diary.logForDay')}
-      </a>
+      <div className={journalOn ? 'diary-actions' : undefined}>
+        <a className="btn btn-primary btn-block" href={href('log', day)}>
+          <Icon name="plus" /> {t('diary.logForDay')}
+        </a>
+        {journalOn && (
+          <button className="btn btn-secondary btn-block" onClick={() => setJournalSheet('new')}>
+            <Icon name="plus" /> {t('journal.entryShort')}
+          </button>
+        )}
+      </div>
 
-      {meals.length === 0 && <p className="muted empty">{t('diary.empty')}</p>}
-      {meals.map((meal) => (
-        <div className="card meal" key={meal[0]!.id}>
-          <div className="meal-head">
-            <strong>{formatTime(meal[0]!.time)}</strong>
-            <span className="muted small">{t('diary.meal')}</span>
-            <button
-              className="btn btn-small btn-ghost meal-again"
-              aria-label={t('repeat.againLabel')}
-              onClick={async () => {
-                // The copy is logged now; show today's diary so it can be edited straight away.
-                const added = await logMealAgain(meal, Date.now(), d.batchesById, toast);
-                if (added.length && day !== d.today) navigate('diary');
-              }}
-            >
-              <Icon name="repeat" size={16} /> {t('repeat.again')}
-            </button>
+      {timeline.length === 0 && <p className="muted empty">{t('diary.empty')}</p>}
+      {timeline.map((item) =>
+        item.kind === 'notes' ? (
+          <div className="card journal-card" key={item.notes[0]!.id}>
+            <span className="muted small journal-label">
+              <Icon name="journal" size={16} /> {t('journal.entry')}
+            </span>
+            <ul className="plain-list">
+              {item.notes.map((note) => (
+                <li key={note.id}>
+                  <JournalRow entry={note} onEdit={() => setJournalSheet(note)} />
+                </li>
+              ))}
+            </ul>
           </div>
-          <ul className="plain-list">
-            {meal.map((e) => (
-              <li key={e.id}>
-                <button className="entry-row" onClick={() => setEditing(e)}>
-                  <span className="entry-label">{e.label}</span>
-                  <span className="muted small">{entryAmount(e, d)}</span>
-                  <span className={`conf conf-${e.confidence}`} title={t(`confidence.${e.confidence}` as MessageKey)}>
-                    {e.confidence}
-                  </span>
-                  <span className="entry-edit">
-                    <Icon name="edit" size={16} />
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ))}
+        ) : (
+          <MealCard key={item.meal[0]!.id} meal={item.meal} day={day} onEdit={setEditing} />
+        ),
+      )}
 
       {meals.length > 0 && <p className="muted small">{t('diary.editHint')}</p>}
       {mealSummary.length > 0 && (
@@ -166,6 +175,50 @@ export function DiaryPage({ day: dayParam }: { day?: string }) {
 
       {editing && <EditEntrySheet entry={editing} onClose={() => setEditing(null)} />}
       {addingSun && <SunEntrySheet day={day} onClose={() => setAddingSun(false)} />}
+      {journalSheet && (
+        <JournalSheet entry={journalSheet === 'new' ? undefined : journalSheet} defaultTime={defaultTimeFor(day, d.today)} onClose={() => setJournalSheet(null)} />
+      )}
     </section>
+  );
+}
+
+/** One meal: its items, each tappable to edit, and "Log again". */
+function MealCard({ meal, day, onEdit }: { meal: LogEntry[]; day: string; onEdit: (e: LogEntry) => void }) {
+  const d = useData();
+  const toast = useToast();
+  return (
+    <div className="card meal">
+      <div className="meal-head">
+        <strong>{formatTime(meal[0]!.time)}</strong>
+        <span className="muted small">{t('diary.meal')}</span>
+        <button
+          className="btn btn-small btn-ghost meal-again"
+          aria-label={t('repeat.againLabel')}
+          onClick={async () => {
+            // The copy is logged now; show today's diary so it can be edited straight away.
+            const added = await logMealAgain(meal, Date.now(), d.batchesById, toast);
+            if (added.length && day !== d.today) navigate('diary');
+          }}
+        >
+          <Icon name="repeat" size={16} /> {t('repeat.again')}
+        </button>
+      </div>
+      <ul className="plain-list">
+        {meal.map((e) => (
+          <li key={e.id}>
+            <button className="entry-row" onClick={() => onEdit(e)}>
+              <span className="entry-label">{e.label}</span>
+              <span className="muted small">{entryAmount(e, d)}</span>
+              <span className={`conf conf-${e.confidence}`} title={t(`confidence.${e.confidence}` as MessageKey)}>
+                {e.confidence}
+              </span>
+              <span className="entry-edit">
+                <Icon name="edit" size={16} />
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }

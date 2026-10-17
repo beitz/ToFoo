@@ -5,13 +5,13 @@ import { href, navigate } from '../../app/router';
 import { t, type MessageKey } from '../../i18n';
 import { dayKey, formatTime } from '../../lib/dates';
 import { fmtNumber, fmtTokens, fmtUsd } from '../../lib/format';
-import { appNote, emptyConversation, sendMessage, type AiModel, type Conversation, type ShownProposal, type TurnOutcome } from '../../ai/assistant';
+import { appNote, emptyConversation, sendMessage, type AiModel, type Conversation, type ShownNote, type ShownProposal, type TurnOutcome } from '../../ai/assistant';
 import { classifyError, getAiSettings, makeCreate, saveUsage } from '../../ai/client';
 import { mergeModelTokens, modelTokensCost, totalTokens, type ModelTokens } from '../../ai/pricing';
 import { prepareImage, type PreparedImage } from '../../ai/image';
 import { photoLabel, readPhotoTime, type PhotoTime } from '../../ai/photoTime';
-import { getOpenAiKey, transcribe } from '../../ai/transcribe';
-import { useRecorder } from './useRecorder';
+import { appendText, useDictation } from './useDictation';
+import { RecordingTime } from './RecordingTime';
 import type { ProposedItem, ProductTools } from '../../ai/tools';
 import { findProduct, findUsda } from '../../foods/findProduct';
 import { productLabel, productPageUrl, productRef } from '../../foods/products';
@@ -28,10 +28,9 @@ import { defaultTimeFor } from '../log/time';
 
 type Bubble = { role: 'user'; text: string; previews: string[] } | { role: 'assistant'; text: string } | { role: 'card'; id: string };
 type ComposerPhoto = PreparedImage & { barcodes: string[]; time: PhotoTime };
-interface Card {
-  proposal: ShownProposal;
-  logged: boolean;
-}
+/** A proposed meal (M1, …) or journal entry (J1, …), and whether the user logged or saved it. */
+type Card = { kind: 'meal'; proposal: ShownProposal; logged: boolean } | { kind: 'note'; note: ShownNote; logged: boolean };
+const cardId = (c: Card) => (c.kind === 'meal' ? c.proposal.id : c.note.id);
 
 /** Photos per message: enough for a couple of days of meals; each one adds to the cost of every request in the chat. */
 const MAX_PHOTOS = 20;
@@ -114,13 +113,8 @@ function Chat({ apiKey, model, day }: { apiKey: string; model: AiModel; day: str
   const [chatTokens, setChatTokens] = useState<ModelTokens>({});
   const [turnTokens, setTurnTokens] = useState<ModelTokens>({});
   // Voice input (opt-in, OpenAI key): record, then the transcript lands in the text box.
-  const voiceOn = isOn(d.settings.features, 'voiceInput');
-  const [voiceKey, setVoiceKey] = useState('');
-  useEffect(() => {
-    if (voiceOn) void getOpenAiKey().then(setVoiceKey);
-  }, [voiceOn]);
-  const recorder = useRecorder();
-  const [transcribing, setTranscribing] = useState(false);
+  const dictation = useDictation({ onText: (added) => setText((old) => appendText(old, added)), onError: setError });
+  const { recording, transcribing } = dictation;
   /** Index of the photo shown large, for looking at photos while talking about them. */
   const [viewing, setViewing] = useState<number>();
 
@@ -153,8 +147,8 @@ function Chat({ apiKey, model, day }: { apiKey: string; model: AiModel; day: str
       now: Date.now(),
       day,
       today: d.today,
-      logged: all.filter((c) => c.logged).map((c) => c.proposal.id),
-      open: all.filter((c) => !c.logged).map((c) => c.proposal.id),
+      logged: all.filter((c) => c.logged).map(cardId),
+      open: all.filter((c) => !c.logged).map(cardId),
       barcodes: [...new Set(images.flatMap((i) => i.barcodes))],
     });
     const labelled = images.map((img, i) => ({ ...img, label: photoLabel(photoCount + i + 1, img.time) }));
@@ -180,7 +174,7 @@ function Chat({ apiKey, model, day }: { apiKey: string; model: AiModel; day: str
               ...(usdaOn ? { searchUsda: (q: string, kind: 'generic' | 'branded') => findUsda(q, kind, 8) } : {}),
             }
           : undefined;
-      const ctx = { db: d.foods, index: d.searchIndex, boost: d.searchBoost, products, now: Date.now() };
+      const ctx = { db: d.foods, index: d.searchIndex, boost: d.searchBoost, products, now: Date.now(), journal: isOn(d.settings.features, 'journal') };
       const r = await sendMessage(create, model, conversation, msg, ctx, onUsage);
       setConversation(r.conversation);
       setPhotoCount((n) => n + msg.images.length);
@@ -204,13 +198,16 @@ function Chat({ apiKey, model, day }: { apiKey: string; model: AiModel; day: str
     const added: Bubble[] = outcome.text ? [{ role: 'assistant', text: outcome.text }] : [];
     if (outcome.kind === 'proposal') {
       // A correction replaces its open card: the old one goes, the new one appears at the end.
-      const replaced = new Set(outcome.proposals.map((p) => p.replaces).filter((id): id is string => !!id && cardsRef.current.get(id)?.logged === false));
+      const shown: Card[] = [...outcome.proposals.map((p): Card => ({ kind: 'meal', proposal: p, logged: false })), ...outcome.notes.map((n): Card => ({ kind: 'note', note: n, logged: false }))];
+      const replaced = new Set(
+        shown.map((c) => (c.kind === 'meal' ? c.proposal.replaces : c.note.replaces)).filter((id): id is string => !!id && cardsRef.current.get(id)?.logged === false),
+      );
       setCards((all) => {
         const next = new Map([...all].filter(([id]) => !replaced.has(id)));
-        for (const p of outcome.proposals) next.set(p.id, { proposal: p, logged: false });
+        for (const c of shown) next.set(cardId(c), c);
         return next;
       });
-      setBubbles((b) => [...b.filter((x) => !(x.role === 'card' && replaced.has(x.id))), ...added, ...outcome.proposals.map((p): Bubble => ({ role: 'card', id: p.id }))]);
+      setBubbles((b) => [...b.filter((x) => !(x.role === 'card' && replaced.has(x.id))), ...added, ...shown.map((c): Bubble => ({ role: 'card', id: cardId(c) }))]);
     } else setBubbles((b) => [...b, ...added]);
   }
 
@@ -228,33 +225,13 @@ function Chat({ apiKey, model, day }: { apiKey: string; model: AiModel; day: str
 
   const timedOut = images.filter((i) => i.time.source !== 'photo').length;
 
-  useEffect(() => {
-    if (recorder.state.kind === 'denied') setError('voice.error.denied');
-    if (recorder.state.kind === 'unsupported') setError('voice.error.unsupported');
-  }, [recorder.state.kind]);
-
   async function toggleRecording() {
-    if (recorder.state.kind !== 'recording') {
-      setError(undefined);
-      await recorder.start();
-      return;
-    }
-    const audio = await recorder.stop();
-    if (!audio) {
-      setError('voice.error.empty');
-      return;
-    }
-    setTranscribing(true);
-    const r = await transcribe(audio, voiceKey);
-    setTranscribing(false);
-    if (!r.ok) setError(`voice.error.${r.error}`);
-    else if (r.text) setText((old) => (old.trim() ? `${old.trimEnd()}\n${r.text}` : r.text));
-    else setError('voice.error.empty');
+    if (!recording) setError(undefined);
+    await dictation.toggle();
   }
 
-  const recording = recorder.state.kind === 'recording';
   const micButton =
-    voiceOn && voiceKey ? (
+    dictation.available ? (
       <button
         className={`icon-btn composer-btn${recording ? ' composer-recording' : ''}`}
         aria-label={t(recording ? 'voice.stop' : 'voice.record')}
@@ -266,9 +243,9 @@ function Chat({ apiKey, model, day }: { apiKey: string; model: AiModel; day: str
       </button>
     ) : null;
   const voiceStatus =
-    recorder.state.kind === 'recording' ? (
+    dictation.startedAt !== undefined ? (
       <p className="composer-note voice-status small" role="status">
-        <span className="rec-dot" aria-hidden="true" /> <RecordingTime since={recorder.state.startedAt} />
+        <span className="rec-dot" aria-hidden="true" /> <RecordingTime since={dictation.startedAt} />
       </p>
     ) : transcribing ? (
       <p className="composer-note muted small" role="status">
@@ -280,10 +257,13 @@ function Chat({ apiKey, model, day }: { apiKey: string; model: AiModel; day: str
     <>
       {/* While a photo is open, everything behind it is out of reach for touch and screen readers. */}
       <div className="chat" aria-live="polite" inert={viewing !== undefined}>
-        <div className="bubble bubble-assistant">{t('ai.intro')}</div>
+        <div className="bubble bubble-assistant">
+          {t('ai.intro')}
+          {isOn(d.settings.features, 'journal') && ` ${t('ai.introJournal')}`}
+        </div>
         {bubbles.map((b, i) =>
           b.role === 'card' ? (
-            cards.has(b.id) && <ProposalCard key={b.id} card={cards.get(b.id)!} day={day} toast={toast} onLogged={(v) => setLogged(b.id, v)} />
+            cards.has(b.id) && <CardView key={b.id} card={cards.get(b.id)!} day={day} toast={toast} onLogged={(v) => setLogged(b.id, v)} />
           ) : b.role === 'user' ? (
             <div key={i} className="bubble bubble-user">
               {b.previews.length > 0 && (
@@ -367,17 +347,6 @@ function Chat({ apiKey, model, day }: { apiKey: string; model: AiModel; day: str
       )}
     </>
   );
-}
-
-/** Seconds since recording started, ticking. */
-function RecordingTime({ since }: { since: number }) {
-  const [now, setNow] = useState(Date.now());
-  useEffect(() => {
-    const id = window.setInterval(() => setNow(Date.now()), 500);
-    return () => window.clearInterval(id);
-  }, []);
-  const s = Math.max(0, Math.floor((now - since) / 1000));
-  return <>{t('voice.recording', { time: `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` })}</>;
 }
 
 /** The chosen photos, large, one at a time: look through them while talking about them. */
@@ -468,8 +437,70 @@ function photoTimeShort(pt: PhotoTime): string {
   return pt.source === 'photo' ? s : `≈ ${s}`;
 }
 
+type CardProps<C extends Card> = { card: C; day: string; toast: ReturnType<typeof useToast>; onLogged: (logged: boolean) => void };
+
+function CardView({ card, ...rest }: CardProps<Card>) {
+  return card.kind === 'meal' ? <ProposalCard card={card} {...rest} /> : <NoteCard card={card} {...rest} />;
+}
+
+/** A journal entry the assistant proposes: check or edit the words and time, then save. */
+function NoteCard({ card, day, toast, onLogged }: CardProps<Extract<Card, { kind: 'note' }>>) {
+  const { note } = card;
+  const d = useData();
+  const [text, setText] = useState(note.text);
+  const [time, setTime] = useState(() => note.time ?? defaultTimeFor(day, d.today));
+  const [saving, setSaving] = useState(false);
+
+  async function save() {
+    if (!text.trim() || saving) return;
+    setSaving(true);
+    try {
+      const added = await repo.addJournal({ time, day: dayKey(new Date(time)), text: text.trim() });
+      toast(t('journal.saved'), async () => {
+        await repo.deleteJournal(added.id);
+        onLogged(false);
+      });
+      onLogged(true);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (card.logged) {
+    return (
+      <div className="card proposal-done row">
+        <Icon name="check" size={18} />
+        <span>
+          {t('ai.noteSaved', { when: `${new Date(time).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}, ${formatTime(time)}` })}{' '}
+          <a href={href('diary', dayKey(new Date(time)))}>{t('edit.inDiary')}</a>
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="card proposal">
+      <div className="row-between">
+        <strong className="journal-label">
+          <Icon name="journal" size={18} /> {t('ai.noteTitle')}
+        </strong>
+        <span className="muted small" title={t('ai.cardId')}>
+          {note.id}
+        </span>
+      </div>
+      <textarea className="note-text" rows={3} value={text} aria-label={t('ai.noteTitle')} onChange={(e) => setText(e.target.value)} />
+      <TimeField value={time} onChange={setTime} />
+      <div className="sheet-actions">
+        <button className="btn btn-primary" disabled={!text.trim() || saving} onClick={() => void save()}>
+          {t('ai.saveNote')}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /** One meal the assistant proposes: check, adjust grams and time, remove items, then log. */
-function ProposalCard({ card, day, toast, onLogged }: { card: Card; day: string; toast: ReturnType<typeof useToast>; onLogged: (logged: boolean) => void }) {
+function ProposalCard({ card, day, toast, onLogged }: CardProps<Extract<Card, { kind: 'meal' }>>) {
   const { proposal } = card;
   const d = useData();
   const [items, setItems] = useState<Array<Omit<ProposedItem, 'grams'> & { grams: number | undefined }>>(proposal.items);

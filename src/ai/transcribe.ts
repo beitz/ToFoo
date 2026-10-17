@@ -19,6 +19,9 @@ export const MAX_AUDIO_BYTES = 25 * 1024 * 1024;
  */
 export const TRANSCRIBE_PROMPT =
   'Someone describing what they ate for a food diary, in German or English or both, often looking at their meal photos. Food names, brands, amounts in grams, times of day.';
+/** The same for journal entries: how the day went, how they feel, sleep, symptoms, food. */
+export const JOURNAL_TRANSCRIBE_PROMPT =
+  'Someone speaking a personal journal entry, in German or English or both: how their day went, how they feel, sleep, energy, symptoms, food, times of day.';
 
 export async function getOpenAiKey(): Promise<string> {
   return (await repo.getMeta<string>(KEY_META)) ?? '';
@@ -48,12 +51,12 @@ export function audioFileName(mimeType: string): string {
 }
 
 /** Send one recording; `fetchFn` is injected so this can be tested without a network. */
-export async function transcribe(audio: Blob, apiKey: string, fetchFn: typeof fetch = fetch): Promise<TranscribeResult> {
+export async function transcribe(audio: Blob, apiKey: string, fetchFn: typeof fetch = fetch, prompt: string = TRANSCRIBE_PROMPT): Promise<TranscribeResult> {
   if (audio.size > MAX_AUDIO_BYTES) return { ok: false, error: 'tooLong' };
   const form = new FormData();
   form.append('file', audio, audioFileName(audio.type));
   form.append('model', TRANSCRIBE_MODEL);
-  form.append('prompt', TRANSCRIBE_PROMPT);
+  form.append('prompt', prompt);
   form.append('response_format', 'json');
   let res: Response;
   try {

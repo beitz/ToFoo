@@ -1997,9 +1997,62 @@ body:has(.composer) .toast-area {
   font-weight: 600;
 }
 
+/* ── Journal ─────────────────────────────────────────────────── */
+.diary-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.diary-actions .btn-block {
+  margin: 0;
+}
+.journal-editor textarea {
+  min-height: 7.5em;
+  resize: vertical;
+  line-height: 1.4;
+}
+.journal-voice {
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: center;
+  margin-top: 8px;
+}
+.journal-voice .btn {
+  min-height: 44px;
+}
+.journal-row {
+  grid-template-columns: auto 1fr auto;
+  grid-auto-flow: row;
+  align-items: start;
+  padding: 10px 0;
+}
+.journal-time {
+  padding-top: 2px;
+  font-variant-numeric: tabular-nums;
+}
+.journal-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.journal-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.proposal .note-text {
+  margin: 8px 0;
+  resize: vertical;
+}
+.diary-actions {
+  margin: 10px 0;
+}
+.journal-card .journal-row {
+  padding-bottom: 0;
+}
+
 /* ── Home: floating log and fasting buttons ──────────────────── */
 .page:has(.fab-stack) {
-  padding-bottom: calc(var(--nav-h) + 150px + env(safe-area-inset-bottom));
+  padding-bottom: calc(var(--nav-h) + 210px + env(safe-area-inset-bottom));
 }
 .fab-stack {
   position: fixed;

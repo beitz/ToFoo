@@ -208,6 +208,11 @@ export function HomePage() {
       )}
       <p className="muted small disclaimer">{t('home.disclaimer')}</p>
       <div className="fab-stack">
+        {isOn(d.settings.features, 'journal') && (
+          <a className="fab fab-small" href={href('journal')} aria-label={t('home.journal')} title={t('home.journal')}>
+            <Icon name="journal" />
+          </a>
+        )}
         <button
           className={`fab fab-small${d.activeFast ? ' on' : ''}`}
           onClick={toggleFast}

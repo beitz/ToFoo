@@ -12,6 +12,7 @@ import {
   type DayStatusRecord,
   type FoodRef,
   type Fast,
+  type JournalEntry,
   type LogEntry,
   type NewLogEntry as NewLog,
   type Product,
@@ -35,6 +36,7 @@ export interface Snapshot {
   fasts: Fast[];
   sunEntries: SunEntry[];
   products: Product[];
+  journal: JournalEntry[];
 }
 
 
@@ -224,6 +226,27 @@ export function createRepo(db: ToFooDB) {
       await db.sunEntries.delete(id);
     },
 
+    // ── Journal ──
+    async addJournal(e: Omit<JournalEntry, 'id' | 'schemaVersion'>): Promise<JournalEntry> {
+      const rec: JournalEntry = { ...e, id: newId(), schemaVersion: v };
+      await db.journal.put(rec);
+      return rec;
+    },
+    async updateJournal(e: JournalEntry): Promise<void> {
+      await db.journal.put({ ...e, schemaVersion: v });
+    },
+    /** Delete an entry; returns it so the UI can offer undo via restoreJournal. */
+    async deleteJournal(id: string): Promise<JournalEntry | undefined> {
+      return db.transaction('rw', db.journal, async () => {
+        const old = await db.journal.get(id);
+        await db.journal.delete(id);
+        return old;
+      });
+    },
+    async restoreJournal(e: JournalEntry): Promise<void> {
+      await db.journal.put(e);
+    },
+
     // ── Meta ──
     async getMeta<T>(key: string): Promise<T | undefined> {
       return (await db.meta.get(key))?.value as T | undefined;
@@ -234,7 +257,7 @@ export function createRepo(db: ToFooDB) {
 
     // ── Backup ──
     async snapshot(): Promise<Snapshot> {
-      return db.transaction('r', [db.profile, db.settings, db.recipes, db.batches, db.log, db.customFoods, db.dayStatus, db.fasts, db.sunEntries, db.products], async () => ({
+      return db.transaction('r', [db.profile, db.settings, db.recipes, db.batches, db.log, db.customFoods, db.dayStatus, db.fasts, db.sunEntries, db.products, db.journal], async () => ({
         profile: (await db.profile.get('profile')) ?? null,
         settings: (await db.settings.get('settings')) ?? null,
         recipes: await db.recipes.toArray(),
@@ -245,11 +268,12 @@ export function createRepo(db: ToFooDB) {
         fasts: await db.fasts.toArray(),
         sunEntries: await db.sunEntries.toArray(),
         products: await db.products.toArray(),
+        journal: await db.journal.toArray(),
       }));
     },
     /** Replace all personal data with the snapshot (after the user confirmed a preview). */
     async restore(s: Snapshot): Promise<void> {
-      const tables = [db.profile, db.settings, db.recipes, db.batches, db.log, db.customFoods, db.dayStatus, db.fasts, db.sunEntries, db.products];
+      const tables = [db.profile, db.settings, db.recipes, db.batches, db.log, db.customFoods, db.dayStatus, db.fasts, db.sunEntries, db.products, db.journal];
       await db.transaction('rw', tables, async () => {
         await Promise.all(tables.map((t) => t.clear()));
         if (s.profile) await db.profile.put(s.profile);
@@ -262,6 +286,7 @@ export function createRepo(db: ToFooDB) {
         await db.fasts.bulkPut(s.fasts);
         await db.sunEntries.bulkPut(s.sunEntries);
         await db.products.bulkPut(s.products);
+        await db.journal.bulkPut(s.journal);
       });
       await runMigrations(db);
     },
