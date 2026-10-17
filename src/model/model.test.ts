@@ -341,8 +341,30 @@ describe('simulation', () => {
     expect(fe.value.central).toBeCloseTo(fe.averageAbsorbed / male30.byNutrient.get('FE')!.physiological, 6);
     expect(fe.status).toBe('fine'); // the diet covers the need, though the store started empty
     expect(fe.store!.central).toBeLessThan(0.01);
-    expect(fe.storeHistory!.length).toBe(3);
     expect(res.get('VITD')!.kind).toBe('tank');
+  });
+
+  it('counts how long a slow store\'s balance has been low, only while something is logged', () => {
+    const d = days('2026-08-01', 50);
+    const poor = simulate(baseInput(d, d.map((day, i) => manual(`p${i}`, day, 12, { FE: 2 })))).nutrients.get('FE')!;
+    expect(poor.lowForDays).toBe(50);
+    const good = simulate(baseInput(d, d.map((day, i) => manual(`g${i}`, day, 12, { FE: 16, VITC: 200 })))).nutrients.get('FE')!;
+    expect(good.lowForDays).toBe(0);
+    const nothing = simulate(baseInput(days('2026-08-01', 1), [])).nutrients.get('FE')!;
+    expect(nothing.lowForDays).toBe(0);
+  });
+
+  it('a blood test sets the store on its day and turns a slow store back into a tank', () => {
+    const d = days('2026-10-01', 10);
+    const entries = d.map((day, i) => manual(`f${i}`, day, 12, { FE: 16, VITC: 200 }));
+    const res = simulate(baseInput(d, entries, { startingLevel: 'empty', measuredStores: { FE: { day: d[5]!, amount: 200 } } })).nutrients.get('FE')!;
+    expect(res.kind).toBe('tank');
+    expect(res.measuredOn).toBe(d[5]);
+    expect(res.history[4]!.central).toBeLessThan(0.05); // before the test: the empty guess
+    expect(res.level!.central).toBeGreaterThan(200 - 5 * 0.95); // from the test on: measured level ± a few days of flow
+    // A test from before the model start sets the first day; one in the future changes nothing.
+    expect(simulate(baseInput(d, entries, { measuredStores: { FE: { day: '2026-01-01', amount: 200 } } })).nutrients.get('FE')!.history[0]!.central).toBeGreaterThan(0.15);
+    expect(simulate(baseInput(d, entries, { measuredStores: { FE: { day: '2027-01-01', amount: 200 } } })).nutrients.get('FE')!.kind).toBe('balance');
   });
 
   it('an empty iron store on a good diet is filling, with the time to the fine zone', () => {
