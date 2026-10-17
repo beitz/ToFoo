@@ -291,7 +291,7 @@ Automatic detection (face-down phone, being at home at night) is not possible in
 
 ## AI recipe ideas
 
-"What should I cook next?" answered by the assistant, with ideas that fit the user's gaps, habits and preferences, each with one line on why it is suggested (owner's idea, 2026-10-17; details proposed, nothing built). Optional, off by default, needs the AI assistant and the user's own Anthropic key.
+"What should I cook next?" answered by the assistant, with ideas that fit the user's gaps, habits and preferences, each with one line on why it is suggested (owner's idea, 2026-10-17; details proposed, nothing built; comes after Insights in the build order). Optional, off by default, needs the AI assistant and the user's own Anthropic key.
 
 **Flow**:
 
@@ -495,7 +495,7 @@ v1 is the smallest app that is useful every day; each later version adds to the 
 - [ ] Activity: simple log (what, when, how long, how hard, outside); outdoor time feeds the sun estimate
 - [ ] Insights: the assistant looks for patterns across journal, food, sleep and activity, numbers computed by the app
 
-**AI recipe ideas** (owner's idea 2026-10-17; not ordered against the journal work yet):
+**AI recipe ideas** (owner's idea 2026-10-17; built after Insights, owner's decision):
 
 - [ ] Recipe ideas from the assistant: cards with a reason line and the app's own portion numbers, save to recipes; cooking preferences text; exclusions as a hard filter
 - [ ] Later: improve an existing recipe, a snack for today, ideas from a fridge photo, a shopping list from an idea
