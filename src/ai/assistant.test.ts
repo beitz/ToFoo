@@ -241,6 +241,15 @@ describe('packaged products (Open Food Facts lookup on)', () => {
     expect((await runLookupBarcode({ barcodes: ['1'] }, ctx)).ok).toBe(false);
   });
 
+  it('does not fetch a product again that this chat already looked up', async () => {
+    const p = products();
+    lookups.length = 0;
+    await runLookupBarcode({ barcodes: ['4008400121925'] }, { ...ctx, products: p });
+    const again = await runLookupBarcode({ barcodes: ['4008400121925'] }, { ...ctx, products: p });
+    expect(again.text).toContain('OFF:4008400121925 | Giotto Haselnuss');
+    expect(lookups).toEqual(['4008400121925']);
+  });
+
   it('lists saved products in food searches', () => {
     const r = runSearchFoods({ queries: ['giotto'] }, { ...ctx, products: products() });
     expect(r.text).toContain('OFF:8000500319475 | GiOTTO Haselnuss Stick · Ferrero');
