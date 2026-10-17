@@ -2,13 +2,13 @@ import { useMemo, useState } from 'react';
 import { useData } from '../../app/data';
 import { useToast } from '../../app/toast';
 import { href, navigate } from '../../app/router';
-import { t } from '../../i18n';
+import { t, type MessageKey } from '../../i18n';
 import { addDays, formatDay } from '../../lib/dates';
 import { isOn } from '../../settings/features';
 import { repo } from '../../storage/repo';
 import { CompactGauge, Gauge } from '../../ui/Gauge';
 import { Icon } from '../../ui/Icon';
-import { urgencyRank } from '../../ui/status';
+import { statusLabel } from '../../ui/status';
 import { NUTRIENT_BY_ID, NUTRIENTS } from '../../model/nutrients';
 import { rankFoods } from '../../model/ranking';
 import { NON_SINGLE_FOOD_GROUPS } from '../../foods/foodDb';
@@ -17,6 +17,7 @@ import { Field, Segmented, Sheet } from '../../ui/controls';
 import type { NutrientResult } from '../../model/simulate';
 import { Prompts } from './Prompts';
 import { StockChips } from './StockChips';
+import { attentionCounts, COLLAPSED_BY_DEFAULT, groupNutrients, type HomeGrouping } from './grouping';
 
 /** Shown first, in one row: energy and the macronutrients. */
 const MACRO_ROW = ['ENERCC', 'PROT625', 'FAT', 'CHO', 'FIBT'];
@@ -38,15 +39,20 @@ export function HomePage() {
 
   const view = settings.homeView ?? 'compact';
   const macros = MACRO_ROW.map((id) => (hidden.has(id) ? undefined : model.nutrients.get(id))).filter((r): r is NutrientResult => !!r);
-  const gauges = useMemo(
+  const grouping: HomeGrouping = settings.homeGrouping ?? 'status';
+  const groups = useMemo(
     () =>
-      NUTRIENTS.filter((n) => !hidden.has(n.id) && !MACRO_ROW.includes(n.id))
-        .map((n) => model.nutrients.get(n.id)!)
-        .filter(Boolean)
-        .sort((a, b) => urgencyRank(a.status) - urgencyRank(b.status) || (b.status === 'tooHigh' ? (b.ulRatio ?? b.value.central) - (a.ulRatio ?? a.value.central) : a.value.central - b.value.central)),
+      groupNutrients(
+        NUTRIENTS.filter((n) => !hidden.has(n.id) && !MACRO_ROW.includes(n.id))
+          .map((n) => model.nutrients.get(n.id)!)
+          .filter(Boolean),
+        grouping,
+      ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [model, settings.hiddenNutrients],
+    [model, settings.hiddenNutrients, grouping],
   );
+  const isCollapsed = (key: string) => settings.homeCollapsed?.[key] ?? COLLAPSED_BY_DEFAULT.has(key);
+  const toggleGroup = (key: string) => void repo.updateSettings({ homeCollapsed: { ...settings.homeCollapsed, [key]: !isCollapsed(key) } });
 
   const gaps = useMemo(() => {
     const excludedGroups = new Set(d.profile.exclusions.groups);
@@ -123,6 +129,7 @@ export function HomePage() {
           ]}
         />
       </div>
+      <p className="muted small home-legend">{t('home.legend')}</p>
       {(weightDefault || sexDefault) && (
         <p className="muted small">
           {weightDefault ? '* ' : ''}
@@ -137,17 +144,58 @@ export function HomePage() {
           ))}
         </div>
       )}
-      <div className={view === 'compact' ? 'cgauge-grid' : 'gauge-grid'}>
-        {gauges.map((r) => {
-          const defaultBased = weightDefault && (r.kind === 'tank' || r.kind === 'balance' || PER_KG.has(r.id));
-          const open = () => navigate('nutrient', r.id);
-          return view === 'compact' ? (
-            <CompactGauge key={r.id} result={r} defaultBased={defaultBased} onClick={open} />
-          ) : (
-            <Gauge key={r.id} result={r} showRange={showRange} advanced={advanced} defaultBased={defaultBased} onClick={open} />
-          );
-        })}
-      </div>
+      <Segmented
+        label={t('home.grouping')}
+        className="home-grouping"
+        value={grouping}
+        onChange={(v) => void repo.updateSettings({ homeGrouping: v })}
+        options={[
+          { value: 'status', label: t('home.groupStatus') },
+          { value: 'type', label: t('home.groupType') },
+          { value: 'none', label: t('home.groupNone') },
+        ]}
+      />
+      {groups.map((g) => {
+        const grid = (
+          <div className={view === 'compact' ? 'cgauge-grid' : 'gauge-grid'} id={`group-${g.key}`}>
+            {g.items.map((r) => {
+              const defaultBased = weightDefault && (r.kind === 'tank' || r.kind === 'balance' || PER_KG.has(r.id));
+              const open = () => navigate('nutrient', r.id);
+              return view === 'compact' ? (
+                <CompactGauge key={r.id} result={r} defaultBased={defaultBased} onClick={open} />
+              ) : (
+                <Gauge key={r.id} result={r} showRange={showRange} advanced={advanced} defaultBased={defaultBased} onClick={open} />
+              );
+            })}
+          </div>
+        );
+        if (grouping === 'none') return <div key={g.key}>{grid}</div>;
+        const collapsed = isCollapsed(g.key);
+        const counts = grouping === 'type' ? attentionCounts(g.items) : [];
+        // Status headings say what to do; type headings say how many need attention.
+        const hint =
+          grouping === 'status'
+            ? ['tooHigh', 'low', 'gettingLow'].includes(g.id)
+              ? t(`home.groupHint.${g.id}` as MessageKey)
+              : ''
+            : counts.length
+              ? counts.map((c) => `${c.n} ${statusLabel(c.status).toLowerCase()}`).join(' · ')
+              : t('home.groupAllFine');
+        return (
+          <div key={g.key} className={`home-group home-group-${g.id}`}>
+            <button className="home-group-head" aria-expanded={!collapsed} aria-controls={`group-${g.key}`} onClick={() => toggleGroup(g.key)}>
+              <span className={collapsed ? 'chev' : 'chev chev-open'} aria-hidden>
+                <Icon name="chevron" size={16} />
+              </span>
+              <span className="home-group-title">
+                {t(`home.group.${grouping}.${g.id}` as MessageKey)} <span className="home-group-count">{g.items.length}</span>
+              </span>
+              {hint && <span className="home-group-hint">{hint}</span>}
+            </button>
+            {!collapsed && grid}
+          </div>
+        );
+      })}
 
       <h2 className="section-title">{t('home.gaps')}</h2>
       {gaps.length === 0 ? (

@@ -361,6 +361,23 @@
                         "detailed"
                       ]
                     },
+                    "homeGrouping": {
+                      "type": "string",
+                      "enum": [
+                        "status",
+                        "type",
+                        "none"
+                      ]
+                    },
+                    "homeCollapsed": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {
+                        "type": "boolean"
+                      }
+                    },
                     "favourites": {
                       "type": "array",
                       "items": {

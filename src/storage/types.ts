@@ -100,6 +100,10 @@ export interface Settings extends Versioned {
   defaultPlan: StoragePlan;
   /** Home screen nutrient layout; unset = compact. */
   homeView?: 'compact' | 'detailed';
+  /** Home nutrient list grouping; unset = by status. */
+  homeGrouping?: 'status' | 'type' | 'none';
+  /** Home groups the user opened (false) or closed (true), by group key; unset keys use the default. */
+  homeCollapsed?: Record<string, boolean>;
   /** Foods pinned to the top of the log screen, in the order they were added. */
   favourites?: FoodRef[];
 }

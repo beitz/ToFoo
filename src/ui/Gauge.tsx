@@ -33,7 +33,9 @@ function gaugeLabel(r: NutrientResult): string {
     ? `${fmtAmount(r.id, r.averageIntake)}/day`
     : r.kind === 'tank'
       ? t('gauge.full', { pct: fmtFill(r.value.central) })
-      : fmtPercent(r.value.central);
+      : r.kind === 'limit'
+        ? t('gauge.ofMax', { pct: fmtPercent(r.value.central) })
+        : fmtPercent(r.value.central);
 }
 
 /**
