@@ -1,0 +1,9 @@
+
+> tofoo@0.1.0 dev
+> vite --port 5173
+
+
+  VITE v7.3.7  ready in 362 ms
+
+  ➜  Local:   http://localhost:5173/ToFoo/
+  ➜  Network: use --host to expose
