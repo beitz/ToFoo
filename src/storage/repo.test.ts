@@ -73,6 +73,29 @@ describe('repository', () => {
     expect(await b.db.journal.where('day').equals('2026-10-15').toArray()).toEqual([removed]);
   });
 
+  it('starts and ends a sleep, replaces overlapping sleeps on save, and backs them up', async () => {
+    const repo = await fresh();
+    const H = 3_600_000;
+    const night = new Date(2026, 9, 15, 23, 30).getTime();
+    const started = await repo.startSleep(night);
+    expect(started!.day).toBe('2026-10-15');
+    expect(await repo.startSleep(night + H)).toBeUndefined(); // already asleep
+    const before = await repo.endSleep(night + 7.5 * H);
+    expect(before).toEqual(started);
+    expect((await repo.db.sleep.get(started!.id))!).toMatchObject({ end: night + 7.5 * H, day: '2026-10-16' });
+    // The same night told to the assistant replaces the one from the buttons; undo brings it back.
+    const { saved, replaced } = await repo.saveSleep({ start: night - 0.5 * H, end: night + 7 * H });
+    expect(replaced.map((r) => r.id)).toEqual([started!.id]);
+    expect(await repo.db.sleep.count()).toBe(1);
+    await repo.undoSleep(saved, replaced);
+    expect((await repo.db.sleep.toArray()).map((r) => r.id)).toEqual([started!.id]);
+    // An afternoon nap overlaps nothing.
+    await repo.saveSleep({ start: night + 15 * H, end: night + 15.5 * H });
+    const b = await fresh();
+    await b.restore(await repo.snapshot());
+    expect(await b.db.sleep.count()).toBe(2);
+  });
+
   it('pins and unpins favourite foods', async () => {
     const repo = await fresh();
     const oats = { source: 'BLS', version: '4.0', code: 'C133000' } as const;

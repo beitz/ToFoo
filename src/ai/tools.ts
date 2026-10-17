@@ -13,6 +13,7 @@ import { hasOwnMicros, isProductCode, productFood, productId, productLabel } fro
 import { normalize, search, type SearchIndex } from '../foods/search';
 import { parseLocalDateTime } from './photoTime';
 import { fmtNumber } from '../lib/format';
+import { MAX_SLEEP_MS } from '../logic/sleep';
 import type { Preparation } from '../model/paramTypes';
 import type { RawValue } from '../model/types';
 import type { Product } from '../storage/types';
@@ -77,6 +78,22 @@ export const journalProposalInput = z.object({
 export interface JournalProposal {
   text: string;
   time?: number;
+  replaces?: string;
+}
+
+export const sleepProposalInput = z.object({
+  /** Local "YYYY-MM-DD HH:MM" the user fell asleep. */
+  start: z.string(),
+  /** Local "YYYY-MM-DD HH:MM" the user woke up. */
+  end: z.string(),
+  /** Id of the open sleep card this replaces (e.g. "S1"); empty for a new one. */
+  replaces: z.string().optional(),
+});
+
+/** A sleep the assistant proposes, for the user to check. */
+export interface SleepProposal {
+  start: number;
+  end: number;
   replaces?: string;
 }
 
@@ -146,11 +163,13 @@ export interface ToolContext {
   now?: number;
   /** The journal is on: the assistant may propose journal entries. */
   journal?: boolean;
+  /** Sleep is on: the assistant may propose sleeps. */
+  sleep?: boolean;
 }
 
 /** Which online sources the assistant is offered (decides the prompt and tool variant). */
-export function sourcesOf(products: ProductTools | undefined, journal = false): { off: boolean; usda: boolean; webSearch: boolean; journal: boolean } {
-  return { off: !!products?.find, usda: !!products?.searchUsda, webSearch: !!products?.find && !!products.webSearch, journal };
+export function sourcesOf(products: ProductTools | undefined, journal = false, sleep = false): { off: boolean; usda: boolean; webSearch: boolean; journal: boolean; sleep: boolean } {
+  return { off: !!products?.find, usda: !!products?.searchUsda, webSearch: !!products?.find && !!products.webSearch, journal, sleep };
 }
 
 const LABEL_FIELDS: Array<[string, string, string]> = [
@@ -278,6 +297,26 @@ export function validateJournalProposal(input: unknown, now?: number): { ok: tru
   if (problems.length) return { ok: false, error: `${problems.join('\n')}\nFix these and call propose_journal_entry again.` };
   const replaces = parsed.data.replaces?.trim();
   return { ok: true, proposal: { text, ...(time !== undefined ? { time } : {}), ...(replaces ? { replaces } : {}) } };
+}
+
+/** Check a `propose_sleep` call: both times valid and plausible, waking after falling asleep, not too long. */
+export function validateSleepProposal(input: unknown, now?: number): { ok: true; proposal: SleepProposal } | { ok: false; error: string } {
+  const parsed = sleepProposalInput.safeParse(input);
+  if (!parsed.success) return { ok: false, error: `Invalid input: ${parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}` };
+  const problems: string[] = [];
+  const start = checkTime(parsed.data.start, now);
+  const end = checkTime(parsed.data.end, now);
+  if (start.problem) problems.push(`start: ${start.problem}`);
+  else if (start.time === undefined) problems.push('start is empty; give the time the user fell asleep.');
+  if (end.problem) problems.push(`end: ${end.problem}`);
+  else if (end.time === undefined) problems.push('end is empty; give the time the user woke up.');
+  if (start.time !== undefined && end.time !== undefined) {
+    if (end.time <= start.time) problems.push('end must be after start (a night runs from the evening to the next morning; check the dates).');
+    else if (end.time - start.time > MAX_SLEEP_MS) problems.push(`the sleep is ${Math.round((end.time - start.time) / 3_600_000)} hours long; check the dates.`);
+  }
+  if (problems.length || start.time === undefined || end.time === undefined) return { ok: false, error: `${problems.join('\n')}\nFix these and call propose_sleep again.` };
+  const replaces = parsed.data.replaces?.trim();
+  return { ok: true, proposal: { start: start.time, end: end.time, ...(replaces ? { replaces } : {}) } };
 }
 
 /** A product the assistant may use: looked up in this conversation or saved on this phone. */

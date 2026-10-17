@@ -152,6 +152,9 @@ export const dayStatusSchema = z.object({ day, ...versioned, status: z.enum(['lo
 export const fastSchema = z.object({ id: z.string(), ...versioned, startDay: day, endDay: day.optional() });
 export const sunEntrySchema = z.object({ id: z.string(), ...versioned, day, startHour: z.number().min(0).max(24), minutes: z.number().nonnegative(), skin });
 export const journalEntrySchema = z.object({ id: z.string(), ...versioned, time: z.number(), day, text: z.string() }).describe('A free-text journal entry');
+export const sleepRecordSchema = z
+  .object({ id: z.string(), ...versioned, start: z.number(), end: z.number().optional(), day })
+  .describe('One sleep: fell asleep (start) and woke up (end, missing while asleep), epoch ms; day is the local day it ended');
 
 const header = {
   format: z.literal('tofoo', { error: 'not a ToFoo file (expected "format": "tofoo")' }),
@@ -175,6 +178,7 @@ export const backupSchema = z.object({
     sunEntries: z.array(sunEntrySchema),
     products: z.array(productSchema).default([]),
     journal: z.array(journalEntrySchema).default([]),
+    sleep: z.array(sleepRecordSchema).default([]),
   }),
 });
 

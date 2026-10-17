@@ -3,7 +3,7 @@ import type * as Beta from '@anthropic-ai/sdk/resources/beta/messages/messages';
 import type { Food } from '../foods/foodDb';
 import { buildIndex } from '../foods/search';
 import { appNote, emptyConversation, requestParams, sendMessage, textOf, type CreateMessage } from './assistant';
-import { describeFood, MAX_ITEM_GRAMS, runLookupBarcode, runSearchFoods, runSearchUsda, validateJournalProposal, validateProposal, type ProductTools, type ToolContext } from './tools';
+import { describeFood, MAX_ITEM_GRAMS, runLookupBarcode, runSearchFoods, runSearchUsda, validateJournalProposal, validateProposal, validateSleepProposal, type ProductTools, type ToolContext } from './tools';
 import type { Product } from '../storage/types';
 import type { FindResult } from '../foods/findProduct';
 
@@ -446,5 +446,37 @@ describe('journal entries', () => {
     expect(validateJournalProposal(entry('x'.repeat(5000)), now)).toMatchObject({ ok: false });
     expect(validateJournalProposal(entry('Slept badly', '2026-10-18 07:00'), now)).toMatchObject({ ok: false });
     expect(validateJournalProposal(entry('Slept badly', '', 'J2'), now)).toEqual({ ok: true, proposal: { text: 'Slept badly', replaces: 'J2' } });
+  });
+});
+
+describe('sleep', () => {
+  const now = new Date(2026, 9, 17, 20, 0).getTime();
+  const sleep = (start: string, end: string, replaces = '') => ({ start, end, replaces });
+
+  it('offers propose_sleep only with sleep on, and sends sleep quality to the journal', () => {
+    const names = (on: boolean) => (requestParams('claude-opus-5-5', [], { sleep: on }).tools ?? []).map((t) => ('name' in t ? t.name : ''));
+    expect(names(false)).not.toContain('propose_sleep');
+    expect(names(true)).toContain('propose_sleep');
+    expect(String(requestParams('claude-opus-5-5', [], { sleep: true, journal: true }).system)).toContain('goes in a journal entry');
+    expect(String(requestParams('claude-opus-5-5', [], { sleep: true }).system)).not.toContain('journal entry');
+  });
+
+  it('shows a sleep card next to the others', async () => {
+    const api = scripted(reply([toolUse('s', 'propose_sleep', sleep('2026-10-16 23:30', '2026-10-17 07:10')), toolUse('j', 'propose_journal_entry', { text: 'Woke up twice.', time: '2026-10-17 07:10', replaces: '' })], 'tool_use'));
+    const { conversation, outcome } = await sendMessage(api.create, 'claude-opus-5-5', emptyConversation(), { text: 'slept 23:30 to 7:10, woke up twice', images: [] }, { ...ctx, now, journal: true, sleep: true });
+    expect(outcome.kind === 'proposal' && outcome.sleeps).toEqual([{ id: 'S1', start: new Date(2026, 9, 16, 23, 30).getTime(), end: new Date(2026, 9, 17, 7, 10).getTime() }]);
+    expect(outcome.kind === 'proposal' && outcome.notes.map((n) => n.id)).toEqual(['J1']);
+    expect(conversation.sleeps).toBe(1);
+  });
+
+  it('checks sleeps: both times, waking after falling asleep, not in the future, not too long', () => {
+    expect(validateSleepProposal(sleep('', '2026-10-17 07:00'), now)).toMatchObject({ ok: false });
+    expect(validateSleepProposal(sleep('2026-10-17 23:30', '2026-10-17 07:00'), now)).toMatchObject({ ok: false });
+    expect(validateSleepProposal(sleep('2026-10-17 23:30', '2026-10-18 07:00'), now)).toMatchObject({ ok: false });
+    expect(validateSleepProposal(sleep('2026-10-15 23:30', '2026-10-17 07:00'), now)).toMatchObject({ ok: false });
+    expect(validateSleepProposal(sleep('2026-10-17 14:00', '2026-10-17 14:40', 'S1'), now)).toEqual({
+      ok: true,
+      proposal: { start: new Date(2026, 9, 17, 14, 0).getTime(), end: new Date(2026, 9, 17, 14, 40).getTime(), replaces: 'S1' },
+    });
   });
 });

@@ -85,7 +85,8 @@ export type FeatureKey =
   | 'usda'
   | 'productWebSearch'
   | 'voiceInput'
-  | 'journal';
+  | 'journal'
+  | 'sleep';
 
 export interface Settings extends Versioned {
   id: 'settings';
@@ -229,6 +230,20 @@ export interface JournalEntry extends Versioned {
   /** Local calendar day of `time` (YYYY-MM-DD). */
   day: string;
   text: string;
+}
+
+/**
+ * One sleep: when the user fell asleep and woke up (docs/SPEC.md, "Sleep"). No quality rating, by
+ * the owner's decision. `end` is missing while the user is asleep (after "Going to sleep").
+ */
+export interface SleepRecord extends Versioned {
+  id: string;
+  /** Epoch ms the user fell asleep. */
+  start: number;
+  /** Epoch ms the user woke up; missing while asleep. */
+  end?: number;
+  /** Local calendar day the sleep ended (YYYY-MM-DD): a night belongs to the morning after it. */
+  day: string;
 }
 
 export interface MetaRecord {

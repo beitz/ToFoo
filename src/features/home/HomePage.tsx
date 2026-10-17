@@ -16,6 +16,8 @@ import { diverseTop } from '../../foods/variety';
 import { Field, Segmented, Sheet } from '../../ui/controls';
 import type { NutrientResult } from '../../model/simulate';
 import { Prompts } from './Prompts';
+import { SleepQuestion } from '../sleep/SleepQuestion';
+import { SleepButton } from '../sleep/SleepButton';
 import { StockChips } from './StockChips';
 import { attentionCounts, COLLAPSED_BY_DEFAULT, groupNutrients, type HomeGrouping } from './grouping';
 
@@ -101,6 +103,7 @@ export function HomePage() {
       )}
       <StockChips />
 
+      {isOn(d.settings.features, 'sleep') && <SleepQuestion />}
       <Prompts />
 
       <div className="section-title home-gauges-head">
@@ -213,6 +216,7 @@ export function HomePage() {
             <Icon name="journal" />
           </a>
         )}
+        {isOn(d.settings.features, 'sleep') && <SleepButton />}
         <button
           className={`fab fab-small${d.activeFast ? ' on' : ''}`}
           onClick={toggleFast}
