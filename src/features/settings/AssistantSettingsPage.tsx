@@ -6,6 +6,7 @@ import { t } from '../../i18n';
 import { AI_MODELS, DEFAULT_AI_MODEL, type AiModel } from '../../ai/assistant';
 import { getAiSettings, getUsage, setAiModel, setApiKey } from '../../ai/client';
 import { PRICES_AS_OF, summarize, type UsageDay } from '../../ai/pricing';
+import { getOpenAiKey, setOpenAiKey } from '../../ai/transcribe';
 import { addDays } from '../../lib/dates';
 import { fmtNumber, fmtTokens, fmtUsd } from '../../lib/format';
 import { isOn } from '../../settings/features';
@@ -115,6 +116,8 @@ export function AssistantSettingsPage() {
         ))}
       </div>
 
+      <VoiceSettings />
+
       <h2 className="section-title">{t('ai.usageTitle')}</h2>
       <div className="card">
         {usage && usage.length > 0 ? (
@@ -146,5 +149,62 @@ export function AssistantSettingsPage() {
         <p className="muted small">{t('ai.usageNote', { date: PRICES_AS_OF })}</p>
       </div>
     </section>
+  );
+}
+
+/** Voice input: its own toggle and OpenAI key, kept on this phone like the Anthropic key. */
+function VoiceSettings() {
+  const d = useData();
+  const toast = useToast();
+  const on = isOn(d.settings.features, 'voiceInput');
+  const [key, setKey] = useState<string>();
+  const [draft, setDraft] = useState('');
+  useEffect(() => {
+    void getOpenAiKey().then(setKey);
+  }, []);
+
+  async function save(value: string) {
+    await setOpenAiKey(value);
+    setKey(value.trim());
+    setDraft('');
+    toast(t(value.trim() ? 'ai.keySaved' : 'ai.keyRemoved'));
+  }
+
+  return (
+    <>
+      <h2 className="section-title">{t('voice.title')}</h2>
+      <div className="card">
+        <p className="small">{t('voice.intro')}</p>
+        <Toggle checked={on} onChange={(v) => repo.updateSettings({ features: { ...d.settings.features, voiceInput: v } })} label={t('voice.enable')} />
+        <p className="muted small">{t('voice.privacy')}</p>
+        {on &&
+          (key ? (
+            <div className="row-between">
+              <span>
+                {t('ai.keyIsSet')} <span className="muted">…{key.slice(-4)}</span>
+              </span>
+              <button className="btn btn-small btn-danger-ghost" onClick={() => void save('')}>
+                {t('ai.removeKey')}
+              </button>
+            </div>
+          ) : (
+            <>
+              <p className="muted small">{t('voice.needsKey')}</p>
+              <Field label={t('voice.key')} hint={t('ai.keyHint')}>
+                {(id) => <input id={id} type="password" autoComplete="off" spellCheck={false} placeholder="sk-…" value={draft} onChange={(e) => setDraft(e.target.value)} />}
+              </Field>
+              <button className="btn btn-primary" disabled={!draft.trim()} onClick={() => void save(draft)}>
+                {t('common.save')}
+              </button>
+              <p className="muted small">
+                {t('voice.getKey')}{' '}
+                <a href="https://platform.openai.com/api-keys" target="_blank" rel="noreferrer noopener">
+                  platform.openai.com
+                </a>
+              </p>
+            </>
+          ))}
+      </div>
+    </>
   );
 }

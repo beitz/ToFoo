@@ -70,7 +70,8 @@ export type FeatureKey =
   | 'aiAssistant'
   | 'openFoodFacts'
   | 'usda'
-  | 'productWebSearch';
+  | 'productWebSearch'
+  | 'voiceInput';
 
 export interface Settings extends Versioned {
   id: 'settings';

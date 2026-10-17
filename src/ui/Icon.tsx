@@ -14,6 +14,8 @@ const paths: Record<string, string> = {
   search: 'M10.5 4a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13zM15.5 15.5 20 20',
   close: 'M6 6l12 12M18 6 6 18',
   back: 'M15 5l-7 7 7 7',
+  mic: 'M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3zM5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21',
+  stop: 'M7 7h10v10H7z',
   chevron: 'M9 5l7 7-7 7',
   trash: 'M5 7h14M10 7V4.5h4V7M7 7l1 12.5h8L17 7',
   edit: 'M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4',

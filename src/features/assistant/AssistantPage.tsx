@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useData } from '../../app/data';
 import { useToast } from '../../app/toast';
 import { href, navigate } from '../../app/router';
@@ -10,6 +10,8 @@ import { classifyError, getAiSettings, makeCreate, saveUsage } from '../../ai/cl
 import { mergeModelTokens, modelTokensCost, totalTokens, type ModelTokens } from '../../ai/pricing';
 import { prepareImage, type PreparedImage } from '../../ai/image';
 import { photoLabel, readPhotoTime, type PhotoTime } from '../../ai/photoTime';
+import { getOpenAiKey, transcribe } from '../../ai/transcribe';
+import { useRecorder } from './useRecorder';
 import type { ProposedItem, ProductTools } from '../../ai/tools';
 import { findProduct, findUsda } from '../../foods/findProduct';
 import { productLabel, productPageUrl, productRef } from '../../foods/products';
@@ -111,6 +113,16 @@ function Chat({ apiKey, model, day }: { apiKey: string; model: AiModel; day: str
   /** Billed tokens: the whole chat, and the user's latest message (all requests it caused). */
   const [chatTokens, setChatTokens] = useState<ModelTokens>({});
   const [turnTokens, setTurnTokens] = useState<ModelTokens>({});
+  // Voice input (opt-in, OpenAI key): record, then the transcript lands in the text box.
+  const voiceOn = isOn(d.settings.features, 'voiceInput');
+  const [voiceKey, setVoiceKey] = useState('');
+  useEffect(() => {
+    if (voiceOn) void getOpenAiKey().then(setVoiceKey);
+  }, [voiceOn]);
+  const recorder = useRecorder();
+  const [transcribing, setTranscribing] = useState(false);
+  /** Index of the photo shown large, for looking at photos while talking about them. */
+  const [viewing, setViewing] = useState<number>();
 
   useEffect(() => {
     endRef.current?.scrollIntoView?.({ block: 'end', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
@@ -216,9 +228,58 @@ function Chat({ apiKey, model, day }: { apiKey: string; model: AiModel; day: str
 
   const timedOut = images.filter((i) => i.time.source !== 'photo').length;
 
+  useEffect(() => {
+    if (recorder.state.kind === 'denied') setError('voice.error.denied');
+    if (recorder.state.kind === 'unsupported') setError('voice.error.unsupported');
+  }, [recorder.state.kind]);
+
+  async function toggleRecording() {
+    if (recorder.state.kind !== 'recording') {
+      setError(undefined);
+      await recorder.start();
+      return;
+    }
+    const audio = await recorder.stop();
+    if (!audio) {
+      setError('voice.error.empty');
+      return;
+    }
+    setTranscribing(true);
+    const r = await transcribe(audio, voiceKey);
+    setTranscribing(false);
+    if (!r.ok) setError(`voice.error.${r.error}`);
+    else if (r.text) setText((old) => (old.trim() ? `${old.trimEnd()}\n${r.text}` : r.text));
+    else setError('voice.error.empty');
+  }
+
+  const recording = recorder.state.kind === 'recording';
+  const micButton =
+    voiceOn && voiceKey ? (
+      <button
+        className={`icon-btn composer-btn${recording ? ' composer-recording' : ''}`}
+        aria-label={t(recording ? 'voice.stop' : 'voice.record')}
+        aria-pressed={recording}
+        onClick={() => void toggleRecording()}
+        disabled={transcribing}
+      >
+        <Icon name={recording ? 'stop' : 'mic'} filled={recording} />
+      </button>
+    ) : null;
+  const voiceStatus =
+    recorder.state.kind === 'recording' ? (
+      <p className="composer-note voice-status small" role="status">
+        <span className="rec-dot" aria-hidden="true" /> <RecordingTime since={recorder.state.startedAt} />
+      </p>
+    ) : transcribing ? (
+      <p className="composer-note muted small" role="status">
+        {t('voice.transcribing')}
+      </p>
+    ) : null;
+
   return (
     <>
-      <div className="chat" aria-live="polite">
+      {/* While a photo is open, everything behind it is out of reach for touch and screen readers. */}
+      <div className="chat" aria-live="polite" inert={viewing !== undefined}>
         <div className="bubble bubble-assistant">{t('ai.intro')}</div>
         {bubbles.map((b, i) =>
           b.role === 'card' ? (
@@ -250,12 +311,14 @@ function Chat({ apiKey, model, day }: { apiKey: string; model: AiModel; day: str
         <div ref={endRef} />
       </div>
 
-      <div className="composer">
+      <div className="composer" inert={viewing !== undefined}>
         {images.length > 0 && (
           <div className="composer-photos">
             {images.map((img, i) => (
               <div key={i} className="composer-photo">
-                <img src={img.preview} alt={t('ai.photo')} />
+                <button className="composer-photo-open" aria-label={t('viewer.open', { n: i + 1 })} onClick={() => setViewing(i)}>
+                  <img src={img.preview} alt="" />
+                </button>
                 <span className="composer-photo-time small">{photoTimeShort(img.time)}</span>
                 <button className="icon-btn" aria-label={t('ai.removePhoto')} onClick={() => setImages((all) => all.filter((_, j) => j !== i))}>
                   <Icon name="close" size={16} />
@@ -265,11 +328,14 @@ function Chat({ apiKey, model, day }: { apiKey: string; model: AiModel; day: str
           </div>
         )}
         {timedOut > 0 && <p className="composer-note muted small">{t('ai.photoTimesMissing', { n: timedOut })}</p>}
+        {micButton && images.length > 0 && !voiceStatus && <p className="composer-note muted small">{t('viewer.hint')}</p>}
+        {voiceStatus}
         <div className="composer-row">
           <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={(e) => void addPhotos(e.target.files).then(() => (e.target.value = ''))} />
           <button className="icon-btn composer-btn" aria-label={t('ai.addPhoto')} onClick={() => fileRef.current?.click()} disabled={busy}>
             <Icon name="camera" />
           </button>
+          {micButton}
           <textarea
             rows={1}
             value={text}
@@ -286,12 +352,96 @@ function Chat({ apiKey, model, day }: { apiKey: string; model: AiModel; day: str
               }
             }}
           />
-          <button className="icon-btn composer-btn composer-send" aria-label={t('ai.send')} onClick={() => void send()} disabled={busy || (!text.trim() && images.length === 0)}>
+          <button
+            className="icon-btn composer-btn composer-send"
+            aria-label={t('ai.send')}
+            onClick={() => void send()}
+            disabled={busy || recording || transcribing || (!text.trim() && images.length === 0)}
+          >
             <Icon name="send" />
           </button>
         </div>
       </div>
+      {viewing !== undefined && images[viewing] && (
+        <PhotoViewer images={images} index={viewing} onIndex={setViewing} onClose={() => setViewing(undefined)} controls={micButton} status={voiceStatus} />
+      )}
     </>
+  );
+}
+
+/** Seconds since recording started, ticking. */
+function RecordingTime({ since }: { since: number }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), 500);
+    return () => window.clearInterval(id);
+  }, []);
+  const s = Math.max(0, Math.floor((now - since) / 1000));
+  return <>{t('voice.recording', { time: `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` })}</>;
+}
+
+/** The chosen photos, large, one at a time: look through them while talking about them. */
+function PhotoViewer({
+  images,
+  index,
+  onIndex,
+  onClose,
+  controls,
+  status,
+}: {
+  images: ComposerPhoto[];
+  index: number;
+  onIndex: (i: number) => void;
+  onClose: () => void;
+  controls: ReactNode;
+  status: ReactNode;
+}) {
+  const img = images[index]!;
+  const touchX = useRef<number | undefined>(undefined);
+  const go = (delta: number) => onIndex(Math.min(images.length - 1, Math.max(0, index + delta)));
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+      if (e.key === 'ArrowLeft') go(-1);
+      if (e.key === 'ArrowRight') go(1);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
+  return (
+    <div className="photo-viewer" role="dialog" aria-modal="true" aria-label={t('viewer.title', { n: index + 1, total: images.length })}>
+      <div className="photo-viewer-head">
+        <span>
+          {t('viewer.title', { n: index + 1, total: images.length })} · {photoTimeShort(img.time)}
+        </span>
+        <button className="icon-btn" aria-label={t('viewer.close')} onClick={onClose}>
+          <Icon name="close" />
+        </button>
+      </div>
+      <div
+        className="photo-viewer-image"
+        onTouchStart={(e) => (touchX.current = e.touches[0]?.clientX)}
+        onTouchEnd={(e) => {
+          const start = touchX.current;
+          const end = e.changedTouches[0]?.clientX;
+          // A deliberate horizontal swipe, not a tap.
+          if (start !== undefined && end !== undefined && Math.abs(end - start) > 50) go(end < start ? 1 : -1);
+          touchX.current = undefined;
+        }}
+      >
+        <img src={img.preview} alt={t('ai.photo')} />
+      </div>
+      {status}
+      <div className="photo-viewer-controls">
+        <button className="icon-btn" aria-label={t('viewer.prev')} onClick={() => go(-1)} disabled={index === 0}>
+          <Icon name="back" />
+        </button>
+        {controls}
+        <button className="icon-btn" aria-label={t('viewer.next')} onClick={() => go(1)} disabled={index === images.length - 1}>
+          <Icon name="chevron" />
+        </button>
+      </div>
+    </div>
   );
 }
 
