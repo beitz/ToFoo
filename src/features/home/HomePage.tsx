@@ -31,6 +31,7 @@ export function HomePage() {
   const { model, settings, today } = d;
   const [fastSheet, setFastSheet] = useState(false);
   const [fastStart, setFastStart] = useState(today);
+  const [legendOpen, setLegendOpen] = useState(false);
   const showRange = isOn(settings.features, 'uncertaintyRanges');
   const hidden = new Set(settings.hiddenNutrients);
   const todayStatus = model.dayStatus[today];
@@ -102,15 +103,23 @@ export function HomePage() {
 
       <Prompts />
 
-      <h2 className="section-title">{t('home.gauges')}</h2>
-      <details
-        className="muted small home-legend"
-        open={!isCollapsed('legend')}
-        onToggle={(e) => e.currentTarget.open === isCollapsed('legend') && toggleGroup('legend')}
-      >
-        <summary>{t('home.legendTitle')}</summary>
-        {t('home.legend')}
-      </details>
+      <div className="section-title home-gauges-head">
+        <h2>{t('home.gauges')}</h2>
+        <button
+          className="icon-btn"
+          aria-label={t('home.legendTitle')}
+          aria-expanded={legendOpen}
+          aria-controls="home-legend"
+          onClick={() => setLegendOpen((o) => !o)}
+        >
+          <Icon name="info" />
+        </button>
+      </div>
+      {legendOpen && (
+        <p className="muted small home-legend" id="home-legend">
+          {t('home.legend')}
+        </p>
+      )}
       {(weightDefault || sexDefault) && (
         <p className="muted small">
           {weightDefault ? '* ' : ''}

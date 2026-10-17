@@ -2044,14 +2044,8 @@ body:has(.fab-stack) .toast-area {
   justify-content: flex-start;
   padding-right: calc(var(--gutter) + 72px);
 }
-.home-legend summary {
-  min-height: 44px;
+.home-gauges-head {
   display: flex;
   align-items: center;
-  cursor: pointer;
-  color: var(--accent);
-  font-weight: 600;
-}
-.home-legend[open] {
-  margin-bottom: 8px;
+  gap: 4px;
 }
