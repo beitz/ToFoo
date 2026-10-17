@@ -83,6 +83,7 @@ export function periodBreakdown(input: PeriodInput): PeriodResult {
       ulRatio,
       windowDays: inRange,
       knownDays: n,
+      leftOutDays: 0,
       missingDataDays: idx.filter((i) => sim.daily[i]!.missing.has(id)).length,
       history: [],
       contributors: [],

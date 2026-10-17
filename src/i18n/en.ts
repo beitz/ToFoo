@@ -514,6 +514,7 @@ export const en = {
   'duration.months': '{n} months',
   'duration.years': '{n} years',
   'nutrient.knownDays': '({known} of {days} days logged.)',
+  'nutrient.knownDaysLeftOut': '({known} of {days} days logged; {left} left out, not counted.)',
   'nutrient.missingData': 'On {n} day(s), some foods you ate have no data for this nutrient, so the real value may be higher.',
   'nutrient.upperLimit': 'Upper limit {limit}/day: you are at {pct}.',
   'nutrient.ulBasis.RETOL': '(applies to preformed vitamin A, not carotenoids)',

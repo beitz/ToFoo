@@ -96,7 +96,11 @@ export function NutrientPage({ id }: { id: string }) {
         {r.kind !== 'info' && req && (
           <p className="small muted">
             {t('nutrient.averageIntake', { amount: fmtAmount(id, r.averageIntake), ref: fmtAmount(id, req.recommended) })}
-            {r.knownDays < r.windowDays && r.kind !== 'tank' ? ` ${t('nutrient.knownDays', { known: r.knownDays, days: r.windowDays })}` : ''}
+            {r.kind !== 'tank' && r.leftOutDays > 0
+              ? ` ${t('nutrient.knownDaysLeftOut', { known: r.knownDays, days: r.windowDays - r.leftOutDays, left: r.leftOutDays })}`
+              : r.knownDays < r.windowDays && r.kind !== 'tank'
+                ? ` ${t('nutrient.knownDays', { known: r.knownDays, days: r.windowDays })}`
+                : ''}
           </p>
         )}
         {isTank && req && <TankTrendNote r={r} need={req.physiological} startedEmpty={d.profile.startingLevel === 'empty'} />}
