@@ -27,6 +27,12 @@ export function fmtPercent(v: number): string {
   return `${Math.round(v * 100)}%`;
 }
 
+/** Tank fill level: a store with something in it never reads "0%". */
+export function fmtFill(v: number): string {
+  if (Number.isFinite(v) && v > 0 && Math.round(v * 100) === 0) return '<1%';
+  return fmtPercent(v);
+}
+
 export function fmtGrams(g: number): string {
   return `${fmtNumber(g, g < 10 ? 1 : 0)} g`;
 }

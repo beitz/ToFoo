@@ -140,7 +140,7 @@ A simple synthesis estimate added to the vitamin D tank, from latitude, date (se
 
 The user chooses at setup (changeable later, with a one-line pro/con each):
 
-- **Empty**: safest for someone who suspects poor intake; may show alarm for a while.
+- **Empty**: safest for someone who suspects poor intake. Big stores (iron, B12, vitamin A) then read "low" for months to years even on a good diet, so the nutrient screen says whether a store is filling or going down at the recent rate and, when it is low but filling, roughly how long until it leaves the low zone, and that the low reading comes from the empty start. A store with anything in it never reads "0 % full" (it shows "<1 %").
 - **Average**: realistic for a typical diet; may be too optimistic.
 - **Custom per nutrient**: for users with an idea of their status.
 - **From blood test** (v3): most accurate, recalibrates tanks to measured values.

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fmtAmount, fmtPercent, fmtTokens, fmtUsd } from './format';
+import { fmtAmount, fmtFill, fmtPercent, fmtTokens, fmtUsd } from './format';
 
 describe('format', () => {
   it('shows large µg amounts in mg', () => {
@@ -9,6 +9,11 @@ describe('format', () => {
   });
   it('formats percentages', () => {
     expect(fmtPercent(0.456)).toBe('46%');
+  });
+  it('never shows a store with something in it as 0% full', () => {
+    expect(fmtFill(0.001)).toBe('<1%');
+    expect(fmtFill(0)).toBe('0%');
+    expect(fmtFill(0.6)).toBe('60%');
   });
   it('formats small dollar amounts and token counts', () => {
     expect(fmtUsd(0.0312)).toBe('$0.031');
