@@ -73,6 +73,8 @@ export interface NutrientResult {
   windowDays: number;
   /** Days in the window with a known status (logged / fasted). */
   knownDays: number;
+  /** Days in the window marked "Leave out": they count in no average. */
+  leftOutDays: number;
   /** Days in the window on which some eaten food had no data for this nutrient. */
   missingDataDays: number;
   history: HistoryPoint[];
@@ -404,6 +406,7 @@ export function simulate(input: SimulationInput): SimulationResult {
       ulRatio,
       windowDays: end >= 0 ? windowIdx(end).length : 0,
       knownDays: knownInWindow,
+      leftOutDays: end >= 0 ? windowIdx(end).length - win.length : 0,
       missingDataDays,
       contributors,
     };

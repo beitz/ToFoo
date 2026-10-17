@@ -14,6 +14,7 @@ const result = (id: string, status: NutrientResult['status'], ulRatio?: number):
   ulRatio,
   windowDays: 7,
   knownDays: 7,
+  leftOutDays: 0,
   missingDataDays: 0,
   history: [],
   contributors: [],

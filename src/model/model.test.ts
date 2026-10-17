@@ -384,6 +384,8 @@ describe('simulation', () => {
     expect(left.averageIntake).toBeCloseTo(200);
     expect(left.knownDays).toBe(asZero.knownDays - 1);
     expect(left.windowDays).toBe(asZero.windowDays);
+    expect(left.leftOutDays).toBe(1);
+    expect(asZero.leftOutDays).toBe(0);
 
     // Tanks can't skip a day: a left-out day drains like a filled-in one, not like a fast.
     const fe = (dayStatus: SimulationInput['dayStatus']) => simulate(baseInput(d, entries, { dayStatus })).nutrients.get('FE')!;
