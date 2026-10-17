@@ -10,11 +10,12 @@ import { barcodesInPhoto, canDetectBarcodes, detectBarcodes } from './barcode';
 /** How often the live camera view is checked for a barcode. */
 const SCAN_INTERVAL_MS = 250;
 
-type Status = { kind: 'idle' } | { kind: 'looking'; code: string } | { kind: 'notFound'; code: string } | { kind: 'error'; message: MessageKey };
+type Status = { kind: 'idle' } | { kind: 'looking'; code: string } | { kind: 'notFound'; code: string } | { kind: 'error'; message: MessageKey; detail?: string };
 
-const LOOKUP_ERRORS: Record<'offline' | 'busy' | 'other', MessageKey> = {
+const LOOKUP_ERRORS: Record<'offline' | 'busy' | 'denied' | 'other', MessageKey> = {
   offline: 'off.error.offline',
   busy: 'off.error.busy',
+  denied: 'off.error.denied',
   other: 'off.error.other',
 };
 
@@ -39,7 +40,7 @@ export function BarcodeSheet({ onFound, onManual, onClose }: { onFound: (p: Prod
       const r = await findProduct(code);
       if (r.kind === 'found') onFound(r.product);
       else if (r.kind === 'notFound') setStatus({ kind: 'notFound', code });
-      else setStatus({ kind: 'error', message: LOOKUP_ERRORS[r.reason] });
+      else setStatus({ kind: 'error', message: LOOKUP_ERRORS[r.reason], detail: r.detail });
     } finally {
       busy.current = false;
     }
@@ -103,6 +104,7 @@ export function BarcodeSheet({ onFound, onManual, onClose }: { onFound: (p: Prod
       {status.kind === 'error' && (
         <p className="notice" role="alert">
           <Icon name="alert" size={16} /> {t(status.message)}
+          {status.detail && <span className="muted small block error-detail">{t('off.error.detail', { detail: status.detail })}</span>}
         </p>
       )}
       {status.kind === 'notFound' && (

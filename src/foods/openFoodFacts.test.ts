@@ -93,10 +93,25 @@ describe('lookupBarcode', () => {
   it('reports unknown products, busy servers and no connection', async () => {
     expect(await lookupBarcode('4000000000013', respond(404, { result: { id: 'product_not_found' } }))).toEqual({ kind: 'notFound' });
     expect(await lookupBarcode('1234567890128', respond(200, { product: { code: '1234567890128' } }))).toEqual({ kind: 'notFound' });
-    expect(await lookupBarcode('1', respond(503, {}))).toEqual({ kind: 'error', reason: 'busy' });
+    expect(await lookupBarcode('1', respond(503, {}))).toEqual({ kind: 'error', reason: 'busy', detail: 'HTTP 503 from world.openfoodfacts.org/api/v3/product/1: "{}"' });
     const offline = (async () => {
       throw new TypeError('Failed to fetch');
     }) as unknown as typeof fetch;
-    expect(await lookupBarcode('1', offline)).toEqual({ kind: 'error', reason: 'offline' });
+    expect(await lookupBarcode('1', offline)).toEqual({ kind: 'error', reason: 'offline', detail: 'No answer from world.openfoodfacts.org/api/v3/product/1 (Failed to fetch).' });
+  });
+
+  it("quotes the server's own words when it refuses, so the problem can be traced", async () => {
+    const page = `<!DOCTYPE html><html><head><title>Page temporarily unavailable</title><style>.x{color:red}</style></head>
+      <body><h1>Page temporarily unavailable</h1><p>Our services are currently experiencing unusually high demand, or the page you requested is
+      not available to anonymous users.</p><a href="https://world.openfoodfacts.org/cgi/user.pl"
+      class="btn">Register</a><script>var translations = { en: {} };</script></body></html>`;
+    const html = (status: number) => (async () => new Response(page, { status, statusText: 'Service Unavailable' })) as unknown as typeof fetch;
+    const r = await lookupBarcode('4008400121925', html(503));
+    expect(r.kind === 'error' && r.reason).toBe('busy');
+    expect(r.kind === 'error' && r.detail).toBe(
+      'HTTP 503 Service Unavailable from world.openfoodfacts.org/api/v3/product/4008400121925: "Page temporarily unavailable Page temporarily unavailable Our services are currently experiencing unusually high demand, or the page you requested is not available to anonymous users. Register"',
+    );
+    const denied = await lookupBarcode('1', respond(403, { status_verbose: 'authentication required' }));
+    expect(denied).toEqual({ kind: 'error', reason: 'denied', detail: 'HTTP 403 from world.openfoodfacts.org/api/v3/product/1: "authentication required"' });
   });
 });

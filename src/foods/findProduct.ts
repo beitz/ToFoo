@@ -3,6 +3,7 @@
  * Facts) or USDA foods by name. A fetched food is not saved until it is logged, so lookups that
  * lead nowhere leave nothing behind.
  */
+import { diag } from '../app/diagnostics';
 import { createRateLimiter } from '../lib/rateLimit';
 import { repo } from '../storage/repo';
 import { CURRENT_SCHEMA_VERSION, type Product } from '../storage/types';
@@ -33,6 +34,8 @@ export async function findProduct(code: string, opts: { refresh?: boolean; fetch
   if (saved && !opts.refresh) return { kind: 'found', product: saved };
   await offLimiter.take();
   const r = await lookupBarcode(code, opts.fetchImpl);
+  // Kept in the diagnostics log (Settings → About → Diagnostics) so a failure can be traced later.
+  if (r.kind === 'error') diag('off.lookup', { code, reason: r.reason, detail: r.detail });
   if (r.kind !== 'found') return r;
   return { kind: 'found', product: toProduct(r.product, saved?.match) };
 }

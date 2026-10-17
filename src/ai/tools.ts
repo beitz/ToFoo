@@ -200,7 +200,7 @@ export async function runLookupBarcode(input: unknown, ctx: ToolContext): Promis
       ctx.products.seen.set(r.product.id, r.product);
       lines.push(describeProduct(r.product, ctx.db));
     } else if (r.kind === 'notFound') lines.push(`${code}: not in Open Food Facts. Use the closest generic BLS food instead.`);
-    else lines.push(`${code}: could not be looked up right now (${r.reason === 'offline' ? 'no connection' : 'Open Food Facts is busy'}). Use the closest generic BLS food instead.`);
+    else lines.push(`${code}: could not be looked up. Error: ${r.detail} Tell the user this error word for word (it helps them trace the problem), then use the closest generic BLS food instead.`);
   }
   return { ok: true, text: lines.join('\n') };
 }
