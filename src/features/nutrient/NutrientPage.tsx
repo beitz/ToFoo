@@ -16,6 +16,9 @@ import { LineChart } from '../../ui/LineChart';
 import { hasNoData } from '../../ui/Gauge';
 import { StatusBadge } from '../../ui/status';
 import { Icon } from '../../ui/Icon';
+import { testHintText } from './testHint';
+import { BloodTests, markersFor } from './BloodTests';
+import { formatDay } from '../../lib/dates';
 
 export function NutrientPage({ id }: { id: string }) {
   const d = useData();
@@ -103,7 +106,9 @@ export function NutrientPage({ id }: { id: string }) {
                 : ''}
           </p>
         )}
-        {isTank && req && <TankTrendNote r={r} need={req.physiological} startedEmpty={d.profile.startingLevel === 'empty'} />}
+        {isTank && req && <TankTrendNote r={r} need={req.physiological} startedEmpty={d.profile.startingLevel === 'empty' && !r.measuredOn} />}
+        {r.measuredOn && <p className="small">{t('nutrient.measuredOn', { day: formatDay(r.measuredOn, d.today) })}</p>}
+        <TestHint r={r} name={def.name} />
         {r.missingDataDays > 0 && <p className="small notice">{t('nutrient.missingData', { n: r.missingDataDays })}</p>}
         {r.ulRatio !== undefined && req?.upperLimit && (
           <p className={`small${r.ulRatio > 1 ? ' notice' : ' muted'}`}>
@@ -117,34 +122,22 @@ export function NutrientPage({ id }: { id: string }) {
         )}
       </div>
 
-      {r.kind === 'balance' && r.store && req && (
+      {r.kind === 'balance' && req && (
         <>
           <h2 className="section-title">{t('nutrient.storeTitle')}</h2>
           <div className="card">
-            <p className="big-number">
-              {t('gauge.full', { pct: fmtFill(r.store.central) })}
-              {showRange && r.store.high - r.store.low > 0.02 && <span className="muted range"> ({fmtPercent(r.store.low)}–{fmtPercent(r.store.high)})</span>}
-            </p>
-            <p className="small muted">{t('nutrient.storeExplain', { start: t(`start.${d.profile.startingLevel}` as MessageKey) })}</p>
-            <TankTrendNote r={r} need={req.physiological} startedEmpty={d.profile.startingLevel === 'empty'} />
-            {id === 'FE' && isOn(d.settings.features, 'absorption') && <p className="small muted">{t('nutrient.ironReference')}</p>}
-            {r.storeHistory && r.storeHistory.length > 1 && (
-              <>
-                <LineChart
-                  points={r.storeHistory.slice(-120).map((p) => ({ ...p, low: scale(p.low), central: scale(p.central), high: scale(p.high) }))}
-                  guides={[{ value: 100, label: '100%' }, { value: statusThresholds.tank.value.gettingLow * 100, label: fmtPercent(statusThresholds.tank.value.gettingLow) }]}
-                  showRange={showRange}
-                  format={(v) => `${Math.round(v)}%`}
-                />
-                <p className="muted small">{t('nutrient.historyStore')}</p>
-              </>
-            )}
+            <p className="small">{t('nutrient.storeUnknown')}</p>
             <p className="small">
-              <a href={href('settings', 'start')}>{t('nutrient.changeStart')}</a>
+              {t(r.averageAbsorbed >= req.physiological ? 'nutrient.storeGaining' : 'nutrient.storeLosing', {
+                absorbed: fmtAmount(id, r.averageAbsorbed),
+                need: fmtAmount(id, req.physiological),
+              })}
             </p>
+            {!markersFor(id).length && <p className="small muted">{t('nutrient.noLabYet')}</p>}
           </div>
         </>
       )}
+      {(r.kind === 'balance' || r.kind === 'tank') && <BloodTests id={id} />}
 
       <NutrientInfo id={id} />
 
@@ -323,4 +316,9 @@ function TankTrendNote({ r, need, startedEmpty }: { r: NutrientResult; need: num
       )}
     </>
   );
+}
+
+function TestHint({ r, name }: { r: NutrientResult; name: string }) {
+  const text = testHintText(r, name);
+  return text ? <p className="small notice">{text}</p> : null;
 }

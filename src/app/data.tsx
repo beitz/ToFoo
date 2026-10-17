@@ -11,6 +11,7 @@ import { resolveRequirements, type ResolvedRequirements } from '../model/require
 import { simulate, type SimulationResult } from '../model/simulate';
 import type { ModelEntry } from '../model/types';
 import { currentWeight, explicitDayStatus, resolveEntry, sunByDay, activeFast } from '../logic/resolve';
+import { measuredStores } from '../logic/lab';
 
 /** Longest history the model simulates (performance guard). */
 const MAX_MODEL_DAYS = 730;
@@ -136,6 +137,7 @@ export function DataProvider({ children, fallback }: { children: ReactNode; fall
       sunByDay: sunByDay(days, profile, sunEntries),
       startingLevel: profile.startingLevel,
       customStartLevels: profile.customStartLevels,
+      measuredStores: measuredStores(profile.labResults),
       weightKg: weight ?? 70,
       sex: profile.sex,
     });

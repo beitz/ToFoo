@@ -29,6 +29,8 @@ export interface SimulationInput {
   startingLevel: StartingLevelChoice;
   /** Custom start fractions (0–1) per tank nutrient. */
   customStartLevels?: Readonly<Record<string, number>>;
+  /** Store levels measured by a blood test (absorbed units), set on that day. A measured slow store shows as a tank. */
+  measuredStores?: Readonly<Record<string, { day: string; amount: number }>>;
   weightKg: number;
   sex?: Sex;
 }
@@ -61,8 +63,10 @@ export interface NutrientResult {
   capacity?: number;
   level?: Range;
   store?: Range;
-  /** Balance: fill level over time (for tanks this is `history`). */
-  storeHistory?: HistoryPoint[];
+  /** Tank: day of the blood test the store was set from, if any. */
+  measuredOn?: string;
+  /** Balance: days in a row (up to today) the balance has been in the "low" zone, with something logged in each window. */
+  lowForDays?: number;
   /** Tank and balance: average net change per day over the window (absorbed + sun − need, central), before clamping. */
   netPerDay?: number;
   /** Average per day over the window: absorbed (central) and raw intake (central). */
@@ -319,7 +323,11 @@ export function simulate(input: SimulationInput): SimulationResult {
     const isTank = !isInfo && (model?.kind === 'tank' || model?.kind === 'tankDays');
     const physiological = r?.physiological ?? 0;
     const storeDays = isTank && physiological > 0 ? (tankCapacity(id, input.weightKg, input.sex, physiological) ?? 0) / physiological : 0;
-    const kind: GaugeKind = isInfo ? 'info' : r!.limitOnly ? 'limit' : isTank ? (storeDays >= slowStore.minDays.value ? 'balance' : 'tank') : 'rolling';
+    const measured = isTank ? input.measuredStores?.[id] : undefined;
+    // Index of the day the measurement sets the store (the first model day if it was taken before); -1 if none / in the future.
+    const measuredIdx = measured ? days.findIndex((d) => d >= measured.day) : -1;
+    const slow = storeDays >= slowStore.minDays.value && measuredIdx < 0;
+    const kind: GaugeKind = isInfo ? 'info' : r!.limitOnly ? 'limit' : isTank ? (slow ? 'balance' : 'tank') : 'rolling';
     const windowDays =
       model?.kind === 'rolling' && model.window === 'short' ? settings.shortWindowDays : settings.longWindowDays;
 
@@ -414,7 +422,7 @@ export function simulate(input: SimulationInput): SimulationResult {
     // Balance: absorbed (plus sun) at reference iron stores, so it says what the diet covers whatever the store guess.
     const sunAt = (s: Scenario, i: number) => (id === 'VITD' && settings.sun ? (input.sunByDay?.[days[i]!]?.[s] ?? 0) : 0);
     const referenceInflow = Object.fromEntries(SCENARIOS.map((s) => [s, inflow[s].map((v, i) => v + sunAt(s, i))])) as Record<Scenario, number[]>;
-    let storePart: Pick<NutrientResult, 'capacity' | 'level' | 'store' | 'storeHistory' | 'netPerDay'> = {};
+    let storePart: Pick<NutrientResult, 'capacity' | 'level' | 'store' | 'netPerDay'> = {};
     if (kind === 'tank' || kind === 'balance') {
       const capacity = tankCapacity(id, input.weightKg, input.sex, physiological) ?? 1;
       const refWeight = referenceWeightKg.value[input.sex ?? 'unknown'];
@@ -431,6 +439,7 @@ export function simulate(input: SimulationInput): SimulationResult {
         let l = startFraction * capacity;
         const series: number[] = [];
         days.forEach((_, i) => {
+          if (i === measuredIdx) l = Math.min(capacity, measured!.amount);
           const sunUg = sunAt(s, i);
           if (adaptIron) {
             // Stores scale with body weight; the ferritin relation is for a reference-sized adult.
@@ -464,10 +473,11 @@ export function simulate(input: SimulationInput): SimulationResult {
           store,
           netPerDay,
           history,
+          measuredOn: measuredIdx >= 0 ? measured!.day : undefined,
         });
         continue;
       }
-      storePart = { capacity, level, store, storeHistory: history, netPerDay };
+      storePart = { capacity, level, store, netPerDay };
     }
 
     // Rolling, limit and info.
@@ -499,6 +509,15 @@ export function simulate(input: SimulationInput): SimulationResult {
       const vals = SCENARIOS.map((s) => valueAt(s, i));
       history.push({ day: days[i]!, low: Math.min(...vals), central: vals[1]!, high: Math.max(...vals) });
     }
+    let lowForDays: number | undefined;
+    if (kind === 'balance') {
+      lowForDays = 0;
+      for (let i = end; i >= Math.max(0, end - HISTORY_DAYS + 1); i--) {
+        const windowKnown = knownPrefix[i + 1]! - knownPrefix[Math.max(0, i - windowDays + 1)]!;
+        if (windowKnown === 0 || valueAt('central', i) >= statusThresholds.rolling.value.low) break;
+        lowForDays++;
+      }
+    }
     const v = end >= 0 ? { low: valueAt('low', end), central: valueAt('central', end), high: valueAt('high', end) } : { low: 0, central: 0, high: 0 };
     const value = { low: Math.min(v.low, v.central, v.high), central: v.central, high: Math.max(v.low, v.central, v.high) };
     results.set(id, {
@@ -506,6 +525,7 @@ export function simulate(input: SimulationInput): SimulationResult {
       status: classify(kind === 'balance' ? 'rolling' : kind, value.central, ulRatio, knownInWindow > 0),
       value,
       history,
+      lowForDays,
       ...storePart,
     });
   }

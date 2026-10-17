@@ -34,6 +34,15 @@ export interface OutdoorSession {
   skin: SkinExposure;
 }
 
+export interface LabResult {
+  id: string;
+  /** Key of `labMarkers` in model/parameters.ts, e.g. 'ferritin'. */
+  marker: string;
+  /** In the marker's unit. */
+  value: number;
+  day: string;
+}
+
 export interface Profile extends Versioned {
   id: 'profile';
   birthYear?: number;
@@ -50,6 +59,8 @@ export interface Profile extends Versioned {
   exclusions: { groups: string[]; foods: string[] };
   startingLevel: StartingLevelChoice;
   customStartLevels?: Record<string, number>;
+  /** Blood test values that set a store's level on the day of the test (model/parameters.ts `labMarkers`). */
+  labResults?: LabResult[];
   /** First day the model simulates (set at first launch). */
   modelStartDay: string;
   onboarded: boolean;
