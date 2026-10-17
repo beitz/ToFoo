@@ -5,7 +5,7 @@ import { href, navigate } from '../../app/router';
 import { t, type MessageKey } from '../../i18n';
 import { dayKey, formatTime } from '../../lib/dates';
 import { fmtNumber, fmtTokens, fmtUsd } from '../../lib/format';
-import { appNote, emptyConversation, sendMessage, type AiModel, type Conversation, type ShownNote, type ShownProposal, type TurnOutcome } from '../../ai/assistant';
+import { appNote, emptyConversation, sendMessage, type AiModel, type Conversation, type ShownNote, type ShownProposal, type ShownSleep, type TurnOutcome } from '../../ai/assistant';
 import { classifyError, getAiSettings, makeCreate, saveUsage } from '../../ai/client';
 import { mergeModelTokens, modelTokensCost, totalTokens, type ModelTokens } from '../../ai/pricing';
 import { prepareImage, type PreparedImage } from '../../ai/image';
@@ -26,12 +26,15 @@ import { Icon } from '../../ui/Icon';
 import { ConfidenceField } from '../log/ConfidenceField';
 import { TimeField } from '../log/TimeField';
 import { defaultTimeFor } from '../log/time';
+import { sleepProblem } from '../sleep/SleepSheet';
+import { durationText, spanText } from '../sleep/format';
 
 type Bubble = { role: 'user'; text: string; previews: string[] } | { role: 'assistant'; text: string } | { role: 'card'; id: string };
 type ComposerPhoto = PreparedImage & { barcodes: string[]; time: PhotoTime };
-/** A proposed meal (M1, …) or journal entry (J1, …), and whether the user logged or saved it. */
-type Card = { kind: 'meal'; proposal: ShownProposal; logged: boolean } | { kind: 'note'; note: ShownNote; logged: boolean };
-const cardId = (c: Card) => (c.kind === 'meal' ? c.proposal.id : c.note.id);
+/** A proposed meal (M1, …), journal entry (J1, …) or sleep (S1, …), and whether the user logged or saved it. */
+type Card = { kind: 'meal'; proposal: ShownProposal; logged: boolean } | { kind: 'note'; note: ShownNote; logged: boolean } | { kind: 'sleep'; sleep: ShownSleep; logged: boolean };
+const cardOf = (c: Card) => (c.kind === 'meal' ? c.proposal : c.kind === 'note' ? c.note : c.sleep);
+const cardId = (c: Card) => cardOf(c).id;
 /** Undoes one saved card. */
 type Undo = () => Promise<void>;
 /** Saves a card as it is shown (with the user's edits); undefined if it cannot be saved as it is. */
@@ -205,7 +208,15 @@ function Chat({ apiKey, model, day }: { apiKey: string; model: AiModel; day: str
               ...(usdaOn ? { searchUsda: (q: string, kind: 'generic' | 'branded') => findUsda(q, kind, 8) } : {}),
             }
           : undefined;
-      const ctx = { db: d.foods, index: d.searchIndex, boost: d.searchBoost, products, now: Date.now(), journal: isOn(d.settings.features, 'journal') };
+      const ctx = {
+        db: d.foods,
+        index: d.searchIndex,
+        boost: d.searchBoost,
+        products,
+        now: Date.now(),
+        journal: isOn(d.settings.features, 'journal'),
+        sleep: isOn(d.settings.features, 'sleep'),
+      };
       const r = await sendMessage(create, model, conversation, msg, ctx, onUsage);
       setConversation(r.conversation);
       setPhotoCount((n) => n + msg.images.length);
@@ -231,10 +242,12 @@ function Chat({ apiKey, model, day }: { apiKey: string; model: AiModel; day: str
     const added: Bubble[] = outcome.text ? [{ role: 'assistant', text: outcome.text }] : [];
     if (outcome.kind === 'proposal') {
       // A correction replaces its open card: the old one goes, the new one appears at the end.
-      const shown: Card[] = [...outcome.proposals.map((p): Card => ({ kind: 'meal', proposal: p, logged: false })), ...outcome.notes.map((n): Card => ({ kind: 'note', note: n, logged: false }))];
-      const replaced = new Set(
-        shown.map((c) => (c.kind === 'meal' ? c.proposal.replaces : c.note.replaces)).filter((id): id is string => !!id && cardsRef.current.get(id)?.logged === false),
-      );
+      const shown: Card[] = [
+        ...outcome.proposals.map((p): Card => ({ kind: 'meal', proposal: p, logged: false })),
+        ...outcome.notes.map((n): Card => ({ kind: 'note', note: n, logged: false })),
+        ...outcome.sleeps.map((s): Card => ({ kind: 'sleep', sleep: s, logged: false })),
+      ];
+      const replaced = new Set(shown.map((c) => cardOf(c).replaces).filter((id): id is string => !!id && cardsRef.current.get(id)?.logged === false));
       setCards((all) => {
         const next = new Map([...all].filter(([id]) => !replaced.has(id)));
         for (const c of shown) next.set(cardId(c), c);
@@ -316,6 +329,7 @@ function Chat({ apiKey, model, day }: { apiKey: string; model: AiModel; day: str
         <div className="bubble bubble-assistant">
           {t('ai.intro')}
           {isOn(d.settings.features, 'journal') && ` ${t('ai.introJournal')}`}
+          {isOn(d.settings.features, 'sleep') && ` ${t('ai.introSleep')}`}
         </div>
         {bubbles.map((b, i) =>
           b.role === 'card' ? (
@@ -517,7 +531,73 @@ function useRegister(id: string, save: Saver | undefined, register: CardProps<Ca
 }
 
 function CardView({ card, ...rest }: CardProps<Card>) {
-  return card.kind === 'meal' ? <ProposalCard card={card} {...rest} /> : <NoteCard card={card} {...rest} />;
+  if (card.kind === 'meal') return <ProposalCard card={card} {...rest} />;
+  if (card.kind === 'sleep') return <SleepCard card={card} {...rest} />;
+  return <NoteCard card={card} {...rest} />;
+}
+
+/** A sleep the assistant proposes: check or adjust both times, then save (replacing any sleep at that time). */
+function SleepCard({ card, toast, onLogged, register }: CardProps<Extract<Card, { kind: 'sleep' }>>) {
+  const { sleep } = card;
+  const [start, setStart] = useState(sleep.start);
+  const [end, setEnd] = useState(sleep.end);
+  const [saving, setSaving] = useState(false);
+  const problem = sleepProblem({ start, end });
+
+  async function save(): Promise<Undo | undefined> {
+    if (problem || saving) return;
+    setSaving(true);
+    try {
+      const { saved, replaced } = await repo.saveSleep({ start, end });
+      onLogged(true);
+      return async () => {
+        await repo.undoSleep(saved, replaced);
+        onLogged(false);
+      };
+    } finally {
+      setSaving(false);
+    }
+  }
+  useRegister(sleep.id, card.logged ? undefined : save, register);
+
+  async function saveOne() {
+    const undo = await save();
+    if (undo) toast(t('sleep.saved', { duration: durationText(end - start) }), undo);
+  }
+
+  if (card.logged) {
+    return (
+      <div className="card proposal-done row">
+        <Icon name="check" size={18} />
+        <span>
+          {t('ai.sleepSaved', { span: spanText({ start, end }) })} <a href={href('diary', dayKey(new Date(end)))}>{t('edit.inDiary')}</a>
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="card proposal">
+      <div className="row-between">
+        <strong className="journal-label">
+          <Icon name="bed" size={18} /> {t('sleep.short')}
+        </strong>
+        <span className="muted small" title={t('ai.cardId')}>
+          {sleep.id}
+        </span>
+      </div>
+      <TimeField label={t('sleep.fellAsleep')} value={start} onChange={setStart} />
+      <TimeField label={t('sleep.wokeUp')} value={end} onChange={setEnd} />
+      <div className="sheet-actions">
+        <span className={problem ? 'notice small' : 'muted'} role={problem ? 'alert' : undefined}>
+          {problem ?? durationText(end - start)}
+        </span>
+        <button className="btn btn-primary" disabled={!!problem || saving} onClick={() => void saveOne()}>
+          {t('ai.saveSleep')}
+        </button>
+      </div>
+    </div>
+  );
 }
 
 /** A journal entry the assistant proposes: check or edit the words and time, then save. */

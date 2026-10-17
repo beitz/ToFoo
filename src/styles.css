@@ -2118,3 +2118,10 @@ body:has(.fab-stack) .toast-area {
   display: flex;
   justify-content: flex-end;
 }
+/* With a third button (sleep), "Log for this day" takes the whole first row. */
+.diary-actions:has(> :nth-child(3)) > :first-child {
+  grid-column: 1 / -1;
+}
+.page:has(.fab-stack > :nth-child(4)) {
+  padding-bottom: calc(var(--nav-h) + 266px + env(safe-area-inset-bottom));
+}

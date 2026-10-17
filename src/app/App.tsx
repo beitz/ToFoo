@@ -9,6 +9,7 @@ import { Icon } from '../ui/Icon';
 import { AboutPage } from '../features/about/AboutPage';
 import { HomePage } from '../features/home/HomePage';
 import { FastShortcut } from '../features/home/FastShortcut';
+import { SleepShortcut } from '../features/sleep/SleepShortcut';
 import { CalendarPage } from '../features/review/CalendarPage';
 import { ReviewPage } from '../features/review/ReviewPage';
 import { LogPage } from '../features/log/LogPage';
@@ -86,6 +87,8 @@ function Page({ route }: { route: string[] }) {
       return <ReviewPage from={b} to={c} />;
     case 'fast':
       return <FastShortcut />;
+    case 'sleep':
+      return <SleepShortcut />;
     default:
       return <HomePage />;
   }

@@ -3,11 +3,11 @@ import { useData } from '../../app/data';
 import { useToast } from '../../app/toast';
 import { href, navigate } from '../../app/router';
 import { t, type MessageKey } from '../../i18n';
-import { addDays, formatDay, formatTime } from '../../lib/dates';
+import { addDays, formatDay, formatTime, parseDay } from '../../lib/dates';
 import { fmtAmount } from '../../lib/format';
 import { groupMeals } from '../../model/simulate';
 import { repo } from '../../storage/repo';
-import type { JournalEntry, LogEntry, SunEntry } from '../../storage/types';
+import type { JournalEntry, LogEntry, SleepRecord, SunEntry } from '../../storage/types';
 import { Icon } from '../../ui/Icon';
 import { Segmented } from '../../ui/controls';
 import { entryAmount } from '../log/describe';
@@ -20,6 +20,9 @@ import { JournalRow } from '../journal/JournalPage';
 import { JournalSheet } from '../journal/JournalSheet';
 import { useJournal } from '../journal/useJournal';
 import { defaultTimeFor } from '../log/time';
+import { useSleep } from '../sleep/useSleep';
+import { SleepSheet } from '../sleep/SleepSheet';
+import { spanText } from '../sleep/format';
 
 type StatusChoice = 'auto' | 'logged' | 'partial' | 'fasted' | 'filled' | 'excluded';
 
@@ -33,17 +36,26 @@ export function DiaryPage({ day: dayParam }: { day?: string }) {
   const [journalSheet, setJournalSheet] = useState<JournalEntry | 'new' | null>(null);
   const journalOn = isOn(d.settings.features, 'journal');
   const notes = useJournal(day) ?? [];
+  const sleepOn = isOn(d.settings.features, 'sleep');
+  const sleeps = useSleep(day) ?? [];
+  // A sleep being edited, or 'new' for one being added.
+  const [sleepSheet, setSleepSheet] = useState<SleepRecord | 'new' | null>(null);
 
   const entries = d.log.filter((e) => e.day === day);
   const meals = groupMeals(entries, d.settings.mealWindowMinutes);
-  // Meals and journal entries in one timeline, so "tired after lunch" sits after the lunch;
-  // journal entries with no meal between them share a card.
-  type Item = { kind: 'meal'; time: number; meal: LogEntry[] } | { kind: 'notes'; time: number; notes: JournalEntry[] };
+  // Meals, journal entries and sleeps in one timeline, so "tired after lunch" sits after the lunch;
+  // journal entries with no meal between them share a card. A sleep sits where it ended.
+  type Item = { kind: 'meal'; time: number; meal: LogEntry[] } | { kind: 'notes'; time: number; notes: JournalEntry[] } | { kind: 'sleep'; time: number; sleep: SleepRecord };
   const timeline: Item[] = [];
-  const sorted = [...meals.map((meal) => ({ time: meal[0]!.time, meal })), ...notes.map((note) => ({ time: note.time, note }))].sort((a, b) => a.time - b.time);
+  const sorted = [
+    ...meals.map((meal) => ({ time: meal[0]!.time, meal })),
+    ...notes.map((note) => ({ time: note.time, note })),
+    ...(sleepOn ? sleeps.map((sleep) => ({ time: sleep.end ?? sleep.start, sleep })) : []),
+  ].sort((a, b) => a.time - b.time);
   for (const x of sorted) {
     const last = timeline[timeline.length - 1];
     if ('meal' in x) timeline.push({ kind: 'meal', time: x.time, meal: x.meal });
+    else if ('sleep' in x) timeline.push({ kind: 'sleep', time: x.time, sleep: x.sleep });
     else if (last?.kind === 'notes') last.notes.push(x.note);
     else timeline.push({ kind: 'notes', time: x.time, notes: [x.note] });
   }
@@ -112,7 +124,7 @@ export function DiaryPage({ day: dayParam }: { day?: string }) {
         <p className="muted small">{t(choice === 'auto' && isOn(d.settings.features, 'fillUnloggedDays') ? 'diary.hint.autoFilled' : (`diary.hint.${choice}` as MessageKey))}</p>
       </div>
 
-      <div className={journalOn ? 'diary-actions' : undefined}>
+      <div className={journalOn || sleepOn ? 'diary-actions' : undefined}>
         <a className="btn btn-primary btn-block" href={href('log', day)}>
           <Icon name="plus" /> {t('diary.logForDay')}
         </a>
@@ -121,11 +133,30 @@ export function DiaryPage({ day: dayParam }: { day?: string }) {
             <Icon name="plus" /> {t('journal.entryShort')}
           </button>
         )}
+        {sleepOn && (
+          <button className="btn btn-secondary btn-block" onClick={() => setSleepSheet('new')}>
+            <Icon name="plus" /> {t('sleep.short')}
+          </button>
+        )}
       </div>
 
       {timeline.length === 0 && <p className="muted empty">{t('diary.empty')}</p>}
       {timeline.map((item) =>
-        item.kind === 'notes' ? (
+        item.kind === 'sleep' ? (
+          <div className="card sleep-card" key={item.sleep.id}>
+            <button className="entry-row" onClick={() => setSleepSheet(item.sleep)}>
+              <span className="entry-label journal-label">
+                <Icon name="bed" size={16} /> {t('sleep.short')}
+              </span>
+              <span className="muted small">
+                {item.sleep.end !== undefined ? spanText({ start: item.sleep.start, end: item.sleep.end }) : t('sleep.since', { time: formatTime(item.sleep.start) })}
+              </span>
+              <span className="entry-edit">
+                <Icon name="edit" size={16} />
+              </span>
+            </button>
+          </div>
+        ) : item.kind === 'notes' ? (
           <div className="card journal-card" key={item.notes[0]!.id}>
             <span className="muted small journal-label">
               <Icon name="journal" size={16} /> {t('journal.entry')}
@@ -175,11 +206,26 @@ export function DiaryPage({ day: dayParam }: { day?: string }) {
 
       {editing && <EditEntrySheet entry={editing} onClose={() => setEditing(null)} />}
       {addingSun && <SunEntrySheet day={day} onClose={() => setAddingSun(false)} />}
+      {sleepSheet && (
+        <SleepSheet
+          record={sleepSheet === 'new' ? undefined : sleepSheet}
+          initial={sleepSheet === 'new' ? sleepDefault(day) : undefined}
+          onClose={() => setSleepSheet(null)}
+        />
+      )}
       {journalSheet && (
         <JournalSheet entry={journalSheet === 'new' ? undefined : journalSheet} defaultTime={defaultTimeFor(day, d.today)} onClose={() => setJournalSheet(null)} />
       )}
     </section>
   );
+}
+
+/** A new sleep in the diary: the night that ended that morning, 23:00 to 07:00 (the user adjusts it). */
+function sleepDefault(day: string): { start: number; end: number } {
+  const morning = parseDay(day);
+  morning.setHours(7, 0, 0, 0);
+  const end = Math.min(morning.getTime(), Date.now());
+  return { start: end - 8 * 3_600_000, end };
 }
 
 /** One meal: its items, each tappable to edit, and "Log again". */

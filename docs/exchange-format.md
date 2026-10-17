@@ -32,14 +32,16 @@ Everything personal, as stored on the device. Written by Settings → Backup →
     "profile": { "id": "profile", "schemaVersion": 1, "…": "…" },
     "settings": { "id": "settings", "schemaVersion": 1, "…": "…" },
     "recipes": [], "batches": [], "log": [], "customFoods": [],
-    "dayStatus": [], "fasts": [], "sunEntries": [], "products": [], "journal": []
+    "dayStatus": [], "fasts": [], "sunEntries": [], "products": [], "journal": [], "sleep": []
   }
 }
 ```
 
-Each record has a `schemaVersion`; older records are migrated on import. `products` may be missing in backups from before the Open Food Facts lookup, and `journal` in backups from before the journal; each then counts as empty.
+Each record has a `schemaVersion`; older records are migrated on import. `products` may be missing in backups from before the Open Food Facts lookup, `journal` in backups from before the journal, and `sleep` in backups from before sleep; each then counts as empty.
 
 Journal entries (`data.journal[]`): `id`, `schemaVersion`, `time` (epoch ms the entry is about), `day` (the local `YYYY-MM-DD` of `time`) and `text` (what the user wrote, plain text).
+
+Sleep (`data.sleep[]`): `id`, `schemaVersion`, `start` (epoch ms the user fell asleep), `end` (epoch ms they woke up; missing while they are asleep) and `day` (the local `YYYY-MM-DD` the sleep ended, or started while it is going: a night belongs to the morning after it). No quality rating.
 
 Products (`data.products[]`) are foods from online databases as fetched: Open Food Facts products (data licence ODbL) and USDA FoodData Central foods (public domain). Fields: `id` (`OFF:<barcode>` or `USDA:<fdcId>`), `source` (`"OFF"` or `"USDA"`), `code` (barcode or FoodData Central id), `usdaType` (USDA only: `Foundation`, `SR Legacy`, `Survey (FNDDS)` or `Branded`), `name`, optional `brand`, `quantity`, `serving` (`{ label, grams }`), `per100` (values per 100 g, or per 100 ml if `perMl`, by BLS component code in BLS units: label values, or the USDA database values for USDA generic foods; a nutrient without a value is absent, not 0), `categories`, optional `lastModified`, `fetchedAt`, and optional `match` (`{ version, code }`: the BLS food whose values fill in what the source lacks).
 

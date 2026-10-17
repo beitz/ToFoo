@@ -3,6 +3,7 @@
  */
 import { newId } from '../lib/id';
 import { refKey } from '../lib/refs';
+import { overlaps, sleepDay } from '../logic/sleep';
 import { db as defaultDb, runMigrations, type ToFooDB } from './db';
 import { defaultProfile, defaultSettings } from './defaults';
 import {
@@ -13,6 +14,7 @@ import {
   type FoodRef,
   type Fast,
   type JournalEntry,
+  type SleepRecord,
   type LogEntry,
   type NewLogEntry as NewLog,
   type Product,
@@ -37,6 +39,7 @@ export interface Snapshot {
   sunEntries: SunEntry[];
   products: Product[];
   journal: JournalEntry[];
+  sleep: SleepRecord[];
 }
 
 
@@ -247,6 +250,58 @@ export function createRepo(db: ToFooDB) {
       await db.journal.put(e);
     },
 
+    // ── Sleep ──
+    /** "Going to sleep": start a sleep now, unless one is already going. */
+    async startSleep(start: number): Promise<SleepRecord | undefined> {
+      return db.transaction('rw', db.sleep, async () => {
+        if ((await db.sleep.toArray()).some((r) => r.end === undefined)) return undefined;
+        const rec: SleepRecord = { id: newId(), schemaVersion: v, start, day: sleepDay({ start }) };
+        await db.sleep.put(rec);
+        return rec;
+      });
+    },
+    /** "I'm up": end the sleep that is going; returns it as it was, for undo. */
+    async endSleep(end: number): Promise<SleepRecord | undefined> {
+      return db.transaction('rw', db.sleep, async () => {
+        const open = (await db.sleep.toArray()).find((r) => r.end === undefined);
+        if (!open) return undefined;
+        await db.sleep.put({ ...open, end: Math.max(end, open.start), day: sleepDay({ start: open.start, end: Math.max(end, open.start) }) });
+        return open;
+      });
+    },
+    /**
+     * Save a sleep with both times (from the morning question, the diary or the assistant). Sleeps it
+     * overlaps are replaced, so a night told to the assistant after "Going to sleep" is not counted
+     * twice. Returns the new record and the replaced ones, for undo.
+     */
+    async saveSleep(s: { start: number; end: number }, replacing?: string): Promise<{ saved: SleepRecord; replaced: SleepRecord[] }> {
+      return db.transaction('rw', db.sleep, async () => {
+        const replaced = (await db.sleep.toArray()).filter((r) => r.id === replacing || overlaps(r, s));
+        await db.sleep.bulkDelete(replaced.map((r) => r.id));
+        const old = replaced.find((r) => r.id === replacing);
+        const saved: SleepRecord = { id: old?.id ?? newId(), schemaVersion: v, start: s.start, end: s.end, day: sleepDay(s) };
+        await db.sleep.put(saved);
+        return { saved, replaced };
+      });
+    },
+    /** Undo a save: remove what was saved and put back what it replaced. */
+    async undoSleep(saved: SleepRecord, replaced: SleepRecord[]): Promise<void> {
+      await db.transaction('rw', db.sleep, async () => {
+        await db.sleep.delete(saved.id);
+        await db.sleep.bulkPut(replaced);
+      });
+    },
+    async deleteSleep(id: string): Promise<SleepRecord | undefined> {
+      return db.transaction('rw', db.sleep, async () => {
+        const old = await db.sleep.get(id);
+        await db.sleep.delete(id);
+        return old;
+      });
+    },
+    async restoreSleep(r: SleepRecord): Promise<void> {
+      await db.sleep.put(r);
+    },
+
     // ── Meta ──
     async getMeta<T>(key: string): Promise<T | undefined> {
       return (await db.meta.get(key))?.value as T | undefined;
@@ -257,7 +312,7 @@ export function createRepo(db: ToFooDB) {
 
     // ── Backup ──
     async snapshot(): Promise<Snapshot> {
-      return db.transaction('r', [db.profile, db.settings, db.recipes, db.batches, db.log, db.customFoods, db.dayStatus, db.fasts, db.sunEntries, db.products, db.journal], async () => ({
+      return db.transaction('r', [db.profile, db.settings, db.recipes, db.batches, db.log, db.customFoods, db.dayStatus, db.fasts, db.sunEntries, db.products, db.journal, db.sleep], async () => ({
         profile: (await db.profile.get('profile')) ?? null,
         settings: (await db.settings.get('settings')) ?? null,
         recipes: await db.recipes.toArray(),
@@ -269,11 +324,12 @@ export function createRepo(db: ToFooDB) {
         sunEntries: await db.sunEntries.toArray(),
         products: await db.products.toArray(),
         journal: await db.journal.toArray(),
+        sleep: await db.sleep.toArray(),
       }));
     },
     /** Replace all personal data with the snapshot (after the user confirmed a preview). */
     async restore(s: Snapshot): Promise<void> {
-      const tables = [db.profile, db.settings, db.recipes, db.batches, db.log, db.customFoods, db.dayStatus, db.fasts, db.sunEntries, db.products, db.journal];
+      const tables = [db.profile, db.settings, db.recipes, db.batches, db.log, db.customFoods, db.dayStatus, db.fasts, db.sunEntries, db.products, db.journal, db.sleep];
       await db.transaction('rw', tables, async () => {
         await Promise.all(tables.map((t) => t.clear()));
         if (s.profile) await db.profile.put(s.profile);
@@ -287,6 +343,7 @@ export function createRepo(db: ToFooDB) {
         await db.sunEntries.bulkPut(s.sunEntries);
         await db.products.bulkPut(s.products);
         await db.journal.bulkPut(s.journal);
+        await db.sleep.bulkPut(s.sleep);
       });
       await runMigrations(db);
     },
