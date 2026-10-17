@@ -386,6 +386,23 @@
                               "source",
                               "code"
                             ]
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "source": {
+                                "type": "string",
+                                "const": "USDA"
+                              },
+                              "code": {
+                                "type": "string",
+                                "pattern": "^\\d{1,10}$"
+                              }
+                            },
+                            "required": [
+                              "source",
+                              "code"
+                            ]
                           }
                         ]
                       }
@@ -485,6 +502,23 @@
                                 "code": {
                                   "type": "string",
                                   "pattern": "^\\d{4,14}$"
+                                }
+                              },
+                              "required": [
+                                "source",
+                                "code"
+                              ]
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "source": {
+                                  "type": "string",
+                                  "const": "USDA"
+                                },
+                                "code": {
+                                  "type": "string",
+                                  "pattern": "^\\d{1,10}$"
                                 }
                               },
                               "required": [
@@ -683,6 +717,23 @@
                                     "code": {
                                       "type": "string",
                                       "pattern": "^\\d{4,14}$"
+                                    }
+                                  },
+                                  "required": [
+                                    "source",
+                                    "code"
+                                  ]
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "source": {
+                                      "type": "string",
+                                      "const": "USDA"
+                                    },
+                                    "code": {
+                                      "type": "string",
+                                      "pattern": "^\\d{1,10}$"
                                     }
                                   },
                                   "required": [
@@ -937,6 +988,23 @@
                               "code": {
                                 "type": "string",
                                 "pattern": "^\\d{4,14}$"
+                              }
+                            },
+                            "required": [
+                              "source",
+                              "code"
+                            ]
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "source": {
+                                "type": "string",
+                                "const": "USDA"
+                              },
+                              "code": {
+                                "type": "string",
+                                "pattern": "^\\d{1,10}$"
                               }
                             },
                             "required": [
@@ -1389,11 +1457,24 @@
                   },
                   "source": {
                     "type": "string",
-                    "const": "OFF"
+                    "enum": [
+                      "OFF",
+                      "USDA"
+                    ]
                   },
                   "code": {
                     "type": "string",
-                    "pattern": "^\\d{4,14}$"
+                    "pattern": "^\\d{1,14}$"
+                  },
+                  "usdaType": {
+                    "description": "USDA only: the FoodData Central data type",
+                    "type": "string",
+                    "enum": [
+                      "Foundation",
+                      "SR Legacy",
+                      "Survey (FNDDS)",
+                      "Branded"
+                    ]
                   },
                   "name": {
                     "type": "string",
@@ -1430,7 +1511,7 @@
                       "type": "number",
                       "minimum": 0
                     },
-                    "description": "Label values per 100 g (per 100 ml if perMl) by BLS component code, in BLS units. A nutrient not on the label is absent."
+                    "description": "Values per 100 g (per 100 ml if perMl) by BLS component code, in BLS units: label values, or USDA database values for USDA generic foods. A nutrient without a value is absent."
                   },
                   "perMl": {
                     "type": "boolean"
@@ -1445,7 +1526,7 @@
                     "type": "number"
                   },
                   "match": {
-                    "description": "BLS food that supplies the nutrients the label lacks",
+                    "description": "BLS food that supplies the nutrients the source lacks",
                     "type": "object",
                     "properties": {
                       "version": {
@@ -1475,7 +1556,7 @@
                   "categories",
                   "fetchedAt"
                 ],
-                "description": "A packaged product from Open Food Facts (ODbL), as fetched"
+                "description": "A food from an online database, as fetched: a packaged product from Open Food Facts (ODbL) or a food from USDA FoodData Central (public domain)"
               }
             }
           },

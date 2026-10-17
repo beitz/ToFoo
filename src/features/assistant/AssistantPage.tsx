@@ -11,9 +11,8 @@ import { mergeModelTokens, modelTokensCost, totalTokens, type ModelTokens } from
 import { prepareImage, type PreparedImage } from '../../ai/image';
 import { photoLabel, readPhotoTime, type PhotoTime } from '../../ai/photoTime';
 import type { ProposedItem, ProductTools } from '../../ai/tools';
-import { findProduct } from '../../foods/findProduct';
-import { productUrl } from '../../foods/openFoodFacts';
-import { productLabel } from '../../foods/products';
+import { findProduct, findUsda } from '../../foods/findProduct';
+import { productLabel, productPageUrl, productRef } from '../../foods/products';
 import type { FoodRef, Product } from '../../storage/types';
 import { barcodesInPhoto } from '../log/barcode';
 import type { EntryConfidence } from '../../model/types';
@@ -99,6 +98,7 @@ function Chat({ apiKey, model, day }: { apiKey: string; model: AiModel; day: str
   /** Photos sent so far, so numbers stay unique across the chat. */
   const [photoCount, setPhotoCount] = useState(0);
   const offOn = isOn(d.settings.features, 'openFoodFacts');
+  const usdaOn = isOn(d.settings.features, 'usda');
   // Products looked up in this chat stay usable for later proposals in it.
   const [seenProducts] = useState(() => new Map<string, Product>());
   const [busy, setBusy] = useState(false);
@@ -157,7 +157,15 @@ function Chat({ apiKey, model, day }: { apiKey: string; model: AiModel; day: str
       void saveUsage(tokens);
     };
     try {
-      const products: ProductTools | undefined = offOn ? { saved: d.productsByCode, find: (code) => findProduct(code), seen: seenProducts } : undefined;
+      const products: ProductTools | undefined =
+        offOn || usdaOn
+          ? {
+              saved: d.productsById,
+              seen: seenProducts,
+              ...(offOn ? { find: (code: string) => findProduct(code) } : {}),
+              ...(usdaOn ? { searchUsda: (q: string, kind: 'generic' | 'branded') => findUsda(q, kind, 8) } : {}),
+            }
+          : undefined;
       const ctx = { db: d.foods, index: d.searchIndex, boost: d.searchBoost, products, now: Date.now() };
       const r = await sendMessage(create, model, conversation, msg, ctx, onUsage);
       setConversation(r.conversation);
@@ -324,7 +332,7 @@ function ProposalCard({ card, day, toast, onLogged }: { card: Card; day: string;
         if (it.product) {
           await repo.saveProduct(it.product);
           await repo.setProductMatch(it.product.id, it.product.match ?? null);
-          ref = { source: 'OFF', code: it.product.code };
+          ref = productRef(it.product);
         }
         const entry = await repo.addLog({
           kind: 'food',
@@ -373,7 +381,7 @@ function ProposalCard({ card, day, toast, onLogged }: { card: Card; day: string;
           <li key={`${it.food.code}-${i}`} className="proposal-item">
             <div className="proposal-name">
               {it.product ? (
-                <a href={productUrl(it.product.code)} target="_blank" rel="noreferrer">
+                <a href={productPageUrl(it.product)} target="_blank" rel="noreferrer">
                   {productLabel(it.product)}
                 </a>
               ) : (

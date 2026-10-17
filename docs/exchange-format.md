@@ -10,6 +10,7 @@ One versioned JSON format for backups, shared recipes (QR codes, v2) and pasted 
 - Top level: `"format": "tofoo"`, `"formatVersion": 1`, and `"type"`: `"backup"`, `"recipe"` or `"logEntry"`.
 - Foods are **referenced, never copied**: `{ "source": "BLS", "version": "4.0", "code": "H700000" }`. Only manual ingredients carry their own nutrient values (`per100g`) and a confidence.
 - Packaged products from Open Food Facts are referenced by barcode: `{ "source": "OFF", "code": "8000500319475" }`. Open Food Facts has no versions, so a backup also carries the product as it was fetched (`data.products`).
+- Foods from USDA FoodData Central are referenced by FoodData Central id: `{ "source": "USDA", "code": "170392" }`. A new USDA release gives changed foods new ids; the backup also carries the food as fetched (`data.products`).
 - Nutrient amounts use **BLS component codes and BLS units** (e.g. `"VITC"` in mg, `"VITB12"` in µg, `"VITB6"` in µg). See `data/README.md`.
 - **Unknown fields are ignored**, so newer files with extra fields still import in older apps. A file with a *higher* `formatVersion` than the app knows is refused with a message to update the app.
 - **Import always shows a preview and asks for confirmation.** Invalid input gives a clear error (field path + problem) and nothing is imported.
@@ -38,7 +39,7 @@ Everything personal, as stored on the device. Written by Settings → Backup →
 
 Each record has a `schemaVersion`; older records are migrated on import. `products` may be missing in backups from before the Open Food Facts lookup; it then counts as empty.
 
-Products (`data.products[]`) are Open Food Facts products as fetched (data licence ODbL): `id` (`OFF:<barcode>`), `source: "OFF"`, `code` (barcode), `name`, optional `brand`, `quantity`, `serving` (`{ label, grams }`), `per100` (label values per 100 g, or per 100 ml if `perMl`, by BLS component code in BLS units; a nutrient not on the label is absent, not 0), `categories`, optional `lastModified`, `fetchedAt`, and optional `match` (`{ version, code }`: the BLS food whose values fill in what the label lacks).
+Products (`data.products[]`) are foods from online databases as fetched: Open Food Facts products (data licence ODbL) and USDA FoodData Central foods (public domain). Fields: `id` (`OFF:<barcode>` or `USDA:<fdcId>`), `source` (`"OFF"` or `"USDA"`), `code` (barcode or FoodData Central id), `usdaType` (USDA only: `Foundation`, `SR Legacy`, `Survey (FNDDS)` or `Branded`), `name`, optional `brand`, `quantity`, `serving` (`{ label, grams }`), `per100` (values per 100 g, or per 100 ml if `perMl`, by BLS component code in BLS units: label values, or the USDA database values for USDA generic foods; a nutrient without a value is absent, not 0), `categories`, optional `lastModified`, `fetchedAt`, and optional `match` (`{ version, code }`: the BLS food whose values fill in what the source lacks).
 
 Log entries (`data.log[]`) have `id`, `time` (epoch ms), `day` (local `YYYY-MM-DD`), `confidence`, `label` and a `kind`:
 

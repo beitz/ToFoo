@@ -1,15 +1,15 @@
 /**
  * The tools the AI assistant may use, and the app-side code that runs them. The assistant can only
- * look up BLS foods (and, with the Open Food Facts lookup on, packaged products by barcode) and
- * propose a meal made of those codes plus grams. It never supplies nutrient values, so every
+ * look up BLS foods (and, with the Open Food Facts lookup on, packaged products by barcode; with
+ * USDA on, USDA foods by name) and propose a meal made of those codes plus grams. It never supplies nutrient values, so every
  * number in the log still comes from a database (docs/SPEC.md, "AI assistant logging").
- * Everything here is pure except the injected product lookup.
+ * Everything here is pure except the injected lookups.
  */
 import { z } from 'zod';
 import type { Food, FoodDb } from '../foods/foodDb';
-import type { FindResult } from '../foods/findProduct';
+import type { FindResult, UsdaFindResult } from '../foods/findProduct';
 import { normalizeBarcode } from '../foods/openFoodFacts';
-import { barcodeOf, isProductCode, productFood, productId, productLabel } from '../foods/products';
+import { hasOwnMicros, isProductCode, productFood, productLabel } from '../foods/products';
 import { normalize, search, type SearchIndex } from '../foods/search';
 import { parseLocalDateTime } from './photoTime';
 import { fmtNumber } from '../lib/format';
@@ -23,6 +23,9 @@ export const PREPARATIONS = ['asListed', 'raw', 'boiled', 'steamed', 'baked', 'f
 const RESULTS_PER_QUERY = 8;
 const MAX_QUERIES = 6;
 const MAX_BARCODES = 4;
+/** USDA searches per call: each is one request, and the shared demo key allows few a day. */
+const MAX_USDA_QUERIES = 3;
+const USDA_RESULTS_PER_QUERY = 8;
 /** Saved products listed per search query. */
 const PRODUCTS_PER_QUERY = 4;
 /**
@@ -36,6 +39,7 @@ const MAX_PAST_MS = 400 * 86_400_000;
 
 export const searchInput = z.object({ queries: z.array(z.string()).min(1) });
 export const lookupInput = z.object({ barcodes: z.array(z.string()).min(1) });
+export const usdaInput = z.object({ queries: z.array(z.string()).min(1), branded: z.boolean() });
 
 export const proposalInput = z.object({
   summary: z.string(),
@@ -46,7 +50,7 @@ export const proposalInput = z.object({
         grams: z.number(),
         preparation: z.enum(PREPARATIONS),
         note: z.string(),
-        /** Products only: BLS code of the most similar food, for what the label lacks. */
+        /** Products and USDA foods only: BLS code of the most similar food, for what the source lacks. */
         micros_from: z.string().optional(),
       }),
     )
@@ -94,13 +98,18 @@ export function describeFood(food: Food, db: Pick<FoodDb, 'groups'>): string {
   return `${food.code} | ${food.nameEn} | ${food.nameDe} | ${group} | per 100 g: ${fmt(p.ENERCC)} kcal, protein ${fmt(p.PROT625)} g, fat ${fmt(p.FAT)} g, carbs ${fmt(p.CHO)} g`;
 }
 
-/** Packaged products (Open Food Facts lookup on): what the assistant may use and how it looks them up. */
+/**
+ * Foods from online databases (Open Food Facts lookup or USDA on): what the assistant may use and
+ * how it looks them up.
+ */
 export interface ProductTools {
-  /** Products saved on this phone, by barcode (listed by search_foods without any request). */
+  /** Products and USDA foods saved on this phone, by id (listed by search_foods without any request). */
   saved: ReadonlyMap<string, Product>;
-  /** Look up a barcode: this phone first, then Open Food Facts. */
-  find: (barcode: string) => Promise<FindResult>;
-  /** Products looked up in this conversation, by barcode (filled by lookup_barcode). */
+  /** Look up a barcode: this phone first, then Open Food Facts. Absent when the lookup is off. */
+  find?: (barcode: string) => Promise<FindResult>;
+  /** Search USDA FoodData Central by name. Absent when USDA is off. */
+  searchUsda?: (query: string, kind: 'generic' | 'branded') => Promise<UsdaFindResult>;
+  /** Products and USDA foods looked up in this conversation, by id (filled by lookup_barcode and search_usda). */
   seen: Map<string, Product>;
 }
 
@@ -108,10 +117,15 @@ export interface ToolContext {
   db: Pick<FoodDb, 'byCode' | 'groups'> & { version?: string };
   index: SearchIndex;
   boost?: (code: string) => number;
-  /** Absent when the Open Food Facts lookup is off. */
+  /** Absent when both the Open Food Facts lookup and USDA are off. */
   products?: ProductTools;
   /** Current time, for checking proposed meal times (injected to keep this pure). */
   now?: number;
+}
+
+/** Which online sources the assistant is offered (decides the prompt and tool variant). */
+export function sourcesOf(products: ProductTools | undefined): { off: boolean; usda: boolean } {
+  return { off: !!products?.find, usda: !!products?.searchUsda };
 }
 
 const LABEL_FIELDS: Array<[string, string, string]> = [
@@ -122,17 +136,20 @@ const LABEL_FIELDS: Array<[string, string, string]> = [
   ['SUGAR', 'sugars ', 'g'],
 ];
 
-/** One line per product: code, name, brand, sizes, label macros and its BLS match if chosen. */
+/** One line per product or USDA food: code, name, brand, sizes, macros and its BLS match if chosen. */
 export function describeProduct(p: Product, db: Pick<FoodDb, 'byCode'>): string {
   const sizes = [p.quantity && `pack ${p.quantity}`, p.serving && `serving ${p.serving.label}`].filter(Boolean).join(', ');
   const label = LABEL_FIELDS.filter(([id]) => p.per100[id] !== undefined).map(([id, name, unit]) => `${name}${fmtNumber(p.per100[id]!, 1)} ${unit}`);
   const match = p.match ? db.byCode.get(p.match.code) : undefined;
+  const own = hasOwnMicros(p);
+  const per = `per 100 ${p.perMl ? 'ml' : 'g'}`;
   return [
-    productId(p.code),
+    p.id,
     productLabel(p),
+    ...(p.source === 'USDA' ? [own ? `USDA ${p.usdaType}, generic food with full nutrient data` : 'USDA branded product (US label)'] : []),
     sizes || 'size unknown',
-    label.length ? `label per 100 ${p.perMl ? 'ml' : 'g'}: ${label.join(', ')}` : 'no nutrition values on the label data',
-    match ? `micronutrients from ${match.code} ${match.nameEn} (chosen by the user)` : 'no similar BLS food chosen yet',
+    label.length ? `${own ? '' : 'label '}${per}: ${label.join(', ')}` : 'no nutrition values on the label data',
+    match ? `${own ? 'gaps filled' : 'micronutrients'} from ${match.code} ${match.nameEn} (chosen by the user)` : own ? 'no similar BLS food chosen (optional)' : 'no similar BLS food chosen yet',
   ].join(' | ');
 }
 
@@ -160,7 +177,8 @@ export function runSearchFoods(input: unknown, ctx: ToolContext): { ok: boolean;
 
 /** Run `lookup_barcode`: products found are remembered for propose_meal. */
 export async function runLookupBarcode(input: unknown, ctx: ToolContext): Promise<{ ok: boolean; text: string }> {
-  if (!ctx.products) return { ok: false, text: 'The Open Food Facts lookup is off.' };
+  const find = ctx.products?.find;
+  if (!ctx.products || !find) return { ok: false, text: 'The Open Food Facts lookup is off.' };
   const parsed = lookupInput.safeParse(input);
   if (!parsed.success) return { ok: false, text: 'Invalid input: expected {"barcodes": ["…"]}.' };
   const lines: string[] = [];
@@ -170,9 +188,9 @@ export async function runLookupBarcode(input: unknown, ctx: ToolContext): Promis
       lines.push(`${raw}: not a valid barcode (check the digits; the last one is a check digit).`);
       continue;
     }
-    const r = await ctx.products.find(code);
+    const r = await find(code);
     if (r.kind === 'found') {
-      ctx.products.seen.set(r.product.code, r.product);
+      ctx.products.seen.set(r.product.id, r.product);
       lines.push(describeProduct(r.product, ctx.db));
     } else if (r.kind === 'notFound') lines.push(`${code}: not in Open Food Facts. Use the closest generic BLS food instead.`);
     else lines.push(`${code}: could not be looked up right now (${r.reason === 'offline' ? 'no connection' : 'Open Food Facts is busy'}). Use the closest generic BLS food instead.`);
@@ -180,10 +198,38 @@ export async function runLookupBarcode(input: unknown, ctx: ToolContext): Promis
   return { ok: true, text: lines.join('\n') };
 }
 
+const USDA_ERRORS: Record<Extract<UsdaFindResult, { kind: 'error' }>['reason'], string> = {
+  offline: 'no connection',
+  busy: 'USDA is busy',
+  rateLimit: "the USDA search limit for this phone is used up; the user can add their own free key in the settings",
+  badKey: 'the USDA API key in the settings is not valid',
+  other: 'USDA gave an unexpected answer',
+};
+
+/** Run `search_usda`: foods found are remembered for propose_meal. */
+export async function runSearchUsda(input: unknown, ctx: ToolContext): Promise<{ ok: boolean; text: string }> {
+  const searchUsda = ctx.products?.searchUsda;
+  if (!ctx.products || !searchUsda) return { ok: false, text: 'USDA FoodData Central is off.' };
+  const parsed = usdaInput.safeParse(input);
+  if (!parsed.success) return { ok: false, text: 'Invalid input: expected {"queries": ["…"], "branded": false}.' };
+  const blocks: string[] = [];
+  for (const q of parsed.data.queries.slice(0, MAX_USDA_QUERIES)) {
+    const r = await searchUsda(q, parsed.data.branded ? 'branded' : 'generic');
+    if (r.kind !== 'ok') {
+      blocks.push(`Results for "${q}": could not search USDA right now (${USDA_ERRORS[r.reason]}). Use BLS foods instead.`);
+      if (r.reason === 'rateLimit' || r.reason === 'badKey' || r.reason === 'offline') break;
+      continue;
+    }
+    const found = r.products.slice(0, USDA_RESULTS_PER_QUERY);
+    for (const p of found) ctx.products.seen.set(p.id, p);
+    blocks.push(`Results for "${q}":\n${found.length ? found.map((p) => describeProduct(p, ctx.db)).join('\n') : 'No matches. Try other English words.'}`);
+  }
+  return { ok: true, text: blocks.join('\n\n') };
+}
+
 /** A product the assistant may use: looked up in this conversation or saved on this phone. */
 function knownProduct(code: string, products: ProductTools | undefined): Product | undefined {
-  const barcode = barcodeOf(code);
-  return products?.seen.get(barcode) ?? products?.saved.get(barcode);
+  return products?.seen.get(code) ?? products?.saved.get(code);
 }
 
 /**
@@ -207,13 +253,15 @@ export function validateProposal(
     let product: Product | undefined;
     if (isProductCode(code)) {
       const found = knownProduct(code, products);
-      if (!found) problems.push(`Unknown product ${code}: use only products returned by lookup_barcode or search_foods.`);
+      if (!found) problems.push(`Unknown product ${code}: use only codes returned by lookup_barcode, search_usda or search_foods.`);
       else if (found.match) product = found;
       else {
         const microsFrom = it.micros_from?.trim() ?? '';
         const match = microsFrom ? db.byCode.get(microsFrom) : undefined;
-        if (!match) problems.push(`${code}: micros_from must be the BLS code (from search_foods) of the most similar generic food${microsFrom ? `; ${microsFrom} is not one` : ''}.`);
-        else product = { ...found, match: { version: db.version ?? '4.0', code: match.code } };
+        // USDA generic foods have their own vitamins and minerals; a similar BLS food only fills gaps.
+        if (match) product = { ...found, match: { version: db.version ?? '4.0', code: match.code } };
+        else if (hasOwnMicros(found) && !microsFrom) product = found;
+        else problems.push(`${code}: micros_from must be the BLS code (from search_foods) of the most similar generic food${microsFrom ? `; ${microsFrom} is not one` : ''}.`);
       }
       if (product) food = productFood(product, db);
     } else {

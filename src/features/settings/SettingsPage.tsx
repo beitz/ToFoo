@@ -40,6 +40,7 @@ export function SettingsPage() {
         <LinkRow to={['settings', 'saved']} label={t('settings.saved')} detail={t('settings.savedDetail', { n: d.customFoods.length })} />
         <LinkRow to={['settings', 'backup']} label={t('settings.backup')} />
         <LinkRow to={['settings', 'assistant']} label={t('ai.settingsTitle')} detail={isOn(s.features, 'aiAssistant') ? t('ai.statusOn') : t('ai.statusOff')} />
+        <LinkRow to={['settings', 'usda']} label={t('usda.heading')} detail={isOn(s.features, 'usda') ? t('ai.statusOn') : t('ai.statusOff')} />
       </ul>
 
       <h2 className="section-title">{t('settings.kitchen')}</h2>

@@ -7,6 +7,7 @@ import type { EntryConfidence } from '../model/types';
 import type { SkinExposure } from '../model/sun';
 import type { StartingLevelChoice } from '../model/simulate';
 import type { ProductData } from '../foods/openFoodFacts';
+import type { UsdaDataType } from '../foods/usda';
 
 export const CURRENT_SCHEMA_VERSION = 1;
 
@@ -16,9 +17,14 @@ export interface Versioned {
 
 /**
  * A reference to a food: never copied nutrient values (docs/SPEC.md). Open Food Facts products
- * have no versions; their fetched label values are kept in the `products` table.
+ * have no versions; their fetched label values are kept in the `products` table. USDA foods are
+ * referenced by FoodData Central id (a new USDA release gives changed foods new ids), and kept in
+ * the same table.
  */
-export type FoodRef = { source: 'BLS'; version: string; code: string } | { source: 'custom'; id: string } | { source: 'OFF'; code: string };
+export type FoodRef = { source: 'BLS'; version: string; code: string } | { source: 'custom'; id: string } | { source: ProductSource; code: string };
+
+/** Online databases whose foods are saved in the `products` table. */
+export type ProductSource = 'OFF' | 'USDA';
 
 export interface OutdoorSession {
   /** 0 = Sunday … 6 = Saturday. */
@@ -62,7 +68,8 @@ export type FeatureKey =
   | 'fillUnloggedDays'
   | 'backupReminder'
   | 'aiAssistant'
-  | 'openFoodFacts';
+  | 'openFoodFacts'
+  | 'usda';
 
 export interface Settings extends Versioned {
   id: 'settings';
@@ -143,14 +150,18 @@ export type LogEntry =
   | (LogBase & { kind: 'drink'; drink: 'tea' | 'coffee' });
 
 /**
- * A packaged product fetched from Open Food Facts, kept so entries stay computable offline and
- * the same after OFF edits the product. Label values come from OFF; everything the label lacks
- * (most vitamins and minerals) is borrowed from `match`, the closest BLS food, when one is chosen.
+ * A food fetched from an online database (Open Food Facts or USDA FoodData Central), kept so
+ * entries stay computable offline and the same after the source edits it. For a packaged product
+ * the label values come from the source; everything the label lacks (most vitamins and minerals)
+ * is borrowed from `match`, the closest BLS food, when one is chosen. USDA generic foods carry
+ * most nutrients themselves; `match` only fills their gaps.
  */
 export interface Product extends Versioned, ProductData {
-  /** `OFF:<barcode>`. */
+  /** `OFF:<barcode>` or `USDA:<fdcId>`. */
   id: string;
-  source: 'OFF';
+  source: ProductSource;
+  /** USDA only: which FoodData Central data type the food comes from. */
+  usdaType?: UsdaDataType;
   match?: { version: string; code: string };
   /** When the label values were fetched (epoch ms). */
   fetchedAt: number;

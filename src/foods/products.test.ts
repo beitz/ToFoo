@@ -51,6 +51,29 @@ describe('products as foods', () => {
     expect(f.group).toBe('');
   });
 
+  it('uses USDA generic values as database values and fills only the gaps from the match', () => {
+    const tofu: Product = {
+      id: 'USDA:172475',
+      schemaVersion: 1,
+      source: 'USDA',
+      usdaType: 'SR Legacy',
+      code: '172475',
+      name: 'Tofu, raw, firm',
+      per100: { ENERCC: 144, MG: 58, MET: 0.2, CYSTE: 0.1 },
+      categories: ['Legumes and Legume Products', 'Tofu'],
+      fetchedAt: 0,
+    };
+    const alone = productFood(tofu, foods);
+    expect(alone.code).toBe('USDA:172475');
+    expect(alone.group).toBe('H'); // from the USDA category, for the phytate rule
+    expect(alone.provenance).toMatchObject({ ENERCC: 'D', MG: 'D' });
+    expect(alone.per100.SAA).toBeCloseTo(0.3);
+    const filled = productFood({ ...tofu, match: { version: '4.0', code: 'S610000' } }, foods);
+    expect(filled.per100).toMatchObject({ MG: 58, FAT: 35, VITB12: null });
+    expect(filled.provenance).toMatchObject({ MG: 'D', FAT: 'U' });
+    expect(filled.group).toBe('S');
+  });
+
   it('returns the same object for the same record (model caches rely on it)', () => {
     expect(productFood(giotto, foods)).toBe(productFood(giotto, foods));
   });
@@ -63,9 +86,13 @@ describe('products as foods', () => {
   });
 
   it('resolves logged products for the model', () => {
-    const ctx: ResolveContext = { foods, products: new Map([[giotto.code, giotto]]), batches: new Map(), customFoods: new Map(), salt: { iodised: true, fluoridated: false } };
+    const ctx: ResolveContext = { foods, products: new Map([[giotto.id, giotto]]), batches: new Map(), customFoods: new Map(), salt: { iodised: true, fluoridated: false } };
     const e = resolveEntry({ id: '1', schemaVersion: 1, time: 0, day: '2026-10-16', confidence: 'A', label: 'Giotto', kind: 'food', ref: { source: 'OFF', code: giotto.code }, grams: 4.3, preparation: 'asListed' }, ctx)!;
     expect(e.parts[0]).toMatchObject({ grams: 4.3, nameEn: 'GiOTTO Haselnuss', per100: { ENERCC: 632 } });
+    const usda: Product = { ...giotto, id: 'USDA:8000500319475', source: 'USDA', usdaType: 'Branded', per100: { ENERCC: 500 } };
+    const both: ResolveContext = { ...ctx, products: new Map([[giotto.id, giotto], [usda.id, usda]]) };
+    const fromUsda = resolveEntry({ id: '3', schemaVersion: 1, time: 0, day: '2026-10-16', confidence: 'A', label: 'x', kind: 'food', ref: { source: 'USDA', code: usda.code }, grams: 10, preparation: 'asListed' }, both)!;
+    expect(fromUsda.parts[0]!.per100.ENERCC).toBe(500);
     const unknown = resolveEntry({ id: '2', schemaVersion: 1, time: 0, day: '2026-10-16', confidence: 'A', label: 'x', kind: 'food', ref: { source: 'OFF', code: '1' }, grams: 1, preparation: 'asListed' }, ctx);
     expect(unknown).toBeNull();
   });

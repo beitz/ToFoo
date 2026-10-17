@@ -4,6 +4,7 @@
 import type { Food, FoodDb } from '../foods/foodDb';
 import { ALL_SALT_CODES, saltCode } from '../foods/foodDb';
 import { productFood } from '../foods/products';
+import { refKey } from '../lib/refs';
 import { addDays, dayRange, parseDay, utcOffsetHours } from '../lib/dates';
 import { sun as sunParams } from '../../model/parameters';
 import type { Range } from '../model/paramTypes';
@@ -13,7 +14,7 @@ import type { Batch, CustomFood, DayStatusRecord, Fast, FoodRef, Ingredient, Log
 
 export interface FoodContext {
   foods: FoodDb;
-  /** Open Food Facts products by barcode. */
+  /** Foods from online databases (Open Food Facts, USDA) by id (`OFF:<barcode>`, `USDA:<fdcId>`). */
   products: ReadonlyMap<string, Product>;
 }
 
@@ -25,8 +26,8 @@ export interface ResolveContext extends FoodContext {
 
 export function foodForRef(ref: FoodRef, ctx: FoodContext): Food | undefined {
   if (ref.source === 'BLS') return ctx.foods.byCode.get(ref.code);
-  if (ref.source === 'OFF') {
-    const p = ctx.products.get(ref.code);
+  if (ref.source === 'OFF' || ref.source === 'USDA') {
+    const p = ctx.products.get(refKey(ref));
     return p ? productFood(p, ctx.foods) : undefined;
   }
   return undefined;

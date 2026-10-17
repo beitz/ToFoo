@@ -4,10 +4,10 @@
  * so the loop can be tested without a network.
  */
 import type * as Beta from '@anthropic-ai/sdk/resources/beta/messages/messages';
-import { SYSTEM_PROMPT, SYSTEM_PROMPT_WITH_PRODUCTS, TOOLS, TOOLS_WITH_PRODUCTS } from './prompt';
+import { systemPromptFor, toolsFor, type PromptSources } from './prompt';
 import { usageOf, type ModelTokens } from './pricing';
 import { fmtLocalDateTime } from './photoTime';
-import { runLookupBarcode, runSearchFoods, validateProposal, type Proposal, type ToolContext } from './tools';
+import { runLookupBarcode, runSearchFoods, runSearchUsda, sourcesOf, validateProposal, type Proposal, type ToolContext } from './tools';
 
 export type CreateMessage = (params: Beta.MessageCreateParamsNonStreaming) => Promise<Beta.BetaMessage>;
 
@@ -48,12 +48,12 @@ export type TurnOutcome =
   | { kind: 'error'; reason: 'refusal' | 'tooLong' | 'tooManySteps' };
 
 /** Request parameters per model (fallbacks re-run a declined request on another model). */
-export function requestParams(model: AiModel, messages: Beta.BetaMessageParam[], withProducts = false): Beta.MessageCreateParamsNonStreaming {
+export function requestParams(model: AiModel, messages: Beta.BetaMessageParam[], sources: PromptSources = {}): Beta.MessageCreateParamsNonStreaming {
   return {
     model,
     max_tokens: 16000,
-    system: withProducts ? SYSTEM_PROMPT_WITH_PRODUCTS : SYSTEM_PROMPT,
-    tools: withProducts ? TOOLS_WITH_PRODUCTS : TOOLS,
+    system: systemPromptFor(sources),
+    tools: toolsFor(sources),
     messages,
     cache_control: { type: 'ephemeral' },
     output_config: { effort: 'medium' },
@@ -101,13 +101,13 @@ export async function sendMessage(
   if (user.text.trim()) content.push({ type: 'text', text: user.text.trim() });
   if (user.appNote) content.push({ type: 'text', text: user.appNote });
   messages.push({ role: 'user', content });
-  const withProducts = !!ctx.products;
+  const sources = sourcesOf(ctx.products);
 
   let cards = conversation.cards;
   const done = (outcome: TurnOutcome, pendingResults: Beta.BetaToolResultBlockParam[] = []) => ({ conversation: { messages, pendingResults, cards }, outcome });
 
   for (let step = 0; step < MAX_STEPS; step++) {
-    const res = await create(requestParams(model, messages, withProducts));
+    const res = await create(requestParams(model, messages, sources));
     onUsage?.(usageOf(res, model));
     // Append the whole content (thinking and fallback blocks included) so the next request replays it unchanged.
     messages.push({ role: 'assistant', content: res.content });
@@ -124,8 +124,11 @@ export async function sendMessage(
       if (use.name === 'search_foods') {
         const r = runSearchFoods(use.input, ctx);
         results.push({ type: 'tool_result', tool_use_id: use.id, content: r.text, is_error: !r.ok });
-      } else if (use.name === 'lookup_barcode' && withProducts) {
+      } else if (use.name === 'lookup_barcode' && sources.off) {
         const r = await runLookupBarcode(use.input, ctx);
+        results.push({ type: 'tool_result', tool_use_id: use.id, content: r.text, is_error: !r.ok });
+      } else if (use.name === 'search_usda' && sources.usda) {
+        const r = await runSearchUsda(use.input, ctx);
         results.push({ type: 'tool_result', tool_use_id: use.id, content: r.text, is_error: !r.ok });
       } else if (use.name === 'propose_meal') {
         const r = validateProposal(use.input, ctx.db, ctx.products, ctx.now);

@@ -3,7 +3,7 @@ import type * as Beta from '@anthropic-ai/sdk/resources/beta/messages/messages';
 import type { Food } from '../foods/foodDb';
 import { buildIndex } from '../foods/search';
 import { appNote, emptyConversation, requestParams, sendMessage, type CreateMessage } from './assistant';
-import { describeFood, MAX_ITEM_GRAMS, runLookupBarcode, runSearchFoods, validateProposal, type ProductTools, type ToolContext } from './tools';
+import { describeFood, MAX_ITEM_GRAMS, runLookupBarcode, runSearchFoods, runSearchUsda, validateProposal, type ProductTools, type ToolContext } from './tools';
 import type { Product } from '../storage/types';
 import type { FindResult } from '../foods/findProduct';
 
@@ -222,7 +222,7 @@ describe('packaged products (Open Food Facts lookup on)', () => {
   const saved: Product = { ...giotto, id: 'OFF:8000500319475', code: '8000500319475', name: 'GiOTTO Haselnuss Stick', match: { version: '4.0', code: 'S450000' } };
   const lookups: string[] = [];
   const products = (): ProductTools => ({
-    saved: new Map([[saved.code, saved]]),
+    saved: new Map([[saved.id, saved]]),
     seen: new Map(),
     find: async (code): Promise<FindResult> => {
       lookups.push(code);
@@ -237,7 +237,7 @@ describe('packaged products (Open Food Facts lookup on)', () => {
     expect(r.text).toContain('4008400121926: not a valid barcode');
     expect(r.text).toContain('4000000000013: not in Open Food Facts');
     expect(lookups).toEqual(['4008400121925', '4000000000013']);
-    expect(p.seen.has('4008400121925')).toBe(true);
+    expect(p.seen.has('OFF:4008400121925')).toBe(true);
     expect((await runLookupBarcode({ barcodes: ['1'] }, ctx)).ok).toBe(false);
   });
 
@@ -249,7 +249,7 @@ describe('packaged products (Open Food Facts lookup on)', () => {
 
   it('needs a similar BLS food for a product, unless the user chose one', () => {
     const p = products();
-    p.seen.set(giotto.code, giotto);
+    p.seen.set(giotto.id, giotto);
     const item = (code: string, micros_from: string) => ({ summary: 'Snack', items: [{ code, grams: 4.3, preparation: 'asListed', note: '1 ball', micros_from }], assumptions: [], confidence: 'B' });
     const missing = validateProposal(item('OFF:4008400121925', ''), db, p);
     expect(!missing.ok && missing.error).toContain('micros_from must be the BLS code');
@@ -273,5 +273,79 @@ describe('packaged products (Open Food Facts lookup on)', () => {
     expect(api.requests[0]!.tools!.map((t) => (t as { name: string }).name)).toEqual(['search_foods', 'lookup_barcode', 'propose_meal']);
     expect(JSON.stringify(api.requests[0]!.messages[0]!.content)).toContain('Barcodes the app read');
     expect(requestParams('claude-opus-5-5', []).tools!.map((t) => (t as { name: string }).name)).toEqual(['search_foods', 'propose_meal']);
+  });
+});
+
+describe('USDA FoodData Central (on)', () => {
+  const kimchi: Product = {
+    id: 'USDA:170392',
+    schemaVersion: 1,
+    source: 'USDA',
+    usdaType: 'SR Legacy',
+    code: '170392',
+    name: 'Cabbage, kimchi',
+    serving: { label: '1 cup', grams: 150 },
+    per100: { ENERCC: 15, PROT625: 1.1, FAT: 0.5, CHO: 0.8, NA: 498 },
+    categories: ['Vegetables and Vegetable Products', 'Cabbage'],
+    fetchedAt: 0,
+  };
+  const paste: Product = { ...kimchi, id: 'USDA:2345678', code: '2345678', usdaType: 'Branded', name: 'Gochujang', brand: 'Bibigo', serving: undefined, categories: [] };
+  const searches: string[] = [];
+  const usda = (result: 'ok' | 'rateLimit' = 'ok'): ProductTools => ({
+    saved: new Map(),
+    seen: new Map(),
+    searchUsda: async (q, kind) => {
+      searches.push(`${q}:${kind}`);
+      if (result === 'rateLimit') return { kind: 'error', reason: 'rateLimit' };
+      return { kind: 'ok', products: kind === 'branded' ? [paste] : [kimchi] };
+    },
+  });
+
+  it('searches USDA, describes the data type and remembers the results', async () => {
+    const p = usda();
+    const r = await runSearchUsda({ queries: ['kimchi', 'a', 'b', 'c'], branded: false }, { ...ctx, products: p });
+    expect(r.text).toContain('USDA:170392 | Cabbage, kimchi | USDA SR Legacy, generic food with full nutrient data | serving 1 cup | per 100 g: 15 kcal, protein 1.1 g, fat 0.5 g, carbs 0.8 g | no similar BLS food chosen (optional)');
+    expect(searches).toEqual(['kimchi:generic', 'a:generic', 'b:generic']);
+    expect(p.seen.has('USDA:170392')).toBe(true);
+    const b = await runSearchUsda({ queries: ['gochujang'], branded: true }, { ...ctx, products: p });
+    expect(b.text).toContain('USDA branded product (US label)');
+    expect((await runSearchUsda({ queries: ['x'], branded: false }, ctx)).ok).toBe(false);
+  });
+
+  it('stops after a rate limit and tells the model why', async () => {
+    searches.length = 0;
+    const r = await runSearchUsda({ queries: ['kimchi', 'tteok'], branded: false }, { ...ctx, products: usda('rateLimit') });
+    expect(r.text).toContain('search limit');
+    expect(searches).toEqual(['kimchi:generic']);
+  });
+
+  it('accepts generic USDA foods without micros_from, but not branded ones', () => {
+    const p = usda();
+    p.seen.set(kimchi.id, kimchi);
+    p.seen.set(paste.id, paste);
+    const item = (code: string, micros_from: string) => ({ summary: 'Side', items: [{ code, grams: 50, preparation: 'asListed', note: '', micros_from }], assumptions: [], confidence: 'C' });
+    const generic = validateProposal(item('USDA:170392', ''), db, p);
+    expect(generic.ok && generic.proposal.items[0]!.product?.match).toBeUndefined();
+    expect(generic.ok && generic.proposal.items[0]!.food.provenance.NA).toBe('D');
+    const filled = validateProposal(item('USDA:170392', 'S450000'), db, p);
+    expect(filled.ok && filled.proposal.items[0]!.product?.match?.code).toBe('S450000');
+    const brandedMissing = validateProposal(item('USDA:2345678', ''), db, p);
+    expect(!brandedMissing.ok && brandedMissing.error).toContain('micros_from must be the BLS code');
+    const wrong = validateProposal(item('USDA:170392', 'X1'), db, p);
+    expect(!wrong.ok && wrong.error).toContain('X1 is not one');
+  });
+
+  it('offers search_usda only when USDA is on', async () => {
+    const api = scripted(
+      reply([toolUse('t1', 'search_usda', { queries: ['kimchi'], branded: false })], 'tool_use'),
+      reply([toolUse('t2', 'propose_meal', { summary: 'Kimchi', items: [{ code: 'USDA:170392', grams: 50, preparation: 'asListed', note: '', micros_from: '' }], assumptions: [], confidence: 'C' })], 'tool_use'),
+    );
+    const { outcome } = await sendMessage(api.create, 'claude-opus-5-5', emptyConversation(), { text: 'some kimchi', images: [] }, { ...ctx, products: usda() });
+    expect(outcome.kind === 'proposal' && outcome.proposals[0]!.items[0]!.product?.id).toBe('USDA:170392');
+    expect(api.requests[0]!.tools!.map((t) => (t as { name: string }).name)).toEqual(['search_foods', 'search_usda', 'propose_meal']);
+    expect(api.requests[0]!.system).toContain('search_usda');
+    expect(requestParams('claude-opus-5-5', [], { off: true, usda: true }).tools!.map((t) => (t as { name: string }).name)).toEqual(['search_foods', 'lookup_barcode', 'search_usda', 'propose_meal']);
+    // The same objects every time, so the prompt cache keeps working.
+    expect(requestParams('claude-opus-5-5', [], { usda: true }).system).toBe(requestParams('claude-opus-5-5', [], { usda: true }).system);
   });
 });

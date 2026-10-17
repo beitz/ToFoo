@@ -1,25 +1,37 @@
 /**
- * Open Food Facts products as foods the model can use (pure, tested in products.test.ts).
+ * Foods from online databases (Open Food Facts products, USDA foods) as foods the model can use
+ * (pure, tested in products.test.ts).
  *
- * The label gives energy, macros and salt (sometimes a few vitamins). Everything else is borrowed
+ * A label gives energy, macros and salt (sometimes a few vitamins). Everything else is borrowed
  * from the closest BLS food the user (or the assistant) picked, per 100 g, as docs/SPEC.md
- * describes. Provenance follows the BLS categories: label values are "B" (Labelangabe), borrowed
- * ones "U" (Übernommener Wert, taken over from a similar food), so the model's data uncertainty
- * treats them like the matching BLS cases. Without a match, the rest stays missing, never zero.
+ * describes. USDA generic foods have most nutrients themselves; the BLS food only fills gaps.
+ * Provenance follows the BLS categories: label values are "B" (Labelangabe), USDA generic values
+ * "D" (Nährstoffdatenbank, taken from another database, as BLS itself marks USDA values),
+ * borrowed ones "U" (Übernommener Wert, taken over from a similar food), so the model's data
+ * uncertainty treats them like the matching BLS cases. Without a match, the rest stays missing,
+ * never zero.
  */
+import { DERIVED } from '../model/nutrients';
 import type { RawValue } from '../model/types';
-import type { Product } from '../storage/types';
-import type { Food, FoodDb } from './foodDb';
+import type { FoodRef, Product, ProductSource } from '../storage/types';
+import { sumDerived, type Food, type FoodDb } from './foodDb';
+import { productUrl } from './openFoodFacts';
+import { usdaFoodUrl, usdaGroup } from './usda';
 
-export const OFF_PREFIX = 'OFF:';
+/** Storage id and food code of a product: `OFF:<barcode>` or `USDA:<fdcId>`. */
+export const productId = (code: string, source: ProductSource = 'OFF') => `${source}:${code}`;
+export const isProductCode = (code: string) => code.startsWith('OFF:') || code.startsWith('USDA:');
+export const productRef = (p: Pick<Product, 'source' | 'code'>): FoodRef => ({ source: p.source, code: p.code });
 
-/** Storage id and food code of a product: `OFF:<barcode>`. */
-export const productId = (barcode: string) => `${OFF_PREFIX}${barcode}`;
-export const isProductCode = (code: string) => code.startsWith(OFF_PREFIX);
-export const barcodeOf = (code: string) => (isProductCode(code) ? code.slice(OFF_PREFIX.length) : code);
+/** USDA generic foods (not branded) carry most nutrients themselves; a BLS match is optional. */
+export const hasOwnMicros = (p: Pick<Product, 'source' | 'usdaType'>) => p.source === 'USDA' && p.usdaType !== 'Branded';
 
-/** Provenance codes (data/README.md): label value, and value taken over from a similar food. */
+/** The food's page at its source. */
+export const productPageUrl = (p: Pick<Product, 'source' | 'code'>) => (p.source === 'USDA' ? usdaFoodUrl(p.code) : productUrl(p.code));
+
+/** Provenance codes (data/README.md): label value, database value, value taken over from a similar food. */
 export const LABEL_PROVENANCE = 'B';
+export const DATABASE_PROVENANCE = 'D';
 export const BORROWED_PROVENANCE = 'U';
 
 // Stable objects per product record and food list, so the model's per-food caches keep working.
@@ -38,16 +50,23 @@ export function productFood(product: Product, foods: Pick<FoodDb, 'byCode'>): Fo
       provenance[id] = v === null ? '-' : BORROWED_PROVENANCE;
     }
   }
+  const own = hasOwnMicros(product) ? DATABASE_PROVENANCE : LABEL_PROVENANCE;
   for (const [id, v] of Object.entries(product.per100)) {
     per100[id] = v;
-    provenance[id] = LABEL_PROVENANCE;
+    provenance[id] = own;
+  }
+  // Sums like methionine + cysteine, from the merged parts (USDA has amino and fatty acids).
+  for (const [id, parts] of Object.entries(DERIVED)) {
+    if (!parts.some((p) => p in product.per100)) continue;
+    per100[id] = sumDerived(per100, parts);
+    provenance[id] = provenance[parts[0]!] ?? '-';
   }
   const food: Food = {
-    code: productId(product.code),
+    code: product.id,
     nameEn: product.name,
     nameDe: product.brand ?? '',
-    // The matched food's group drives the iron estimates (meat/fish, phytate); none without a match.
-    group: match?.group ?? '',
+    // The group drives the iron estimates (meat/fish, phytate): the matched food's, else the USDA category's.
+    group: match?.group ?? (product.source === 'USDA' && product.usdaType !== 'Branded' ? usdaGroup(product.categories) : ''),
     per100,
     provenance,
   };

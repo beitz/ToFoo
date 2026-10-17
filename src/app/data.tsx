@@ -3,6 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { loadFoodDb, groupSearchBoost, type FoodDb } from '../foods/foodDb';
 import { buildIndex, type SearchIndex } from '../foods/search';
 import { dayRange, todayKey, addDays } from '../lib/dates';
+import { refKey } from '../lib/refs';
 import { isOn } from '../settings/features';
 import { repo } from '../storage/repo';
 import type { Batch, CustomFood, DayStatusRecord, Fast, LogEntry, Product, Profile, Recipe, Settings, SunEntry } from '../storage/types';
@@ -27,10 +28,10 @@ export interface AppData {
   log: LogEntry[];
   customFoods: CustomFood[];
   customFoodsById: Map<string, CustomFood>;
-  /** Open Food Facts products saved on this device, most recently used first. */
+  /** Foods from online databases (Open Food Facts, USDA) saved on this device, most recently used first. */
   products: Product[];
-  /** Products by barcode. */
-  productsByCode: Map<string, Product>;
+  /** Products by id (`OFF:<barcode>`, `USDA:<fdcId>`, the same as `refKey` of their FoodRef). */
+  productsById: Map<string, Product>;
   dayStatus: DayStatusRecord[];
   fasts: Fast[];
   sunEntries: SunEntry[];
@@ -111,8 +112,8 @@ export function DataProvider({ children, fallback }: { children: ReactNode; fall
       { birthYear: profile.birthYear, sex: profile.sex, weightKg: weight, activity: profile.activity, phytate: profile.phytate, menstruation: profile.menstruation },
       Number(today.slice(0, 4)),
     );
-    const productsByCode = new Map(productList.map((p) => [p.code, p]));
-    const ctx = { foods, products: productsByCode, batches: batchesById, customFoods: customFoodsById, salt: profile.salt };
+    const productsById = new Map(productList.map((p) => [p.id, p]));
+    const ctx = { foods, products: productsById, batches: batchesById, customFoods: customFoodsById, salt: profile.salt };
     const modelEntries = log.map((e) => resolveEntry(e, ctx)).filter((e): e is ModelEntry => e !== null);
     const earliestLog = log.reduce((min, e) => (e.day < min ? e.day : min), profile.modelStartDay);
     const start = earliestLog < addDays(today, -MAX_MODEL_DAYS) ? addDays(today, -MAX_MODEL_DAYS) : earliestLog;
@@ -144,10 +145,10 @@ export function DataProvider({ children, fallback }: { children: ReactNode; fall
     for (let i = log.length - 1; i >= 0; i--) {
       const e = log[i]!;
       if (e.kind !== 'food') continue;
-      if (e.ref.source === 'OFF' && !lastUsed.has(e.ref.code)) lastUsed.set(e.ref.code, e.time);
+      if ((e.ref.source === 'OFF' || e.ref.source === 'USDA') && !lastUsed.has(refKey(e.ref))) lastUsed.set(refKey(e.ref), e.time);
       if (rank < 60 && e.ref.source === 'BLS' && !recentFoods.has(e.ref.code)) recentFoods.set(e.ref.code, 1 / (1 + rank++ * 0.15));
     }
-    const products = [...productList].sort((a, b) => (lastUsed.get(b.code) ?? b.fetchedAt) - (lastUsed.get(a.code) ?? a.fetchedAt));
+    const products = [...productList].sort((a, b) => (lastUsed.get(b.id) ?? b.fetchedAt) - (lastUsed.get(a.id) ?? a.fetchedAt));
     for (const r of recipes) for (const ing of r.ingredients) if (ing.ref.source === 'BLS' && !recentFoods.has(ing.ref.code)) recentFoods.set(ing.ref.code, 0.3);
     return {
       today,
@@ -163,7 +164,7 @@ export function DataProvider({ children, fallback }: { children: ReactNode; fall
       customFoods,
       customFoodsById,
       products,
-      productsByCode,
+      productsById,
       dayStatus,
       fasts,
       sunEntries,
