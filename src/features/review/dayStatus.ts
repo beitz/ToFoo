@@ -6,5 +6,7 @@ export const DAY_ICON: Record<DayStatus | 'pending', string> = {
   partial: 'half',
   fasted: 'moon',
   unknown: 'minus',
+  filled: 'approx',
+  excluded: 'skip',
   pending: 'plus',
 };

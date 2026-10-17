@@ -15,8 +15,9 @@ import { EditEntrySheet } from './EditEntrySheet';
 import { SunEntrySheet } from './SunEntrySheet';
 import { sunSessionsFor } from '../../logic/resolve';
 import { logMealAgain } from '../log/logAgain';
+import { isOn } from '../../settings/features';
 
-type StatusChoice = 'auto' | 'logged' | 'partial' | 'fasted';
+type StatusChoice = 'auto' | 'logged' | 'partial' | 'fasted' | 'filled' | 'excluded';
 
 export function DiaryPage({ day: dayParam }: { day?: string }) {
   const d = useData();
@@ -28,6 +29,7 @@ export function DiaryPage({ day: dayParam }: { day?: string }) {
   const entries = d.log.filter((e) => e.day === day);
   const meals = groupMeals(entries, d.settings.mealWindowMinutes);
   const explicit = d.dayStatus.find((s) => s.day === day)?.status;
+  const choice: StatusChoice = explicit ?? 'auto';
   const effective = d.model.dayStatus[day] ?? 'unknown';
   const mealSummary = d.model.meals.filter((m) => m.day === day);
   const totals = mealSummary.reduce<Record<string, number>>((acc, m) => {
@@ -76,16 +78,19 @@ export function DiaryPage({ day: dayParam }: { day?: string }) {
         </div>
         <Segmented<StatusChoice>
           label={t('diary.status')}
-          value={explicit ?? 'auto'}
+          className="segmented-grid"
+          value={choice}
           onChange={(v) => void setStatus(v)}
           options={[
             { value: 'auto', label: t('diary.auto') },
             { value: 'logged', label: t('diary.complete') },
             { value: 'partial', label: t('diary.partial') },
             { value: 'fasted', label: t('diary.fasted') },
+            { value: 'filled', label: t('diary.filled') },
+            { value: 'excluded', label: t('diary.excluded') },
           ]}
         />
-        <p className="muted small">{t('diary.statusHint')}</p>
+        <p className="muted small">{t(choice === 'auto' && isOn(d.settings.features, 'fillUnloggedDays') ? 'diary.hint.autoFilled' : (`diary.hint.${choice}` as MessageKey))}</p>
       </div>
 
       <a className="btn btn-primary btn-block" href={href('log', day)}>

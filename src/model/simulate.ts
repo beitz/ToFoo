@@ -295,6 +295,10 @@ export function simulate(input: SimulationInput): SimulationResult {
   const impute = settings.imputeUnlogged;
   // Without imputation the log is taken as complete: an unlogged past day is a known day with nothing eaten.
   const known = (d: string) => statuses[d] === 'logged' || statuses[d] === 'fasted' || (!impute && statuses[d] === 'unknown');
+  // Days filled in from recent intake: unlogged ones when the setting is on, and days marked so one by one.
+  const filledIn = (st: DayStatus | 'pending' | undefined) => st === 'filled' || st === 'excluded' || (impute && st === 'unknown');
+  // Left-out days count in no average; the stores still run through them (on filled-in intake).
+  const included = days.map((d) => statuses[d] !== 'excluded');
   const today = days[days.length - 1];
   const todayCounts = today !== undefined && statuses[today] !== 'pending';
   const lookback = uncertainty.imputationLookbackDays.value;
@@ -328,9 +332,9 @@ export function simulate(input: SimulationInput): SimulationResult {
         for (let k = knownHistory.length - n; k < knownHistory.length; k++) sum += knownHistory[k]!;
         const imputed = n ? sum / n : physiological;
         let v: number;
-        if (!impute || st === 'logged' || st === 'fasted' || st === 'pending') v = logged;
-        else if (st === 'partial') v = s === 'low' ? logged : Math.max(logged, imputed);
-        else v = s === 'low' ? 0 : s === 'central' ? imputed : Math.max(imputed, physiological);
+        if (filledIn(st)) v = s === 'low' ? logged : s === 'central' ? Math.max(logged, imputed) : Math.max(logged, imputed, physiological);
+        else if (impute && st === 'partial') v = s === 'low' ? logged : Math.max(logged, imputed);
+        else v = logged;
         if (known(d)) knownHistory.push(logged);
         series.push(v);
         if (adaptIron) {
@@ -355,7 +359,7 @@ export function simulate(input: SimulationInput): SimulationResult {
       for (let i = Math.max(0, endIdx - windowDays + 1); i <= endIdx; i++) out.push(i);
       return out;
     };
-    const win = end >= 0 ? windowIdx(end) : [];
+    const win = end >= 0 ? windowIdx(end).filter((i) => included[i]) : [];
     const knownInWindow = win.filter((i) => known(days[i]!)).length;
     const missingDataDays = win.filter((i) => totals.central[i]!.missing.has(id)).length;
     const mean = (arr: number[], idx: number[]) => (idx.length ? idx.reduce((a, i) => a + (arr[i] ?? 0), 0) / idx.length : 0);
@@ -391,7 +395,7 @@ export function simulate(input: SimulationInput): SimulationResult {
       averageAbsorbed: mean(inflow.central, win),
       averageIntake,
       ulRatio,
-      windowDays: win.length,
+      windowDays: end >= 0 ? windowIdx(end).length : 0,
       knownDays: knownInWindow,
       missingDataDays,
       contributors,
@@ -449,21 +453,23 @@ export function simulate(input: SimulationInput): SimulationResult {
     const source = kind === 'limit' || kind === 'info' ? null : inflow;
     // Prefix sums make every window average O(1).
     const knownMask = days.map((d) => (known(d) ? 1 : 0));
+    const includedMask = included.map((x) => (x ? 1 : 0));
     const prefix = (arr: number[]) => {
       const p = new Float64Array(arr.length + 1);
       for (let i = 0; i < arr.length; i++) p[i + 1] = p[i]! + arr[i]!;
       return p;
     };
     const knownPrefix = prefix(knownMask);
+    const includedPrefix = prefix(includedMask);
     const sums = {} as Record<Scenario, Float64Array>;
     for (const s of SCENARIOS) {
-      sums[s] = source ? prefix(source[s]) : prefix(days.map((_, i) => (knownMask[i] ? (totals[s][i]!.intake[id] ?? 0) : 0)));
+      sums[s] = source ? prefix(source[s].map((v, i) => v * includedMask[i]!)) : prefix(days.map((_, i) => (knownMask[i] ? (totals[s][i]!.intake[id] ?? 0) : 0)));
     }
     const valueAt = (s: Scenario, endIdx: number) => {
       const start = Math.max(0, endIdx - windowDays + 1);
       const total = sums[s][endIdx + 1]! - sums[s][start]!;
-      // Rolling: all days count (unknown days are imputed). Limit / info: raw intake on known days only.
-      const n = source ? endIdx - start + 1 : knownPrefix[endIdx + 1]! - knownPrefix[start]!;
+      // Rolling: all days count (unknown days are imputed) except left-out ones. Limit / info: raw intake on known days only.
+      const n = source ? includedPrefix[endIdx + 1]! - includedPrefix[start]! : knownPrefix[endIdx + 1]! - knownPrefix[start]!;
       return n > 0 ? total / n / denom : 0;
     };
     const history: HistoryPoint[] = [];

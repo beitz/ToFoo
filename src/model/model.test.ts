@@ -317,6 +317,43 @@ describe('simulation', () => {
     expect(vitc.status).toBe('low');
   });
 
+  it('a day marked "filled in" is imputed even with the setting off', () => {
+    const d = days('2026-01-01', 30);
+    // Today with nothing yet is never imputed by the setting; mark only the past days.
+    const filled = Object.fromEntries(d.slice(0, -1).map((day) => [day, 'filled' as const]));
+    const asSetting = simulate(baseInput(d, [], imputing)).nutrients.get('FE')!;
+    const perDay = simulate(baseInput(d, [], { dayStatus: filled })).nutrients.get('FE')!;
+    expect(perDay.value).toEqual(asSetting.value);
+  });
+
+  it('a day marked "nothing eaten" by fasting still counts as zero with the setting on', () => {
+    const d = days('2026-01-01', 30);
+    const fasted = Object.fromEntries(d.map((day) => [day, 'fasted' as const]));
+    const plain = simulate(baseInput(d, [], { dayStatus: fasted })).nutrients.get('FE')!;
+    const withSetting = simulate(baseInput(d, [], { ...imputing, dayStatus: fasted })).nutrients.get('FE')!;
+    expect(withSetting.value.central).toBeCloseTo(plain.value.central, 6);
+  });
+
+  it('a left-out day counts in no rolling average or limit, but stores keep running on recent intake', () => {
+    const d = days('2026-01-01', 8);
+    // Seven days of 200 mg vitamin C; one unlogged day in between.
+    const logged = d.filter((_, i) => i !== 3);
+    const entries = logged.map((day, i) => manual(`c${i}`, day, 12, { VITC: 200, FE: 20 }));
+    const asZero = simulate(baseInput(d, entries)).nutrients.get('VITC')!;
+    const left = simulate(baseInput(d, entries, { dayStatus: { [d[3]!]: 'excluded' } })).nutrients.get('VITC')!;
+    const allLogged = simulate(baseInput(d, [...entries, manual('x', d[3]!, 12, { VITC: 200 })])).nutrients.get('VITC')!;
+    expect(left.value.central).toBeGreaterThan(asZero.value.central);
+    expect(left.value.central).toBeCloseTo(allLogged.value.central, 6);
+    expect(left.averageIntake).toBeCloseTo(200);
+    expect(left.knownDays).toBe(asZero.knownDays - 1);
+    expect(left.windowDays).toBe(asZero.windowDays);
+
+    // Tanks can't skip a day: a left-out day drains like a filled-in one, not like a fast.
+    const fe = (dayStatus: SimulationInput['dayStatus']) => simulate(baseInput(d, entries, { dayStatus })).nutrients.get('FE')!;
+    expect(fe({ [d[3]!]: 'excluded' }).value).toEqual(fe({ [d[3]!]: 'filled' }).value);
+    expect(fe({ [d[3]!]: 'excluded' }).value.central).toBeGreaterThan(fe({}).value.central);
+  });
+
   it('without imputation: today alone, still empty, has no data yet', () => {
     const vitc = simulate(baseInput(days('2026-01-01', 1), [])).nutrients.get('VITC')!;
     expect(vitc.knownDays).toBe(0);

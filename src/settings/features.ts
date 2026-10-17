@@ -15,7 +15,7 @@ export const FEATURES: FeatureInfo[] = [
   { key: 'absorption', label: 'Absorption modelling', description: 'Off: typical absorption for everything (raw intake vs. recommendation).', default: true },
   { key: 'retention', label: 'Cooking and storage losses', description: 'Off: no losses from cooking, fridge or freezer.', default: true },
   { key: 'sunVitaminD', label: 'Vitamin D from sun', description: 'Add the estimated vitamin D your skin makes.', default: true },
-  { key: 'fillUnloggedDays', label: 'Fill in unlogged days', description: 'Assume you ate as usual on days you did not log, shown as a wider range. Off: a day without entries counts as nothing eaten.', default: false },
+  { key: 'fillUnloggedDays', label: 'Fill in unlogged days', description: 'Assume you ate as usual on days you did not log, shown as a wider range. Off: a day without entries counts as nothing eaten. Any single day can be set otherwise in the diary.', default: false },
   { key: 'advancedNumbers', label: 'Advanced numbers', description: 'Show units, parameter values and sources inline.', default: false },
   { key: 'yesterdayNudge', label: 'Ask about yesterday', description: 'A gentle note when yesterday has no status.', default: true },
   { key: 'backupReminder', label: 'Backup reminder', description: 'A note when your last backup is older than the set number of days.', default: true },

@@ -506,6 +506,16 @@ textarea:focus-visible,
   cursor: pointer;
   padding: 0 6px;
 }
+/* More options than fit one row on a phone: three per row. */
+.segmented.segmented-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border-radius: 14px;
+}
+.segmented.segmented-grid button {
+  border-radius: 11px;
+  min-height: 44px;
+}
 .segmented button.on {
   background: var(--surface);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
@@ -1670,7 +1680,11 @@ body:has(.composer) .toast-area {
 .day-fasted svg {
   color: var(--accent);
 }
+.day-filled svg {
+  color: var(--warn);
+}
 .day-unknown svg,
+.day-excluded svg,
 .day-pending svg {
   color: var(--unknown);
 }

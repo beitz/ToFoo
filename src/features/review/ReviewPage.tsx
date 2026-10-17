@@ -60,7 +60,7 @@ export function ReviewPage({ from: fromParam, to: toParam }: { from?: string; to
   }
 
   const counts = period.statusCounts;
-  const parts = (['logged', 'partial', 'fasted', 'unknown'] as const).filter((s) => counts[s] > 0);
+  const parts = (['logged', 'partial', 'fasted', 'unknown', 'filled', 'excluded'] as const).filter((s) => counts[s] > 0);
 
   return (
     <section>

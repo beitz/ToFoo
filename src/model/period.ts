@@ -5,7 +5,8 @@
  * Only logged amounts count; nothing is imputed, because the point is to see what was eaten.
  * Which days count follows the model: logged and fasted days, and unlogged past days unless
  * "Fill in unlogged days" is on (then they are unknown and left out). Partly logged days are left
- * out too, since their totals are known to be incomplete; the result says how many there were.
+ * out too, since their totals are known to be incomplete, and so are days marked "filled in" or
+ * "left out" one by one; the result says how many there were.
  *
  * Percentages compare like with like (docs/SPEC.md, units): absorbed ÷ physiological need for
  * stores and rolling nutrients, as on Home; intake ÷ limit for limits; plain intake for info.
@@ -40,7 +41,7 @@ export interface PeriodResult {
 
 export function periodBreakdown(input: PeriodInput): PeriodResult {
   const { days, sim, requirements: req, imputeUnlogged, from, to } = input;
-  const statusCounts: PeriodResult['statusCounts'] = { logged: 0, partial: 0, fasted: 0, unknown: 0, pending: 0 };
+  const statusCounts: PeriodResult['statusCounts'] = { logged: 0, partial: 0, fasted: 0, unknown: 0, filled: 0, excluded: 0, pending: 0 };
   const idx: number[] = [];
   days.forEach((d, i) => {
     if (d < from || d > to) return;

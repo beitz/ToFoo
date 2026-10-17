@@ -38,6 +38,8 @@ const paths: Record<string, string> = {
   calendar: 'M4.5 6.5h15v13h-15zM4.5 10.5h15M8.5 4v4M15.5 4v4',
   half: 'M12 4a8 8 0 1 0 0 16a8 8 0 1 0 0-16zM12 4v16M12 8h4M12 12h5M12 16h4',
   minus: 'M7 12h10',
+  approx: 'M5 9.5c2.3-2 4.7-2 7 0s4.7 2 7 0M5 15c2.3-2 4.7-2 7 0s4.7 2 7 0',
+  skip: 'M12 3.5a8.5 8.5 0 1 0 0 17 8.5 8.5 0 0 0 0-17zM6 6l12 12',
   tank: 'M8 4h8a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z',
 };
 
