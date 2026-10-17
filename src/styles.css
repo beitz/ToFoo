@@ -736,16 +736,6 @@ textarea:focus-visible,
   cursor: pointer;
 }
 
-/* ── Today card ──────────────────────────────────────────────── */
-.today-status {
-  display: flex;
-  flex-direction: column;
-  margin-bottom: 10px;
-}
-.today-actions {
-  display: flex;
-  gap: 10px;
-}
 .prompt p {
   margin-top: 0;
 }
@@ -1869,4 +1859,199 @@ body:has(.composer) .toast-area {
   .chev {
     transition: none;
   }
+}
+
+/* ── Home: one line per nutrient ─────────────────────────────── */
+.nrow-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+@media (min-width: 560px) {
+  .nrow-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 16px;
+  }
+}
+.nrow {
+  display: grid;
+  grid-template-columns: 16px minmax(64px, 6.2rem) minmax(48px, 1fr) 4.4rem 2.2rem;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 2px 2px;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.9rem;
+  text-align: left;
+  cursor: pointer;
+}
+.nrow:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 1px;
+}
+.nrow-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+.nrow-bar {
+  position: relative;
+  display: block;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--surface-2);
+}
+.nrow-fill,
+.nrow-band {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  border-radius: 4px;
+  background: currentColor;
+}
+.nrow-band {
+  opacity: 0.35;
+}
+.nrow-dot {
+  position: absolute;
+  top: -3px;
+  width: 4px;
+  height: 14px;
+  margin-left: -2px;
+  border-radius: 2px;
+  background: currentColor;
+  box-shadow: 0 0 0 1.5px var(--bg);
+}
+.nrow-target {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--text);
+  opacity: 0.55;
+}
+.nrow-value {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.nrow-value small {
+  font-weight: 400;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+.trend {
+  text-align: left;
+  white-space: nowrap;
+  letter-spacing: -0.18em;
+  font-weight: 700;
+  line-height: 1;
+}
+.trend-neutral {
+  color: var(--text-muted);
+}
+.trend-better {
+  color: var(--ok);
+}
+.trend-worse {
+  color: var(--warn);
+}
+.nrow.gauge-fine svg,
+.nrow.gauge-fine .nrow-bar {
+  color: var(--ok);
+}
+.nrow.gauge-gettingLow svg,
+.nrow.gauge-gettingLow .nrow-bar {
+  color: var(--warn);
+}
+.nrow.gauge-low svg,
+.nrow.gauge-low .nrow-bar {
+  color: var(--low);
+}
+.nrow.gauge-tooHigh svg,
+.nrow.gauge-tooHigh .nrow-bar {
+  color: var(--high);
+}
+.nrow.gauge-unknown svg,
+.nrow.gauge-info svg,
+.nrow.gauge-unknown .nrow-bar {
+  color: var(--unknown);
+}
+.nrow.gauge-info .nrow-bar {
+  background: none;
+}
+.home-fasting {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 10px;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* ── Home: floating log and fasting buttons ──────────────────── */
+.page:has(.fab-stack) {
+  padding-bottom: calc(var(--nav-h) + 150px + env(safe-area-inset-bottom));
+}
+.fab-stack {
+  position: fixed;
+  right: max(var(--gutter), calc((100vw - 640px) / 2 + var(--gutter)));
+  bottom: calc(var(--nav-h) + 16px + env(safe-area-inset-bottom));
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.fab {
+  display: grid;
+  place-items: center;
+  width: 60px;
+  height: 60px;
+  border: none;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-text);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+}
+.fab-small {
+  width: 48px;
+  height: 48px;
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+.fab-small.on {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.fab:focus-visible {
+  outline: 3px solid var(--text);
+  outline-offset: 2px;
+}
+/* Toasts sit left of the buttons so undo stays reachable. */
+body:has(.fab-stack) .toast-area {
+  justify-content: flex-start;
+  padding-right: calc(var(--gutter) + 72px);
+}
+.home-legend summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  color: var(--accent);
+  font-weight: 600;
+}
+.home-legend[open] {
+  margin-bottom: 8px;
 }

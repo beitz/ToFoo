@@ -711,6 +711,34 @@ export const slowStore = {
   } satisfies Valued<number>,
 };
 
+/** How the trend arrows next to each nutrient are drawn. Display choices, not physiology. */
+export const trendDisplay = {
+  lookbackDays: {
+    value: 7,
+    source: 'Modelling choice',
+    confidence: 'assumption',
+    note: 'The arrow shows how much the shown value moved over this many days. The value itself already runs on each nutrient\'s own timescale (its average window or its store), so one lookback fits all.',
+  } satisfies Valued<number>,
+  minDays: {
+    value: 3,
+    source: 'Modelling choice',
+    confidence: 'assumption',
+    note: 'Fewer days of history than this: no arrow, since one or two days say little about a direction.',
+  } satisfies Valued<number>,
+  arrowDays: {
+    value: { fast: 7, medium: 30 },
+    source: 'Modelling choice',
+    confidence: 'assumption',
+    note: 'Arrow count from how soon the value reaches the next status line at the current rate: three within `fast` days, two within `medium`, one when slower or when no line lies ahead.',
+  } satisfies Valued<{ fast: number; medium: number }>,
+  steadyPerWeek: {
+    value: 0.02,
+    source: 'Modelling choice',
+    confidence: 'assumption',
+    note: 'A change smaller than this per week (2 percentage points of need, fill or limit) shows as steady.',
+  } satisfies Valued<number>,
+};
+
 export const statusThresholds = {
   tank: {
     value: { low: 0.2, gettingLow: 0.4 },

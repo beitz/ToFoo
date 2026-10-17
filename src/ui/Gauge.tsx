@@ -1,14 +1,14 @@
 import type { NutrientResult } from '../model/simulate';
+import { trendOf, type Trend } from '../model/trend';
 import { NUTRIENT_BY_ID } from '../model/nutrients';
 import { fmtAmount, fmtFill, fmtPercent } from '../lib/format';
-import { STATUS_ICON, StatusBadge, statusLabel } from './status';
+import { STATUS_ICON, statusLabel } from './status';
 import { Icon } from './Icon';
 import { t } from '../i18n';
 
 interface Props {
   result: NutrientResult;
   showRange: boolean;
-  advanced: boolean;
   onClick?: () => void;
   defaultBased?: boolean;
 }
@@ -81,46 +81,79 @@ export function CompactGauge({ result: r, onClick, defaultBased, variant = 'row'
   );
 }
 
-export function Gauge({ result: r, showRange, advanced, onClick, defaultBased }: Props) {
+/** Arrows for a trend: ↑↑↑ soon at the next status line, ↑ slow, → steady. */
+export function trendArrows(tr: Trend): string {
+  return tr.direction === 'steady' ? '→' : (tr.direction === 'up' ? '↑' : '↓').repeat(tr.speed);
+}
+
+/** Spoken / tooltip text for a trend. */
+export function trendLabel(tr: Trend): string {
+  if (tr.direction === 'steady') return t('trend.steady');
+  const dir = t(tr.direction === 'up' ? 'trend.up' : 'trend.down');
+  if (tr.daysToNext === undefined) return dir;
+  return t(tr.speed === 3 ? 'trend.withinWeek' : tr.speed === 2 ? 'trend.withinMonth' : 'trend.slow', { dir });
+}
+
+export function TrendMark({ result: r }: { result: NutrientResult }) {
+  const tr = hasNoData(r) || r.status === 'unknown' ? null : trendOf(r);
+  if (!tr) return <span className="trend trend-none" aria-hidden />;
+  const tone = tr.better === true ? 'better' : tr.better === false ? 'worse' : 'neutral';
+  const label = trendLabel(tr);
+  return (
+    <span className={`trend trend-${tone}`} title={label} aria-label={label} role="img">
+      {trendArrows(tr)}
+    </span>
+  );
+}
+
+/**
+ * One line per nutrient: status, name, a bar with the uncertainty band and the 100 % mark, the value
+ * and the trend arrows.
+ */
+export function GaugeRow({ result: r, showRange, onClick, defaultBased }: Pick<Props, 'result' | 'showRange' | 'onClick' | 'defaultBased'>) {
   const def = NUTRIENT_BY_ID.get(r.id);
   const name = def?.short ?? r.id;
   const noData = r.status === 'unknown' || hasNoData(r);
+  const isInfo = r.kind === 'info';
   const central = noData ? 0 : toScale(r, r.value.central);
   const lo = noData ? 0 : toScale(r, r.value.low);
   const hi = noData ? 0 : toScale(r, r.value.high);
-  const label = noData ? '–' : gaugeLabel(r);
-  const range =
-    showRange && r.kind !== 'info' && !noData && hi - lo > 0.02 ? `${fmtPercent(r.value.low)}–${fmtPercent(r.value.high)}` : null;
-  const kindLabel = r.kind === 'tank' ? t('gauge.kindTank') : r.kind === 'balance' ? t('gauge.kindBalance', { days: r.windowDays }) : r.kind === 'info' ? t('gauge.kindInfo') : t('gauge.kindRolling', { days: r.windowDays });
-
+  const band = showRange && !noData && hi - lo > 0.01;
+  const pct = isInfo ? fmtAmount(r.id, r.averageIntake) : r.kind === 'tank' ? fmtFill(r.value.central) : fmtPercent(r.value.central);
+  const suffix = isInfo ? t('gauge.perDay') : r.kind === 'tank' ? t('gauge.fullShort') : r.kind === 'limit' ? t('gauge.ofMaxShort') : '';
+  const range = band ? `, ${t('gauge.rangeSpoken', { low: fmtPercent(r.value.low), high: fmtPercent(r.value.high) })}` : '';
   return (
-    <button className={`gauge gauge-${r.kind} gauge-${r.status}`} onClick={onClick} aria-label={`${def?.name ?? r.id}: ${label}`}>
-      <div className="gauge-head">
-        <span className="gauge-name">{name}</span>
-        {defaultBased && <span className="gauge-default" title={t('gauge.defaultBased')}>*</span>}
-      </div>
-      <div className="gauge-body">
-        {r.kind === 'tank' ? (
-          <div className="tank" aria-hidden>
-            {showRange && <div className="tank-range" style={{ bottom: `${lo * 100}%`, height: `${(hi - lo) * 100}%` }} />}
-            <div className="tank-fill" style={{ height: `${central * 100}%` }} />
-          </div>
-        ) : (
-          <div className="bar" aria-hidden>
-            {showRange && r.kind !== 'info' && <div className="bar-range" style={{ left: `${lo * 100}%`, width: `${(hi - lo) * 100}%` }} />}
-            {r.kind !== 'info' && <div className="bar-fill" style={{ width: `${central * 100}%` }} />}
-            {r.kind !== 'info' && <div className="bar-target" style={{ left: `${(1 / 1.5) * 100}%` }} />}
-          </div>
+    <button
+      className={`nrow gauge-${r.kind} gauge-${r.status}`}
+      onClick={onClick}
+      aria-label={`${def?.name ?? r.id}: ${noData ? t('gauge.noData') : gaugeLabel(r)}${range}, ${statusLabel(r.status)}`}
+    >
+      <Icon name={STATUS_ICON[r.status]} size={14} />
+      <span className="nrow-name">
+        {name}
+        {defaultBased && <span className="gauge-default">*</span>}
+      </span>
+      <span className="nrow-bar" aria-hidden>
+        {!isInfo && (
+          <>
+            {band ? (
+              <>
+                <span className="nrow-fill" style={{ width: `${lo * 100}%` }} />
+                <span className="nrow-band" style={{ left: `${lo * 100}%`, width: `${(hi - lo) * 100}%` }} />
+                <span className="nrow-dot" style={{ left: `${central * 100}%` }} />
+              </>
+            ) : (
+              <span className="nrow-fill" style={{ width: `${central * 100}%` }} />
+            )}
+            {r.kind !== 'tank' && <span className="nrow-target" style={{ left: `${(1 / 1.5) * 100}%` }} />}
+          </>
         )}
-        <div className="gauge-values">
-          <span className="gauge-value">{label}</span>
-          {range && <span className="gauge-range">{range}</span>}
-        </div>
-      </div>
-      <div className="gauge-foot">
-        <StatusBadge status={r.status} compact />
-        {advanced && <span className="gauge-kind">{kindLabel}</span>}
-      </div>
+      </span>
+      <span className="nrow-value" aria-hidden>
+        {noData ? '–' : pct}
+        {!noData && suffix && <small> {suffix}</small>}
+      </span>
+      <TrendMark result={r} />
     </button>
   );
 }
