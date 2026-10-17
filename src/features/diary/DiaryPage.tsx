@@ -119,6 +119,9 @@ export function DiaryPage({ day: dayParam }: { day?: string }) {
                   <span className={`conf conf-${e.confidence}`} title={t(`confidence.${e.confidence}` as MessageKey)}>
                     {e.confidence}
                   </span>
+                  <span className="entry-edit">
+                    <Icon name="edit" size={16} />
+                  </span>
                 </button>
               </li>
             ))}
@@ -126,6 +129,7 @@ export function DiaryPage({ day: dayParam }: { day?: string }) {
         </div>
       ))}
 
+      {meals.length > 0 && <p className="muted small">{t('diary.editHint')}</p>}
       {mealSummary.length > 0 && (
         <p className="muted small">
           {t('diary.totals')}: {fmtAmount('ENERCC', totals.ENERCC ?? 0)} · {t('nutrient.protein')} {fmtAmount('PROT625', totals.PROT625 ?? 0)} · {t('nutrient.fat')} {fmtAmount('FAT', totals.FAT ?? 0)}

@@ -198,6 +198,8 @@ Every log entry carries a confidence level, and every day has an explicit status
 
 **Time of entry**: a new entry assumes the meal was just finished, so the timestamp defaults to now. Date and time stay one tap away for logging after the fact. Any eating pattern is supported; OMAD is the optimised path, not a requirement.
 
+**Editing an entry** (built 2026-10-17): tap an entry in the diary (or in "This meal" while logging, or "Edit in diary" on a logged assistant card) to change its amount, preparation, confidence and time, or delete it with undo. A food, a saved item or a manual entry can also be replaced by another food: "Change food" searches the BLS and saved products, USDA on a tap, or scans a barcode, for example when a meal logged as a generic dish turns out to be a known packaged product. The entry keeps its id, time and confidence; the amount carries over (servings × serving weight for a saved item; a manual entry asks for grams). A packaged product picked this way starts with the old entry's BLS food as the source of its missing vitamins and minerals, unless the product already has one; the user can change it as on the log screen. One undo restores the old entry. Recipe portions and drinks keep their own fields (portions and storage; tea or coffee) and are not replaced.
+
 **Confidence levels**:
 
 | Level | Meaning | Example |
@@ -424,6 +426,7 @@ v1 is the smallest app that is useful every day; each later version adds to the 
 - [ ] Change a dish's ingredients when logging it; swap preview in the recipe editor
 - [x] Repeat a past meal; favourite foods; home-screen shortcuts (built 2026-10-16)
 - [x] Day and range nutrient breakdown; calendar of day statuses (built 2026-10-16)
+- [x] Edit a logged entry, including replacing its food by search or barcode (built 2026-10-17)
 - [ ] Trends and weekly look-back
 - [ ] Water; day notes
 - [ ] Nice to have: fasting timer; "eat soon" flag for fridge portions (needs a shelf-life source)

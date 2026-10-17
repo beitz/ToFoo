@@ -184,6 +184,7 @@ export const en = {
   'off.lookUp': 'Look up',
   'off.looking': 'Looking up {code}…',
   'off.notFound': 'Open Food Facts does not know {code}. Enter the values from the label instead.',
+  'off.notFoundEdit': 'Open Food Facts does not know {code}. Try another barcode, or search for a similar food.',
   'off.scanAnother': 'Try another',
   'off.privacy': 'Only the barcode is sent to Open Food Facts. Products you log stay on this phone and are found by name next time, without asking Open Food Facts again.',
   'off.error.invalid': 'That is not a valid barcode. Check the digits.',
@@ -405,7 +406,20 @@ export const en = {
   'diary.portions': 'Portions',
   'diary.storage': 'Stored in',
   'diary.servings': 'Servings',
-  'diary.manualHint': 'To change the nutrients of a manual entry, delete it and enter it again.',
+  'diary.manualHint': 'To change the nutrients of a manual entry, delete it and enter it again, or replace it with a food.',
+  'diary.editHint': 'Tap an entry to change the amount, time or food, or to delete it.',
+
+  // Editing an entry
+  'edit.changeFood': 'Change food',
+  'edit.replaceWithFood': 'Replace with a food',
+  'edit.pickTitle': 'Replace with',
+  'edit.scanHint': 'Have the package? Scan its barcode for the product\'s own label values.',
+  'edit.noResults': 'No food found. Try another word.',
+  'edit.noResultsScan': 'No food found. Try another word, or scan the barcode of a packaged product.',
+  'edit.replaces': 'Replaces {name}.',
+  'edit.keepOld': 'Keep the old food',
+  'edit.replaced': 'Changed to {name}.',
+  'edit.inDiary': 'Edit in diary',
 
   // Recipes
   'recipes.title': 'Recipes',

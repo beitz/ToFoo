@@ -522,7 +522,8 @@ function ProposalCard({ card, day, toast, onLogged }: { card: Card; day: string;
       <div className="card proposal-done row">
         <Icon name="check" size={18} />
         <span>
-          {t('ai.cardLogged', { name: title, when: `${new Date(time).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}, ${formatTime(time)}` })}
+          {t('ai.cardLogged', { name: title, when: `${new Date(time).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}, ${formatTime(time)}` })}{' '}
+          <a href={href('diary', dayKey(new Date(time)))}>{t('edit.inDiary')}</a>
         </span>
       </div>
     );

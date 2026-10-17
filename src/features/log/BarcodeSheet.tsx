@@ -18,8 +18,11 @@ const LOOKUP_ERRORS: Record<'offline' | 'busy' | 'other', MessageKey> = {
   other: 'off.error.other',
 };
 
-/** Scan or type a barcode, then find the product on this phone or at Open Food Facts. */
-export function BarcodeSheet({ onFound, onManual, onClose }: { onFound: (p: Product) => void; onManual: () => void; onClose: () => void }) {
+/**
+ * Scan or type a barcode, then find the product on this phone or at Open Food Facts. Without
+ * `onManual` (changing a logged entry) an unknown product offers no manual entry.
+ */
+export function BarcodeSheet({ onFound, onManual, onClose }: { onFound: (p: Product) => void; onManual?: () => void; onClose: () => void }) {
   const [typed, setTyped] = useState('');
   const [status, setStatus] = useState<Status>({ kind: 'idle' });
   const [camera, setCamera] = useState<'starting' | 'on' | 'failed' | 'unsupported'>(() => (canDetectBarcodes() && typeof navigator.mediaDevices?.getUserMedia === 'function' ? 'starting' : 'unsupported'));
@@ -104,11 +107,13 @@ export function BarcodeSheet({ onFound, onManual, onClose }: { onFound: (p: Prod
       )}
       {status.kind === 'notFound' && (
         <div className="card notice-card" role="alert">
-          <p>{t('off.notFound', { code: status.code })}</p>
+          <p>{t(onManual ? 'off.notFound' : 'off.notFoundEdit', { code: status.code })}</p>
           <div className="row">
-            <button className="btn btn-secondary" onClick={onManual}>
-              {t('log.manual')}
-            </button>
+            {onManual && (
+              <button className="btn btn-secondary" onClick={onManual}>
+                {t('log.manual')}
+              </button>
+            )}
             <button className="btn btn-ghost" onClick={() => setStatus({ kind: 'idle' })}>
               {t('off.scanAnother')}
             </button>
