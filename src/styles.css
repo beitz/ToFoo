@@ -2125,3 +2125,6 @@ body:has(.fab-stack) .toast-area {
 .page:has(.fab-stack > :nth-child(4)) {
   padding-bottom: calc(var(--nav-h) + 266px + env(safe-area-inset-bottom));
 }
+.diary-actions:has(> :nth-child(4)) {
+  grid-template-columns: repeat(3, 1fr);
+}

@@ -3,9 +3,9 @@ import { useData } from '../../app/data';
 import { useToast } from '../../app/toast';
 import { href, navigate } from '../../app/router';
 import { t, type MessageKey } from '../../i18n';
-import { dayKey, formatTime } from '../../lib/dates';
+import { dayKey, formatDay, formatTime } from '../../lib/dates';
 import { fmtNumber, fmtTokens, fmtUsd } from '../../lib/format';
-import { appNote, emptyConversation, sendMessage, type AiModel, type Conversation, type ShownNote, type ShownProposal, type ShownSleep, type TurnOutcome } from '../../ai/assistant';
+import { appNote, emptyConversation, sendMessage, type AiModel, type Conversation, type ShownNote, type ShownProposal, type ShownSleep, type ShownActivity, type TurnOutcome } from '../../ai/assistant';
 import { classifyError, getAiSettings, makeCreate, saveUsage } from '../../ai/client';
 import { mergeModelTokens, modelTokensCost, totalTokens, type ModelTokens } from '../../ai/pricing';
 import { prepareImage, type PreparedImage } from '../../ai/image';
@@ -28,12 +28,13 @@ import { TimeField } from '../log/TimeField';
 import { defaultTimeFor } from '../log/time';
 import { sleepProblem } from '../sleep/SleepSheet';
 import { durationText, spanText } from '../sleep/format';
+import { ActivityForm, activityName, DEFAULT_ACTIVITY_SKIN, recordOf, type ActivityDraft } from '../activity/ActivityForm';
 
 type Bubble = { role: 'user'; text: string; previews: string[] } | { role: 'assistant'; text: string } | { role: 'card'; id: string };
 type ComposerPhoto = PreparedImage & { barcodes: string[]; time: PhotoTime };
-/** A proposed meal (M1, …), journal entry (J1, …) or sleep (S1, …), and whether the user logged or saved it. */
-type Card = { kind: 'meal'; proposal: ShownProposal; logged: boolean } | { kind: 'note'; note: ShownNote; logged: boolean } | { kind: 'sleep'; sleep: ShownSleep; logged: boolean };
-const cardOf = (c: Card) => (c.kind === 'meal' ? c.proposal : c.kind === 'note' ? c.note : c.sleep);
+/** A proposed meal (M1, …), journal entry (J1, …), sleep (S1, …) or activity (A1, …), and whether the user logged or saved it. */
+type Card = { kind: 'meal'; proposal: ShownProposal; logged: boolean } | { kind: 'note'; note: ShownNote; logged: boolean } | { kind: 'sleep'; sleep: ShownSleep; logged: boolean } | { kind: 'activity'; activity: ShownActivity; logged: boolean };
+const cardOf = (c: Card) => (c.kind === 'meal' ? c.proposal : c.kind === 'note' ? c.note : c.kind === 'sleep' ? c.sleep : c.activity);
 const cardId = (c: Card) => cardOf(c).id;
 /** Undoes one saved card. */
 type Undo = () => Promise<void>;
@@ -216,6 +217,7 @@ function Chat({ apiKey, model, day }: { apiKey: string; model: AiModel; day: str
         now: Date.now(),
         journal: isOn(d.settings.features, 'journal'),
         sleep: isOn(d.settings.features, 'sleep'),
+        activity: isOn(d.settings.features, 'activity'),
       };
       const r = await sendMessage(create, model, conversation, msg, ctx, onUsage);
       setConversation(r.conversation);
@@ -246,6 +248,7 @@ function Chat({ apiKey, model, day }: { apiKey: string; model: AiModel; day: str
         ...outcome.proposals.map((p): Card => ({ kind: 'meal', proposal: p, logged: false })),
         ...outcome.notes.map((n): Card => ({ kind: 'note', note: n, logged: false })),
         ...outcome.sleeps.map((s): Card => ({ kind: 'sleep', sleep: s, logged: false })),
+        ...outcome.activities.map((a): Card => ({ kind: 'activity', activity: a, logged: false })),
       ];
       const replaced = new Set(shown.map((c) => cardOf(c).replaces).filter((id): id is string => !!id && cardsRef.current.get(id)?.logged === false));
       setCards((all) => {
@@ -330,6 +333,7 @@ function Chat({ apiKey, model, day }: { apiKey: string; model: AiModel; day: str
           {t('ai.intro')}
           {isOn(d.settings.features, 'journal') && ` ${t('ai.introJournal')}`}
           {isOn(d.settings.features, 'sleep') && ` ${t('ai.introSleep')}`}
+          {isOn(d.settings.features, 'activity') && ` ${t('ai.introActivity')}`}
         </div>
         {bubbles.map((b, i) =>
           b.role === 'card' ? (
@@ -533,6 +537,7 @@ function useRegister(id: string, save: Saver | undefined, register: CardProps<Ca
 function CardView({ card, ...rest }: CardProps<Card>) {
   if (card.kind === 'meal') return <ProposalCard card={card} {...rest} />;
   if (card.kind === 'sleep') return <SleepCard card={card} {...rest} />;
+  if (card.kind === 'activity') return <ActivityCard card={card} {...rest} />;
   return <NoteCard card={card} {...rest} />;
 }
 
@@ -594,6 +599,99 @@ function SleepCard({ card, toast, onLogged, register }: CardProps<Extract<Card, 
         </span>
         <button className="btn btn-primary" disabled={!!problem || saving} onClick={() => void saveOne()}>
           {t('ai.saveSleep')}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** An activity the assistant proposes: a summary to check, the full form behind Change, then save. */
+function ActivityCard({ card, toast, onLogged, register }: CardProps<Extract<Card, { kind: 'activity' }>>) {
+  const { activity } = card;
+  const [draft, setDraft] = useState<ActivityDraft>(() => ({
+    kind: activity.kind,
+    name: activity.name ?? '',
+    time: activity.start,
+    minutes: activity.minutes,
+    intensity: activity.intensity ?? 'moderate',
+    outside: activity.outside,
+    sun: true,
+    skin: activity.skin ?? DEFAULT_ACTIVITY_SKIN,
+  }));
+  const [changing, setChanging] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const r = recordOf(draft);
+
+  async function save(): Promise<Undo | undefined> {
+    if (!r.ok || saving) return;
+    setSaving(true);
+    try {
+      const added = await repo.addActivity({ ...r.fields, day: dayKey(new Date(r.fields.time)) });
+      onLogged(true);
+      return async () => {
+        await repo.deleteActivity(added.id);
+        onLogged(false);
+      };
+    } finally {
+      setSaving(false);
+    }
+  }
+  useRegister(activity.id, card.logged ? undefined : save, register);
+
+  async function saveOne() {
+    const undo = await save();
+    if (undo) toast(t('activity.saved'), undo);
+  }
+
+  const summary = [
+    formatTime(draft.time),
+    t('activity.summary', { min: draft.minutes ?? '–' }),
+    t(`activity.intensity.${draft.intensity}` as MessageKey),
+    ...(draft.outside ? [t('activity.outsideMark')] : []),
+  ].join(' · ');
+
+  if (card.logged) {
+    return (
+      <div className="card proposal-done row">
+        <Icon name="check" size={18} />
+        <span>
+          {t('ai.activitySaved', { name: activityName(draft), summary })} <a href={href('diary', dayKey(new Date(draft.time)))}>{t('edit.inDiary')}</a>
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="card proposal">
+      <div className="row-between">
+        <strong className="journal-label">
+          <Icon name="activity" size={18} /> {activityName(draft)}
+        </strong>
+        <span className="muted small" title={t('ai.cardId')}>
+          {activity.id}
+        </span>
+      </div>
+      {changing ? (
+        <ActivityForm draft={draft} onChange={setDraft} />
+      ) : (
+        <p className="muted">
+          {formatDay(dayKey(new Date(draft.time)))}, {summary}
+          {draft.outside && draft.sun && ` · ${t('ai.activitySun')}`}
+        </p>
+      )}
+      <div className="sheet-actions">
+        {!r.ok && (
+          <span className="notice small" role="alert">
+            {r.problem}
+          </span>
+        )}
+        {!changing && (
+          <button className="btn btn-ghost" onClick={() => setChanging(true)}>
+            {t('ai.change')}
+          </button>
+        )}
+        <button className="btn btn-primary" disabled={!r.ok || saving} onClick={() => void saveOne()}>
+          {t('ai.saveActivity')}
         </button>
       </div>
     </div>

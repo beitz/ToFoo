@@ -55,6 +55,7 @@ export function backupSummary(b: BackupFile): Array<[string, number]> {
     ['Packaged products', b.data.products.length],
     ['Journal entries', b.data.journal.length],
     ['Sleeps', b.data.sleep.length],
+    ['Activities', b.data.activities.length],
   ];
 }
 

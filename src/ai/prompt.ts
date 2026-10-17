@@ -3,6 +3,7 @@
  * Open Food Facts lookup, its web search, and USDA), each kept stable so prompt caching works.
  */
 import type { BetaTool, BetaToolUnion, BetaWebSearchTool20250305 } from '@anthropic-ai/sdk/resources/beta/messages/messages';
+import { ACTIVITY_KINDS, INTENSITIES } from '../storage/types';
 import { PREPARATIONS } from './tools';
 
 const GENERIC_NOTE = `say so in assumptions (e.g. "generic hazelnut praline, not the label values")`;
@@ -20,10 +21,13 @@ const USDA = `- When no BLS food fits a single food or ingredient well (foods co
 
 // The journal (docs/SPEC.md, "Journal"): the assistant only passes on the user's words, for
 // patterns to be looked for later; it never interprets them.
-const JOURNAL = `- Journal: the user keeps a free-text journal in ToFoo, to look for patterns later between how they feel and what they ate, slept and did. When the user tells you something worth keeping there that is not a food (how they feel or slept, energy, mood, symptoms such as a headache, stress, exercise, events such as "ate out, guessed amounts"), propose it with propose_journal_entry in their own words: tidy the wording lightly, keep their language, add nothing, and do not interpret, explain or diagnose. One entry per moment it is about, with time set to when it happened (empty for now, or the day the chat was opened for). Do not repeat what a meal card already shows. If the user only tells you journal things, propose just the entry and do not ask about food. To change an open journal card, call propose_journal_entry again with replaces set to its id (J1, J2, …).`;
+const JOURNAL = (activity: boolean) => `- Journal: the user keeps a free-text journal in ToFoo, to look for patterns later between how they feel and what they ate, slept and did. When the user tells you something worth keeping there that is not a food (how they feel or slept, energy, mood, symptoms such as a headache, stress, ${activity ? '' : 'exercise, '}events such as "ate out, guessed amounts"), propose it with propose_journal_entry in their own words: tidy the wording lightly, keep their language, add nothing, and do not interpret, explain or diagnose. One entry per moment it is about, with time set to when it happened (empty for now, or the day the chat was opened for). Do not repeat what a meal${activity ? ' or activity' : ''} card already shows. If the user only tells you journal things, propose just the entry and do not ask about food. To change an open journal card, call propose_journal_entry again with replaces set to its id (J1, J2, …).`;
 
 // Sleep (docs/SPEC.md, "Sleep"): only when the user fell asleep and woke up; no quality rating.
 const SLEEP = (journal: boolean) => `- Sleep: when the user says when they slept ("slept from 1 to 8", "in bed at 23:30, up at 7", "napped an hour after lunch"), propose it with propose_sleep: start is when they fell asleep, end when they woke up, both local "YYYY-MM-DD HH:MM"; a night usually starts the evening before the morning it ends. One call per sleep, naps included. If only one end is known ("woke up at 6"), use their usual pattern from the conversation or ask in your numbered questions. The app records no sleep quality${journal ? ': how they slept (badly, woke up often, tired) goes in a journal entry, in their words, not in the sleep card' : ''}. Saving a sleep replaces any sleep the app already has at that time, so propose a night even if the user may have pressed the sleep buttons. To change an open sleep card, call propose_sleep again with replaces set to its id (S1, S2, …).`;
+
+// Activity (docs/SPEC.md, "Activity"): what, when, how long, roughly how hard; no calories.
+const ACTIVITY = `- Activity: when the user says they moved (a walk, a run, cycling to work, the gym, football, gardening), propose it with propose_activity: kind (walk, run, cycling, strength, or other with their word as name), start as local "YYYY-MM-DD HH:MM", minutes, intensity only if they said or it is obvious (easy, moderate, hard), and whether it was outside. One call per activity. Estimate a missing start or length from what they said ("walked to work" fits their usual commute time) and say so in your text; ask in your numbered questions only when it matters. Outside time counts toward the vitamin D sun estimate; set skin only when they said what they wore ("in shorts and T-shirt": armsLegs). The app computes no calories. To change an open activity card, call propose_activity again with replaces set to its id (A1, A2, …).`;
 
 export interface PromptSources {
   /** Open Food Facts barcode lookup on. */
@@ -36,14 +40,17 @@ export interface PromptSources {
   journal?: boolean;
   /** Sleep is on: the assistant may propose sleeps. */
   sleep?: boolean;
+  /** Activity is on: the assistant may propose activities. */
+  activity?: boolean;
 }
 
-function systemPrompt({ off = false, usda = false, webSearch = false, journal = false, sleep = false }: PromptSources): string {
+function systemPrompt({ off = false, usda = false, webSearch = false, journal = false, sleep = false, activity = false }: PromptSources): string {
   const extra = [
     off && ' Packaged products can also be looked up by barcode in Open Food Facts.',
     usda && ' Foods the BLS lacks can be searched in USDA FoodData Central.',
     journal && ' The user can also tell you things for their journal.',
     sleep && ' The user can also tell you when they slept.',
+    activity && ' The user can also tell you what exercise or activity they did.',
   ]
     .filter(Boolean)
     .join('');
@@ -54,10 +61,10 @@ Your job: work out which foods the user ate and how many grams of each, then cal
 How to work:
 - Find foods with search_foods. Search short, generic terms, in English and German (e.g. ["milk roll", "Milchbrötchen"]); send several queries in one call. Only use codes that search_foods returned.
 ${off ? BRANDED_WITH_PRODUCTS : BRANDED_BLS_ONLY}
-${off && webSearch ? `${WEB_SEARCH}\n` : ''}${usda ? `${USDA}\n` : ''}${journal ? `${JOURNAL}\n` : ''}${sleep ? `${SLEEP(journal)}\n` : ''}- Mixed dishes (restaurant meals, a hotpot, a bowl): use a matching BLS dish if there is one, otherwise split it into ingredients with estimated grams. Include what changes the result most: cooking oil, sauces, broth that was actually eaten.
+${off && webSearch ? `${WEB_SEARCH}\n` : ''}${usda ? `${USDA}\n` : ''}${journal ? `${JOURNAL(activity)}\n` : ''}${sleep ? `${SLEEP(journal)}\n` : ''}${activity ? `${ACTIVITY}\n` : ''}- Mixed dishes (restaurant meals, a hotpot, a bowl): use a matching BLS dish if there is one, otherwise split it into ingredients with estimated grams. Include what changes the result most: cooking oil, sauces, broth that was actually eaten.
 - Amounts: use what the user said, label weights, counts of standard items, and visual cues (plate size, cutlery, hands, packaging). Think about the portion one person ate, not the whole shared dish.
 - Ask when the answer would noticeably change the result (an unknown main food, a portion that could easily be double or half, whether shared food was all eaten). Ask one short question at a time and offer a default the user can just accept, e.g. "About one bowl, roughly 400 ml?". Do not ask about details that barely matter. Do not ask for more photos (barcode, label, packaging) when you can work with what you have: the user often cannot take them. If one would clearly change the result, mention it once alongside your proposal, not instead of it. If the user cannot know, estimate and record the assumption.
-- Everything at once: the user often logs a day or two in one go, in one long message (often spoken for many minutes, with filler words and corrections) and many photos (meals, packaging, barcodes, labels, screenshots). Go through all of it and propose every meal${journal ? ', journal entry' : ''}${sleep ? ', sleep' : ''} it contains: leave nothing out and propose nothing twice. Later words override earlier ones ("no, it was two eggs"). The app puts a line before each photo with its number and capture time. Group the photos into meals by time and content: photos minutes apart of the same table are one meal; the same food at different times (yogurt in the morning and in the evening) is two; a photo of a package or barcode belongs to the meal that food was eaten in. Also include meals the user only describes in words. Before proposing, ask everything that matters in one message, as a short numbered list with a default for each, and say how you grouped the photos (e.g. "Photos 2–5: Korean BBQ, Thu 19:40"); keep it to what really changes the result. Then propose everything in one response, one call per meal${journal ? ', journal entry' : ''}${sleep ? ', sleep' : ''}.
+- Everything at once: the user often logs a day or two in one go, in one long message (often spoken for many minutes, with filler words and corrections) and many photos (meals, packaging, barcodes, labels, screenshots). Go through all of it and propose every meal${journal ? ', journal entry' : ''}${sleep ? ', sleep' : ''}${activity ? ', activity' : ''} it contains: leave nothing out and propose nothing twice. Later words override earlier ones ("no, it was two eggs"). The app puts a line before each photo with its number and capture time. Group the photos into meals by time and content: photos minutes apart of the same table are one meal; the same food at different times (yogurt in the morning and in the evening) is two; a photo of a package or barcode belongs to the meal that food was eaten in. Also include meals the user only describes in words. Before proposing, ask everything that matters in one message, as a short numbered list with a default for each, and say how you grouped the photos (e.g. "Photos 2–5: Korean BBQ, Thu 19:40"); keep it to what really changes the result. Then propose everything in one response, one call per meal${journal ? ', journal entry' : ''}${sleep ? ', sleep' : ''}${activity ? ', activity' : ''}.
 - Times: set each meal's time to when it was eaten, as local "YYYY-MM-DD HH:MM". Use what the user said first ("at 8", "yesterday lunch" means a plausible lunch time that day, "after the run" means after the run's time), then the capture time of the meal's first photo. Words like "this morning" or "yesterday" count from the current time the app gives you, not from the photos. A "file date" may be when the photo was saved rather than taken; ask if it looks off. When the user gives no time and there is no photo, pick a plausible time and say so in assumptions. Leave time empty only for a single meal eaten just now or on the day the chat was opened for; when a message covers several meals, set every time.
 - Cards: each proposal is shown as a card with an id (M1, M2, …). The user can log each card, edit it, or keep chatting. To change an open card, call propose_meal with the whole corrected meal and replaces set to its id; the app swaps the card. The app tells you which cards were logged; never propose those again.
 - preparation: "asListed" when the BLS food already matches how it was eaten (cooked entries, bread, dishes, sweets); otherwise raw, boiled, steamed, baked or fried.
@@ -67,8 +74,8 @@ ${off && webSearch ? `${WEB_SEARCH}\n` : ''}${usda ? `${USDA}\n` : ''}${journal 
 Style: brief, friendly, plain text (no headings or tables). Answer in the language the user writes in.`;
 }
 
-const key = ({ off = false, usda = false, webSearch = false, journal = false, sleep = false }: PromptSources) =>
-  `${off ? 1 : 0}${usda ? 1 : 0}${off && webSearch ? 1 : 0}${journal ? 1 : 0}${sleep ? 1 : 0}`;
+const key = ({ off = false, usda = false, webSearch = false, journal = false, sleep = false, activity = false }: PromptSources) =>
+  `${off ? 1 : 0}${usda ? 1 : 0}${off && webSearch ? 1 : 0}${journal ? 1 : 0}${sleep ? 1 : 0}${activity ? 1 : 0}`;
 const prompts = new Map<string, string>();
 const toolSets = new Map<string, BetaToolUnion[]>();
 
@@ -131,7 +138,7 @@ export const WEB_SEARCH_TOOL: BetaWebSearchTool20250305 = {
   user_location: { type: 'approximate', country: 'DE' },
 };
 
-function tools({ off = false, usda = false, webSearch = false, journal = false, sleep = false }: PromptSources): BetaToolUnion[] {
+function tools({ off = false, usda = false, webSearch = false, journal = false, sleep = false, activity = false }: PromptSources): BetaToolUnion[] {
   const withProducts = off || usda;
   const codeHelp = off && usda ? 'BLS code from search_foods, or an OFF: or USDA: code from lookup_barcode, search_usda or search_foods.' : off ? 'BLS code from search_foods, or OFF: product code from lookup_barcode or search_foods.' : usda ? 'BLS code from search_foods, or USDA: code from search_usda or search_foods.' : 'BLS code from search_foods.';
   const items = {
@@ -174,6 +181,7 @@ function tools({ off = false, usda = false, webSearch = false, journal = false, 
     },
     ...(journal ? [PROPOSE_JOURNAL_ENTRY] : []),
     ...(sleep ? [PROPOSE_SLEEP] : []),
+    ...(activity ? [PROPOSE_ACTIVITY] : []),
   ];
 }
 
@@ -207,6 +215,28 @@ const PROPOSE_SLEEP: BetaTool = {
       replaces: { type: 'string', description: 'Id of the open sleep card this corrects (e.g. "S1"); empty for a new sleep.' },
     },
     required: ['start', 'end', 'replaces'],
+    additionalProperties: false,
+  },
+};
+
+const PROPOSE_ACTIVITY: BetaTool = {
+  name: 'propose_activity',
+  description:
+    'Show the user one activity (a walk, a run, a workout, sport) to save, as a card with what, when and how long for the user to check and confirm; nothing is saved until they do. After a correction, call it again with replaces set to the card id.',
+  strict: true,
+  input_schema: {
+    type: 'object',
+    properties: {
+      kind: { type: 'string', enum: [...ACTIVITY_KINDS] },
+      name: { type: 'string', description: 'The user\'s word for it when kind is "other" or more specific, e.g. "Football", "Yoga"; empty otherwise.' },
+      start: { type: 'string', description: 'When it started, local "YYYY-MM-DD HH:MM", e.g. "2026-10-16 17:30".' },
+      minutes: { type: 'number', description: 'How long, in minutes.' },
+      intensity: { type: 'string', enum: ['', ...INTENSITIES], description: 'How hard, if said or obvious; empty otherwise.' },
+      outside: { type: 'boolean' },
+      skin: { type: 'string', enum: ['', 'faceHands', 'faceHandsForearms', 'faceHandsArms', 'armsLegs', 'mostOfBody'], description: 'Uncovered skin outside, only if the user said what they wore; empty otherwise.' },
+      replaces: { type: 'string', description: 'Id of the open activity card this corrects (e.g. "A1"); empty for a new activity.' },
+    },
+    required: ['kind', 'name', 'start', 'minutes', 'intensity', 'outside', 'skin', 'replaces'],
     additionalProperties: false,
   },
 };

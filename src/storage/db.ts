@@ -4,7 +4,7 @@
  */
 import Dexie, { type Table } from 'dexie';
 import { migrateRecord, needsMigration, TABLES, type TableName } from './migrations';
-import type { Batch, CustomFood, DayStatusRecord, Fast, JournalEntry, LogEntry, MetaRecord, Product, Profile, Recipe, Settings, SleepRecord, SunEntry } from './types';
+import type { ActivityRecord, Batch, CustomFood, DayStatusRecord, Fast, JournalEntry, LogEntry, MetaRecord, Product, Profile, Recipe, Settings, SleepRecord, SunEntry } from './types';
 
 export class ToFooDB extends Dexie {
   profile!: Table<Profile, string>;
@@ -19,6 +19,7 @@ export class ToFooDB extends Dexie {
   products!: Table<Product, string>;
   journal!: Table<JournalEntry, string>;
   sleep!: Table<SleepRecord, string>;
+  activities!: Table<ActivityRecord, string>;
   meta!: Table<MetaRecord, string>;
 
   constructor(name = 'tofoo') {
@@ -42,6 +43,8 @@ export class ToFooDB extends Dexie {
     this.version(3).stores({ journal: 'id, time, day' });
     // v4: sleep.
     this.version(4).stores({ sleep: 'id, start, day' });
+    // v5: activities.
+    this.version(5).stores({ activities: 'id, time, day' });
   }
 
   table_(name: TableName): Table<Record<string, unknown>, string> {

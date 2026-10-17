@@ -96,6 +96,20 @@ describe('repository', () => {
     expect(await b.db.sleep.count()).toBe(2);
   });
 
+  it('adds, edits, deletes and restores activities, and backs them up', async () => {
+    const repo = await fresh();
+    const a = await repo.addActivity({ kind: 'walk', time: 10, day: '2026-10-15', minutes: 30, intensity: 'easy', outside: true, sunSkin: 'faceHands' });
+    expect(a.schemaVersion).toBe(1);
+    await repo.updateActivity({ ...a, minutes: 45 });
+    expect((await repo.db.activities.get(a.id))!.minutes).toBe(45);
+    const removed = await repo.deleteActivity(a.id);
+    expect(await repo.db.activities.count()).toBe(0);
+    await repo.restoreActivity(removed!);
+    const b = await fresh();
+    await b.restore(await repo.snapshot());
+    expect(await b.db.activities.where('day').equals('2026-10-15').toArray()).toEqual([removed]);
+  });
+
   it('pins and unpins favourite foods', async () => {
     const repo = await fresh();
     const oats = { source: 'BLS', version: '4.0', code: 'C133000' } as const;
