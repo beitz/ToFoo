@@ -1814,3 +1814,59 @@ body:has(.composer) .toast-area {
   height: 64px;
   border: 2px solid #fff;
 }
+
+/* ── Home nutrient groups ────────────────────────────────────── */
+.home-legend {
+  margin: 0 0 6px;
+}
+.home-grouping {
+  margin-bottom: 10px;
+}
+.home-group {
+  margin-bottom: 6px;
+}
+.home-group-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  padding: 6px 4px;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.home-group-head:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 1px;
+}
+.home-group-title {
+  font-weight: 700;
+}
+.home-group-count {
+  font-weight: 400;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.home-group-hint {
+  margin-left: auto;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  text-align: right;
+}
+.chev {
+  display: inline-flex;
+  transition: transform 0.15s ease;
+}
+.chev-open {
+  transform: rotate(90deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .chev {
+    transition: none;
+  }
+}

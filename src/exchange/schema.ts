@@ -75,6 +75,8 @@ export const settingsSchema = z.object({
   backupReminderDays: z.number().int().positive(),
   defaultPlan: plan,
   homeView: z.enum(['compact', 'detailed']).optional(),
+  homeGrouping: z.enum(['status', 'type', 'none']).optional(),
+  homeCollapsed: z.record(z.string(), z.boolean()).optional(),
   favourites: z.array(foodRef).optional(),
 });
 
