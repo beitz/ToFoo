@@ -6,6 +6,7 @@
 import type * as Beta from '@anthropic-ai/sdk/resources/beta/messages/messages';
 import { SYSTEM_PROMPT, SYSTEM_PROMPT_WITH_PRODUCTS, TOOLS, TOOLS_WITH_PRODUCTS } from './prompt';
 import { usageOf, type ModelTokens } from './pricing';
+import { fmtLocalDateTime } from './photoTime';
 import { runLookupBarcode, runSearchFoods, validateProposal, type Proposal, type ToolContext } from './tools';
 
 export type CreateMessage = (params: Beta.MessageCreateParamsNonStreaming) => Promise<Beta.BetaMessage>;
@@ -14,8 +15,8 @@ export const AI_MODELS = ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-
 export type AiModel = (typeof AI_MODELS)[number];
 export const DEFAULT_AI_MODEL: AiModel = 'claude-opus-5-5';
 
-/** Tool rounds per user message before giving up: a normal meal needs one to three. */
-const MAX_STEPS = 8;
+/** Tool rounds per user message before giving up: a normal meal needs one to three, a batch of meals a few more. */
+const MAX_STEPS = 12;
 
 export interface Conversation {
   messages: Beta.BetaMessageParam[];
@@ -24,19 +25,26 @@ export interface Conversation {
    * and the results go out with the user's next message.
    */
   pendingResults: Beta.BetaToolResultBlockParam[];
+  /** Cards shown so far; the next one gets id M(cards + 1). */
+  cards: number;
 }
 
-export const emptyConversation = (): Conversation => ({ messages: [], pendingResults: [] });
+export const emptyConversation = (): Conversation => ({ messages: [], pendingResults: [], cards: 0 });
 
 export interface UserImage {
   mediaType: 'image/jpeg' | 'image/png' | 'image/webp';
   /** Base64 without the data-URL prefix. */
   data: string;
+  /** Sent as text right before the photo, e.g. its number and capture time. */
+  label?: string;
 }
+
+/** A proposal as shown: with the card id the assistant uses to refer to it. */
+export type ShownProposal = Proposal & { id: string };
 
 export type TurnOutcome =
   | { kind: 'reply'; text: string }
-  | { kind: 'proposal'; text: string; proposal: Proposal }
+  | { kind: 'proposal'; text: string; proposals: ShownProposal[] }
   | { kind: 'error'; reason: 'refusal' | 'tooLong' | 'tooManySteps' };
 
 /** Request parameters per model (fallbacks re-run a declined request on another model). */
@@ -85,14 +93,18 @@ export async function sendMessage(
   const messages = [...conversation.messages];
   const content: Beta.BetaContentBlockParam[] = [
     ...conversation.pendingResults,
-    ...user.images.map((img): Beta.BetaImageBlockParam => ({ type: 'image', source: { type: 'base64', media_type: img.mediaType, data: img.data } })),
+    ...user.images.flatMap((img): Beta.BetaContentBlockParam[] => [
+      ...(img.label ? [{ type: 'text' as const, text: img.label }] : []),
+      { type: 'image', source: { type: 'base64', media_type: img.mediaType, data: img.data } },
+    ]),
   ];
   if (user.text.trim()) content.push({ type: 'text', text: user.text.trim() });
   if (user.appNote) content.push({ type: 'text', text: user.appNote });
   messages.push({ role: 'user', content });
   const withProducts = !!ctx.products;
 
-  const done = (outcome: TurnOutcome, pendingResults: Beta.BetaToolResultBlockParam[] = []) => ({ conversation: { messages, pendingResults }, outcome });
+  let cards = conversation.cards;
+  const done = (outcome: TurnOutcome, pendingResults: Beta.BetaToolResultBlockParam[] = []) => ({ conversation: { messages, pendingResults, cards }, outcome });
 
   for (let step = 0; step < MAX_STEPS; step++) {
     const res = await create(requestParams(model, messages, withProducts));
@@ -106,8 +118,8 @@ export async function sendMessage(
     if (uses.length === 0) return done({ kind: 'reply', text: textOf(res.content) });
 
     const results: Beta.BetaToolResultBlockParam[] = [];
-    let proposal: Proposal | undefined;
-    let proposalId = '';
+    const proposals: Array<{ id: string; proposal: Proposal }> = [];
+    let rejected = false;
     for (const use of uses) {
       if (use.name === 'search_foods') {
         const r = runSearchFoods(use.input, ctx);
@@ -116,25 +128,44 @@ export async function sendMessage(
         const r = await runLookupBarcode(use.input, ctx);
         results.push({ type: 'tool_result', tool_use_id: use.id, content: r.text, is_error: !r.ok });
       } else if (use.name === 'propose_meal') {
-        const r = validateProposal(use.input, ctx.db, ctx.products);
-        if (r.ok) {
-          proposal = r.proposal;
-          proposalId = use.id;
-        } else results.push({ type: 'tool_result', tool_use_id: use.id, content: r.error, is_error: true });
+        const r = validateProposal(use.input, ctx.db, ctx.products, ctx.now);
+        if (r.ok) proposals.push({ id: use.id, proposal: r.proposal });
+        else {
+          rejected = true;
+          results.push({ type: 'tool_result', tool_use_id: use.id, content: r.error, is_error: true });
+        }
       } else {
         results.push({ type: 'tool_result', tool_use_id: use.id, content: `Unknown tool ${use.name}.`, is_error: true });
       }
     }
 
-    if (proposal) {
-      const shown: Beta.BetaToolResultBlockParam = {
+    // Cards are shown all together or not at all, so the user never sees half a batch.
+    if (proposals.length && !rejected) {
+      const shown = proposals.map(({ proposal }): ShownProposal => ({ ...proposal, id: `M${++cards}` }));
+      const shownResults = proposals.map(({ id }, i): Beta.BetaToolResultBlockParam => ({
         type: 'tool_result',
-        tool_use_id: proposalId,
-        content: 'The proposal was shown to the user. They have not logged it; their reply follows.',
-      };
-      return done({ kind: 'proposal', text: textOf(res.content), proposal }, [...results, shown]);
+        tool_use_id: id,
+        content: `Shown to the user as card ${shown[i]!.id}. Not logged yet; their reply follows.`,
+      }));
+      return done({ kind: 'proposal', text: textOf(res.content), proposals: shown }, [...results, ...shownResults]);
+    }
+    for (const { id } of proposals) {
+      results.push({ type: 'tool_result', tool_use_id: id, content: 'Not shown: another proposal in this response had errors. Call propose_meal again for this meal too.', is_error: true });
     }
     messages.push({ role: 'user', content: results });
   }
   return done({ kind: 'error', reason: 'tooManySteps' });
+}
+
+/**
+ * The app's note on each user message: the current time and the chat's day (so "yesterday" and
+ * photo times can be placed), cards already logged or still open, and barcodes read from photos.
+ */
+export function appNote(o: { now: number; day: string; today: string; logged: string[]; open: string[]; barcodes: string[] }): string {
+  const parts = [`Now: ${fmtLocalDateTime(o.now)}.`];
+  if (o.day !== o.today) parts.push(`The user opened this chat for ${o.day}.`);
+  if (o.logged.length) parts.push(`Cards already logged: ${o.logged.join(', ')}.`);
+  if (o.open.length) parts.push(`Cards still open: ${o.open.join(', ')}.`);
+  if (o.barcodes.length) parts.push(`Barcodes the app read from the photos: ${o.barcodes.join(', ')}.`);
+  return `(${parts.join(' ')})`;
 }
