@@ -11,11 +11,11 @@ function vitC(id: string, day: string, mg: number, extra: Partial<ModelEntry> = 
   return { id, label: id, time: Date.parse(`${day}T12:00:00Z`), dayKey: day, confidence: 'A', isSupplement: true, parts: [], direct: { VITC: mg }, ...extra };
 }
 
-function run(imputeUnlogged: boolean, entries: ModelEntry[], from = DAYS[0]!, to = DAYS[4]!) {
+function run(imputeUnlogged: boolean, entries: ModelEntry[], from = DAYS[0]!, to = DAYS[4]!, dayStatus: SimulationInput['dayStatus'] = {}) {
   const input: SimulationInput = {
     days: DAYS,
     // 03 fasted; 04 nothing logged; 05 is today with nothing yet (pending).
-    dayStatus: { '2026-10-03': 'fasted' },
+    dayStatus: { '2026-10-03': 'fasted', ...dayStatus },
     entries,
     requirements: req,
     settings: { ...DEFAULT_MODEL_SETTINGS, imputeUnlogged },
@@ -31,7 +31,7 @@ const entries = [vitC('a', '2026-10-01', 100), vitC('b', '2026-10-02', 100)];
 describe('periodBreakdown', () => {
   it('averages logged intake over logged, fasted and (by default) unlogged days', () => {
     const p = run(false, entries);
-    expect(p.statusCounts).toEqual({ logged: 2, partial: 0, fasted: 1, unknown: 1, pending: 1 });
+    expect(p.statusCounts).toEqual({ logged: 2, partial: 0, fasted: 1, unknown: 1, filled: 0, excluded: 0, pending: 1 });
     expect(p.countedDays).toBe(4);
     expect(p.nutrients.get('VITC')!.averageIntake).toBeCloseTo(50);
   });
@@ -40,6 +40,15 @@ describe('periodBreakdown', () => {
     const p = run(true, entries);
     expect(p.countedDays).toBe(3);
     expect(p.nutrients.get('VITC')!.averageIntake).toBeCloseTo(200 / 3);
+  });
+
+  it('leaves out a day marked filled in or left out, whatever the setting', () => {
+    for (const st of ['filled', 'excluded'] as const) {
+      const p = run(false, entries, DAYS[0], DAYS[4], { '2026-10-04': st });
+      expect(p.statusCounts[st]).toBe(1);
+      expect(p.countedDays).toBe(3);
+      expect(p.nutrients.get('VITC')!.averageIntake).toBeCloseTo(200 / 3);
+    }
   });
 
   it('covers only the chosen range and compares absorbed amounts with the absorbed need', () => {

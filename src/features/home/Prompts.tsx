@@ -38,6 +38,9 @@ export function Prompts() {
           <button className="btn btn-small" onClick={() => repo.setDayStatus(yesterday, 'fasted')}>
             {t('prompt.fasted')}
           </button>
+          <button className="btn btn-small" onClick={() => repo.setDayStatus(yesterday, 'excluded')}>
+            {t('prompt.leaveOut')}
+          </button>
           <button className="btn btn-small btn-ghost" onClick={() => repo.setMeta(`nudge:${yesterday}`, true)}>
             {t('prompt.notLogged')}
           </button>

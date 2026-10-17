@@ -184,7 +184,8 @@ export interface CustomFood extends Versioned {
 
 export interface DayStatusRecord extends Versioned {
   day: string;
-  status: 'logged' | 'partial' | 'fasted';
+  /** filled / excluded override "Fill in unlogged days" for this one day. */
+  status: 'logged' | 'partial' | 'fasted' | 'filled' | 'excluded';
 }
 
 export interface Fast extends Versioned {

@@ -144,7 +144,7 @@ export const productSchema = z
   })
   .describe('A food from an online database, as fetched: a packaged product from Open Food Facts (ODbL) or a food from USDA FoodData Central (public domain)');
 
-export const dayStatusSchema = z.object({ day, ...versioned, status: z.enum(['logged', 'partial', 'fasted']) });
+export const dayStatusSchema = z.object({ day, ...versioned, status: z.enum(['logged', 'partial', 'fasted', 'filled', 'excluded']) });
 export const fastSchema = z.object({ id: z.string(), ...versioned, startDay: day, endDay: day.optional() });
 export const sunEntrySchema = z.object({ id: z.string(), ...versioned, day, startHour: z.number().min(0).max(24), minutes: z.number().nonnegative(), skin });
 

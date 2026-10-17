@@ -8,7 +8,7 @@ import { Icon } from '../../ui/Icon';
 import { isOn } from '../../settings/features';
 import { DAY_ICON } from './dayStatus';
 
-const STATUSES: Array<DayStatus | 'pending'> = ['logged', 'partial', 'fasted', 'unknown'];
+const STATUSES: Array<DayStatus | 'pending'> = ['logged', 'partial', 'fasted', 'unknown', 'filled', 'excluded'];
 
 /** Month view of day statuses; tap a day to open it in the diary. Route: #/calendar[/YYYY-MM]. */
 export function CalendarPage({ month: monthParam }: { month?: string }) {
@@ -68,7 +68,7 @@ export function CalendarPage({ month: monthParam }: { month?: string }) {
       </div>
 
       <ul className="calendar-legend plain-list">
-        {STATUSES.map((s) => (
+        {STATUSES.filter((s) => (s !== 'filled' && s !== 'excluded') || counts[s]).map((s) => (
           <li key={s} className={`day-${s}`}>
             <Icon name={DAY_ICON[s]} size={16} /> {t(`day.${s}` as MessageKey)} · {counts[s] ?? 0}
           </li>

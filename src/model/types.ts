@@ -41,7 +41,12 @@ export interface ModelEntry {
   modifiers?: { tea?: boolean; coffee?: boolean };
 }
 
-export type DayStatus = 'logged' | 'partial' | 'fasted' | 'unknown';
+/**
+ * logged: complete; partial: some meals missing; fasted: nothing eaten; unknown: no entries (follows "Fill in unlogged days").
+ * Per-day overrides of that setting: filled (ate as usual, filled in from recent intake) and excluded (left out of
+ * averages and reviews; stores still assume recent intake, since the body kept using them that day).
+ */
+export type DayStatus = 'logged' | 'partial' | 'fasted' | 'unknown' | 'filled' | 'excluded';
 
 export interface ModelSettings {
   absorption: boolean;

@@ -1354,7 +1354,9 @@
                     "enum": [
                       "logged",
                       "partial",
-                      "fasted"
+                      "fasted",
+                      "filled",
+                      "excluded"
                     ]
                   }
                 },
