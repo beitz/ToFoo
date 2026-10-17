@@ -87,7 +87,8 @@ export type FeatureKey =
   | 'voiceInput'
   | 'journal'
   | 'sleep'
-  | 'activity';
+  | 'activity'
+  | 'water';
 
 export interface Settings extends Versioned {
   id: 'settings';
@@ -256,6 +257,20 @@ export type Intensity = (typeof INTENSITIES)[number];
  * One activity (docs/SPEC.md, "Activity"): what, when, how long, roughly how hard, and whether it
  * was outside. No energy burned (that needs a sourced table of activity energy costs).
  */
+/**
+ * Plain water drunk (docs/SPEC.md, "Water"): tap, mineral or sparkling water without anything in it.
+ * Kept apart from the food log, so it never ends a fast or makes a day count as eaten; drinks with
+ * nutrients (juice, milk, coffee) are logged as foods, and their water is counted from the BLS.
+ */
+export interface WaterRecord extends Versioned {
+  id: string;
+  /** Epoch ms it was drunk. */
+  time: number;
+  /** Local calendar day of `time` (YYYY-MM-DD). */
+  day: string;
+  ml: number;
+}
+
 export interface ActivityRecord extends Versioned {
   id: string;
   kind: ActivityKind;

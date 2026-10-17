@@ -15,6 +15,7 @@ import { parseLocalDateTime } from './photoTime';
 import { fmtNumber } from '../lib/format';
 import { MAX_SLEEP_MS } from '../logic/sleep';
 import { MAX_ACTIVITY_MINUTES } from '../logic/activity';
+import { MAX_WATER_ML } from '../logic/water';
 import type { Preparation } from '../model/paramTypes';
 import type { RawValue } from '../model/types';
 import type { SkinExposure } from '../model/sun';
@@ -127,6 +128,21 @@ export interface ActivityProposal {
   replaces?: string;
 }
 
+export const waterProposalInput = z.object({
+  ml: z.number(),
+  /** Local "YYYY-MM-DD HH:MM" it was drunk (or the middle of the time it was drunk over); empty for now. */
+  time: z.string().optional(),
+  /** Id of the open water card this replaces (e.g. "W1"); empty for a new one. */
+  replaces: z.string().optional(),
+});
+
+/** Plain water the assistant proposes, for the user to check. */
+export interface WaterProposal {
+  ml: number;
+  time?: number;
+  replaces?: string;
+}
+
 /** Longest proposed journal entry: a few paragraphs, not a transcript of the whole chat. */
 const MAX_JOURNAL_CHARS = 4000;
 
@@ -197,6 +213,8 @@ export interface ToolContext {
   sleep?: boolean;
   /** Activity is on: the assistant may propose activities. */
   activity?: boolean;
+  /** Water is on: the assistant may propose plain water. */
+  water?: boolean;
 }
 
 /** Which online sources the assistant is offered (decides the prompt and tool variant). */
@@ -205,8 +223,9 @@ export function sourcesOf(
   journal = false,
   sleep = false,
   activity = false,
-): { off: boolean; usda: boolean; webSearch: boolean; journal: boolean; sleep: boolean; activity: boolean } {
-  return { off: !!products?.find, usda: !!products?.searchUsda, webSearch: !!products?.find && !!products.webSearch, journal, sleep, activity };
+  water = false,
+): { off: boolean; usda: boolean; webSearch: boolean; journal: boolean; sleep: boolean; activity: boolean; water: boolean } {
+  return { off: !!products?.find, usda: !!products?.searchUsda, webSearch: !!products?.find && !!products.webSearch, journal, sleep, activity, water };
 }
 
 const LABEL_FIELDS: Array<[string, string, string]> = [
@@ -383,6 +402,21 @@ export function validateActivityProposal(input: unknown, now?: number): { ok: tr
       ...(replaces ? { replaces } : {}),
     },
   };
+}
+
+/** Check a `propose_water` call: a plausible amount at a plausible time. */
+export function validateWaterProposal(input: unknown, now?: number): { ok: true; proposal: WaterProposal } | { ok: false; error: string } {
+  const parsed = waterProposalInput.safeParse(input);
+  if (!parsed.success) return { ok: false, error: `Invalid input: ${parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}` };
+  const problems: string[] = [];
+  const { ml } = parsed.data;
+  if (!(ml > 0)) problems.push('ml must be more than 0.');
+  else if (ml > MAX_WATER_ML) problems.push(`ml is ${ml}, more than ${MAX_WATER_ML} in one card; split it over the day (one card per part of the day).`);
+  const { time, problem } = checkTime(parsed.data.time, now);
+  if (problem) problems.push(problem);
+  if (problems.length) return { ok: false, error: `${problems.join('\n')}\nFix these and call propose_water again.` };
+  const replaces = parsed.data.replaces?.trim();
+  return { ok: true, proposal: { ml: Math.round(ml), ...(time !== undefined ? { time } : {}), ...(replaces ? { replaces } : {}) } };
 }
 
 /** A product the assistant may use: looked up in this conversation or saved on this phone. */

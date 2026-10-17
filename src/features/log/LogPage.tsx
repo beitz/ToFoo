@@ -25,6 +25,7 @@ import { entryAmount } from './describe';
 import { logMealAgain, mealTitle } from './logAgain';
 import { recentMeals } from '../../logic/repeat';
 import { refKey } from '../../lib/refs';
+import { WaterSheet } from '../water/WaterSheet';
 
 type Selected =
   | { kind: 'food'; food: Food }
@@ -41,6 +42,7 @@ const RECENT_PRODUCTS = 6;
 export function LogPage({ day: dayParam, foodCode }: { day?: string; foodCode?: string }) {
   const d = useData();
   const toast = useToast();
+  const [addingWater, setAddingWater] = useState(false);
   const day = dayParam && /^\d{4}-\d{2}-\d{2}$/.test(dayParam) ? dayParam : d.today;
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<Selected>(() => {
@@ -259,8 +261,14 @@ export function LogPage({ day: dayParam, foodCode }: { day?: string; foodCode?: 
             <button className="btn btn-secondary" onClick={() => void addDrink('coffee')}>
               <Icon name="cup" /> {t('log.coffee')}
             </button>
+            {isOn(d.settings.features, 'water') && (
+              <button className="btn btn-secondary" onClick={() => setAddingWater(true)}>
+                <Icon name="drop" /> {t('water.short')}
+              </button>
+            )}
           </div>
           <p className="muted small">{t('log.drinksHint')}</p>
+          {addingWater && <WaterSheet defaultTime={mealTime} onClose={() => setAddingWater(false)} />}
 
           {d.customFoods.length > 0 && (
             <>

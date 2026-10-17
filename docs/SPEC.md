@@ -222,7 +222,9 @@ Confidence is shown as a small marker on entries and widens the uncertainty rang
 - **Favourite foods**: pin BLS foods, packaged products and saved items used all the time (oats, a certain bread) with "Add to favourites" on the amount sheet, so they stay at the top of the log screen instead of dropping out of "Recent". Stored in the settings (and so in backups).
 - **Home-screen shortcuts**: long-press the app icon for "Log meal", "Start fast" and "Write in journal" (web manifest `shortcuts`). "Start fast" starts a fast today, with undo, and opens Home.
 
-**Water** (decided 2026-10-16): drinks can be logged as water amounts with one tap (e.g. +250 ml), and the water in foods counts too (BLS has water content per food). Shown as an amount-only or rolling gauge against a DGE guide value for water; the reference value still needs to be taken from the DGE tables with a source.
+**Water** (decided 2026-10-16): drinks can be logged as water amounts with one tap (e.g. +250 ml), and the water in foods counts too (BLS has water content per food). Shown as an amount-only or rolling gauge against a DGE guide value for water.
+
+Built 2026-10-17 (optional module "Water", off by default): plain water (tap, mineral, sparkling, nothing added) is stored apart from the food log (`data.water` in backups), so it never ends a fast or makes a day count as eaten. Every other drink is logged as a food, and its water comes from the BLS like the water in solid food. A water card on Home (today) and in the diary (any day) shows plain water + water in food and other drinks against the DGE guide value for the user's age group: drinks + solid food, 2,360 / 2,270 / 1,970 / 1,990 ml for 19–24 / 25–50 / 51–64 / 65+ (DGE Richtwerte, derived 2000, not split by sex; oxidation water is part of the DGE total but is not logged, so it is left out on both sides). "+ 250 ml" adds a glass now; tapping the card adds another amount; the log screen has a Water button too. The assistant proposes water cards (W1, W2, …) for plain water and puts other drinks in meals. Items without a water value (some products, manual entries, tea and coffee marks without an amount) are counted and shown, and the total then reads "≥". Water taken up in cooking by foods logged raw is not counted (docs/OPEN_QUESTIONS.md). The guide value assumes average energy needs and climate; DGE says more is needed with heat, high energy turnover or illness.
 
 **Journal** (replaces the day notes decided 2026-10-16): free-text entries at any time, see "Journal, sleep and activity".
 
@@ -271,7 +273,7 @@ Logging should feel like telling a friend what you ate, not operating a database
 
 **Voice input** (built 2026-10-17, opt-in setting "Voice input"): a microphone button in the assistant chat, for talking instead of typing, including while looking through the chosen photos in a full-screen viewer (tap a thumbnail; swipe or arrows to move, the mic stays at hand). The recording goes to OpenAI's transcription API (`gpt-4o-transcribe`) with the user's own OpenAI key, kept on the phone like the Anthropic key and out of backups; the text lands in the chat box to check and edit before sending. Why OpenAI: the Claude API takes no audio, the phone keyboard's dictation was unreliable for the owner (mishearing, no punctuation, often not starting), and on-device Whisper in the browser means a large download, slow transcription on a phone and weaker mixed German/English. Cost: about $0.006 per minute of speech. Nothing is sent until the user taps the microphone; recordings are not stored.
 
-**Everything at once** (owner's goal, 2026-10-17): open the app every day or two, talk for as long as needed and add photos of anything (meals, packaging, barcodes), and the assistant turns the whole dump into the right entries: meals as cards at their own times, journal entries in the user's words, sleep (see "Sleep"), activities (see "Activity"), and later drinks. Built so far (2026-10-17):
+**Everything at once** (owner's goal, 2026-10-17): open the app every day or two, talk for as long as needed and add photos of anything (meals, packaging, barcodes), and the assistant turns the whole dump into the right entries: meals as cards at their own times, journal entries in the user's words, sleep (see "Sleep"), activities (see "Activity") and plain water (see "Water"); other drinks are foods in meals. Built so far (2026-10-17):
 
 - Long recordings are recorded in parts (2 to 4 minutes each, cut at a pause in speech) and each part is typed up while the user keeps talking; later parts get the end of the text so far as context. Reason: `gpt-4o-transcribe` writes at most 2,000 tokens per request, so a single recording longer than about 8–9 minutes came back cut off without an error. A part that fails is retried twice; if it still fails, the parts after it wait (so the text never comes out of order) and the user can try again or drop that part. Sending waits until all parts are in.
 - The assistant is told when the text was dictated (expect misheard food names and spoken corrections), to go through the whole message and propose everything in it, and to give every item its own time: what the user said first, then photo times, counting "this morning" or "yesterday" from the current time.
@@ -427,6 +429,7 @@ Optional features are modules with an on/off switch, so the app can be tuned bet
 | Journal | On | Free-text entries at any time: pen button on Home, diary, assistant |
 | Sleep | Off | Sleep and wake times: buttons, shortcuts, morning question |
 | Activity | Off | Simple activity log; outdoor activity feeds the sun estimate |
+| Water | Off | Plain water with one tap or via the assistant, plus water in foods, against the DGE guide value |
 | Insights | Off | With the assistant on: look for patterns across journal, food, sleep and activity (sends the journal text to Anthropic) |
 | Recipe ideas | Off | With the assistant on: recipe suggestions for your gaps and preferences (sends nutrient statuses, recipe and food names, and your preferences text to Anthropic when you ask) |
 
@@ -496,7 +499,7 @@ v1 is the smallest app that is useful every day; each later version adds to the 
 - [x] Day and range nutrient breakdown; calendar of day statuses (built 2026-10-16)
 - [x] Edit a logged entry, including replacing its food by search or barcode (built 2026-10-17)
 - [ ] Trends and weekly look-back
-- [ ] Water
+- [x] Water: plain water with one tap or through the assistant, water in foods from the BLS, against the DGE guide value (built 2026-10-17)
 - [ ] Nice to have: fasting timer; "eat soon" flag for fridge portions (needs a shelf-life source)
 
 **Journal, sleep and activity** (owner's request 2026-10-17), in this order:

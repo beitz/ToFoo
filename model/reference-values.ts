@@ -13,7 +13,7 @@
  * "Overview on Tolerable Upper Intake Levels", version 11 (August 2025). "Checked" in a note means the
  * value was compared with that primary source on that date.
  */
-import type { InfoOnly, ReferenceValue } from '../src/model/paramTypes';
+import type { ByAge, Cited, InfoOnly, ReferenceValue } from '../src/model/paramTypes';
 
 const DGE = 'DGE/ÖGE Referenzwerte für die Nährstoffzufuhr, 3. Auflage 2025';
 const dgeUrl = (page: string) => `https://www.dge.de/wissenschaft/referenzwerte/${page}/`;
@@ -563,6 +563,34 @@ export const infoOnly: InfoOnly[] = [
   { nutrient: 'CHO', note: 'DGE guide: more than 50 % of energy. Shown as amount and share of energy, without a status.' },
   { nutrient: 'SUGAR', note: 'BLS gives total sugars; the WHO/DGE limits refer to free sugars, which BLS does not separate.' },
 ];
+
+/** Water guide values (Richtwerte), ml per day by age group; not split by sex. */
+export interface WaterGuide extends Cited {
+  kind: 'guide';
+  year: number;
+  /** Water from drinks. */
+  drinks: ByAge;
+  /** Water in solid food. */
+  food: ByAge;
+  /** Water the body makes when it burns food: part of the DGE total, but nothing the user logs. */
+  oxidation: ByAge;
+}
+
+/**
+ * Water (docs/SPEC.md, "Water"). The app measures drinks + water in food (BLS `WATER`, g ≈ ml), so
+ * it compares with drinks + food, not with the total that includes oxidation water.
+ */
+export const waterGuide: WaterGuide = {
+  kind: 'guide',
+  year: 2000,
+  drinks: [1470, 1410, 1230, 1310],
+  food: [890, 860, 740, 680],
+  oxidation: [340, 330, 280, 260],
+  source: `${DGE}, Wasser (Richtwerte für die Wasserzufuhr)`,
+  url: dgeUrl('wasser'),
+  confidence: 'medium',
+  note: 'Totals 2700 / 2600 / 2250 / 2250 ml with oxidation water. DGE bases them on an energy turnover of 11.1 MJ (2650 kcal) in an average German climate; more is needed with high energy turnover, heat, dry cold air, a lot of salt or protein, fever, vomiting or diarrhoea. Checked against the DGE page on 2026-10-17.',
+};
 
 /** Date the values above were checked against the primary sources. */
 export const REFERENCE_VALUES_TAKEN = '2026-10-15';

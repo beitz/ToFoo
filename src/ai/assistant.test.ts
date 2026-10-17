@@ -3,7 +3,7 @@ import type * as Beta from '@anthropic-ai/sdk/resources/beta/messages/messages';
 import type { Food } from '../foods/foodDb';
 import { buildIndex } from '../foods/search';
 import { appNote, emptyConversation, requestParams, sendMessage, textOf, type CreateMessage } from './assistant';
-import { describeFood, MAX_ITEM_GRAMS, runLookupBarcode, runSearchFoods, runSearchUsda, validateJournalProposal, validateProposal, validateSleepProposal, validateActivityProposal, type ProductTools, type ToolContext } from './tools';
+import { describeFood, MAX_ITEM_GRAMS, runLookupBarcode, runSearchFoods, runSearchUsda, validateJournalProposal, validateProposal, validateSleepProposal, validateActivityProposal, validateWaterProposal, type ProductTools, type ToolContext } from './tools';
 import type { Product } from '../storage/types';
 import type { FindResult } from '../foods/findProduct';
 
@@ -529,5 +529,33 @@ describe('activity', () => {
       proposal: { kind: 'walk', start: new Date(2026, 9, 17, 12, 30).getTime(), minutes: 45, outside: false, replaces: 'A1' },
     });
     expect(validateActivityProposal(activity({ skin: 'armsLegs' }), now)).toMatchObject({ ok: true, proposal: { skin: 'armsLegs' } });
+  });
+});
+
+describe('water', () => {
+  const now = new Date(2026, 9, 17, 20, 0).getTime();
+
+  it('offers propose_water only with water on, and keeps other drinks in meals', () => {
+    const names = (on: boolean) => (requestParams('claude-opus-5-5', [], { water: on }).tools ?? []).map((t) => ('name' in t ? t.name : ''));
+    expect(names(false)).not.toContain('propose_water');
+    expect(names(true)).toContain('propose_water');
+    expect(String(requestParams('claude-opus-5-5', [], { water: true }).system)).toContain('Every other drink');
+  });
+
+  it('shows water cards next to the others', async () => {
+    const api = scripted(reply([toolUse('w', 'propose_water', { ml: 500, time: '2026-10-17 10:00', replaces: '' }), toolUse('v', 'propose_water', { ml: 750, time: '', replaces: '' })], 'tool_use'));
+    const { conversation, outcome } = await sendMessage(api.create, 'claude-opus-5-5', emptyConversation(), { text: 'half a litre at 10, then 750 ml', images: [] }, { ...ctx, now, water: true });
+    expect(outcome.kind === 'proposal' && outcome.waters).toEqual([
+      { id: 'W1', ml: 500, time: new Date(2026, 9, 17, 10, 0).getTime() },
+      { id: 'W2', ml: 750 },
+    ]);
+    expect(conversation.waters).toBe(2);
+  });
+
+  it('checks water: an amount within one card, at a plausible time', () => {
+    expect(validateWaterProposal({ ml: 0, time: '', replaces: '' }, now)).toMatchObject({ ok: false });
+    expect(validateWaterProposal({ ml: 4000, time: '', replaces: '' }, now)).toMatchObject({ ok: false });
+    expect(validateWaterProposal({ ml: 250, time: '2026-10-18 09:00', replaces: '' }, now)).toMatchObject({ ok: false });
+    expect(validateWaterProposal({ ml: 249.6, time: '', replaces: 'W1' }, now)).toEqual({ ok: true, proposal: { ml: 250, replaces: 'W1' } });
   });
 });

@@ -171,6 +171,10 @@ export const activitySchema = z
   })
   .describe('One activity: what, when (epoch ms), how long, roughly how hard, outside or not; sunSkin when it counts toward the vitamin D sun estimate');
 
+export const waterSchema = z
+  .object({ id: z.string(), ...versioned, time: z.number(), day, ml: z.number().nonnegative() })
+  .describe('Plain water drunk: when (epoch ms) and how much (ml); drinks with nutrients are food log entries');
+
 const header = {
   format: z.literal('tofoo', { error: 'not a ToFoo file (expected "format": "tofoo")' }),
   formatVersion: z.number().int().positive(),
@@ -195,6 +199,7 @@ export const backupSchema = z.object({
     journal: z.array(journalEntrySchema).default([]),
     sleep: z.array(sleepRecordSchema).default([]),
     activities: z.array(activitySchema).default([]),
+    water: z.array(waterSchema).default([]),
   }),
 });
 
