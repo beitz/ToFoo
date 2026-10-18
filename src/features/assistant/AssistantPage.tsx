@@ -49,6 +49,7 @@ import { sleepProblem } from '../sleep/SleepSheet';
 import { durationText, spanText } from '../sleep/format';
 import { waterText } from '../water/format';
 import { waterProblem } from '../water/WaterSheet';
+import { IngredientSheet } from '../recipes/IngredientSheet';
 import { ActivityForm, activityName, DEFAULT_ACTIVITY_SKIN, recordOf, type ActivityDraft } from '../activity/ActivityForm';
 
 type Bubble = { role: 'user'; text: string; previews: string[] } | { role: 'assistant'; text: string } | { role: 'card'; id: string };
@@ -77,7 +78,7 @@ export interface RecipeChat {
   /** What the recipe has right now, for the assistant. */
   soFar: () => RecipeSoFar;
   /** Add confirmed ingredients (the name and portions only where the recipe has none yet); returns its undo. */
-  add: (p: { name: string; portions?: number; items: ProposedItem[] }) => () => void;
+  add: (p: { name: string; portions?: number; items: ProposedItem[]; instructions?: string }) => () => void;
   /** Every card in the chat was added: back to the editor. */
   done: () => void;
 }
@@ -1045,9 +1046,12 @@ function IngredientsCard({ card, toast, onLogged, register, recipe }: CardProps<
   const { ingredients: proposal } = card;
   const d = useData();
   const [items, setItems] = useState<Array<Omit<ProposedItem, 'grams'> & { grams: number | undefined }>>(proposal.items);
+  const [instructions, setInstructions] = useState(proposal.instructions ?? '');
+  /** The item open in the ingredient sheet (change its food, amount or preparation). */
+  const [editing, setEditing] = useState<number>();
   const [saving, setSaving] = useState(false);
   const [count, setCount] = useState(proposal.items.length);
-  const valid = !!recipe && items.length > 0 && items.every((i) => i.grams && i.grams > 0);
+  const valid = !!recipe && (items.length > 0 || !!instructions.trim()) && items.every((i) => i.grams && i.grams > 0);
   const kcal = items.reduce((sum, i) => {
     const v = i.food.per100.ENERCC;
     return typeof v === 'number' && i.grams ? sum + (v * i.grams) / 100 : sum;
@@ -1066,9 +1070,9 @@ function IngredientsCard({ card, toast, onLogged, register, recipe }: CardProps<
     } finally {
       setSaving(false);
     }
-    const undo = recipe.add({ name: proposal.name, portions: proposal.portions, items: items.map((it) => ({ ...it, grams: it.grams! })) });
+    const undo = recipe.add({ name: proposal.name, portions: proposal.portions, items: items.map((it) => ({ ...it, grams: it.grams! })), instructions });
     setCount(items.length);
-    onLogged(true, { items: items.map(itemSummary) });
+    onLogged(true, { items: items.map(itemSummary), ...(instructions.trim() ? { instructions: instructions.trim() } : {}) });
     return async () => {
       undo();
       onLogged(false);
@@ -1078,7 +1082,7 @@ function IngredientsCard({ card, toast, onLogged, register, recipe }: CardProps<
 
   async function add() {
     const undo = await save();
-    if (undo) toast(t('ai.ingredientsAdded', { n: items.length }), undo);
+    if (undo) toast(items.length ? t('ai.ingredientsAdded', { n: items.length }) : t('ai.stepsAdded'), undo);
   }
 
   const title = proposal.name || t('ai.ingredientsTitle');
@@ -1086,7 +1090,7 @@ function IngredientsCard({ card, toast, onLogged, register, recipe }: CardProps<
     return (
       <div className="card proposal-done row">
         <Icon name="check" size={18} />
-        <span>{t('ai.ingredientsDone', { n: count })}</span>
+        <span>{count ? t('ai.ingredientsDone', { n: count }) : t('ai.stepsDone')}</span>
       </div>
     );
   }
@@ -1105,14 +1109,11 @@ function IngredientsCard({ card, toast, onLogged, register, recipe }: CardProps<
       <ul className="plain-list">
         {items.map((it, i) => (
           <li key={`${it.food.code}-${i}`} className="proposal-item">
-            <div className="proposal-name">
-              {it.product ? (
-                <a href={productPageUrl(it.product)} target="_blank" rel="noreferrer">
-                  {productLabel(it.product)}
-                </a>
-              ) : (
-                <span>{it.food.nameEn}</span>
-              )}
+            {/* Tap to change the food (another BLS food, a product, USDA, a barcode), amount or preparation. */}
+            <button className="proposal-name ingredient-name" onClick={() => setEditing(i)} aria-label={t('recipes.changeIngredient', { name: it.product ? productLabel(it.product) : it.food.nameEn })}>
+              <span className="link-like">
+                {it.product ? productLabel(it.product) : it.food.nameEn} <Icon name="edit" size={14} />
+              </span>
               <span className="muted small block">
                 {it.note || it.food.nameDe}
                 {it.preparation !== 'asListed' && ` · ${t(`prep.${it.preparation}` as MessageKey)}`}
@@ -1120,7 +1121,7 @@ function IngredientsCard({ card, toast, onLogged, register, recipe }: CardProps<
               {it.product?.match && (
                 <span className="muted small block">{t('ai.microsFrom', { name: d.foods.byCode.get(it.product.match.code)?.nameEn ?? it.product.match.code })}</span>
               )}
-            </div>
+            </button>
             <NumberInput value={it.grams} onChange={(g) => setItems((all) => all.map((x, j) => (j === i ? { ...x, grams: g } : x)))} suffix="g" min={0} />
             <button className="icon-btn" aria-label={t('ai.removeItem', { name: it.food.nameEn })} onClick={() => setItems((all) => all.filter((_, j) => j !== i))}>
               <Icon name="trash" size={18} />
@@ -1128,6 +1129,21 @@ function IngredientsCard({ card, toast, onLogged, register, recipe }: CardProps<
           </li>
         ))}
       </ul>
+      {editing !== undefined && items[editing] && (
+        <IngredientSheet
+          key={editing}
+          initial={items[editing]!}
+          onSave={(saved) => {
+            setItems((all) => all.map((x, j) => (j === editing ? { ...x, ...saved, product: saved.product } : x)));
+            setEditing(undefined);
+          }}
+          onRemove={() => {
+            setItems((all) => all.filter((_, j) => j !== editing));
+            setEditing(undefined);
+          }}
+          onClose={() => setEditing(undefined)}
+        />
+      )}
       {proposal.assumptions.length > 0 && (
         <div className="small">
           <span className="muted">{t('ai.assumptions')}</span>
@@ -1138,11 +1154,24 @@ function IngredientsCard({ card, toast, onLogged, register, recipe }: CardProps<
           </ul>
         </div>
       )}
+      {proposal.instructions !== undefined && (
+        <div className="field">
+          <label htmlFor={`steps-${proposal.id}`}>{t('recipes.instructions')}</label>
+          <textarea
+            id={`steps-${proposal.id}`}
+            className="note-text steps-text"
+            rows={4}
+            value={instructions}
+            onChange={(e) => setInstructions(e.target.value)}
+          />
+          <div className="field-hint">{t('ai.stepsReplace')}</div>
+        </div>
+      )}
       <p className="muted small">{t('ai.correctHintRecipe')}</p>
       <div className="sheet-actions">
-        <span className="muted">{t('ai.kcalInAll', { kcal: fmtNumber(kcal) })}</span>
+        {items.length > 0 && <span className="muted">{t('ai.kcalInAll', { kcal: fmtNumber(kcal) })}</span>}
         <button className="btn btn-primary" disabled={!valid || saving} onClick={() => void add()}>
-          {t('ai.addIngredients', { n: items.length })}
+          {items.length ? t('ai.addIngredients', { n: items.length }) : t('ai.addSteps')}
         </button>
       </div>
     </div>

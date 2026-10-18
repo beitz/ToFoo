@@ -105,6 +105,7 @@ export const recipeRecordSchema = z.object({
   name: z.string().min(1),
   portions: z.number().int().positive(),
   ingredients: z.array(ingredient),
+  instructions: z.string().optional(),
   notes: z.string().optional(),
   tags: z.array(z.string()),
   defaultPlan: plan.optional(),

@@ -598,10 +598,23 @@ describe('the recipe editor assistant', () => {
     expect(!v({ items: [{ code: 'X1', grams: 10, preparation: 'raw', note: '' }] }).ok).toBe(true);
   });
 
+  it('takes preparation steps, alone or with ingredients, but never an empty card', () => {
+    const v = (over: object) => validateIngredientsProposal(ingredients(over), db);
+    const steps = v({ items: [], instructions: ' 1. Fry the onions.\n2. Simmer. ' });
+    expect(steps.ok && [steps.proposal.items.length, steps.proposal.instructions]).toEqual([0, '1. Fry the onions.\n2. Simmer.']);
+    const none = v({ instructions: '' });
+    expect(none.ok && none.proposal).not.toHaveProperty('instructions');
+    expect(!v({ items: [], instructions: '' }).ok && (v({ items: [], instructions: '' }) as { error: string }).error).toContain('items is empty');
+    expect(requestParams('claude-opus-5-5', [], { recipe: true }).system).toContain('Preparation steps');
+  });
+
   it('tells the assistant what the recipe already has, instead of the day', () => {
     const now = new Date(2026, 9, 18, 10, 0).getTime();
     expect(appNote({ now, day: '2026-10-17', today: '2026-10-18', logged: ['R1'], open: [], barcodes: [], recipe: { name: 'Dal', portions: 4, ingredients: ['Lentils, dried 250 g, boiled'] } })).toBe(
-      '(Now: Sun 2026-10-18 10:00. The recipe in the editor: name "Dal", 4 portions; ingredients: Lentils, dried 250 g, boiled. Cards already added to the recipe: R1.)',
+      '(Now: Sun 2026-10-18 10:00. The recipe in the editor: name "Dal", 4 portions; ingredients: Lentils, dried 250 g, boiled; no steps yet. Cards already added to the recipe: R1.)',
+    );
+    expect(appNote({ now, day: '2026-10-18', today: '2026-10-18', logged: [], open: [], barcodes: [], recipe: { name: 'Dal', ingredients: [], instructions: '1. Fry the onions.\n2. Add lentils.' } })).toContain(
+      'no ingredients yet; steps:\n1. Fry the onions.\n2. Add lentils.\n',
     );
     expect(appNote({ now, day: '2026-10-18', today: '2026-10-18', logged: [], open: [], barcodes: [], recipe: { name: '', ingredients: [] } })).toContain('no name yet, portions not set; no ingredients yet');
   });

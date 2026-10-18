@@ -302,6 +302,8 @@ export interface RecipeSoFar {
   portions?: number;
   /** One line per ingredient, e.g. "Red lentils, dried 250 g, boiled". */
   ingredients: string[];
+  /** The preparation steps so far. */
+  instructions?: string;
 }
 
 /**
@@ -315,7 +317,7 @@ export function appNote(o: { now: number; day: string; today: string; logged: st
   if (o.recipe) {
     const r = o.recipe;
     const head = [r.name ? `name "${r.name}"` : 'no name yet', r.portions ? `${r.portions} portions` : 'portions not set'].join(', ');
-    parts.push(`The recipe in the editor: ${head}; ${r.ingredients.length ? `ingredients: ${r.ingredients.join('; ')}` : 'no ingredients yet'}.`);
+    parts.push(`The recipe in the editor: ${head}; ${r.ingredients.length ? `ingredients: ${r.ingredients.join('; ')}` : 'no ingredients yet'}; ${r.instructions?.trim() ? `steps:\n${r.instructions.trim()}\n` : 'no steps yet.'}`);
   } else if (o.day !== o.today) parts.push(`The user opened this chat for ${o.day}.`);
   if (o.logged.length) parts.push(`Cards already ${o.recipe ? 'added to the recipe' : 'logged'}: ${o.logged.join(', ')}.`);
   if (o.open.length) parts.push(`Cards still open: ${o.open.join(', ')}.`);
