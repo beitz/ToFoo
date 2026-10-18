@@ -111,7 +111,22 @@ export interface Settings extends Versioned {
   homeCollapsed?: Record<string, boolean>;
   /** Foods pinned to the top of the log screen, in the order they were added. */
   favourites?: FoodRef[];
+  /** Whole meals pinned to the top of the log screen; one tap logs them again. */
+  favouriteMeals?: FavouriteMeal[];
+  /** Log screen sections the user closed (true) or opened (false), by section key; unset = open. */
+  logCollapsed?: Record<string, boolean>;
 }
+
+/**
+ * A pinned meal: its items as they were logged, without time and day. `offsetMinutes` keeps each
+ * item's spacing before the meal's last item (a tea 30 minutes after the food stays 30 minutes after it).
+ */
+export interface FavouriteMeal {
+  id: string;
+  items: FavouriteMealItem[];
+}
+
+export type FavouriteMealItem = DistributiveOmit<LogEntry, 'id' | 'schemaVersion' | 'time' | 'day'> & { offsetMinutes: number };
 
 export interface StoragePlan {
   fresh: number;

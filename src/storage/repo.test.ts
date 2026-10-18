@@ -2,7 +2,7 @@ import 'fake-indexeddb/auto';
 import { describe, expect, it } from 'vitest';
 import { ToFooDB } from './db';
 import { createRepo } from './repo';
-import type { Recipe } from './types';
+import type { FavouriteMeal, Recipe } from './types';
 
 let n = 0;
 const fresh = async () => {
@@ -130,5 +130,19 @@ describe('repository', () => {
     expect((await repo.getSettings())!.favourites).toEqual([oats, { source: 'custom', id: 'x' }]);
     expect(await repo.toggleFavourite({ ...oats, version: '4.1' })).toBe(false);
     expect((await repo.getSettings())!.favourites).toEqual([{ source: 'custom', id: 'x' }]);
+  });
+
+  it('pins favourite meals, puts a removed one back in place, and keeps them in backups', async () => {
+    const repo = await fresh();
+    const meal = (id: string): FavouriteMeal => ({ id, items: [{ kind: 'drink', drink: 'tea', confidence: 'A', label: 'Tea', offsetMinutes: 0 }] });
+    await repo.addFavouriteMeal(meal('a'));
+    await repo.addFavouriteMeal(meal('b'));
+    await repo.addFavouriteMeal(meal('c'));
+    await repo.removeFavouriteMeal('b');
+    await repo.addFavouriteMeal(meal('b'), 1);
+    expect((await repo.getSettings())!.favouriteMeals!.map((m) => m.id)).toEqual(['a', 'b', 'c']);
+    const b = await fresh();
+    await b.restore(await repo.snapshot());
+    expect((await b.getSettings())!.favouriteMeals).toEqual([meal('a'), meal('b'), meal('c')]);
   });
 });

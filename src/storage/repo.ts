@@ -11,6 +11,7 @@ import {
   type Batch,
   type CustomFood,
   type DayStatusRecord,
+  type FavouriteMeal,
   type FoodRef,
   type Fast,
   type JournalEntry,
@@ -86,6 +87,22 @@ export function createRepo(db: ToFooDB) {
         const on = list.some((r) => refKey(r) === key);
         await db.settings.put({ ...s, favourites: on ? list.filter((r) => refKey(r) !== key) : [...list, ref], id: 'settings', schemaVersion: v });
         return !on;
+      });
+    },
+
+    /** Pin a meal on the log screen, at `index` (undo puts it back where it was) or at the end. */
+    async addFavouriteMeal(meal: FavouriteMeal, index?: number): Promise<void> {
+      await db.transaction('rw', db.settings, async () => {
+        const s = (await db.settings.get('settings')) ?? defaultSettings();
+        const list = (s.favouriteMeals ?? []).filter((m) => m.id !== meal.id);
+        list.splice(index ?? list.length, 0, meal);
+        await db.settings.put({ ...s, favouriteMeals: list, id: 'settings', schemaVersion: v });
+      });
+    },
+    async removeFavouriteMeal(id: string): Promise<void> {
+      await db.transaction('rw', db.settings, async () => {
+        const s = (await db.settings.get('settings')) ?? defaultSettings();
+        await db.settings.put({ ...s, favouriteMeals: (s.favouriteMeals ?? []).filter((m) => m.id !== id), id: 'settings', schemaVersion: v });
       });
     },
 

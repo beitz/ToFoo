@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Batch, LogEntry } from '../storage/types';
-import { recentMeals, repeatMeal } from './repeat';
+import { favouriteAsMeal, favouriteFromMeal, mealSignature, recentMeals, repeatMeal } from './repeat';
 
 const H = 3_600_000;
 const T0 = Date.UTC(2026, 9, 14, 8);
@@ -15,14 +15,14 @@ function tea(id: string, time: number): LogEntry {
 function portion(id: string, time: number, batchId: string, portions = 1): LogEntry {
   return { id, schemaVersion: 1, kind: 'portion', batchId, storage: 'freezer', portions, time, day: dayOf(time), confidence: 'A', label: 'Curry' };
 }
-function batch(remaining: Batch['remaining']): Batch {
+function batch(remaining: Batch['remaining'], id = 'b1', cookedAt = 0): Batch {
   return {
-    id: 'b1',
+    id,
     schemaVersion: 1,
     recipeId: 'r1',
     recipe: { name: 'Curry', portions: 6, ingredients: [] },
     cookedDay: '2026-10-01',
-    cookedAt: 0,
+    cookedAt,
     plan: { fresh: 1, fridge: 1, freezer: 4 },
     remaining,
     corrections: [],
@@ -55,6 +55,35 @@ describe('repeatMeal', () => {
     const { entries, skipped } = repeatMeal(meal, T0 + 24 * H, dayOf, new Map([['b1', batch({ fresh: 0, fridge: 0, freezer: 1 })]]));
     expect(entries).toHaveLength(1);
     expect(skipped).toEqual(['Curry']);
+  });
+
+  it('takes the portion from the newest batch of the same recipe when the logged batch has run out', () => {
+    const batches = new Map([
+      ['b1', batch({ fresh: 0, fridge: 0, freezer: 0 })],
+      ['b2', batch({ fresh: 0, fridge: 0, freezer: 1 }, 'b2', 10)],
+      ['b3', batch({ fresh: 0, fridge: 2, freezer: 0 }, 'b3', 20)],
+    ]);
+    const { entries, skipped } = repeatMeal([portion('a', T0, 'b1')], T0 + 24 * H, dayOf, batches);
+    expect(skipped).toEqual([]);
+    expect(entries[0]).toMatchObject({ kind: 'portion', batchId: 'b3', storage: 'fridge' });
+  });
+});
+
+describe('favourite meals', () => {
+  it('keep items and spacing, and repeat like the meal they were pinned from', () => {
+    const meal = [tea('b', T0 + 0.5 * H), food('a', T0, 'C131000', 80)];
+    const fav = favouriteFromMeal(meal, 'f1');
+    expect(fav.items.map((i) => [i.kind, i.offsetMinutes])).toEqual([
+      ['food', 30],
+      ['drink', 0],
+    ]);
+    expect(fav.items[0]).not.toHaveProperty('time');
+    expect(fav.items[0]).not.toHaveProperty('day');
+    expect(fav.items[0]).not.toHaveProperty('id');
+    const now = T0 + 72 * H;
+    const again = repeatMeal(favouriteAsMeal(fav), now, dayOf, new Map());
+    expect(again.entries).toEqual(repeatMeal(meal, now, dayOf, new Map()).entries);
+    expect(mealSignature(favouriteAsMeal(fav), new Map())).toBe(mealSignature(meal, new Map()));
   });
 });
 

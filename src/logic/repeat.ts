@@ -4,7 +4,7 @@
  */
 import { groupMeals } from '../model/simulate';
 import { refKey } from '../lib/refs';
-import type { Batch, LogEntry, NewLogEntry } from '../storage/types';
+import type { Batch, FavouriteMeal, FavouriteMealItem, LogEntry, NewLogEntry } from '../storage/types';
 import { bookingSlot, nextStorage } from './stock';
 
 export interface RepeatResult {
@@ -16,7 +16,9 @@ export interface RepeatResult {
 /**
  * Copy a meal so that its last item lands at `time`. Items keep their spacing (a tea 30 minutes
  * after the meal stays 30 minutes after it), because drink timing matters for iron absorption.
- * Portions come from the batch's current stock; a batch that has run out is skipped.
+ * Portions come from the batch's current stock. When that batch has run out, the newest batch of
+ * the same recipe with portions left stands in (a pinned "chili and bread" outlives one pot); when
+ * no batch of the recipe has any left, the item is skipped.
  */
 export function repeatMeal(meal: readonly LogEntry[], time: number, dayOf: (time: number) => string, batches: ReadonlyMap<string, Batch>): RepeatResult {
   const entries: NewLogEntry[] = [];
@@ -33,25 +35,33 @@ export function repeatMeal(meal: readonly LogEntry[], time: number, dayOf: (time
       entries.push({ ...rest, time: at, day });
       continue;
     }
-    const batch = taken.get(rest.batchId) ?? batches.get(rest.batchId);
-    const storage = batch ? nextStorage(batch, day) : null;
-    if (!batch || !storage) {
+    const current = (id: string) => taken.get(id) ?? batches.get(id);
+    const original = current(rest.batchId);
+    const canServe = (b: Batch): boolean => {
+      const storage = nextStorage(b, day);
+      return !!storage && b.remaining[bookingSlot(b, storage)] >= rest.portions;
+    };
+    const batch = original && canServe(original)
+      ? original
+      : original
+        ? [...batches.values()]
+            .map((b) => current(b.id)!)
+            .filter((b) => b.recipeId === original.recipeId && canServe(b))
+            .sort((a, b) => b.cookedAt - a.cookedAt)[0]
+        : undefined;
+    if (!batch) {
       skipped.push(rest.label);
       continue;
     }
-    const slot = bookingSlot(batch, storage);
-    if (batch.remaining[slot] < rest.portions) {
-      skipped.push(rest.label);
-      continue;
-    }
+    const slot = bookingSlot(batch, nextStorage(batch, day)!);
     taken.set(batch.id, { ...batch, remaining: { ...batch.remaining, [slot]: batch.remaining[slot] - rest.portions } });
-    entries.push({ ...rest, storage: slot, time: at, day });
+    entries.push({ ...rest, batchId: batch.id, storage: slot, time: at, day });
   }
   return { entries, skipped };
 }
 
-/** What makes two meals "the same" for the Recent list: the same items in the same amounts. */
-function mealSignature(meal: readonly LogEntry[], batches: ReadonlyMap<string, Batch>): string {
+/** What makes two meals "the same" (Recent list, favourites): the same items in the same amounts. */
+export function mealSignature(meal: readonly LogEntry[], batches: ReadonlyMap<string, Batch>): string {
   return meal
     .map((e) => {
       switch (e.kind) {
@@ -92,4 +102,26 @@ export function recentMeals(log: readonly LogEntry[], windowMinutes: number, bat
     out.push(meal);
   }
   return out;
+}
+
+const MINUTE = 60_000;
+
+/** Pin a logged meal: keep its items and their spacing, drop time, day and ids. */
+export function favouriteFromMeal(meal: readonly LogEntry[], id: string): FavouriteMeal {
+  const last = Math.max(...meal.map((e) => e.time));
+  const items = [...meal]
+    .sort((a, b) => a.time - b.time)
+    .map((e): FavouriteMealItem => {
+      const { id: _id, schemaVersion: _v, time, day: _day, ...rest } = e;
+      return { ...rest, offsetMinutes: Math.round((last - time) / MINUTE) };
+    });
+  return { id, items };
+}
+
+/**
+ * A pinned meal as log entries that ended at time 0, so the same helpers serve it as a past meal:
+ * `repeatMeal` re-times it, `mealTitle` names it, `mealSignature` matches it against Recent meals.
+ */
+export function favouriteAsMeal(fav: FavouriteMeal): LogEntry[] {
+  return fav.items.map(({ offsetMinutes, ...rest }, i) => ({ ...rest, id: `${fav.id}:${i}`, schemaVersion: 0, time: -offsetMinutes * MINUTE, day: '' }) as LogEntry);
 }
