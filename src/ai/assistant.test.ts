@@ -3,7 +3,7 @@ import type * as Beta from '@anthropic-ai/sdk/resources/beta/messages/messages';
 import type { Food } from '../foods/foodDb';
 import { buildIndex } from '../foods/search';
 import { appNote, emptyConversation, requestParams, sendMessage, textOf, type CreateMessage } from './assistant';
-import { describeFood, MAX_INGREDIENT_GRAMS, MAX_ITEM_GRAMS, validateIngredientsProposal, runLookupBarcode, runSearchFoods, runSearchUsda, validateJournalProposal, validateProposal, validateSleepProposal, validateActivityProposal, validateWaterProposal, type ProductTools, type ToolContext } from './tools';
+import { describeFood, MAX_INGREDIENT_GRAMS, MAX_ITEM_GRAMS, runCheckRecipe, runListRecipes, validateRecipeProposal, validateIngredientsProposal, runLookupBarcode, runSearchFoods, runSearchUsda, validateJournalProposal, validateProposal, validateSleepProposal, validateActivityProposal, validateWaterProposal, type ProductTools, type ToolContext } from './tools';
 import type { Product } from '../storage/types';
 import type { FindResult } from '../foods/findProduct';
 
@@ -137,7 +137,7 @@ describe('sendMessage', () => {
     const refused = scripted(reply([], 'refusal'));
     expect((await sendMessage(refused.create, 'claude-opus-5-5', emptyConversation(), { text: 'x', images: [] }, ctx)).outcome).toEqual({ kind: 'error', reason: 'refusal' });
 
-    const loop = scripted(...Array.from({ length: 20 }, (_, i) => reply([toolUse(`t${i}`, 'search_foods', { queries: ['roll'] })], 'tool_use')));
+    const loop = scripted(...Array.from({ length: 30 }, (_, i) => reply([toolUse(`t${i}`, 'search_foods', { queries: ['roll'] })], 'tool_use')));
     expect((await sendMessage(loop.create, 'claude-opus-5-5', emptyConversation(), { text: 'x', images: [] }, ctx)).outcome).toEqual({ kind: 'error', reason: 'tooManySteps' });
   });
 
@@ -617,5 +617,114 @@ describe('the recipe editor assistant', () => {
       'no ingredients yet; steps:\n1. Fry the onions.\n2. Add lentils.\n',
     );
     expect(appNote({ now, day: '2026-10-18', today: '2026-10-18', logged: [], open: [], barcodes: [], recipe: { name: '', ingredients: [] } })).toContain('no name yet, portions not set; no ingredients yet');
+  });
+});
+
+describe('recipes in the main chat', () => {
+  const curry = {
+    id: 'rec1',
+    name: 'Nougat rolls',
+    portions: 6,
+    ingredients: [{ ref: { source: 'BLS' as const, version: '4.0', code: 'D7A5400' }, name: 'Milk roll', grams: 600, preparation: 'baked' as const }],
+    instructions: 'Bake.',
+    cookedLately: 2,
+    inStock: 3,
+  };
+  const checked: Array<[number, number]> = [];
+  const recipes = (ideas: boolean): ToolContext['recipes'] => ({
+    list: [curry],
+    nameOf: (ing) => ing.name,
+    ...(ideas
+      ? {
+          ideas: {
+            gaps: () => 'Low: Iron.',
+            check: (items: readonly { grams: number }[], portions: number) => {
+              checked.push([items.length, portions]);
+              return `checked ${items.length} items, ${portions} portions`;
+            },
+            checkSaved: (id: string) => (id === 'rec1' ? 'checked 1 items, 6 portions' : undefined),
+            exclusions: { groups: [], foods: ['S450000'] },
+          },
+        }
+      : {}),
+  });
+  const recipe = (over: object = {}) => ({
+    kind: 'own',
+    name: 'Nougat rolls',
+    portions: 6,
+    items: [
+      { code: 'D7A5400', grams: 600, preparation: 'baked', note: '' },
+      { code: 'S450000', grams: 100, preparation: 'asListed', note: '' },
+    ],
+    assumptions: [],
+    instructions: '',
+    reason: '',
+    recipe_id: '',
+    replaces: '',
+    ...over,
+  });
+
+  it('offers list_recipes and propose_recipe, and the idea tools only with recipe ideas on', () => {
+    const names = (sources: Parameters<typeof requestParams>[2]) => requestParams('claude-opus-5-5', [], sources).tools!.map((t) => (t as { name: string }).name);
+    expect(names({ recipes: true })).toEqual(['search_foods', 'propose_meal', 'list_recipes', 'propose_recipe']);
+    expect(names({ recipes: true, ideas: true })).toEqual(['search_foods', 'propose_meal', 'list_recipes', 'propose_recipe', 'nutrient_gaps', 'check_recipe']);
+    expect(names({})).toEqual(['search_foods', 'propose_meal']);
+    const off = requestParams('claude-opus-5-5', [], { recipes: true }).system as string;
+    expect(off).toContain('Recipe ideas are turned off');
+    expect(off).toContain('Several parts');
+    const on = requestParams('claude-opus-5-5', [], { recipes: true, ideas: true }).system as string;
+    expect(on).toContain('call check_recipe');
+    expect(on).not.toContain('Recipe ideas are turned off');
+  });
+
+  it('lists the recipe book with ids, codes, how often cooked and stock', () => {
+    const r = runListRecipes({ query: 'nougat' }, { ...ctx, recipes: recipes(false) });
+    expect(r.text).toContain('recipe_id rec1 | Nougat rolls | 6 portions | cooked 2× in the last 60 days | 3 portions in stock');
+    expect(r.text).toContain('D7A5400 Milk roll 600 g, baked');
+    expect(r.text).toContain('Steps:\nBake.');
+    expect(runListRecipes({ query: 'soup' }, { ...ctx, recipes: recipes(false) }).text).toContain('No recipe matches "soup". The book has: Nougat rolls.');
+    expect(runListRecipes({ query: '' }, ctx).ok).toBe(false);
+  });
+
+  it('checks a recipe with the app, given or saved', () => {
+    checked.length = 0;
+    const c = { ...ctx, recipes: recipes(true) };
+    expect(runCheckRecipe({ portions: 4, items: recipe().items, recipe_id: '' }, c).text).toBe('checked 2 items, 4 portions');
+    expect(runCheckRecipe({ portions: 0, items: [], recipe_id: 'rec1' }, c).text).toBe('Nougat rolls as saved:\nchecked 1 items, 6 portions');
+    expect(runCheckRecipe({ portions: 2.5, items: recipe().items, recipe_id: '' }, c).ok).toBe(false);
+    expect(runCheckRecipe({ portions: 4, items: recipe().items, recipe_id: '' }, { ...ctx, recipes: recipes(false) }).ok).toBe(false);
+  });
+
+  it('checks proposed recipes: own ones freely, ideas need a reason and no excluded food', () => {
+    const own = validateRecipeProposal(recipe(), { ...ctx, recipes: recipes(true) });
+    expect(own.ok && [own.proposal.kind, own.proposal.items.length, own.proposal]).toEqual(['own', 2, expect.not.objectContaining({ recipeId: expect.anything() })]);
+    const idea = validateRecipeProposal(recipe({ kind: 'idea' }), { ...ctx, recipes: recipes(true) });
+    expect(!idea.ok && idea.error).toContain('reason is empty');
+    expect(!idea.ok && idea.error).toContain('excluded these foods: Nougat');
+    const ok = validateRecipeProposal(recipe({ kind: 'idea', reason: 'Iron is low; one portion gives 30 %.', items: [recipe().items[0]] }), { ...ctx, recipes: recipes(true) });
+    expect(ok.ok && ok.proposal.reason).toBe('Iron is low; one portion gives 30 %.');
+    const ideasOff = validateRecipeProposal(recipe({ kind: 'idea', reason: 'x' }), { ...ctx, recipes: recipes(false) });
+    expect(!ideasOff.ok && ideasOff.error).toContain('recipe ideas, which are turned off');
+    expect(!validateRecipeProposal(recipe({ recipe_id: 'nope' }), { ...ctx, recipes: recipes(false) }).ok).toBe(true);
+    const change = validateRecipeProposal(recipe({ recipe_id: 'rec1' }), { ...ctx, recipes: recipes(false) });
+    expect(change.ok && change.proposal.recipeId).toBe('rec1');
+    expect(!validateRecipeProposal(recipe({ portions: 0 }), { ...ctx, recipes: recipes(false) }).ok).toBe(true);
+    expect(!validateRecipeProposal(recipe({ name: ' ' }), { ...ctx, recipes: recipes(false) }).ok).toBe(true);
+  });
+
+  it('shows a recipe and a meal from one message together, numbered R and M', async () => {
+    const api = scripted(
+      reply(
+        [
+          text('Saved the pot as a recipe, and your bowl as a meal.'),
+          toolUse('a', 'propose_recipe', recipe({ items: [recipe().items[0]] })),
+          toolUse('b', 'propose_meal', { summary: 'Rolls', items: [{ code: 'D7A5400', grams: 100, preparation: 'asListed', note: '' }], assumptions: [], confidence: 'C', time: '', replaces: '' }),
+        ],
+        'tool_use',
+      ),
+    );
+    const { outcome, conversation } = await sendMessage(api.create, 'claude-opus-5-5', emptyConversation(), { text: 'baked rolls, ate one', images: [] }, { ...ctx, recipes: recipes(false) });
+    expect(outcome.kind === 'proposal' && [outcome.recipes.map((r) => r.id), outcome.proposals.map((p) => p.id)]).toEqual([['R1'], ['M1']]);
+    expect(conversation.pendingResults.map((r) => r.content)).toContain('Shown to the user as card R1. Not saved yet; their reply follows.');
   });
 });

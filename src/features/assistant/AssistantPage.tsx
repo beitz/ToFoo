@@ -14,13 +14,6 @@ import {
   sendMessage,
   type AiModel,
   type Conversation,
-  type RecipeSoFar,
-  type ShownIngredients,
-  type ShownNote,
-  type ShownProposal,
-  type ShownSleep,
-  type ShownActivity,
-  type ShownWater,
   type TurnOutcome,
 } from '../../ai/assistant';
 import { classifyError, getAiSettings, makeCreate, saveUsage } from '../../ai/client';
@@ -34,10 +27,10 @@ import { appendText, useDictation } from './useDictation';
 import { RecordingTime } from './RecordingTime';
 import { UsageLine } from './UsageLine';
 import { VoiceFailed } from './VoiceFailed';
-import type { ProposedItem, ProductTools } from '../../ai/tools';
+import type { ProposedItem, ProductTools, RecipeTools } from '../../ai/tools';
 import { findProduct, findUsda } from '../../foods/findProduct';
 import { productLabel, productPageUrl, productRef } from '../../foods/products';
-import type { FoodRef, Product } from '../../storage/types';
+import type { FoodRef, Ingredient, Product } from '../../storage/types';
 import { barcodesInPhoto } from '../log/barcode';
 import type { EntryConfidence } from '../../model/types';
 import { isOn } from '../../settings/features';
@@ -53,38 +46,23 @@ import { waterText } from '../water/format';
 import { waterProblem } from '../water/WaterSheet';
 import { IngredientSheet } from '../recipes/IngredientSheet';
 import { ActivityForm, activityName, DEFAULT_ACTIVITY_SKIN, recordOf, type ActivityDraft } from '../activity/ActivityForm';
+import { cardId, cardOf, cardTitle, useRegister, type Card, type CardProps, type RecipeChat, type Saver, type Undo } from './cards';
+import { RecipeCard } from './RecipeCard';
+import { Pages, type DictationTarget } from './Pages';
+import { refKey } from '../../lib/refs';
+import { itemIngredient } from '../../logic/ingredients';
+import { checkPortion, describeCheck, describeStatus, gapFoods, oftenEaten, portionIntake, recipeInfos } from '../../logic/recipeIdeas';
+import type { AppData } from '../../app/data';
 
-type Bubble = { role: 'user'; text: string; previews: string[] } | { role: 'assistant'; text: string } | { role: 'card'; id: string };
+export type { RecipeChat } from './cards';
+
+/** A chat bubble; an answer with several cards is one 'pages' bubble, its cards shown as pages. */
+type Bubble =
+  | { role: 'user'; text: string; previews: string[] }
+  | { role: 'assistant'; text: string }
+  | { role: 'card'; id: string }
+  | { role: 'pages'; key: number; text: string; ids: string[] };
 type ComposerPhoto = PreparedImage & { barcodes: string[]; time: PhotoTime };
-/**
- * A proposed meal (M1, …), journal entry (J1, …), sleep (S1, …), activity (A1, …), water (W1, …)
- * or recipe ingredients (R1, …), and whether the user logged, saved or added it.
- */
-type Card =
-  | { kind: 'meal'; proposal: ShownProposal; logged: boolean }
-  | { kind: 'note'; note: ShownNote; logged: boolean }
-  | { kind: 'sleep'; sleep: ShownSleep; logged: boolean }
-  | { kind: 'activity'; activity: ShownActivity; logged: boolean }
-  | { kind: 'water'; water: ShownWater; logged: boolean }
-  | { kind: 'ingredients'; ingredients: ShownIngredients; logged: boolean };
-const cardOf = (c: Card) =>
-  c.kind === 'meal' ? c.proposal : c.kind === 'note' ? c.note : c.kind === 'sleep' ? c.sleep : c.kind === 'activity' ? c.activity : c.kind === 'water' ? c.water : c.ingredients;
-const cardId = (c: Card) => cardOf(c).id;
-/** Undoes one saved card. */
-type Undo = () => Promise<void>;
-/** Saves a card as it is shown (with the user's edits); undefined if it cannot be saved as it is. */
-type Saver = () => Promise<Undo | undefined>;
-
-/** The recipe editor's chat: confirmed cards become ingredients of the recipe being edited. */
-export interface RecipeChat {
-  /** What the recipe has right now, for the assistant. */
-  soFar: () => RecipeSoFar;
-  /** Add confirmed ingredients (the name and portions only where the recipe has none yet); returns its undo. */
-  add: (p: { name: string; portions?: number; items: ProposedItem[]; instructions?: string }) => () => void;
-  /** Every card in the chat was added: back to the editor. */
-  done: () => void;
-}
-
 /** Photos per message: enough for a couple of days of meals; each one adds to the cost of every request in the chat. */
 const MAX_PHOTOS = 50;
 /**
@@ -134,11 +112,15 @@ export function RecipeAssistant({ recipe, onClose }: { recipe: RecipeChat; onClo
   );
 }
 
-/** Log a meal by chatting: photos and/or text in, a checked list of BLS foods out. Route: #/assistant[/day]. */
+/**
+ * The assistant: meals, journal, sleep, activity, water and recipes in one chat, photos, text and
+ * voice in, cards to check out. Route: #/assistant (from Home) or #/assistant/day (from the log
+ * screen of that day).
+ */
 export function AssistantPage({ day: dayParam }: { day?: string }) {
   const d = useData();
   const day = dayParam && /^\d{4}-\d{2}-\d{2}$/.test(dayParam) ? dayParam : d.today;
-  const back = dayParam ? href('log', day) : href('log');
+  const back = dayParam ? href('log', day) : href();
   const body = <ChatOrNotice chat={(ai) => <Chat apiKey={ai.apiKey} model={ai.model} day={day} />} />;
 
   return (
@@ -147,7 +129,7 @@ export function AssistantPage({ day: dayParam }: { day?: string }) {
         <a className="icon-btn" href={back} aria-label={t('common.back')}>
           <Icon name="back" />
         </a>
-        <h1>{t('ai.title')}</h1>
+        <h1>{t('ai.pageTitle')}</h1>
       </header>
       {body}
     </section>
@@ -182,6 +164,11 @@ function Chat({ apiKey, model, day, recipe }: { apiKey: string; model: AiModel; 
     else savers.current.delete(id);
   }, []);
   const [savingAll, setSavingAll] = useState(false);
+  /** The answer shown as pages right now (its bubble key), if any. */
+  const [pagesOpen, setPagesOpen] = useState<number>();
+  const pagesKey = useRef(0);
+  /** While pages are open, the microphone fills the comment box of the page shown. */
+  const dictationTarget: DictationTarget = useRef(null);
   const [text, setText] = useState('');
   const [images, setImages] = useState<ComposerPhoto[]>([]);
   /** Photos sent so far, so numbers stay unique across the chat, and their size (base64 characters). */
@@ -209,6 +196,7 @@ function Chat({ apiKey, model, day, recipe }: { apiKey: string; model: AiModel; 
   // Voice input (opt-in, OpenAI key): record, then the transcript lands in the text box.
   const dictation = useDictation({
     onText: (added, continued) => {
+      if (dictationTarget.current) return dictationTarget.current(added, continued);
       setText((old) => appendText(old, added, continued));
       setDictated(true);
     },
@@ -243,8 +231,39 @@ function Chat({ apiKey, model, day, recipe }: { apiKey: string; model: AiModel; 
     }
   }
 
-  async function send() {
-    if (busy || (!text.trim() && images.length === 0)) return;
+  /** The recipe book for the assistant, and with recipe ideas on, the app's numbers for ideas. */
+  function recipeTools(): RecipeTools {
+    const nameOf = (ing: Ingredient) => (ing.ref.source === 'BLS' ? (d.foods.byCode.get(ing.ref.code)?.nameEn ?? ing.name) : (d.productsById.get(refKey(ing.ref)) ? productLabel(d.productsById.get(refKey(ing.ref))!) : ing.name));
+    const tools: RecipeTools = { list: recipeInfos(d.recipes, d.batches, d.today), nameOf };
+    if (!isOn(d.settings.features, 'recipeIdeas')) return tools;
+    const hidden = new Set(d.settings.hiddenNutrients);
+    return {
+      ...tools,
+      ideas: {
+        exclusions: d.profile.exclusions,
+        gaps: () => ideasOverview(d, hidden),
+        check: (items, portions) => {
+          const products = new Map([...d.productsById, ...items.flatMap((it) => (it.product ? [[it.product.id, it.product] as const] : []))]);
+          const ctx = { foods: d.foods, products, batches: new Map(), customFoods: new Map(), salt: d.profile.salt };
+          const ingredients = items.map((it) => itemIngredient(it, d.foods.version, d.profile.salt));
+          return describeCheck(checkPortion(portionIntake({ name: '', portions, ingredients }, ctx), d.model.nutrients, d.requirements), portions);
+        },
+        checkSaved: (id) => {
+          const r = d.recipes.find((x) => x.id === id);
+          if (!r) return undefined;
+          const ctx = { foods: d.foods, products: d.productsById, batches: new Map(), customFoods: new Map(), salt: r.saltOverride ?? d.profile.salt };
+          return describeCheck(checkPortion(portionIntake(r, ctx), d.model.nutrients, d.requirements), r.portions);
+        },
+      },
+    };
+  }
+
+  /** Send the composer's text and photos, or a reply written on an answer's pages. */
+  async function send(reply?: { text: string; dictated: boolean }) {
+    const text_ = reply ? reply.text : text;
+    const images_ = reply ? [] : images;
+    const dictated_ = reply ? reply.dictated : dictated;
+    if (busy || (!text_.trim() && images_.length === 0)) return;
     const all = [...cards.values()];
     const note = appNote({
       now: Date.now(),
@@ -252,19 +271,21 @@ function Chat({ apiKey, model, day, recipe }: { apiKey: string; model: AiModel; 
       today: d.today,
       logged: all.filter((c) => c.logged).map(cardId),
       open: all.filter((c) => !c.logged).map(cardId),
-      barcodes: [...new Set(images.flatMap((i) => i.barcodes))],
-      dictated: dictated && !!text.trim(),
+      barcodes: [...new Set(images_.flatMap((i) => i.barcodes))],
+      dictated: dictated_ && !!text_.trim(),
       ...(recipe ? { recipe: recipe.soFar() } : {}),
     });
-    const labelled = images.map((img, i) => ({ ...img, label: photoLabel(photoCount + i + 1, img.time) }));
-    const msg = { text, images: labelled, appNote: note };
+    const labelled = images_.map((img, i) => ({ ...img, label: photoLabel(photoCount + i + 1, img.time) }));
+    const msg = { text: text_, images: labelled, appNote: note };
     setBusy(true);
     setError(undefined);
-    recorder.event({ type: 'user', text: msg.text.trim(), photos: labelled.map((i) => i.label), ...(dictated && msg.text.trim() ? { dictated: true } : {}) });
+    recorder.event({ type: 'user', text: msg.text.trim(), photos: labelled.map((i) => i.label), ...(dictated_ && msg.text.trim() ? { dictated: true } : {}) });
     setBubbles((b) => [...b, { role: 'user', text: msg.text.trim(), previews: msg.images.map((i) => i.preview) }]);
-    setText('');
-    setImages([]);
-    setDictated(false);
+    if (!reply) {
+      setText('');
+      setImages([]);
+      setDictated(false);
+    }
     setTurnTokens({});
     const onUsage = (tokens: ModelTokens) => {
       setChatTokens((c) => mergeModelTokens(c, tokens));
@@ -296,6 +317,7 @@ function Chat({ apiKey, model, day, recipe }: { apiKey: string; model: AiModel; 
               sleep: isOn(d.settings.features, 'sleep'),
               activity: isOn(d.settings.features, 'activity'),
               water: isOn(d.settings.features, 'water'),
+              recipes: recipeTools(),
             }),
       };
       const r = await sendMessage(create, model, conversation, msg, ctx, onUsage);
@@ -307,9 +329,12 @@ function Chat({ apiKey, model, day, recipe }: { apiKey: string; model: AiModel; 
     } catch (e) {
       // Nothing was added to the conversation: put the message back so a tap on Send retries it.
       setBubbles((b) => b.slice(0, -1));
-      setText(msg.text);
-      setImages(images);
-      setDictated(dictated);
+      // A failed reply from the pages lands in the box too, unless the user is already typing there.
+      if (!reply || !text.trim()) {
+        setText(msg.text);
+        setDictated(dictated_);
+      }
+      if (!reply) setImages(images);
       const kind = await classifyError(e);
       recorder.event({ type: 'error', reason: kind, detail: e instanceof Error ? e.message : String(e) });
       setError(ERROR_TEXT[kind]);
@@ -334,7 +359,11 @@ function Chat({ apiKey, model, day, recipe }: { apiKey: string; model: AiModel; 
         ...outcome.activities.map((a): Card => ({ kind: 'activity', activity: a, logged: false })),
         ...outcome.waters.map((w): Card => ({ kind: 'water', water: w, logged: false })),
         ...outcome.ingredients.map((r): Card => ({ kind: 'ingredients', ingredients: r, logged: false })),
+        ...outcome.recipes.map((r): Card => ({ kind: 'recipe', recipe: r, logged: false })),
       ];
+      // In the order the assistant proposed them, so a day reads in order and related cards sit together.
+      const rank = (c: Card) => outcome.order.indexOf(cardId(c));
+      shown.sort((a, b) => rank(a) - rank(b));
       recorder.event({ type: 'cards', text: outcome.text, cards: shown.map((c) => cardSummary(cardOf(c))) });
       const replaced = new Set(shown.map((c) => cardOf(c).replaces).filter((id): id is string => !!id && cardsRef.current.get(id)?.logged === false));
       setCards((all) => {
@@ -342,7 +371,12 @@ function Chat({ apiKey, model, day, recipe }: { apiKey: string; model: AiModel; 
         for (const c of shown) next.set(cardId(c), c);
         return next;
       });
-      setBubbles((b) => [...b.filter((x) => !(x.role === 'card' && replaced.has(x.id))), ...added, ...shown.map((c): Bubble => ({ role: 'card', id: cardId(c) }))]);
+      // Several cards are one answer in pages (the text on the first page); one card stays in the chat.
+      const paged = shown.length >= 2 && !recipe;
+      const key = ++pagesKey.current;
+      const next: Bubble[] = paged ? [{ role: 'pages', key, text: outcome.text, ids: shown.map(cardId) }] : [...added, ...shown.map((c): Bubble => ({ role: 'card', id: cardId(c) }))];
+      setBubbles((b) => [...b.filter((x) => !(x.role === 'card' && replaced.has(x.id))), ...next]);
+      if (paged) setPagesOpen(key);
     } else {
       recorder.event({ type: 'assistant', text: outcome.text });
       setBubbles((b) => [...b, ...added]);
@@ -370,13 +404,13 @@ function Chat({ apiKey, model, day, recipe }: { apiKey: string; model: AiModel; 
   const timedOut = images.filter((i) => i.time.source !== 'photo').length;
   const openCards = [...cards.values()].filter((c) => !c.logged).map(cardId);
 
-  /** Save every open card as shown, in the order shown, with one undo for all of them. */
-  async function logAll() {
+  /** Save these open cards (all by default) as shown, in the order shown, with one undo for all of them. */
+  async function logAll(ids: readonly string[] = openCards) {
     if (savingAll) return;
     setSavingAll(true);
     const undos: Undo[] = [];
     try {
-      for (const id of openCards) {
+      for (const id of ids) {
         const undo = await savers.current.get(id)?.();
         if (undo) undos.push(undo);
       }
@@ -384,8 +418,8 @@ function Chat({ apiKey, model, day, recipe }: { apiKey: string; model: AiModel; 
       setSavingAll(false);
     }
     if (undos.length === 0) return;
-    const skipped = openCards.length - undos.length;
-    toast(skipped ? t('ai.loggedSome', { n: undos.length, total: openCards.length }) : t('ai.loggedAll', { n: undos.length }), async () => {
+    const skipped = ids.length - undos.length;
+    toast(skipped ? t('ai.loggedSome', { n: undos.length, total: ids.length }) : t('ai.loggedAll', { n: undos.length }), async () => {
       for (const undo of undos) await undo();
     });
   }
@@ -420,24 +454,34 @@ function Chat({ apiKey, model, day, recipe }: { apiKey: string; model: AiModel; 
       <VoiceFailed onRetry={dictation.retry} onDrop={dictation.drop} />
     ) : null;
 
+  const renderCard = (id: string) => <CardView key={id} card={cards.get(id)!} day={day} toast={toast} onLogged={(v, saved) => setLogged(id, v, saved)} register={register} recipe={recipe} />;
+
   return (
     <>
       {/* While a photo is open, everything behind it is out of reach for touch and screen readers. */}
-      <div className="chat" aria-live="polite" inert={viewing !== undefined}>
+      <div className="chat" aria-live="polite" inert={viewing !== undefined || pagesOpen !== undefined}>
         {recipe ? (
           <div className="bubble bubble-assistant">{t('ai.recipeIntro')}</div>
         ) : (
           <div className="bubble bubble-assistant">
-            {t('ai.intro')}
-            {isOn(d.settings.features, 'journal') && ` ${t('ai.introJournal')}`}
-            {isOn(d.settings.features, 'sleep') && ` ${t('ai.introSleep')}`}
-            {isOn(d.settings.features, 'activity') && ` ${t('ai.introActivity')}`}
-            {isOn(d.settings.features, 'water') && ` ${t('ai.introWater')}`}
+            {t('ai.intro')} {t('ai.introAlso')}{' '}
+            {[
+              isOn(d.settings.features, 'journal') && t('ai.introJournal'),
+              isOn(d.settings.features, 'sleep') && t('ai.introSleep'),
+              isOn(d.settings.features, 'activity') && t('ai.introActivity'),
+              isOn(d.settings.features, 'water') && t('ai.introWater'),
+              t('ai.introRecipes'),
+            ]
+              .filter(Boolean)
+              .join(', ')}
+            .{isOn(d.settings.features, 'recipeIdeas') && ` ${t('ai.introIdeas')}`}
           </div>
         )}
         {bubbles.map((b, i) =>
           b.role === 'card' ? (
-            cards.has(b.id) && <CardView key={b.id} card={cards.get(b.id)!} day={day} toast={toast} onLogged={(v, saved) => setLogged(b.id, v, saved)} register={register} recipe={recipe} />
+            cards.has(b.id) && renderCard(b.id)
+          ) : b.role === 'pages' ? (
+            <PagesBubble key={`p${b.key}`} text={b.text} ids={b.ids} cards={cards} onOpen={() => setPagesOpen(b.key)} />
           ) : b.role === 'user' ? (
             <div key={i} className="bubble bubble-user">
               {b.previews.length > 0 && (
@@ -473,7 +517,7 @@ function Chat({ apiKey, model, day, recipe }: { apiKey: string; model: AiModel; 
         <div ref={endRef} />
       </div>
 
-      <div className="composer" inert={viewing !== undefined}>
+      <div className="composer" inert={viewing !== undefined || pagesOpen !== undefined}>
         {images.length > 0 && (
           <div className="composer-photos">
             {images.map((img, i) => (
@@ -501,8 +545,8 @@ function Chat({ apiKey, model, day, recipe }: { apiKey: string; model: AiModel; 
           <textarea
             rows={1}
             value={text}
-            placeholder={t(recipe ? 'ai.recipePlaceholder' : 'ai.placeholder')}
-            aria-label={t(recipe ? 'ai.recipePlaceholder' : 'ai.placeholder')}
+            placeholder={t(recipe ? 'ai.recipePlaceholder' : 'ai.placeholderAll')}
+            aria-label={t(recipe ? 'ai.recipePlaceholder' : 'ai.placeholderAll')}
             onChange={(e) => setText(e.target.value)}
             enterKeyHint="enter"
             onKeyDown={(e) => {
@@ -524,10 +568,80 @@ function Chat({ apiKey, model, day, recipe }: { apiKey: string; model: AiModel; 
           </button>
         </div>
       </div>
+      {bubbles.map(
+        (b) =>
+          b.role === 'pages' && (
+            <Pages
+              key={`pages${b.key}`}
+              text={b.text}
+              ids={b.ids}
+              cards={cards}
+              open={pagesOpen === b.key && viewing === undefined}
+              onClose={() => setPagesOpen((k) => (k === b.key ? undefined : k))}
+              renderCard={renderCard}
+              onReply={(reply, spoken) => {
+                setPagesOpen(undefined);
+                void send({ text: reply, dictated: spoken });
+              }}
+              onAcceptAll={(ids) => logAll(ids)}
+              savingAll={savingAll}
+              busy={busy}
+              mic={micButton}
+              voiceStatus={voiceStatus}
+              dictationTarget={dictationTarget}
+            />
+          ),
+      )}
       {viewing !== undefined && images[viewing] && (
         <PhotoViewer images={images} index={viewing} onIndex={setViewing} onClose={() => setViewing(undefined)} controls={micButton} status={voiceStatus} />
       )}
     </>
+  );
+}
+
+/**
+ * nutrient_gaps' answer, computed when the assistant asks: the status per nutrient, the foods that
+ * fill the gaps, what the user ate most lately, their exclusions and their cooking preferences.
+ */
+function ideasOverview(d: AppData, hidden: ReadonlySet<string>): string {
+  const ex = d.profile.exclusions;
+  const excluded = [...ex.groups.map((g) => `${d.foods.groups[g]?.en ?? g} (whole group)`), ...ex.foods.map((c) => d.foods.byCode.get(c)?.nameEn ?? c)];
+  const fill = gapFoods(d.foods, d.model.nutrients, d.requirements, ex);
+  const often = oftenEaten(d.log, d.today, 30);
+  const prefs = d.settings.cookingPreferences?.trim();
+  return [
+    `Nutrient status (app-computed, as on the user's Home screen):\n${describeStatus(d.model.nutrients, hidden) || 'Nothing logged yet.'}`,
+    `Foods that fill the gaps best:\n${fill.length ? fill.join('\n') : 'No gaps right now.'}`,
+    `Eaten most in the last 30 days: ${often.length ? often.join('; ') : 'nothing logged.'}`,
+    `Excluded by the user (never use these in ideas): ${excluded.length ? excluded.join('; ') : 'none.'}`,
+    `Cooking preferences, in the user's words: ${prefs ? `\n${prefs}` : 'none written.'}`,
+  ].join('\n\n');
+}
+
+/** An answer in pages, as it sits in the chat: the start of its text, its cards with their state, and a way back into the pages. */
+function PagesBubble({ text, ids, cards, onOpen }: { text: string; ids: readonly string[]; cards: ReadonlyMap<string, Card>; onOpen: () => void }) {
+  const shown = ids.filter((id) => cards.has(id));
+  if (shown.length === 0 && !text) return null;
+  return (
+    <div className="bubble bubble-assistant pages-bubble">
+      {text && <p className="pages-preview">{text}</p>}
+      <ul className="pages-parts small">
+        {shown.map((id) => {
+          const c = cards.get(id)!;
+          return (
+            <li key={id} className={c.logged ? 'done' : undefined}>
+              {c.logged ? <Icon name="check" size={14} /> : <span className="pages-bullet" aria-hidden="true" />} <span className="muted">{id}</span> {cardTitle(c)}
+              {c.logged && <span className="visually-hidden"> ({t('pages.saved')})</span>}
+            </li>
+          );
+        })}
+      </ul>
+      {shown.length > 0 && (
+        <button className="btn btn-small btn-primary" onClick={onOpen}>
+          {t('pages.openPages', { n: shown.length })}
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -610,30 +724,13 @@ function photoTimeShort(pt: PhotoTime): string {
   return pt.source === 'photo' ? s : `≈ ${s}`;
 }
 
-type CardProps<C extends Card> = {
-  card: C;
-  day: string;
-  toast: ReturnType<typeof useToast>;
-  /** Saved (with what was saved, for the saved chat) or undone. */
-  onLogged: (logged: boolean, saved?: Record<string, unknown>) => void;
-  register: (id: string, save: Saver | undefined) => void;
-  recipe?: RecipeChat;
-};
-
-/** Keep the chat's "Log all" pointed at this card's latest save (with the user's edits) while it is open. */
-function useRegister(id: string, save: Saver | undefined, register: CardProps<Card>['register']) {
-  useEffect(() => {
-    register(id, save);
-  });
-  useEffect(() => () => register(id, undefined), [id, register]);
-}
-
 function CardView({ card, ...rest }: CardProps<Card>) {
   if (card.kind === 'meal') return <ProposalCard card={card} {...rest} />;
   if (card.kind === 'sleep') return <SleepCard card={card} {...rest} />;
   if (card.kind === 'activity') return <ActivityCard card={card} {...rest} />;
   if (card.kind === 'water') return <WaterProposalCard card={card} {...rest} />;
   if (card.kind === 'ingredients') return <IngredientsCard card={card} {...rest} />;
+  if (card.kind === 'recipe') return <RecipeCard card={card} {...rest} />;
   return <NoteCard card={card} {...rest} />;
 }
 

@@ -786,6 +786,9 @@
                       "additionalProperties": {
                         "type": "boolean"
                       }
+                    },
+                    "cookingPreferences": {
+                      "type": "string"
                     }
                   },
                   "required": [

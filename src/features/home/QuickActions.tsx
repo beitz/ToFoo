@@ -10,8 +10,9 @@ import { SleepButton } from '../sleep/SleepButton';
 import { DialItem } from './DialItem';
 
 /**
- * The round button on Home. Closed it takes one button's space; the first tap turns it into +
- * and fans out the other quick actions above it, the second tap on + opens Log meal.
+ * The round button on Home, with the assistant's button right above it. Closed they take two
+ * buttons' space; the first tap turns the big one into + and fans out the other quick actions
+ * above, the second tap on + opens Log meal.
  * Tapping outside, Escape or the phone's back gesture closes it again.
  */
 export function QuickActions({ onFast }: { onFast: () => void }) {
@@ -39,7 +40,6 @@ export function QuickActions({ onFast }: { onFast: () => void }) {
       <div className={`fab-stack dial${open ? ' open' : ''}`}>
         {/* Hidden items stay rendered so they can animate out; visibility keeps them out of reach. */}
         <div className="dial-items" id="home-actions" role="group" aria-label={t('home.quickActions')}>
-          {on('aiAssistant') && <DialItem icon="chat" label={t('ai.title')} onClick={() => go('assistant')} />}
           {on('journal') && <DialItem icon="journal" label={t('home.journal')} onClick={() => go('journal')} />}
           {on('activity') && (
             <DialItem
@@ -62,6 +62,8 @@ export function QuickActions({ onFast }: { onFast: () => void }) {
             }}
           />
         </div>
+        {/* The assistant is always one tap away, right above Log meal; its name shows with the others. */}
+        {on('aiAssistant') && <DialItem icon="chat" label={t('ai.pageTitle')} pinned onClick={() => go('assistant')} />}
         <div className="dial-main">
           <span className="dial-label" aria-hidden>
             {t('home.logMeal')}

@@ -90,6 +90,7 @@ export type FeatureKey =
   | 'activity'
   | 'water'
   | 'insights'
+  | 'recipeIdeas'
   | 'saveChats';
 
 export interface Settings extends Versioned {
@@ -116,6 +117,8 @@ export interface Settings extends Versioned {
   favouriteMeals?: FavouriteMeal[];
   /** Log screen sections the user closed (true) or opened (false), by section key; unset = open. */
   logCollapsed?: Record<string, boolean>;
+  /** Recipe ideas: diet, likes, kitchen, time, batch size, in the user's words (guidance for the assistant, not a filter). */
+  cookingPreferences?: string;
 }
 
 /**
