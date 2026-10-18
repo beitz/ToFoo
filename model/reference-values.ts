@@ -13,7 +13,7 @@
  * "Overview on Tolerable Upper Intake Levels", version 11 (August 2025). "Checked" in a note means the
  * value was compared with that primary source on that date.
  */
-import type { ByAge, Cited, InfoOnly, ReferenceValue } from '../src/model/paramTypes';
+import type { ByAge, Cited, InfoOnly, ReferenceValue, Valued } from '../src/model/paramTypes';
 
 const DGE = 'DGE/ÖGE Referenzwerte für die Nährstoffzufuhr, 3. Auflage 2025';
 const dgeUrl = (page: string) => `https://www.dge.de/wissenschaft/referenzwerte/${page}/`;
@@ -127,7 +127,7 @@ export const referenceValues: ReferenceValue[] = [
           ? 'Methionine + cysteine (sulphur amino acids). '
           : nutrient === 'AAA'
             ? 'Phenylalanine + tyrosine (aromatic amino acids). '
-            : '') + 'Mean requirement for adults; DGE gives no values per amino acid. Not re-checked.',
+            : '') + 'Mean requirement for adults; DGE gives no values per amino acid. Checked against Table 23 (full text) on 2026-10-18.',
     }),
   ),
 
@@ -593,4 +593,16 @@ export const waterGuide: WaterGuide = {
 };
 
 /** Date the values above were checked against the primary sources. */
+/**
+ * Adult requirement pattern: mg of each essential amino acid per g of protein. Used only to compare
+ * food proteins with each other (the amino acid score behind "lysine is low in grains"), not as a target.
+ */
+export const aminoAcidPattern: Valued<Record<string, number>> = {
+  value: { HIS: 15, ILE: 30, LEU: 59, LYS: 45, SAA: 22, AAA: 38, THR: 23, TRP: 6, VAL: 39 },
+  source: `${WHO_AA}, column "mg/g protein"`,
+  url: 'https://iris.who.int/handle/10665/43411',
+  confidence: 'high',
+  note: 'Each amino acid requirement (mg/kg per day) divided by the mean protein requirement (0.66 g/kg per day). Checked against the WHO full text on 2026-10-18.',
+};
+
 export const REFERENCE_VALUES_TAKEN = '2026-10-15';

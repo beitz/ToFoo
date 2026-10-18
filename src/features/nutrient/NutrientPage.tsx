@@ -22,6 +22,9 @@ import { energyBasisText } from '../settings/EnergyTarget';
 import { testHintText } from './testHint';
 import { BloodTests, markersFor } from './BloodTests';
 import { formatDay } from '../../lib/dates';
+import { fmtDuration } from '../../ui/duration';
+import { GroupInfoLink, hasGroupInfo } from '../info/GroupInfo';
+import { nutrientType } from '../home/grouping';
 
 export function NutrientPage({ id }: { id: string }) {
   const d = useData();
@@ -264,6 +267,7 @@ export function NutrientPage({ id }: { id: string }) {
 /** What the nutrient does and what too little / too much means. */
 function NutrientInfo({ id }: { id: string }) {
   const key = infoId(id);
+  const group = nutrientType(id);
   const source = NUTRIENT_INFO_SOURCES[key];
   const text = (part: 'role' | 'low' | 'high') => t(`info.${key}.${part}` as MessageKey);
   if (text('role').startsWith('info.')) return null; // no text for this nutrient
@@ -272,6 +276,7 @@ function NutrientInfo({ id }: { id: string }) {
       <h2 className="section-title">{t('nutrient.whatItDoes')}</h2>
       <div className="card small nutrient-info">
         <p>{text('role')}</p>
+        {key === 'EAA' && <p>{t(`aaRole.${id}` as MessageKey)}</p>}
         <p>
           <strong>{t('nutrient.tooLittle')}:</strong> {text('low')}
         </p>
@@ -286,6 +291,7 @@ function NutrientInfo({ id }: { id: string }) {
             </a>
           </p>
         )}
+        {hasGroupInfo(group) && <GroupInfoLink group={group} />}
       </div>
     </>
   );
@@ -297,15 +303,6 @@ function storeLastsText(days: Range): string {
   const high = fmtDuration(days.high);
   const central = fmtDuration(days.central);
   return low === high ? t('nutrient.storeLasts', { central }) : t('nutrient.storeLastsRange', { central, low, high });
-}
-
-/** Rough duration for "about …": days, then weeks, months, years. */
-function fmtDuration(days: number): string {
-  if (days < 1.5) return t('duration.day');
-  if (days < 14) return t('duration.days', { n: Math.round(days) });
-  if (days < 60) return t('duration.weeks', { n: Math.round(days / 7) });
-  if (days < 730) return t('duration.months', { n: Math.round(days / 30.44) });
-  return t('duration.years', { n: fmtNumber(days / 365.25, 1) });
 }
 
 /**

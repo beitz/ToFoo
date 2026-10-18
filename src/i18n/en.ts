@@ -1,8 +1,10 @@
 /** English UI strings (default language). Add a language by creating a file with the same keys. */
+import { groupInfoEn } from './groupInfo.en';
 import { nutrientInfoEn } from './nutrientInfo.en';
 
 export const en = {
   ...nutrientInfoEn,
+  ...groupInfoEn,
   'app.name': 'ToFoo',
   'app.loadError': 'ToFoo could not start.',
   'diag.title': 'Diagnostics',
