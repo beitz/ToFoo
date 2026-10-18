@@ -66,6 +66,12 @@ export function AssistantSettingsPage() {
         {!isOn(d.settings.features, 'openFoodFacts') && <p className="muted small">{t('ai.webSearchNeedsOff')}</p>}
       </div>
 
+      <h2 className="section-title">{t('insights.settingsTitle')}</h2>
+      <div className="card">
+        <Toggle checked={isOn(d.settings.features, 'insights')} onChange={(v) => repo.updateSettings({ features: { ...d.settings.features, insights: v } })} label={t('insights.enable')} />
+        <p className="muted small">{t('insights.privacy')}</p>
+      </div>
+
       <h2 className="section-title">{t('ai.key')}</h2>
       <div className="card">
         {saved?.apiKey ? (

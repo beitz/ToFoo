@@ -4,6 +4,7 @@ import { useToast } from '../../app/toast';
 import { href } from '../../app/router';
 import { t } from '../../i18n';
 import { dayKey, formatDay, formatTime } from '../../lib/dates';
+import { isOn } from '../../settings/features';
 import { repo } from '../../storage/repo';
 import type { JournalEntry } from '../../storage/types';
 import { Icon } from '../../ui/Icon';
@@ -73,6 +74,11 @@ export function JournalPage() {
         </div>
       </div>
 
+      {isOn(d.settings.features, 'aiAssistant') && isOn(d.settings.features, 'insights') && (entries?.length ?? 0) > 0 && (
+        <a className="btn btn-small btn-ghost journal-patterns" href={href('insights')}>
+          <Icon name="insights" size={18} /> {t('insights.open')}
+        </a>
+      )}
       {entries && entries.length === 0 && <p className="muted small">{t('journal.empty')}</p>}
       {shown.map((day) => (
         <div key={day}>

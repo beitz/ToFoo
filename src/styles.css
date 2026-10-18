@@ -2190,3 +2190,78 @@ body:has(.fab-stack) .toast-area {
 .water-list {
   margin-top: 4px;
 }
+
+/* ── Insights ───────────────────────────────────────────────── */
+.insights-start {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.insights-start p {
+  margin: 0;
+}
+.insights-overview li + li {
+  margin-top: 2px;
+}
+.insights-answer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+}
+.insights-checks {
+  width: 100%;
+  padding: 0;
+}
+.insights-checks summary {
+  min-height: 44px;
+  padding: 10px 14px;
+  cursor: pointer;
+  color: var(--accent);
+}
+.insights-checks > ul {
+  padding: 0 14px 10px;
+}
+.insights-check + .insights-check {
+  border-top: 1px solid var(--border);
+}
+.insights-check {
+  padding: 8px 0;
+}
+.insights-check p {
+  margin: 2px 0;
+}
+.insights-check-title {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.insights-days {
+  gap: 6px;
+  margin-top: 6px;
+}
+.insights-day {
+  border-radius: var(--radius-sm);
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 10px;
+  text-decoration: none;
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+.insights-day-yes {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.error-detail {
+  margin: 4px 0 0;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+.notice-card p {
+  margin: 0;
+}
+.journal-patterns {
+  margin: 0 0 12px;
+}

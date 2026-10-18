@@ -88,7 +88,8 @@ export type FeatureKey =
   | 'journal'
   | 'sleep'
   | 'activity'
-  | 'water';
+  | 'water'
+  | 'insights';
 
 export interface Settings extends Versioned {
   id: 'settings';

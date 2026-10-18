@@ -49,6 +49,7 @@ function partFromFood(food: Food, grams: number, preparation: FoodPart['preparat
     provenance: food.provenance,
     group: food.group,
     nameEn: food.nameEn,
+    nameDe: food.nameDe,
     preparation,
     storage,
   };
