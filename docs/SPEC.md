@@ -533,6 +533,7 @@ v1 is the smallest app that is useful every day; each later version adds to the 
 
 - [ ] Shopping list for the next batch; duplicate a recipe; scale a recipe when cooking (last)
 - [ ] CSV export
+- [ ] "At home" screen (owner's idea 2026-10-18, undecided, not to be built yet): one place that shows what is available at home, for quick logging and maybe recipe ideas. Options: (a) favourite items only, as on the log screen today; (b) a storage panel with places such as pantry, cupboard, fridge and freezer, holding cooked batches (already tracked as In stock) and bought foods like kinds of tea; (c) both, with favourites as the quick list and the panel for the full picture. Open: whether bought items get amounts or just "have / don't have", and how they are ticked off when used up.
 - [ ] Phone health data (Health Connect), low priority; the route to automatic sleep times and steps
 - [ ] Energy in and out (calorie balance; the personal energy target exists since 2026-10-17, activity energy not yet): would be nice in one app since it overlaps with nutrient tracking, but the focus stays on nutrients, not weight loss or gain. Only if it can be added cleanly, as an optional feature that keeps the gamification guardrails (no rewards for eating less).
 - [ ] Keep in mind, not needed now: user-set target per nutrient (e.g. from a doctor), clearly marked as user-set. The DGE-derived targets stay as they are.
