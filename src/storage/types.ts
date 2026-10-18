@@ -89,7 +89,8 @@ export type FeatureKey =
   | 'sleep'
   | 'activity'
   | 'water'
-  | 'insights';
+  | 'insights'
+  | 'saveChats';
 
 export interface Settings extends Versioned {
   id: 'settings';

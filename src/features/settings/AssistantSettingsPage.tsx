@@ -72,6 +72,19 @@ export function AssistantSettingsPage() {
         <p className="muted small">{t('insights.privacy')}</p>
       </div>
 
+      <h2 className="section-title">{t('chats.title')}</h2>
+      <ul className="link-list card">
+        <li>
+          <a className="link-row" href={href('settings', 'chats')}>
+            <span>
+              {t('chats.linkTitle')}
+              <span className="muted small block">{t(isOn(d.settings.features, 'saveChats') ? 'chats.linkOn' : 'chats.linkOff')}</span>
+            </span>
+            <Icon name="chevron" size={18} />
+          </a>
+        </li>
+      </ul>
+
       <h2 className="section-title">{t('ai.key')}</h2>
       <div className="card">
         {saved?.apiKey ? (

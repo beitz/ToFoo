@@ -290,6 +290,12 @@ export async function sendMessage(
   return done({ kind: 'error', reason: 'tooManySteps' });
 }
 
+/** The system prompt and tools a request with this context carries (kept with saved chats). */
+export function chatSetup(ctx: ToolContext): { system: string; tools: unknown[] } {
+  const sources = sourcesOf(ctx.products, ctx.journal, ctx.sleep, ctx.activity, ctx.water, ctx.recipe);
+  return { system: systemPromptFor(sources), tools: toolsFor(sources) };
+}
+
 /** The recipe being edited, as the recipe editor's assistant is told about it. */
 export interface RecipeSoFar {
   name: string;

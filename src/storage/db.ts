@@ -4,6 +4,7 @@
  */
 import Dexie, { type Table } from 'dexie';
 import { migrateRecord, needsMigration, TABLES, type TableName } from './migrations';
+import type { ChatPhoto, ChatRecord } from '../ai/chatRecord';
 import type { ActivityRecord, Batch, CustomFood, DayStatusRecord, Fast, JournalEntry, LogEntry, MetaRecord, Product, Profile, Recipe, Settings, SleepRecord, SunEntry, WaterRecord } from './types';
 
 export class ToFooDB extends Dexie {
@@ -22,6 +23,9 @@ export class ToFooDB extends Dexie {
   activities!: Table<ActivityRecord, string>;
   water!: Table<WaterRecord, string>;
   meta!: Table<MetaRecord, string>;
+  /** Saved assistant chats (not in backups: they are logs for debugging, see src/ai/chatRecord.ts). */
+  chats!: Table<ChatRecord, string>;
+  chatPhotos!: Table<ChatPhoto, string>;
 
   constructor(name = 'tofoo') {
     super(name);
@@ -48,6 +52,8 @@ export class ToFooDB extends Dexie {
     this.version(5).stores({ activities: 'id, time, day' });
     // v6: plain water.
     this.version(6).stores({ water: 'id, time, day' });
+    // v7: saved assistant chats and their photos.
+    this.version(7).stores({ chats: 'id, updatedAt', chatPhotos: 'id, chatId' });
   }
 
   table_(name: TableName): Table<Record<string, unknown>, string> {

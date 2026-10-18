@@ -2363,3 +2363,39 @@ body:has(.fab-stack) .toast-area {
 .group-info-sources > li + li {
   margin-top: 4px;
 }
+/* Sharing a saved chat, under the conversation. */
+.chat-export {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  justify-content: flex-end;
+}
+.chat-export-photos {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+}
+.chat-export-photos input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--accent);
+}
+.chat-export a {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}
+.chats-head {
+  margin: 8px 0;
+}
+.chat-row-title {
+  margin: 4px 0;
+  overflow-wrap: anywhere;
+}
+.chat-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}

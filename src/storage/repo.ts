@@ -28,6 +28,7 @@ import {
   type SunEntry,
 } from './types';
 import type { Storage } from '../model/paramTypes';
+import type { ChatPhoto, ChatRecord } from '../ai/chatRecord';
 
 /** All personal data, as stored. Used for backups. */
 export interface Snapshot {
@@ -371,6 +372,40 @@ export function createRepo(db: ToFooDB) {
     },
     async setMeta(key: string, value: unknown): Promise<void> {
       await db.meta.put({ key, value });
+    },
+
+    // ── Saved assistant chats ──
+    /** Save a chat and the photos it does not have yet. */
+    async saveChat(chat: ChatRecord, photos: ChatPhoto[] = []): Promise<void> {
+      await db.transaction('rw', db.chats, db.chatPhotos, async () => {
+        await db.chats.put(chat);
+        if (photos.length) await db.chatPhotos.bulkPut(photos);
+      });
+    },
+    async chatPhotos(chatId: string): Promise<ChatPhoto[]> {
+      return (await db.chatPhotos.where('chatId').equals(chatId).toArray()).sort((a, b) => a.n - b.n);
+    },
+    /** Characters of photo data per chat, for the sizes in the list. */
+    async chatPhotoSizes(): Promise<Map<string, number>> {
+      const sizes = new Map<string, number>();
+      await db.chatPhotos.each((p) => void sizes.set(p.chatId, (sizes.get(p.chatId) ?? 0) + p.data.length));
+      return sizes;
+    },
+    /** Delete chats with their photos; returns them so the UI can offer undo via restoreChats. */
+    async deleteChats(ids: string[]): Promise<{ chats: ChatRecord[]; photos: ChatPhoto[] }> {
+      return db.transaction('rw', db.chats, db.chatPhotos, async () => {
+        const chats = (await db.chats.bulkGet(ids)).filter((c): c is ChatRecord => !!c);
+        const photos = await db.chatPhotos.where('chatId').anyOf(ids).toArray();
+        await db.chats.bulkDelete(ids);
+        await db.chatPhotos.bulkDelete(photos.map((p) => p.id));
+        return { chats, photos };
+      });
+    },
+    async restoreChats(old: { chats: ChatRecord[]; photos: ChatPhoto[] }): Promise<void> {
+      await db.transaction('rw', db.chats, db.chatPhotos, async () => {
+        await db.chats.bulkPut(old.chats);
+        await db.chatPhotos.bulkPut(old.photos);
+      });
     },
 
     // ── Backup ──
