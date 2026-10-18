@@ -396,6 +396,8 @@ Per nutrient (one Markdown file in `content/wiki/`):
 
 Content is drafted once from reputable sources, cited, and reviewed by the user; it is static content in the repo, not generated at runtime. It is general education, not medical advice, and says so once on the wiki's front page.
 
+**Group pages** (decided 2026-10-18): each nutrient group (protein and amino acids, fats, carbohydrates, vitamins, minerals) has a one-page explanation in a pop-up, opened from a small ⓘ next to the group's heading on Home ("By type"), on the food page (the nutrient table is split into the same groups) and from "About …" on each nutrient's "What it does" card. It says what the group is, which ones the body can make, where they come from (animal, plant or both) and what changes absorption, with sources listed at the end. Comparisons are computed, not written: the amino acid make-up of grain, legume, nut and animal protein (median per g protein over BLS foods, as % of the WHO 2007 adult requirement pattern, ↓ below 100 %), the fatty acid shares of common fats (BLS), store durations and cooking losses (from `model/`). Each essential amino acid also has a one-line role, shown on the group page and its nutrient page. Texts: `src/i18n/groupInfo.en.ts`.
+
 ## Motivation and gamification
 
 A light layer of rewards makes regular use feel good, rewarding logging, cooking, variety and nutrients in range, never eating less.

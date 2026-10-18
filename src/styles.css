@@ -2265,3 +2265,74 @@ body:has(.fab-stack) .toast-area {
 .journal-patterns {
   margin: 0 0 12px;
 }
+
+/* ── Nutrient group info pages (ⓘ on Home "By type", food and nutrient pages) ── */
+.home-group-row {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+}
+.home-group-row .home-group-head {
+  flex: 1;
+  min-width: 0;
+  border-bottom: none;
+}
+.info-btn {
+  color: var(--text-muted);
+}
+.group-row th {
+  text-align: left;
+  padding: 10px 4px 0;
+  border-bottom: 1px solid var(--border);
+}
+.group-row-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-weight: 700;
+}
+.group-info h3 {
+  font-size: 1rem;
+  margin: 18px 0 6px;
+}
+.group-info p {
+  margin: 6px 0;
+}
+.group-info-list {
+  margin: 6px 0;
+  padding-left: 1.2em;
+}
+.group-info-list > li + li {
+  margin-top: 6px;
+}
+.table-scroll {
+  overflow-x: auto;
+}
+.group-info-table th {
+  text-align: left;
+  font-weight: 600;
+  padding: 5px 4px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+.group-info-table thead th {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  vertical-align: bottom;
+}
+.group-info-table th.num {
+  text-align: right;
+}
+.group-info-table td.below {
+  font-weight: 700;
+  color: var(--warn);
+}
+.group-info-sources {
+  margin: 6px 0;
+  padding-left: 1.2em;
+  overflow-wrap: anywhere;
+}
+.group-info-sources > li + li {
+  margin-top: 4px;
+}

@@ -20,6 +20,7 @@ import { SleepQuestion } from '../sleep/SleepQuestion';
 import { WaterCard } from '../water/WaterCard';
 import { SleepButton } from '../sleep/SleepButton';
 import { StockChips } from './StockChips';
+import { GroupInfoButton, hasGroupInfo } from '../info/GroupInfo';
 import { attentionCounts, COLLAPSED_BY_DEFAULT, groupNutrients, type HomeGrouping } from './grouping';
 
 /** Shown first, in one row: energy and the macronutrients. */
@@ -174,15 +175,18 @@ export function HomePage() {
               : t('home.groupAllFine');
         return (
           <div key={g.key} className={`home-group home-group-${g.id}`}>
-            <button className="home-group-head" aria-expanded={!collapsed} aria-controls={`group-${g.key}`} onClick={() => toggleGroup(g.key)}>
-              <span className={collapsed ? 'chev' : 'chev chev-open'} aria-hidden>
-                <Icon name="chevron" size={16} />
-              </span>
-              <span className="home-group-title">
-                {t(`home.group.${grouping}.${g.id}` as MessageKey)} <span className="home-group-count">{g.items.length}</span>
-              </span>
-              {hint && <span className="home-group-hint">{hint}</span>}
-            </button>
+            <div className="home-group-row">
+              <button className="home-group-head" aria-expanded={!collapsed} aria-controls={`group-${g.key}`} onClick={() => toggleGroup(g.key)}>
+                <span className={collapsed ? 'chev' : 'chev chev-open'} aria-hidden>
+                  <Icon name="chevron" size={16} />
+                </span>
+                <span className="home-group-title">
+                  {t(`home.group.${grouping}.${g.id}` as MessageKey)} <span className="home-group-count">{g.items.length}</span>
+                </span>
+                {hint && <span className="home-group-hint">{hint}</span>}
+              </button>
+              {grouping === 'type' && hasGroupInfo(g.id) && <GroupInfoButton group={g.id} />}
+            </div>
             {!collapsed && grid}
           </div>
         );
