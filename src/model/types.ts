@@ -21,6 +21,8 @@ export interface FoodPart {
   group?: string;
   /** English name, to detect tea and coffee. */
   nameEn?: string;
+  /** German name, for finding foods by name in either language (Insights). */
+  nameDe?: string;
   preparation: Preparation;
   storage: Storage;
 }

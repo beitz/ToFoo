@@ -4,14 +4,15 @@ import { useToast } from '../../app/toast';
 import { href, navigate } from '../../app/router';
 import { t, type MessageKey } from '../../i18n';
 import { dayKey, formatDay, formatTime } from '../../lib/dates';
-import { fmtNumber, fmtTokens, fmtUsd } from '../../lib/format';
+import { fmtNumber } from '../../lib/format';
 import { appNote, emptyConversation, sendMessage, type AiModel, type Conversation, type ShownNote, type ShownProposal, type ShownSleep, type ShownActivity, type ShownWater, type TurnOutcome } from '../../ai/assistant';
 import { classifyError, getAiSettings, makeCreate, saveUsage } from '../../ai/client';
-import { mergeModelTokens, modelTokensCost, totalTokens, type ModelTokens } from '../../ai/pricing';
+import { mergeModelTokens, type ModelTokens } from '../../ai/pricing';
 import { prepareImage, type PreparedImage } from '../../ai/image';
 import { photoLabel, readPhotoTime, type PhotoTime } from '../../ai/photoTime';
 import { appendText, useDictation } from './useDictation';
 import { RecordingTime } from './RecordingTime';
+import { UsageLine } from './UsageLine';
 import { VoiceFailed } from './VoiceFailed';
 import type { ProposedItem, ProductTools } from '../../ai/tools';
 import { findProduct, findUsda } from '../../foods/findProduct';
@@ -506,16 +507,6 @@ function touchKeyboard(): boolean {
 }
 
 /** What this chat has cost so far, from the token counts the API reports (an estimate at list prices). */
-function UsageLine({ chat, turn, model }: { chat: ModelTokens; turn: ModelTokens; model: AiModel }) {
-  const tokens = Object.values(chat).reduce((n, t) => n + totalTokens(t), 0);
-  if (tokens === 0) return null;
-  return (
-    <p className="usage-line muted small">
-      {t('ai.usageLine', { chat: fmtUsd(modelTokensCost(chat, model)), last: fmtUsd(modelTokensCost(turn, model)), tokens: fmtTokens(tokens) })}
-    </p>
-  );
-}
-
 /** Capture time under a photo thumbnail: "Thu 19:42", "≈ Thu 19:42" from the file date, or "–". */
 function photoTimeShort(pt: PhotoTime): string {
   if (pt.time === undefined) return '–';

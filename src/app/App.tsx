@@ -29,6 +29,7 @@ import { ProfilePage } from '../features/settings/ProfilePage';
 import { SunPage } from '../features/settings/SunPage';
 import { DiagnosticsPage } from '../features/settings/DiagnosticsPage';
 import { BackupPage, ExclusionsPage, NutrientVisibilityPage, SavedPage, StartPage } from '../features/settings/MorePages';
+import { InsightsPage } from '../features/insights/InsightsPage';
 import { Onboarding } from '../features/onboarding/Onboarding';
 
 function Page({ route }: { route: string[] }) {
@@ -44,6 +45,8 @@ function Page({ route }: { route: string[] }) {
       return <DiaryPage day={b} />;
     case 'journal':
       return <JournalPage />;
+    case 'insights':
+      return <InsightsPage />;
     case 'recipes':
       if (b === 'new') return <RecipeEditor key="new" />;
       if (b && c === 'edit') return <RecipeEditor key={b} id={b} />;
@@ -103,7 +106,7 @@ const NAV = [
 
 export function App() {
   const route = useRoute();
-  const section = route[0] === 'about' ? 'settings' : (route[0] ?? 'home');
+  const section = route[0] === 'about' ? 'settings' : route[0] === 'insights' ? 'diary' : (route[0] ?? 'home');
   const active = NAV.some((n) => n.key === section) ? section : 'home';
   const path = route.join('/');
   // Braces matter: an effect's return value is its cleanup, and newer Chrome returns a Promise
