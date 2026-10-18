@@ -352,6 +352,7 @@ One versioned JSON format ("ToFoo exchange format") is used for QR codes, pasted
 - Recipes reference ingredients as `source + version + code + grams + preparation`, never copied nutrient values. Manual ingredients carry their own nutrient values and confidence.
 - A JSON Schema file in the repo (`docs/exchange-format.schema.json`) plus a human-readable description (`docs/exchange-format.md`).
 - Import always shows a preview and asks for confirmation; invalid input gives a clear error, never a silent partial import.
+- Every backup is read back right after export, exactly as a restore would read it; if that fails, the backup page shows the exact problem (and the diagnostics log keeps it), so an unrestorable backup is noticed at once. A type check (`src/exchange/coverage.ts`) fails the build when a stored field is missing from the backup schema, which would otherwise drop it silently on restore.
 
 **QR codes on printed recipes** (v2): the QR encodes a link to the app with the recipe compressed into the URL fragment, e.g. `https://beitz.github.io/ToFoo/#import=<compressed recipe>`. Scanning with the normal phone camera opens the app and shows "Import Linsencurry, 6 portions?". The fragment is never sent to a server. The app has an "Export as QR" action per recipe (SVG and PNG, for the A4 recipe sheets). Claude Code verifies that a typical recipe (15–20 ingredients) stays within a comfortably scannable QR size.
 
