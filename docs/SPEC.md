@@ -342,6 +342,82 @@ Built 2026-10-18 (optional module "Insights", off by default, needs the AI assis
 
 **Cost and privacy**: one request for three ideas costs roughly as much as a logged meal (a few cents with the default model, shown in the usage display). It sends the nutrient statuses, recipe and recent food names, stock and the preferences text to Anthropic, only when the user asks, which the setting says plainly.
 
+## Ketosis estimate during fasts
+
+During a fast, show how far the body has probably moved toward ketosis, as a phase and a range taken from fasting studies, never as one precise number (owner's request, 2026-10-18; spec only, nothing built, roadmap "Later"). Optional module "Ketosis estimate", off by default, used only while a fast runs. It is information, not a target: the guardrails under "Motivation and gamification" apply, so there are no rewards, streaks or "better" colours for deeper ketosis or longer fasts.
+
+**What the studies show.** The marker is blood β-hydroxybutyrate (BHB), the main ketone body, in mmol/L. Means from studies of healthy adults on water-only fasts:
+
+| Time since the last meal | BHB, mmol/L | Source |
+| --- | --- | --- |
+| Fed and overnight | 0.1–0.25 (daily swing) | Puchalska & Crawford 2017, review |
+| 12–36 h | The "metabolic switch" from glycogen to fat; when it comes depends on how full the liver's glycogen store was and on exercise during the fast | Anton et al. 2018, review |
+| about 14 h | 0.4 | Cahill et al. 1966 (6 men of normal weight) |
+| 17.5 h with exercise, 21 h without | Mean time to reach 0.5 | Deru et al. 2021 (20 adults, 36-h fasts, finger-prick meter every 2 h) |
+| 24 h | about 1 | Puchalska & Crawford 2017 |
+| 30 h | Men 0.9, women 1.7 | Haymond et al. 1982 (10 men, 10 women) |
+| about 38 / 62 / 86 / 110 / 134 / 158 h | 1.6 / 2.2 / 2.9 / 3.1 / 3.6 / 4.2 | Cahill et al. 1966 (same 6 men; morning samples. The hours are worked out from the study schedule: last meal at supper, samples at 8 a.m.) |
+| Day 3 / 10 / 17 / 24–38 | 1.2 / 4.3 / 5.1 / 5.8–5.9 (levels off after about 3 weeks) | Owen et al. 1969 (11 people with obesity) |
+
+These are group means; individuals vary a lot around them, and the studies are small, partly old and used different assays.
+
+**What moves the curve.** The direction of each factor is well supported. How big the effect is comes from single small studies, so the sizes go into `model/parameters.ts` with low/central/high values and a confidence note:
+
+- **Carbohydrate in the last meal.** After a low-carb, high-fat shake, older overweight adults reached 0.5 mmol/L at about 12 h on average. After a high-carb shake with the same energy, they did not reach it within 24 h (Gipson et al. 2025, 24 adults). A high-fat day before a fasting day also raised breath acetone (Prabhakar et al. 2015). The app knows the carbohydrate of the last meal and of the days before from the log.
+- **Carbohydrate during the fast.** A high-carb shake at hour 24 of a 38-h fast cut BHB sharply, and a high-fat shake less so: the water-only fast had 135 % and 70 % more BHB (Deru et al. 2024). In the app any logged food ends the fast, so this matters only for drinks and supplements, which do not end it.
+- **Exercise early in the fast.** A treadmill session at the start brought 0.5 mmol/L about 3.6 h earlier (17.5 vs 21.1 h; the uncertainty interval runs from 2.1 h later to 10.9 h earlier), and BHB over the 36 h was 43 % higher (Deru et al. 2021). This is taken from the Activity log: moderate or hard minutes since the last meal.
+- **Sex.** Women's ketones rise sooner and higher (Haymond et al. 1982: 1.7 vs 0.9 at 30 h; Merimee et al. 1978: faster rise in women over 72-h fasts). This is taken from the profile.
+- **Body fat.** Ketosis develops more slowly with obesity (Göschke & Lauffenburger 1975: 14 people of normal weight vs 26 with obesity; Prabhakar et al. 2015: lower BMI, more acetone). The Owen people with obesity were at 1.2 on day 3, while Cahill's men of normal weight were at about 2.2 at a similar time. BMI from the profile's weight and height serves as the proxy.
+- Not used: age (only children differ clearly; Haymond et al. 1982 measured 3.7 at 30 h), and exogenous ketones and MCT oil (not modelled).
+
+**Estimate** (to build later). This is a pure function in `src/model/`, and its curve and shifts live in `model/parameters.ts` with sources. Nothing it computes is stored.
+
+1. Hours since the last meal: from the time of the last entry that ended eating before the fast (entries carry their time), else the fast's start.
+2. A reference curve by hour, for adults of normal weight, through the means above (Cahill 1966, Deru 2021, Haymond 1982, Puchalska 2017), with Owen 1969 as the reference for obesity and long fasts.
+3. Each factor shifts the curve earlier or later by its sourced amount. Its range widens the band.
+4. The output is a phase and a range, for example "Fasting 26 h · ketosis probably starting · about 0.3–0.9 mmol/L". The phases are display choices around the 0.5 mmol/L line that studies use for "nutritional ketosis" (Deru 2021, Gipson 2025): *not yet* (below 0.5), *light* (0.5–1.5), *moderate* (1.5–3), *deep* (above 3, only in long fasts). They are named in words, not shown by colour alone. Ranges are rounded to one decimal, and "about" is always shown.
+
+**Measured values** (optional; they make the estimate personal):
+
+- "Add a measurement" on the fast page, or telling the assistant ("ketones 1.2 this morning"), which proposes a ketone card (K1, K2, …) to check and save, like the other trackers. Each record holds a time, a type and a value. It is stored as user-entered data with a `schemaVersion`, included in backups (`data.ketones`) and in the backup read-back check.
+- **Blood BHB** (finger-prick meter, mmol/L) is the most reliable home method. A common meter agrees with laboratory LC-MS/MS from 0 to 3 mmol/L (slope 1.20). Above 3 its readings scatter, so the app shows such values as "> 3" (Janssen et al. 2010).
+- **Breath acetone** (ppm) depends on the device. It follows blood ketones roughly linearly up to about 4 mmol/L (Göschke & Lauffenburger 1975), but diet, exercise and breathing affect it (Anderson 2015). It is shown as measured and not converted.
+- **Urine strips** detect only acetoacetate and only roughly (Laffel 1999). The strip's level is shown as read and not converted.
+- On the fast page, measurements appear as dots on the curve. The latest one is shown with its age ("1.4 mmol/L, measured 3 h ago"); the estimate never overrides it. With blood measurements from several fasts, the app works out the user's own shift against the reference curve ("you reach 0.5 about 4 h earlier than the study average, from 6 measurements") and uses it in later estimates. Breath and urine values are not used for this, because there is no sourced conversion to blood values.
+- Measured ketones become a measure in Insights.
+
+**Where it shows.** The running-fast line on Home gets the phase ("Fasting 31 h · light ketosis likely"). This also covers the "fasting timer" nice to have under "Dashboard and UX". Tapping the line opens the fast page:
+
+
+- the curve over hours since the last meal, with the estimated band, the user's measurements and a "now" mark;
+- what moved the curve, in words with the source ("last meal 95 g carbohydrate: later", "40 min hard cycling: earlier");
+- past fasts with their length and measurements;
+- a reading guide behind ⓘ that explains BHB, the phases and how uncertain the estimate is.
+
+**Safety.**
+
+
+- The setting says the estimate is not meant for people with diabetes treated with insulin or SGLT2 inhibitors, or during pregnancy, and that their ketone values belong with their doctor. In these groups ketoacidosis can develop with normal blood sugar, and for people on SGLT2 inhibitors prolonged fasting and very-low-carbohydrate diets are listed risk factors (Umpierrez et al. 2024, ADA/EASD consensus; there, diabetic ketoacidosis needs diabetes, BHB ≥ 3.0 mmol/L and acidosis together).
+- A measured blood value above what water-only fasts reach in healthy people (about 6 mmol/L after weeks, Owen et al. 1969; the exact line is open) gets a plain note. It suggests measuring again, and getting medical help if there is nausea, vomiting, belly pain or fast breathing. No other alerts.
+
+**Sources** (all checked 2026-10-18 at least as the abstract; Cahill 1966 and Owen 1969 tables read in full):
+
+- Anderson JC. Measuring breath acetone for monitoring fat loss: review. Obesity 2015;23:2327–34. doi:10.1002/oby.21242
+- Anton SD et al. Flipping the metabolic switch: understanding and applying the health benefits of fasting. Obesity 2018;26:254–68. doi:10.1002/oby.22065
+- Cahill GF Jr et al. Hormone-fuel interrelationships during fasting. J Clin Invest 1966;45:1751–69 (Table III). doi:10.1172/JCI105481
+- Deru LS et al. The effects of exercise on β-hydroxybutyrate concentrations over a 36-h fast: a randomized crossover study. Med Sci Sports Exerc 2021;53:1987–98. doi:10.1249/MSS.0000000000002655
+- Deru LS et al. The effects of a high-carbohydrate versus a high-fat shake on biomarkers of metabolism and glycemic control when used to interrupt a 38-h fast. Nutrients 2024;16:164. doi:10.3390/nu16010164
+- Gipson EZ et al. The effects of initiating a 24-hour fast with a low versus a high carbohydrate shake on glycemic control in older adults. Nutr Metab 2025;22:32. doi:10.1186/s12986-025-00920-5
+- Göschke H, Lauffenburger T. Breath acetone and ketonemia in normal- and overweight subjects during total fasting. Res Exp Med 1975;165:233–44. doi:10.1007/BF01971383
+- Haymond MW et al. Differences in circulating gluconeogenic substrates during short-term fasting in men, women, and children. Metabolism 1982;31:33–42. doi:10.1016/0026-0495(82)90024-5
+- Janssen MJ et al. Accuracy of the Precision point-of-care ketone test examined by LC-MS/MS in the same fingerstick sample. Clin Chem Lab Med 2010;48:1781–4. doi:10.1515/CCLM.2010.351
+- Laffel L. Ketone bodies: a review of physiology, pathophysiology and application of monitoring to diabetes. Diabetes Metab Res Rev 1999;15:412–26
+- Merimee TJ, Misbin RI, Pulkkinen AJ. Sex variations in free fatty acids and ketones during fasting: evidence for a role of glucagon. J Clin Endocrinol Metab 1978;46:414–9. doi:10.1210/jcem-46-3-414
+- Owen OE et al. Liver and kidney metabolism during prolonged starvation. J Clin Invest 1969;48:574–83 (Table II). doi:10.1172/JCI106016
+- Prabhakar A et al. Acetone as biomarker for ketosis buildup capability: a study in healthy individuals under combined high fat and starvation diets. Nutr J 2015;14:41. doi:10.1186/s12937-015-0028-x
+- Puchalska P, Crawford PA. Multi-dimensional roles of ketone bodies in fuel metabolism, signaling, and therapeutics. Cell Metab 2017;25:262–84. doi:10.1016/j.cmet.2016.12.022
+- Umpierrez GE et al. Hyperglycemic crises in adults with diabetes: a consensus report. Diabetes Care 2024;47:1257–75. doi:10.2337/dci24-0032
+
 ## Exchange format, QR codes and the Claude helper
 
 One versioned JSON format ("ToFoo exchange format") is used for QR codes, pasted entries, and backups, so every import path shares one parser and one validator.
@@ -379,7 +455,7 @@ The home screen answers "how am I doing, and what do I eat next?" at a glance, w
 - **Day and range breakdown** (built 2026-10-16): the full nutrient breakdown for one day, a week, a month or a chosen date range ("how was September?"), using the same gauges and percentages. It shows what was logged, nothing filled in: the average per day over the days that count in the model (logged and fasted days, and days without entries unless "Fill in unlogged days" is on; partly logged, filled-in and left-out days are not counted and are shown separately). Percentages are the absorbed amount against the absorbed need, as on Home, and intake against the limit for limits; nutrients with stores show the daily average here, not a fill level. The diary links to the day view and the calendar to the month. The stores view stays the main one on Home.
 - **Trends and weekly look-back**: weekly averages and charts across nutrients, not only one nutrient's history. This is the "weekly recap card" (see Motivation), shipped on its own, without the rest of gamification.
 - **Calendar of day statuses** (built 2026-10-16): a month view, Monday first, with logged / partly / fasted / not logged (and filled in / left out, when used) per day (icon and label, not colour alone) and the count per status; tap a day to open it in the diary, which links back to the calendar. Unlogged days matter for the model, so finding and fixing them fast is worth more here than in other apps.
-- **Fasting timer** (nice to have): "fasted 31 h" on Home, from the last meal's time. Information only, no rewards for longer fasts.
+- **Fasting timer** (nice to have): "fasted 31 h" on Home, from the last meal's time. Information only, no rewards for longer fasts. Planned as part of the ketosis estimate (see "Ketosis estimate during fasts"), which adds the likely phase to the same line.
 
 **UX principles**:
 
@@ -447,6 +523,7 @@ Optional features are modules with an on/off switch, so the app can be tuned bet
 | Save assistant chats | On | Keep each assistant chat on the phone to share as a file (not in backups) |
 | Insights | Off | With the assistant on: look for patterns across journal, food, sleep and activity (sends the journal text to Anthropic) |
 | Recipe ideas | Off | With the assistant on: recipe suggestions for your gaps and preferences (sends nutrient statuses, recipe and food names, and your preferences text to Anthropic when you ask) |
+| Ketosis estimate | Off (later) | During a fast: how far toward ketosis you probably are, from fasting studies, as a phase and a range; optional measured ketone values |
 
 Settings also hold the profile, starting-level choice, salt defaults, meal window, rolling-average window, and backup options. Features are implemented behind one feature-flag module so new ones get a toggle by default.
 
@@ -541,6 +618,7 @@ v1 is the smallest app that is useful every day; each later version adds to the 
 - [ ] CSV export
 - [ ] Automatic backups: up to 5 kept on the phone, listed in Settings → Backup with restore and "Save as file"; the reminder moves there (owner's request 2026-10-18, see "Data storage, backup and privacy")
 - [ ] "At home" screen (owner's idea 2026-10-18, undecided, not to be built yet): one place that shows what is available at home, for quick logging and maybe recipe ideas. Options: (a) favourite items only, as on the log screen today; (b) a storage panel with places such as pantry, cupboard, fridge and freezer, holding cooked batches (already tracked as In stock) and bought foods like kinds of tea; (c) both, with favourites as the quick list and the panel for the full picture. Open: whether bought items get amounts or just "have / don't have", and how they are ticked off when used up.
+- [ ] Ketosis estimate during fasts (owner's request 2026-10-18): optional; phase and BHB range by hours since the last meal from fasting studies, shifted by carbohydrate in the last meal, early exercise, sex and BMI; optional measured blood, breath or urine values, also through the assistant; see "Ketosis estimate during fasts"
 - [ ] Phone health data (Health Connect), low priority; the route to automatic sleep times and steps
 - [ ] Energy in and out (calorie balance; the personal energy target exists since 2026-10-17, activity energy not yet): would be nice in one app since it overlaps with nutrient tracking, but the focus stays on nutrients, not weight loss or gain. Only if it can be added cleanly, as an optional feature that keeps the gamification guardrails (no rewards for eating less).
 - [ ] Keep in mind, not needed now: user-set target per nutrient (e.g. from a doctor), clearly marked as user-set. The DGE-derived targets stay as they are.
