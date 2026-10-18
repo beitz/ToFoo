@@ -65,9 +65,40 @@ export interface Conversation {
   waters?: number;
   /** Ingredient cards (recipe editor) or recipe cards (main chat) shown so far; the next one gets id R(recipes + 1). */
   recipes?: number;
+  /** User messages with photos, each with the cards proposed after it (see retirePhotos). */
+  photoTurns?: PhotoTurn[];
 }
 
-export const emptyConversation = (): Conversation => ({ messages: [], pendingResults: [], cards: 0, notes: 0, sleeps: 0, activities: 0, waters: 0, recipes: 0 });
+/** A user message with photos (its index in messages) and the cards proposed after it, until the next one. */
+export interface PhotoTurn {
+  message: number;
+  cards: string[];
+}
+
+export const emptyConversation = (): Conversation => ({ messages: [], pendingResults: [], cards: 0, notes: 0, sleeps: 0, activities: 0, waters: 0, recipes: 0, photoTurns: [] });
+
+const RETIRED_PHOTO = '[photo removed]';
+const RETIRED_NOTE =
+  '(App note: the photos of this message were removed from the chat to save cost, because everything proposed from them has been saved. If you need to look at one again, ask the user to send it again.)';
+
+/**
+ * Take photos out of the chat once everything proposed from them is saved (or replaced by a
+ * correction). Every request resends the whole chat; the cache makes that cheap only for 5
+ * minutes, so a reply after a longer break pays for every photo again. Photo labels stay, so the
+ * assistant still knows what was there. Recipe ideas do not count: they are not made from photos.
+ */
+export function retirePhotos(conversation: Conversation, handled: (cardId: string) => boolean): Conversation {
+  const turns = conversation.photoTurns ?? [];
+  const done = turns.filter((p) => p.cards.length > 0 && p.cards.every(handled));
+  if (done.length === 0) return conversation;
+  const retire = new Set(done.map((p) => p.message));
+  const messages = conversation.messages.map((m, i): Beta.BetaMessageParam => {
+    if (!retire.has(i) || typeof m.content === 'string') return m;
+    const content = m.content.map((b): Beta.BetaContentBlockParam => (b.type === 'image' ? { type: 'text', text: RETIRED_PHOTO } : b));
+    return { ...m, content: [...content, { type: 'text', text: RETIRED_NOTE }] };
+  });
+  return { ...conversation, messages, photoTurns: turns.filter((p) => !retire.has(p.message)) };
+}
 
 export interface UserImage {
   mediaType: 'image/jpeg' | 'image/png' | 'image/webp';
@@ -178,6 +209,8 @@ export async function sendMessage(
   if (user.appNote) content.push({ type: 'text', text: user.appNote });
   messages.push({ role: 'user', content });
   const sources = sourcesOf(ctx);
+  let photoTurns = [...(conversation.photoTurns ?? [])];
+  if (user.images.length > 0) photoTurns.push({ message: messages.length - 1, cards: [] });
 
   let cards = conversation.cards;
   let notes = conversation.notes ?? 0;
@@ -185,7 +218,7 @@ export async function sendMessage(
   let activities = conversation.activities ?? 0;
   let waters = conversation.waters ?? 0;
   let recipes = conversation.recipes ?? 0;
-  const done = (outcome: TurnOutcome, pendingResults: Beta.BetaToolResultBlockParam[] = []) => ({ conversation: { messages, pendingResults, cards, notes, sleeps, activities, waters, recipes }, outcome });
+  const done = (outcome: TurnOutcome, pendingResults: Beta.BetaToolResultBlockParam[] = []) => ({ conversation: { messages, pendingResults, cards, notes, sleeps, activities, waters, recipes, photoTurns }, outcome });
 
   for (let step = 0; step < MAX_STEPS; step++) {
     const res = await create(requestParams(model, messages, sources));
@@ -302,6 +335,9 @@ export async function sendMessage(
         ...recipesProposed.map(({ id }, i) => [id, shownRecipes[i]!.id] as const),
       ]);
       const order = uses.map((u) => cardOfUse.get(u.id)).filter((id): id is string => !!id);
+      const fromPhotos = order.filter((id) => !shownRecipes.some((r) => r.id === id && r.kind === 'idea'));
+      const last = photoTurns[photoTurns.length - 1];
+      if (last) photoTurns = [...photoTurns.slice(0, -1), { ...last, cards: [...last.cards, ...fromPhotos] }];
       const shownResult = (id: string, card: string, verb: string): Beta.BetaToolResultBlockParam => ({ type: 'tool_result', tool_use_id: id, content: `Shown to the user as card ${card}. Not ${verb} yet; their reply follows.` });
       const shownResults = [
         ...proposals.map(({ id }, i) => shownResult(id, shown[i]!.id, 'logged')),

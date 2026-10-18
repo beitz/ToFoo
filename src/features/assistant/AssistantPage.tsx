@@ -11,6 +11,7 @@ import {
   appNote,
   chatSetup,
   emptyConversation,
+  retirePhotos,
   sendMessage,
   type AiModel,
   type Conversation,
@@ -320,7 +321,9 @@ function Chat({ apiKey, model, day, recipe }: { apiKey: string; model: AiModel; 
               recipes: recipeTools(),
             }),
       };
-      const r = await sendMessage(create, model, conversation, msg, ctx, onUsage);
+      // Photos whose cards are all saved leave the chat, so this and later requests don't pay for them again.
+      const lighter = retirePhotos(conversation, (id) => !cardsRef.current.get(id) || !!cardsRef.current.get(id)?.logged);
+      const r = await sendMessage(create, model, lighter, msg, ctx, onUsage);
       setConversation(r.conversation);
       recorder.conversation(r.conversation.messages, chatSetup(ctx));
       setPhotoCount((n) => n + msg.images.length);

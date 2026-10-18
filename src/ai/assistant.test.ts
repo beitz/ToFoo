@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type * as Beta from '@anthropic-ai/sdk/resources/beta/messages/messages';
 import type { Food } from '../foods/foodDb';
 import { buildIndex } from '../foods/search';
-import { appNote, emptyConversation, requestParams, sendMessage, textOf, type CreateMessage } from './assistant';
+import { appNote, emptyConversation, requestParams, retirePhotos, sendMessage, textOf, type CreateMessage } from './assistant';
 import { describeFood, MAX_INGREDIENT_GRAMS, MAX_ITEM_GRAMS, runCheckRecipe, runListRecipes, validateRecipeProposal, validateIngredientsProposal, runLookupBarcode, runSearchFoods, runSearchUsda, validateJournalProposal, validateProposal, validateSleepProposal, validateActivityProposal, validateWaterProposal, type ProductTools, type ToolContext } from './tools';
 import type { Product } from '../storage/types';
 import type { FindResult } from '../foods/findProduct';
@@ -168,6 +168,36 @@ describe('several meals at once', () => {
     const next = scripted(reply([toolUse('c', 'propose_meal', meal('Yogurt', '2026-10-16 21:05', 'M2'))], 'tool_use'));
     const after = await sendMessage(next.create, 'claude-opus-5-5', conversation, { text: 'the evening one was bigger', images: [] }, { ...ctx, now });
     expect(after.outcome.kind === 'proposal' && after.outcome.proposals.map((p) => [p.id, p.replaces])).toEqual([['M3', 'M2']]);
+  });
+
+  it('takes photos out of the chat once every card made from them is saved or replaced', async () => {
+    const api = scripted(reply([toolUse('a', 'propose_meal', meal('Yogurt', '2026-10-16 08:10')), toolUse('b', 'propose_meal', meal('Yogurt', '2026-10-16 21:05'))], 'tool_use'));
+    const img = (label: string) => ({ mediaType: 'image/jpeg' as const, data: 'AAAA', label });
+    const first = await sendMessage(api.create, 'claude-opus-5-5', emptyConversation(), { text: 'yogurt twice', images: [img('Photo 1'), img('Photo 2')] }, { ...ctx, now });
+    expect(first.conversation.photoTurns).toEqual([{ message: 0, cards: ['M1', 'M2'] }]);
+    const types = (c: typeof first.conversation) => (c.messages[0]!.content as Beta.BetaContentBlockParam[]).map((b) => b.type);
+
+    // M2 still open: the photos stay, the assistant may need them for a correction.
+    expect(retirePhotos(first.conversation, (id) => id === 'M1')).toBe(first.conversation);
+
+    // A correction replaces M2 (its card goes away); once M1 and M3 are saved, the photos go.
+    const next = scripted(reply([toolUse('c', 'propose_meal', meal('Yogurt', '2026-10-16 21:05', 'M2'))], 'tool_use'));
+    const second = await sendMessage(next.create, 'claude-opus-5-5', first.conversation, { text: 'the evening one was bigger', images: [] }, { ...ctx, now });
+    expect(second.conversation.photoTurns).toEqual([{ message: 0, cards: ['M1', 'M2', 'M3'] }]);
+    const saved = new Set(['M1', 'M3']);
+    const lighter = retirePhotos(second.conversation, (id) => id === 'M2' || saved.has(id));
+    expect(types(lighter)).toEqual(['text', 'text', 'text', 'text', 'text', 'text']);
+    expect(JSON.stringify(lighter.messages[0])).not.toContain('AAAA');
+    expect(JSON.stringify(lighter.messages[0])).toContain('Photo 2');
+    expect(lighter.photoTurns).toEqual([]);
+    // The rest of the chat is untouched.
+    expect(lighter.messages.slice(1)).toEqual(second.conversation.messages.slice(1));
+    expect(types(second.conversation)).toContain('image');
+  });
+
+  it('keeps photos of a message that has no cards yet (questions first)', () => {
+    const conv = { ...emptyConversation(), messages: [{ role: 'user' as const, content: [{ type: 'image' as const, source: { type: 'base64' as const, media_type: 'image/jpeg' as const, data: 'AAAA' } }] }], photoTurns: [{ message: 0, cards: [] }] };
+    expect(retirePhotos(conv, () => true)).toBe(conv);
   });
 
   it('shows no cards when one proposal of a batch is invalid, and asks for all again', async () => {
