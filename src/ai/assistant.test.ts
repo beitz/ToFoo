@@ -3,7 +3,7 @@ import type * as Beta from '@anthropic-ai/sdk/resources/beta/messages/messages';
 import type { Food } from '../foods/foodDb';
 import { buildIndex } from '../foods/search';
 import { appNote, emptyConversation, requestParams, sendMessage, textOf, type CreateMessage } from './assistant';
-import { describeFood, MAX_ITEM_GRAMS, runLookupBarcode, runSearchFoods, runSearchUsda, validateJournalProposal, validateProposal, validateSleepProposal, validateActivityProposal, validateWaterProposal, type ProductTools, type ToolContext } from './tools';
+import { describeFood, MAX_INGREDIENT_GRAMS, MAX_ITEM_GRAMS, validateIngredientsProposal, runLookupBarcode, runSearchFoods, runSearchUsda, validateJournalProposal, validateProposal, validateSleepProposal, validateActivityProposal, validateWaterProposal, type ProductTools, type ToolContext } from './tools';
 import type { Product } from '../storage/types';
 import type { FindResult } from '../foods/findProduct';
 
@@ -557,5 +557,52 @@ describe('water', () => {
     expect(validateWaterProposal({ ml: 4000, time: '', replaces: '' }, now)).toMatchObject({ ok: false });
     expect(validateWaterProposal({ ml: 250, time: '2026-10-18 09:00', replaces: '' }, now)).toMatchObject({ ok: false });
     expect(validateWaterProposal({ ml: 249.6, time: '', replaces: 'W1' }, now)).toEqual({ ok: true, proposal: { ml: 250, replaces: 'W1' } });
+  });
+});
+
+describe('the recipe editor assistant', () => {
+  const ingredients = (over: object = {}) => ({ name: 'Milk roll dough', portions: 6, items: [{ code: 'D7A5400', grams: 1200, preparation: 'baked', note: '' }], assumptions: ['6 rolls ≈ 1.2 kg'], replaces: '', ...over });
+  const recipeCtx: ToolContext = { ...ctx, recipe: true, journal: true, sleep: true };
+
+  it('offers the lookups and propose_ingredients, never meals or the trackers', () => {
+    const names = (sources: Parameters<typeof requestParams>[2]) => requestParams('claude-opus-5-5', [], sources).tools!.map((t) => (t as { name: string }).name);
+    expect(names({ recipe: true, journal: true, water: true })).toEqual(['search_foods', 'propose_ingredients']);
+    expect(names({ recipe: true, off: true, usda: true, webSearch: true })).toEqual(['search_foods', 'lookup_barcode', 'web_search', 'search_usda', 'propose_ingredients']);
+    const system = requestParams('claude-opus-5-5', [], { recipe: true, off: true, usda: true }).system as string;
+    expect(system).toContain('enter a recipe');
+    expect(system).toContain('code in propose_ingredients');
+    expect(system).not.toContain('propose_meal');
+  });
+
+  it('shows proposed ingredients as numbered R cards, and refuses meals', async () => {
+    const api = scripted(
+      reply([toolUse('a', 'propose_meal', { summary: 'x', items: [{ code: 'D7A5400', grams: 60, preparation: 'asListed', note: '' }], assumptions: [], confidence: 'C', time: '', replaces: '' })], 'tool_use'),
+      reply([text('Here is the list.'), toolUse('b', 'propose_ingredients', ingredients())], 'tool_use'),
+    );
+    const { outcome, conversation } = await sendMessage(api.create, 'claude-opus-5-5', emptyConversation(), { text: 'my rolls', images: [] }, recipeCtx);
+    const refused = (api.requests[1]!.messages[2]!.content as Beta.BetaToolResultBlockParam[])[0]!;
+    expect(refused.is_error && String(refused.content)).toContain('Unknown tool propose_meal');
+    expect(outcome.kind === 'proposal' && outcome.ingredients.map((r) => [r.id, r.name, r.portions, r.items[0]!.grams, r.items[0]!.preparation])).toEqual([['R1', 'Milk roll dough', 6, 1200, 'baked']]);
+    expect(conversation.recipes).toBe(1);
+    expect(conversation.pendingResults.map((r) => r.content)).toEqual(['Shown to the user as card R1. Not added to the recipe yet; their reply follows.']);
+  });
+
+  it('allows a whole pot but checks amounts and portions', () => {
+    const v = (over: object) => validateIngredientsProposal(ingredients(over), db);
+    expect(v({ items: [{ code: 'D7A5400', grams: MAX_ITEM_GRAMS + 500, preparation: 'raw', note: '' }] }).ok).toBe(true);
+    expect(!v({ items: [{ code: 'D7A5400', grams: MAX_INGREDIENT_GRAMS + 1, preparation: 'raw', note: '' }] }).ok).toBe(true);
+    expect(!v({ portions: 2.5 }).ok && (v({ portions: 2.5 }) as { error: string }).error).toContain('portions 2.5');
+    const unknown = v({ portions: 0, name: ' ' });
+    expect(unknown.ok && unknown.proposal).not.toHaveProperty('portions');
+    expect(unknown.ok && unknown.proposal.name).toBe('');
+    expect(!v({ items: [{ code: 'X1', grams: 10, preparation: 'raw', note: '' }] }).ok).toBe(true);
+  });
+
+  it('tells the assistant what the recipe already has, instead of the day', () => {
+    const now = new Date(2026, 9, 18, 10, 0).getTime();
+    expect(appNote({ now, day: '2026-10-17', today: '2026-10-18', logged: ['R1'], open: [], barcodes: [], recipe: { name: 'Dal', portions: 4, ingredients: ['Lentils, dried 250 g, boiled'] } })).toBe(
+      '(Now: Sun 2026-10-18 10:00. The recipe in the editor: name "Dal", 4 portions; ingredients: Lentils, dried 250 g, boiled. Cards already added to the recipe: R1.)',
+    );
+    expect(appNote({ now, day: '2026-10-18', today: '2026-10-18', logged: [], open: [], barcodes: [], recipe: { name: '', ingredients: [] } })).toContain('no name yet, portions not set; no ingredients yet');
   });
 });

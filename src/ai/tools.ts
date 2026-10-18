@@ -1,8 +1,9 @@
 /**
  * The tools the AI assistant may use, and the app-side code that runs them. The assistant can only
  * look up BLS foods (and, with the Open Food Facts lookup on, packaged products by barcode; with
- * USDA on, USDA foods by name) and propose a meal made of those codes plus grams. It never supplies nutrient values, so every
- * number in the log still comes from a database (docs/SPEC.md, "AI assistant logging").
+ * USDA on, USDA foods by name) and propose a meal (or, in the recipe editor, ingredients) made of
+ * those codes plus grams. It never supplies nutrient values, so every number in the log and in
+ * recipes still comes from a database (docs/SPEC.md, "AI assistant logging").
  * Everything here is pure except the injected lookups.
  */
 import { z } from 'zod';
@@ -38,6 +39,10 @@ const PRODUCTS_PER_QUERY = 4;
  * unit slip (ml vs. l, g vs. kg) than a meal, so the model is asked to check it.
  */
 export const MAX_ITEM_GRAMS = 3000;
+/** The same for one recipe ingredient: a big pot, not a meal (10 kg of potatoes is still a pot). */
+export const MAX_INGREDIENT_GRAMS = 10000;
+/** Sanity limit for a recipe's portions (a party pot), not a physiological number. */
+const MAX_PORTIONS = 100;
 /** Sanity limits for a proposed meal time: clock skew ahead, about a year back. */
 const FUTURE_SLACK_MS = 10 * 60_000;
 const MAX_PAST_MS = 400 * 86_400_000;
@@ -69,6 +74,18 @@ export const proposalInput = z.object({
 });
 
 export type ProposalInput = z.infer<typeof proposalInput>;
+
+/** Ingredients for the recipe being edited (the assistant in the recipe editor). */
+export const ingredientsProposalInput = z.object({
+  /** The dish's name, e.g. "Lentil curry"; empty if unknown. */
+  name: z.string(),
+  /** Portions the whole recipe makes; 0 if unknown. */
+  portions: z.number(),
+  items: proposalInput.shape.items,
+  assumptions: z.array(z.string()),
+  /** Id of the open card this proposal replaces (e.g. "R1"); empty for new ingredients. */
+  replaces: z.string().optional(),
+});
 
 export const journalProposalInput = z.object({
   text: z.string(),
@@ -140,6 +157,16 @@ export const waterProposalInput = z.object({
 export interface WaterProposal {
   ml: number;
   time?: number;
+  replaces?: string;
+}
+
+/** Ingredients the assistant proposes for the recipe being edited, for the user to check. */
+export interface IngredientsProposal {
+  name: string;
+  /** Absent when the assistant could not tell. */
+  portions?: number;
+  items: ProposedItem[];
+  assumptions: string[];
   replaces?: string;
 }
 
@@ -215,6 +242,11 @@ export interface ToolContext {
   activity?: boolean;
   /** Water is on: the assistant may propose plain water. */
   water?: boolean;
+  /**
+   * The chat belongs to the recipe editor: the assistant proposes ingredients for the recipe
+   * instead of meals, and nothing else (no journal, sleep, activity or water).
+   */
+  recipe?: boolean;
 }
 
 /** Which online sources the assistant is offered (decides the prompt and tool variant). */
@@ -224,8 +256,11 @@ export function sourcesOf(
   sleep = false,
   activity = false,
   water = false,
-): { off: boolean; usda: boolean; webSearch: boolean; journal: boolean; sleep: boolean; activity: boolean; water: boolean } {
-  return { off: !!products?.find, usda: !!products?.searchUsda, webSearch: !!products?.find && !!products.webSearch, journal, sleep, activity, water };
+  recipe = false,
+): { off: boolean; usda: boolean; webSearch: boolean; journal: boolean; sleep: boolean; activity: boolean; water: boolean; recipe: boolean } {
+  const online = { off: !!products?.find, usda: !!products?.searchUsda, webSearch: !!products?.find && !!products.webSearch };
+  if (recipe) return { ...online, journal: false, sleep: false, activity: false, water: false, recipe: true };
+  return { ...online, journal, sleep, activity, water, recipe: false };
 }
 
 const LABEL_FIELDS: Array<[string, string, string]> = [
@@ -425,21 +460,19 @@ function knownProduct(code: string, products: ProductTools | undefined): Product
 }
 
 /**
- * Check a `propose_meal` call: every code must be a BLS food (or a product looked up or saved),
- * every amount plausible. A product needs a similar BLS food for its micronutrients unless the
- * user already chose one, which always wins.
+ * Check proposed items: every code must be a BLS food (or a product looked up or saved), every
+ * amount plausible. A product needs a similar BLS food for its micronutrients unless the user
+ * already chose one, which always wins.
  */
-export function validateProposal(
-  input: unknown,
+function validateItems(
+  input: ProposalInput['items'],
   db: Pick<FoodDb, 'byCode'> & { version?: string },
-  products?: ProductTools,
-  now?: number,
-): { ok: true; proposal: Proposal } | { ok: false; error: string } {
-  const parsed = proposalInput.safeParse(input);
-  if (!parsed.success) return { ok: false, error: `Invalid input: ${parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}` };
+  products: ProductTools | undefined,
+  maxGrams: number,
+): { items: ProposedItem[]; problems: string[] } {
   const problems: string[] = [];
   const items: ProposedItem[] = [];
-  for (const it of parsed.data.items) {
+  for (const it of input) {
     const code = it.code.trim();
     let food: Food | undefined;
     let product: Product | undefined;
@@ -460,9 +493,22 @@ export function validateProposal(
       food = db.byCode.get(code);
       if (!food) problems.push(`Unknown code ${it.code}: use only codes returned by search_foods.`);
     }
-    if (!(it.grams > 0) || it.grams > MAX_ITEM_GRAMS) problems.push(`${it.code}: ${it.grams} g is not plausible (expected more than 0 and at most ${MAX_ITEM_GRAMS} g).`);
-    if (food && it.grams > 0 && it.grams <= MAX_ITEM_GRAMS) items.push({ food, grams: Math.round(it.grams * 10) / 10, preparation: it.preparation, note: it.note.trim(), ...(product ? { product } : {}) });
+    if (!(it.grams > 0) || it.grams > maxGrams) problems.push(`${it.code}: ${it.grams} g is not plausible (expected more than 0 and at most ${maxGrams} g).`);
+    if (food && it.grams > 0 && it.grams <= maxGrams) items.push({ food, grams: Math.round(it.grams * 10) / 10, preparation: it.preparation, note: it.note.trim(), ...(product ? { product } : {}) });
   }
+  return { items, problems };
+}
+
+/** Check a `propose_meal` call: known codes, plausible grams (see validateItems) and a plausible time. */
+export function validateProposal(
+  input: unknown,
+  db: Pick<FoodDb, 'byCode'> & { version?: string },
+  products?: ProductTools,
+  now?: number,
+): { ok: true; proposal: Proposal } | { ok: false; error: string } {
+  const parsed = proposalInput.safeParse(input);
+  if (!parsed.success) return { ok: false, error: `Invalid input: ${parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}` };
+  const { items, problems } = validateItems(parsed.data.items, db, products, MAX_ITEM_GRAMS);
   const { time, problem } = checkTime(parsed.data.time, now);
   if (problem) problems.push(problem);
   if (problems.length) return { ok: false, error: `${problems.join('\n')}\nFix these and call propose_meal again.` };
@@ -475,6 +521,34 @@ export function validateProposal(
       assumptions: parsed.data.assumptions.map((a) => a.trim()).filter(Boolean),
       confidence: parsed.data.confidence,
       ...(time !== undefined ? { time } : {}),
+      ...(replaces ? { replaces } : {}),
+    },
+  };
+}
+
+/**
+ * Check a `propose_ingredients` call (the recipe editor's assistant): the same checks as a meal,
+ * with room for a whole pot, and a whole number of portions if any.
+ */
+export function validateIngredientsProposal(
+  input: unknown,
+  db: Pick<FoodDb, 'byCode'> & { version?: string },
+  products?: ProductTools,
+): { ok: true; proposal: IngredientsProposal } | { ok: false; error: string } {
+  const parsed = ingredientsProposalInput.safeParse(input);
+  if (!parsed.success) return { ok: false, error: `Invalid input: ${parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}` };
+  const { items, problems } = validateItems(parsed.data.items, db, products, MAX_INGREDIENT_GRAMS);
+  const { portions } = parsed.data;
+  if (portions < 0 || portions > MAX_PORTIONS || !Number.isInteger(portions)) problems.push(`portions ${portions} is not plausible (a whole number up to ${MAX_PORTIONS}, or 0 if unknown).`);
+  if (problems.length) return { ok: false, error: `${problems.join('\n')}\nFix these and call propose_ingredients again.` };
+  const replaces = parsed.data.replaces?.trim();
+  return {
+    ok: true,
+    proposal: {
+      name: parsed.data.name.trim(),
+      ...(portions > 0 ? { portions } : {}),
+      items,
+      assumptions: parsed.data.assumptions.map((a) => a.trim()).filter(Boolean),
       ...(replaces ? { replaces } : {}),
     },
   };
