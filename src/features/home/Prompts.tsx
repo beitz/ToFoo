@@ -11,9 +11,47 @@ import { repo } from '../../storage/repo';
 import { NumberInput, Segmented } from '../../ui/controls';
 
 const DISMISS_DAYS = 30;
+/** "Later" on the backup reminder hides it this long. */
+const LATER_DAYS = 3;
 
-/** One gentle question or note at a time. */
+/**
+ * The backup reminder, then one gentle question or note at a time. The reminder has its own card so
+ * the other questions cannot hide it: it stays until a backup file is saved or "Later" is tapped.
+ */
 export function Prompts() {
+  return (
+    <>
+      <BackupReminder />
+      <OnePrompt />
+    </>
+  );
+}
+
+function BackupReminder() {
+  const d = useData();
+  const meta = useLiveQuery(async () => ({ last: await repo.getMeta<string>('lastBackupDay'), later: await repo.getMeta<string>('dismissed:backup') }), []);
+  if (!meta) return null;
+  const { last, later } = meta;
+  const dueSince = last ?? d.profile.modelStartDay;
+  // "Later" is stored LATER_DAYS short of the usual dismissal, so it ends after LATER_DAYS.
+  const hidden = !!later && daysBetween(later, d.today) < DISMISS_DAYS;
+  if (!isOn(d.settings.features, 'backupReminder') || d.log.length < 5 || daysBetween(dueSince, d.today) < d.settings.backupReminderDays || hidden) return null;
+  return (
+    <div className="card prompt">
+      <p>{last ? t('prompt.backupOld', { days: daysBetween(last, d.today) }) : t('prompt.backupNever')}</p>
+      <div className="prompt-actions">
+        <a className="btn btn-small" href={href('settings', 'backup')}>
+          {t('prompt.backupNow')}
+        </a>
+        <button className="btn btn-small btn-ghost" onClick={() => repo.setMeta('dismissed:backup', addDays(d.today, LATER_DAYS - DISMISS_DAYS))}>
+          {t('common.later')}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function OnePrompt() {
   const d = useData();
   const meta = useLiveQuery(() => repo.db.meta.toArray(), []);
   const [weight, setWeight] = useState<number>();
@@ -63,25 +101,6 @@ export function Prompts() {
             {t('prompt.testHintDetails')}
           </a>
           <button className="btn btn-small btn-ghost" onClick={() => dismiss(`testHint:${r.id}`)}>
-            {t('common.later')}
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // 3. Backup reminder
-  const lastBackup = m.get('lastBackupDay') as string | undefined;
-  const dueSince = lastBackup ?? d.profile.modelStartDay;
-  if (isOn(f, 'backupReminder') && d.log.length >= 5 && daysBetween(dueSince, d.today) >= d.settings.backupReminderDays && !dismissed('backup')) {
-    return (
-      <div className="card prompt">
-        <p>{lastBackup ? t('prompt.backupOld', { days: daysBetween(lastBackup, d.today) }) : t('prompt.backupNever')}</p>
-        <div className="prompt-actions">
-          <a className="btn btn-small" href={href('settings', 'backup')}>
-            {t('prompt.backupNow')}
-          </a>
-          <button className="btn btn-small btn-ghost" onClick={() => repo.setMeta('dismissed:backup', addDays(d.today, 3 - DISMISS_DAYS))}>
             {t('common.later')}
           </button>
         </div>

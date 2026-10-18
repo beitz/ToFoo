@@ -2,7 +2,8 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { exchangeJsonSchema } from './jsonSchema';
-import { backupSummary, buildBackup, parseExchange } from './parse';
+import { buildBackup, snapshotCounts } from './build';
+import { parseExchange } from './parse';
 import { defaultProfile, defaultSettings } from '../storage/defaults';
 import type { Snapshot } from '../storage/repo';
 
@@ -70,6 +71,7 @@ const snapshot: Snapshot = {
     { id: 'a2', schemaVersion: 1, kind: 'other', name: 'Yoga', time: 9, day: '2026-10-15', minutes: 30, outside: false },
   ],
   water: [{ id: 'w1', schemaVersion: 1, time: 10, day: '2026-10-15', ml: 500 }],
+  portionSizes: [{ food: 'C133000', sizes: [{ label: 'My bowl', grams: 60 }] }],
 };
 
 describe('exchange format', () => {
@@ -79,18 +81,20 @@ describe('exchange format', () => {
     expect(parsed.ok).toBe(true);
     if (parsed.ok && parsed.value.type === 'backup') {
       expect(parsed.value.data).toEqual(snapshot);
-      expect(backupSummary(parsed.value)[0]).toEqual(['Log entries', 4]);
+      expect(snapshotCounts(parsed.value.data)).toMatchObject({ log: 4, journal: 1, portionSizes: 1 });
     }
   });
 
   it('reads backups made before products, the journal, sleep, activities and water existed', () => {
-    const { products: _products, journal: _journal, sleep: _sleep, activities: _activities, water: _water, ...older } = snapshot;
+    const { products: _products, journal: _journal, sleep: _sleep, activities: _activities, water: _water, portionSizes: _sizes, ...older } = snapshot;
     const parsed = parseExchange(JSON.stringify(buildBackup({ ...older, log: snapshot.log.slice(0, 2) } as Snapshot, '0.1.0', new Date())));
     expect(parsed.ok && parsed.value.type === 'backup' && parsed.value.data.products).toEqual([]);
     expect(parsed.ok && parsed.value.type === 'backup' && parsed.value.data.journal).toEqual([]);
     expect(parsed.ok && parsed.value.type === 'backup' && parsed.value.data.sleep).toEqual([]);
     expect(parsed.ok && parsed.value.type === 'backup' && parsed.value.data.activities).toEqual([]);
     expect(parsed.ok && parsed.value.type === 'backup' && parsed.value.data.water).toEqual([]);
+    // Left missing, so restoring an older backup keeps the portion sizes on the phone.
+    expect(parsed.ok && parsed.value.type === 'backup' && parsed.value.data.portionSizes).toBeUndefined();
   });
 
   it('rejects invalid input with a clear message, never partially', () => {

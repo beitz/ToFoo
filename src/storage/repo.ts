@@ -4,13 +4,16 @@
 import { newId } from '../lib/id';
 import { refKey } from '../lib/refs';
 import { overlaps, sleepDay } from '../logic/sleep';
+import { dailyBackupDue, keepCount, PORTIONS_PREFIX, pruneAutoBackups, readSnapshot, SNAPSHOT_TABLES, writeAutoBackup } from './autoBackup';
 import { db as defaultDb, runMigrations, type ToFooDB } from './db';
 import { defaultProfile, defaultSettings } from './defaults';
 import {
   CURRENT_SCHEMA_VERSION,
+  type AutoBackup,
   type Batch,
   type CustomFood,
   type DayStatusRecord,
+  type FoodPortionSizes,
   type FavouriteMeal,
   type FoodRef,
   type Fast,
@@ -46,6 +49,8 @@ export interface Snapshot {
   sleep: SleepRecord[];
   activities: ActivityRecord[];
   water: WaterRecord[];
+  /** Missing in backups from before portion sizes were included; restoring one keeps the sizes on the phone. */
+  portionSizes?: FoodPortionSizes[];
 }
 
 
@@ -410,27 +415,16 @@ export function createRepo(db: ToFooDB) {
 
     // ── Backup ──
     async snapshot(): Promise<Snapshot> {
-      return db.transaction('r', [db.profile, db.settings, db.recipes, db.batches, db.log, db.customFoods, db.dayStatus, db.fasts, db.sunEntries, db.products, db.journal, db.sleep, db.activities, db.water], async () => ({
-        profile: (await db.profile.get('profile')) ?? null,
-        settings: (await db.settings.get('settings')) ?? null,
-        recipes: await db.recipes.toArray(),
-        batches: await db.batches.toArray(),
-        log: await db.log.toArray(),
-        customFoods: await db.customFoods.toArray(),
-        dayStatus: await db.dayStatus.toArray(),
-        fasts: await db.fasts.toArray(),
-        sunEntries: await db.sunEntries.toArray(),
-        products: await db.products.toArray(),
-        journal: await db.journal.toArray(),
-        sleep: await db.sleep.toArray(),
-        activities: await db.activities.toArray(),
-        water: await db.water.toArray(),
-      }));
+      return db.transaction('r', SNAPSHOT_TABLES, () => readSnapshot((name) => db.table(name)));
     },
-    /** Replace all personal data with the snapshot (after the user confirmed a preview). */
-    async restore(s: Snapshot): Promise<void> {
+    /**
+     * Replace all personal data with the snapshot (after the user confirmed a preview). With
+     * `backupFirst`, an automatic backup of the data it replaces is saved in the same transaction.
+     */
+    async restore(s: Snapshot, { backupFirst = false } = {}): Promise<void> {
       const tables = [db.profile, db.settings, db.recipes, db.batches, db.log, db.customFoods, db.dayStatus, db.fasts, db.sunEntries, db.products, db.journal, db.sleep, db.activities, db.water];
-      await db.transaction('rw', tables, async () => {
+      await db.transaction('rw', [...SNAPSHOT_TABLES, 'autoBackups'], async () => {
+        if (backupFirst) await writeAutoBackup((name) => db.table(name), 'restore', new Date());
         await Promise.all(tables.map((t) => t.clear()));
         if (s.profile) await db.profile.put(s.profile);
         if (s.settings) await db.settings.put(s.settings);
@@ -446,8 +440,38 @@ export function createRepo(db: ToFooDB) {
         await db.sleep.bulkPut(s.sleep);
         await db.activities.bulkPut(s.activities);
         await db.water.bulkPut(s.water);
+        if (s.portionSizes) {
+          await db.meta.where('key').startsWith(PORTIONS_PREFIX).delete();
+          await db.meta.bulkPut(s.portionSizes.map((p) => ({ key: PORTIONS_PREFIX + p.food, value: p.sizes })));
+        }
       });
-      await runMigrations(db);
+      await runMigrations(db, { backup: false });
+    },
+
+    // ── Automatic backups ──
+    /** Save the day's automatic backup unless there already is one from today. */
+    async dailyAutoBackup(now: Date): Promise<AutoBackup | undefined> {
+      return db.transaction('rw', [...SNAPSHOT_TABLES, 'autoBackups'], async () => {
+        const newest = await db.autoBackups.orderBy('at').last();
+        if (!dailyBackupDue(newest?.at, now)) return undefined;
+        return writeAutoBackup((name) => db.table(name), 'daily', now);
+      });
+    },
+    /** Newest first. */
+    async listAutoBackups(): Promise<AutoBackup[]> {
+      return db.autoBackups.orderBy('at').reverse().toArray();
+    },
+    async setAutoBackupProblem(id: string, problem: string): Promise<void> {
+      await db.autoBackups.update(id, { problem });
+    },
+    /** Change how many automatic backups are kept; the oldest beyond that are deleted now. */
+    async setAutoBackupKeep(keep: number): Promise<void> {
+      await db.transaction('rw', db.settings, db.autoBackups, async () => {
+        const s = (await db.settings.get('settings')) ?? defaultSettings();
+        const next = { ...s, autoBackupKeep: keep, id: 'settings' as const, schemaVersion: v };
+        await db.settings.put(next);
+        await pruneAutoBackups((name) => db.table(name), keepCount(next));
+      });
     },
   };
 

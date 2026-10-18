@@ -19,7 +19,7 @@ One versioned JSON format for backups, shared recipes (QR codes, v2) and pasted 
 
 ## `type: "backup"`
 
-Everything personal, as stored on the device. Written by Settings → Backup → Export; restored by Import (replaces all data after a preview).
+Everything personal, as stored on the device. Written by Settings → Backup → Export, and by the app itself for automatic backups (same format); restored by Import or by Restore on an automatic backup (replaces all data after a preview).
 
 ```json
 {
@@ -32,12 +32,13 @@ Everything personal, as stored on the device. Written by Settings → Backup →
     "profile": { "id": "profile", "schemaVersion": 1, "…": "…" },
     "settings": { "id": "settings", "schemaVersion": 1, "…": "…" },
     "recipes": [], "batches": [], "log": [], "customFoods": [],
-    "dayStatus": [], "fasts": [], "sunEntries": [], "products": [], "journal": [], "sleep": [], "activities": [], "water": []
+    "dayStatus": [], "fasts": [], "sunEntries": [], "products": [], "journal": [], "sleep": [], "activities": [], "water": [],
+    "portionSizes": [{ "food": "C133000", "sizes": [{ "label": "My bowl", "grams": 60 }] }]
   }
 }
 ```
 
-Each record has a `schemaVersion`; older records are migrated on import. `products` may be missing in backups from before the Open Food Facts lookup, `journal` in backups from before the journal, `sleep` in backups from before sleep, `activities` in backups from before activities, and `water` in backups from before water; each then counts as empty.
+Each record has a `schemaVersion`; older records are migrated on import. `products` may be missing in backups from before the Open Food Facts lookup, `journal` in backups from before the journal, `sleep` in backups from before sleep, `activities` in backups from before activities, and `water` in backups from before water; each then counts as empty. `portionSizes` (portion sizes the user saved per food, by the food code they were saved under) is missing in backups from before 2026-10-18; restoring such a backup leaves the portion sizes on the device as they are.
 
 Journal entries (`data.journal[]`): `id`, `schemaVersion`, `time` (epoch ms the entry is about), `day` (the local `YYYY-MM-DD` of `time`) and `text` (what the user wrote, plain text).
 

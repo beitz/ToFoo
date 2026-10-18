@@ -9,7 +9,7 @@ import { dayKey } from '../../lib/dates';
 import type { Preparation } from '../../model/paramTypes';
 import type { EntryConfidence } from '../../model/types';
 import { repo } from '../../storage/repo';
-import type { FoodRef, LogEntry, Product } from '../../storage/types';
+import type { FoodRef, LogEntry, PortionSize, Product } from '../../storage/types';
 import { Field, NumberInput, Sheet } from '../../ui/controls';
 import { ConfidenceField } from './ConfidenceField';
 import { TimeField } from './TimeField';
@@ -17,10 +17,8 @@ import { PreparationSelect } from './PreparationSelect';
 import { MatchPicker, ProductInfo } from './ProductParts';
 import { FavouriteButton } from './FavouriteButton';
 
-export interface PortionHelper {
-  label: string;
-  grams: number;
-}
+/** Saved portion sizes are in backups (src/storage/autoBackup.ts `readSnapshot`). */
+export type PortionHelper = PortionSize;
 
 type Target = { food: Food; product?: undefined } | { product: Product; food?: undefined };
 

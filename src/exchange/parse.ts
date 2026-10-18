@@ -1,6 +1,5 @@
 import type { z } from 'zod';
-import type { Snapshot } from '../storage/repo';
-import { exchangeSchema, FORMAT_VERSION, type BackupFile, type ExchangeFile } from './schema';
+import { exchangeSchema, FORMAT_VERSION, type ExchangeFile } from './schema';
 
 export type ParseResult = { ok: true; value: ExchangeFile } | { ok: false; error: string };
 
@@ -32,34 +31,4 @@ export function parseExchange(text: string): ParseResult {
   return { ok: true, value: res.data };
 }
 
-export function buildBackup(snapshot: Snapshot, appVersion: string, now: Date): BackupFile {
-  return {
-    format: 'tofoo',
-    formatVersion: FORMAT_VERSION,
-    type: 'backup',
-    exportedAt: now.toISOString(),
-    app: { version: appVersion },
-    data: snapshot,
-  };
-}
-
-export function backupSummary(b: BackupFile): Array<[string, number]> {
-  return [
-    ['Log entries', b.data.log.length],
-    ['Recipes', b.data.recipes.length],
-    ['Batches', b.data.batches.length],
-    ['Saved foods and supplements', b.data.customFoods.length],
-    ['Day statuses', b.data.dayStatus.length],
-    ['Fasts', b.data.fasts.length],
-    ['Time-outside entries', b.data.sunEntries.length],
-    ['Packaged products', b.data.products.length],
-    ['Journal entries', b.data.journal.length],
-    ['Sleeps', b.data.sleep.length],
-    ['Activities', b.data.activities.length],
-    ['Water entries', b.data.water.length],
-  ];
-}
-
-export function backupFileName(now: Date): string {
-  return `tofoo-backup-${now.toISOString().slice(0, 10)}.json`;
-}
+export { buildBackup, backupFileName } from './build';

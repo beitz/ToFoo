@@ -80,6 +80,7 @@ export type FeatureKey =
   | 'yesterdayNudge'
   | 'fillUnloggedDays'
   | 'backupReminder'
+  | 'autoBackup'
   | 'aiAssistant'
   | 'openFoodFacts'
   | 'usda'
@@ -103,6 +104,8 @@ export interface Settings extends Versioned {
   longWindowDays: number;
   theme: 'system' | 'light' | 'dark';
   backupReminderDays: number;
+  /** How many automatic backups to keep on the phone; unset = DEFAULT_AUTO_BACKUP_KEEP. */
+  autoBackupKeep?: number;
   /** Default storage plan for new recipes. */
   defaultPlan: StoragePlan;
   /** Home screen nutrient layout; unset = compact. */
@@ -310,6 +313,42 @@ export interface ActivityRecord extends Versioned {
    * it is already part of the outdoor routine (so it is not counted twice) or was inside.
    */
   sunSkin?: SkinExposure;
+}
+
+/** A portion size the user saved for a food ("My bowl", 60 g); stored in meta under `portions:<food code>`. */
+export interface PortionSize {
+  label: string;
+  grams: number;
+}
+
+/** Saved portion sizes of one food, as they go into backups. */
+export interface FoodPortionSizes {
+  /** The food code the sizes were saved under (BLS code, or the product's code). */
+  food: string;
+  sizes: PortionSize[];
+}
+
+export const DEFAULT_AUTO_BACKUP_KEEP = 5;
+
+/**
+ * A backup the app saved by itself (docs/SPEC.md, "Automatic backups"), kept in the app's own storage.
+ * `json` is the whole backup file, exactly as "Save as file" writes it. Not part of backups.
+ */
+export interface AutoBackup {
+  id: string;
+  /** Epoch ms it was taken. */
+  at: number;
+  reason: 'daily' | 'restore' | 'upgrade';
+  json: string;
+  /** Bytes of `json`. */
+  size: number;
+  /** Records per backup list (log, recipes, journal…), for the list in Settings → Backup. */
+  counts: Record<string, number>;
+  /**
+   * Result of reading the file back the way a restore would: missing = not checked yet, '' = fine,
+   * otherwise the validator's message. Checked after start-up, so the check's code loads only then.
+   */
+  problem?: string;
 }
 
 export interface MetaRecord {
