@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useData } from '../../app/data';
+import { diag } from '../../app/diagnostics';
 import { useToast } from '../../app/toast';
 import { t, type MessageKey } from '../../i18n';
 import { search } from '../../foods/search';
@@ -247,6 +248,7 @@ export function BackupPage() {
   const [pending, setPending] = useState<BackupFile | null>(null);
   const [summary, setSummary] = useState<Array<[string, number]>>([]);
   const [error, setError] = useState<string>();
+  const [exportProblem, setExportProblem] = useState<string>();
   const [paste, setPaste] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
   // Preload the exchange module so sharing stays within the tap's user activation.
@@ -254,10 +256,15 @@ export function BackupPage() {
 
   async function exportAll() {
     const now = new Date();
-    const { buildBackup, backupFileName } = await import('../../exchange/parse');
-    const file = buildBackup(await repo.snapshot(), __APP_VERSION__, now);
+    const { buildBackup, backupFileName, parseExchange } = await import('../../exchange/parse');
+    const json = JSON.stringify(buildBackup(await repo.snapshot(), __APP_VERSION__, now), null, 1);
+    // Read the file back the way a restore would, so a backup that could not be restored is noticed
+    // now and not on the day it is needed. The file is still saved: it holds the data either way.
+    const check = parseExchange(json);
+    setExportProblem(check.ok ? undefined : check.error);
+    if (!check.ok) diag('backup.selfCheckFailed', { error: check.error });
     try {
-      await shareOrDownload(backupFileName(now), JSON.stringify(file, null, 1));
+      await shareOrDownload(backupFileName(now), json);
       await repo.setMeta('lastBackupDay', d.today);
       toast(t('backup.done'));
     } catch (e) {
@@ -292,6 +299,12 @@ export function BackupPage() {
         <button className="btn btn-primary btn-block" onClick={() => void exportAll()}>
           <Icon name="download" /> {t('backup.export')}
         </button>
+        {exportProblem && (
+          <div className="error-box" role="alert">
+            <strong>{t('backup.selfCheckFailed')}</strong>
+            <pre>{exportProblem}</pre>
+          </div>
+        )}
       </div>
       <h2 className="section-title">{t('backup.import')}</h2>
       <div className="card">

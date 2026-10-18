@@ -962,6 +962,7 @@ export const en = {
   'backup.export': 'Export everything',
   'backup.done': 'Backup saved.',
   'backup.failed': 'Backup failed.',
+  'backup.selfCheckFailed': 'The backup was saved, but this app could not read it back, so restoring it would fail. Please report this message so it can be fixed:',
   'backup.import': 'Import a backup',
   'backup.importIntro': 'Choose a ToFoo backup file. You will see a preview first.',
   'backup.chooseFile': 'Choose file',
