@@ -72,6 +72,13 @@ export function AssistantSettingsPage() {
         <p className="muted small">{t('insights.privacy')}</p>
       </div>
 
+      <h2 className="section-title">{t('ideas.settingsTitle')}</h2>
+      <div className="card">
+        <Toggle checked={isOn(d.settings.features, 'recipeIdeas')} onChange={(v) => repo.updateSettings({ features: { ...d.settings.features, recipeIdeas: v } })} label={t('ideas.enable')} />
+        <p className="muted small">{t('ideas.privacy')}</p>
+        <CookingPreferences />
+      </div>
+
       <h2 className="section-title">{t('chats.title')}</h2>
       <ul className="link-list card">
         <li>
@@ -225,5 +232,22 @@ function VoiceSettings() {
           ))}
       </div>
     </>
+  );
+}
+
+/** The free-text cooking preferences the assistant reads for recipe ideas; saved when the box loses focus. */
+function CookingPreferences() {
+  const d = useData();
+  const toast = useToast();
+  const [text, setText] = useState(d.settings.cookingPreferences ?? '');
+  async function save() {
+    if (text.trim() === (d.settings.cookingPreferences ?? '').trim()) return;
+    await repo.updateSettings({ cookingPreferences: text.trim() || undefined });
+    toast(t('ideas.prefsSaved'));
+  }
+  return (
+    <Field label={t('ideas.prefs')} hint={t('ideas.prefsHint')}>
+      {(id) => <textarea id={id} className="note-text" rows={3} value={text} placeholder={t('ideas.prefsPlaceholder')} onChange={(e) => setText(e.target.value)} onBlur={() => void save()} />}
+    </Field>
   );
 }

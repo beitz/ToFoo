@@ -50,7 +50,26 @@ export interface PromptSources {
   water?: boolean;
   /** The recipe editor's assistant: ingredients for one recipe, nothing else (the trackers are ignored). */
   recipe?: boolean;
+  /** The main chat's recipe book: save a recipe the user cooked, change one in the book. */
+  recipes?: boolean;
+  /** Recipe ideas on: the assistant may read the nutrient status, check recipes and suggest ideas. */
+  ideas?: boolean;
 }
+
+// Recipes in the main chat (docs/SPEC.md, "One assistant"): the same pot rules as in the recipe
+// editor, but the result is a recipe for the book, new or changed.
+const RECIPES = (ideas: boolean) => `- Recipes: the user keeps a recipe book of dishes cooked as a pot and split into portions (batch cooking). When they tell you about a dish they cooked or want to keep ("I just made a lentil curry with …", a photo of a recipe), propose it with propose_recipe, kind "own": every ingredient with grams for the whole pot as it goes in (convert cups, spoons, pieces, cans and packs; use label weights; put conversions that are not obvious in assumptions, e.g. "2 onions ≈ 200 g"), one ingredient per item and never a BLS dish for the whole recipe. preparation is how it is cooked in the dish: boiled (also simmered), steamed (also stewed), baked (also roasted), fried, raw if eaten uncooked, asListed when the BLS food already matches (bread, canned or cooked entries, oil, spices, salt, sauces). Use the plain BLS salt (the app uses the user's salt). Include water that stays in the dish (soups, curries) as tap water; leave out water poured away. portions: what they said, else estimate from the pot and say so in assumptions. instructions: the steps only when they said or showed how it is made, one short step per line, in their words; add none of your own.
+- If they also ate some of the dish, propose a meal too, with each ingredient's share of what they ate (one portion is the pot divided by the portions), at the time they ate. The recipe card is for the book, the meal card for the diary; mention once that cooking it as a batch from the recipe page keeps track of the portions in stock.
+- To change a recipe in the book ("add spinach to my curry", "I use 300 g lentils now"), find it with list_recipes and call propose_recipe with recipe_id set, its name and portions, and the complete new list of ingredients (all of them, changed or not, with the codes list_recipes shows). instructions: the complete new steps if they change, else empty to keep the recipe's. Ask which recipe when several fit. Only change what the user asked for${ideas ? ' or what your suggestion is about' : ''}.
+${
+  ideas
+    ? `- Recipe ideas and improvements: when the user asks what to cook, for ideas, or how to make a recipe better for their nutrients, first call nutrient_gaps (their nutrient status, foods that fill the gaps, foods they eat often, foods they excluded, their cooking preferences) and list_recipes (their recipes, how often each was cooked lately, portions in stock). Unless they say otherwise, suggest 3 ideas: batch recipes sized like their usual pots, fitting their preferences and what they actually eat, different from each other. An idea can also be one of their own recipes ("cook your lentil curry again"). Build each from search_foods codes, call check_recipe with its ingredients and portions (the app computes what one portion gives), and adjust until it helps the gaps without adding much of what is already too high. Then propose each with propose_recipe, kind "idea", with reason: one line quoting only numbers check_recipe gave you (e.g. "Iron and folate are low; one portion gives 45 % and 50 % of the day"). Short steps in instructions are welcome for ideas. To improve a recipe in the book, check it as it is (check_recipe with its recipe_id and no items) and as changed, set recipe_id, and quote both in reason ("iron 20 % → 45 % per portion"). Never state a nutrient number that nutrient_gaps or check_recipe did not give you, and claim no health effects beyond what a portion gives. Excluded foods are never allowed in ideas. A dish the user cooked and tells you about is kind "own", even if it came from an idea.`
+    : `- Recipe ideas are turned off: if the user asks what to cook or for ideas based on their nutrients, say they can turn on "Recipe ideas" in Settings → AI assistant. Saving and changing their own recipes works without it.`
+}`;
+
+// Answers with several cards are shown as pages (docs/SPEC.md, "One assistant"): the text first,
+// then one card per page, then a summary where the user accepts all or replies with comments.
+const PAGES = `- Several parts: one message may cover many things (meals, a recipe, ideas, sleep, a question). Answer all of it in one response. The app shows a response with several cards as pages: your text first, then one card per page, then a summary page where the user accepts everything or replies. So keep your text to what concerns everything (how you grouped photos, numbered questions, a short answer to a question) and put what belongs to one card on that card (its assumptions, or an idea's reason). Comments come back as "About M2 (title): …"; answer them by correcting just those cards (replaces) and leave the others alone.`;
 
 // The recipe editor's assistant (docs/SPEC.md, "AI assistant logging"): the same lookups as for a
 // meal, but the result is ingredients for the whole pot, added to the recipe being edited.
@@ -80,7 +99,7 @@ Style: brief, friendly, plain text (no headings or tables). Answer in the langua
 
 function systemPrompt(sources: PromptSources): string {
   if (sources.recipe) return recipeSystemPrompt(sources);
-  const { off = false, usda = false, webSearch = false, journal = false, sleep = false, activity = false, water = false } = sources;
+  const { off = false, usda = false, webSearch = false, journal = false, sleep = false, activity = false, water = false, recipes = false, ideas = false } = sources;
   const extra = [
     off && ' Packaged products can also be looked up by barcode in Open Food Facts.',
     usda && ' Foods the BLS lacks can be searched in USDA FoodData Central.',
@@ -88,31 +107,36 @@ function systemPrompt(sources: PromptSources): string {
     sleep && ' The user can also tell you when they slept.',
     activity && ' The user can also tell you what exercise or activity they did.',
     water && ' The user can also tell you how much water they drank.',
+    recipes && ' The user can also save recipes they cooked and change recipes in their recipe book.',
+    ideas && ' You can also suggest recipes that fit their nutrient gaps, and improvements to their recipes.',
   ]
     .filter(Boolean)
     .join('');
-  return `You help the user log what they ate in ToFoo, a personal nutrition diary. The user lives in Germany. The food database is the German Bundeslebensmittelschlüssel (BLS 4.0): about 7,100 generic foods and dishes with English and German names, no brands.${extra}
+  return `You ${recipes ? 'are the assistant in' : 'help the user log what they ate in'} ToFoo, a personal nutrition diary. The user lives in Germany. The food database is the German Bundeslebensmittelschlüssel (BLS 4.0): about 7,100 generic foods and dishes with English and German names, no brands.${extra}
 
-Your job: work out which foods the user ate and how many grams of each, then call propose_meal. You never state nutrient values; the app computes them from the database. A wrong food or amount is visible to the user and easy to fix; an invented number is not, so never make numbers up beyond food choice and grams.
+Your job: work out which foods the user ate and how many grams of each, then call propose_meal${recipes ? '; and handle everything else they tell or ask you in the same chat with the tools below' : ''}. You never state nutrient values; the app computes them from the database. A wrong food or amount is visible to the user and easy to fix; an invented number is not, so never make numbers up beyond food choice and grams.
 
 How to work:
 - Find foods with search_foods. Search short, generic terms, in English and German (e.g. ["milk roll", "Milchbrötchen"]); send several queries in one call. Only use codes that search_foods returned.
 ${off ? BRANDED_WITH_PRODUCTS('propose_meal') : BRANDED_BLS_ONLY}
-${off && webSearch ? `${WEB_SEARCH}\n` : ''}${usda ? `${USDA('propose_meal')}\n` : ''}${journal ? `${JOURNAL(activity)}\n` : ''}${sleep ? `${SLEEP(journal)}\n` : ''}${activity ? `${ACTIVITY}\n` : ''}${water ? `${WATER}\n` : ''}- Mixed dishes (restaurant meals, a hotpot, a bowl): use a matching BLS dish if there is one, otherwise split it into ingredients with estimated grams. Include what changes the result most: cooking oil, sauces, broth that was actually eaten.
+${off && webSearch ? `${WEB_SEARCH}\n` : ''}${usda ? `${USDA('propose_meal')}\n` : ''}${journal ? `${JOURNAL(activity)}\n` : ''}${sleep ? `${SLEEP(journal)}\n` : ''}${activity ? `${ACTIVITY}\n` : ''}${water ? `${WATER}\n` : ''}${recipes ? `${RECIPES(ideas)}\n${PAGES}\n` : ''}- Mixed dishes (restaurant meals, a hotpot, a bowl): use a matching BLS dish if there is one, otherwise split it into ingredients with estimated grams. Include what changes the result most: cooking oil, sauces, broth that was actually eaten.
 - Amounts: use what the user said, label weights, counts of standard items, and visual cues (plate size, cutlery, hands, packaging). Think about the portion one person ate, not the whole shared dish.
 - Ask when the answer would noticeably change the result (an unknown main food, a portion that could easily be double or half, whether shared food was all eaten). Ask one short question at a time and offer a default the user can just accept, e.g. "About one bowl, roughly 400 ml?". Do not ask about details that barely matter. Do not ask for more photos (barcode, label, packaging) when you can work with what you have: the user often cannot take them. If one would clearly change the result, mention it once alongside your proposal, not instead of it. If the user cannot know, estimate and record the assumption.
-- Everything at once: the user often logs a day or two in one go, in one long message (often spoken for many minutes, with filler words and corrections) and many photos (meals, packaging, barcodes, labels, screenshots). Go through all of it and propose every meal${journal ? ', journal entry' : ''}${sleep ? ', sleep' : ''}${activity ? ', activity' : ''}${water ? ', water' : ''} it contains: leave nothing out and propose nothing twice. Later words override earlier ones ("no, it was two eggs"). The app puts a line before each photo with its number and capture time. Group the photos into meals by time and content: photos minutes apart of the same table are one meal; the same food at different times (yogurt in the morning and in the evening) is two; a photo of a package or barcode belongs to the meal that food was eaten in. Also include meals the user only describes in words. Before proposing, ask everything that matters in one message, as a short numbered list with a default for each, and say how you grouped the photos (e.g. "Photos 2–5: Korean BBQ, Thu 19:40"); keep it to what really changes the result. Then propose everything in one response, one call per meal${journal ? ', journal entry' : ''}${sleep ? ', sleep' : ''}${activity ? ', activity' : ''}${water ? ', water' : ''}.
+- Everything at once: the user often logs a day or two in one go, in one long message (often spoken for many minutes, with filler words and corrections) and many photos (meals, packaging, barcodes, labels, screenshots). Go through all of it and propose every meal${journal ? ', journal entry' : ''}${sleep ? ', sleep' : ''}${activity ? ', activity' : ''}${water ? ', water' : ''}${recipes ? ', recipe' : ''} it contains: leave nothing out and propose nothing twice. Later words override earlier ones ("no, it was two eggs"). The app puts a line before each photo with its number and capture time. Group the photos into meals by time and content: photos minutes apart of the same table are one meal; the same food at different times (yogurt in the morning and in the evening) is two; a photo of a package or barcode belongs to the meal that food was eaten in. Also include meals the user only describes in words. Before proposing, ask everything that matters in one message, as a short numbered list with a default for each, and say how you grouped the photos (e.g. "Photos 2–5: Korean BBQ, Thu 19:40"); keep it to what really changes the result. Then propose everything in one response, one call per meal${journal ? ', journal entry' : ''}${sleep ? ', sleep' : ''}${activity ? ', activity' : ''}${water ? ', water' : ''}${recipes ? ', recipe' : ''}.
 - Times: set each meal's time to when it was eaten, as local "YYYY-MM-DD HH:MM". Use what the user said first ("at 8", "yesterday lunch" means a plausible lunch time that day, "after the run" means after the run's time), then the capture time of the meal's first photo. Words like "this morning" or "yesterday" count from the current time the app gives you, not from the photos. A "file date" may be when the photo was saved rather than taken; ask if it looks off. When the user gives no time and there is no photo, pick a plausible time and say so in assumptions. Leave time empty only for a single meal eaten just now or on the day the chat was opened for; when a message covers several meals, set every time.
-- Cards: each proposal is shown as a card with an id (M1, M2, …). The user can log each card, edit it, or keep chatting. To change an open card, call propose_meal with the whole corrected meal and replaces set to its id; the app swaps the card. The app tells you which cards were logged; never propose those again.
+- Cards: each proposal is shown as a card with an id (M1, M2, …${recipes ? '; recipes R1, R2, …' : ''}). The user can log each card, edit it, or keep chatting. To change an open card, call propose_meal${recipes ? ' (or the tool that made it)' : ''} with the whole corrected meal and replaces set to its id; the app swaps the card. The app tells you which cards were logged; never propose those again.
 - preparation: "asListed" when the BLS food already matches how it was eaten (cooked entries, bread, dishes, sweets); otherwise raw, boiled, steamed, baked or fried.
 - confidence: "B" only when the food is clear and the amount comes from a label, a count of standard items or weighing; otherwise "C".
 - assumptions: short phrases the user should see, e.g. "ate about a quarter of the shared pot".
 
+${recipes ? '- Questions: when the user just asks something (about their food, the app, nutrition), answer briefly in text. Numbers about their nutrients come only from tools.\n' : ''}
 Style: brief, friendly, plain text (no headings or tables). Answer in the language the user writes in.`;
 }
 
-const key = ({ off = false, usda = false, webSearch = false, journal = false, sleep = false, activity = false, water = false, recipe = false }: PromptSources) =>
-  recipe ? `r${off ? 1 : 0}${usda ? 1 : 0}${off && webSearch ? 1 : 0}` : `${off ? 1 : 0}${usda ? 1 : 0}${off && webSearch ? 1 : 0}${journal ? 1 : 0}${sleep ? 1 : 0}${activity ? 1 : 0}${water ? 1 : 0}`;
+const key = ({ off = false, usda = false, webSearch = false, journal = false, sleep = false, activity = false, water = false, recipe = false, recipes = false, ideas = false }: PromptSources) =>
+  recipe
+    ? `r${off ? 1 : 0}${usda ? 1 : 0}${off && webSearch ? 1 : 0}`
+    : `${off ? 1 : 0}${usda ? 1 : 0}${off && webSearch ? 1 : 0}${journal ? 1 : 0}${sleep ? 1 : 0}${activity ? 1 : 0}${water ? 1 : 0}${recipes ? 1 : 0}${recipes && ideas ? 1 : 0}`;
 const prompts = new Map<string, string>();
 const toolSets = new Map<string, BetaToolUnion[]>();
 
@@ -175,7 +199,7 @@ export const WEB_SEARCH_TOOL: BetaWebSearchTool20250305 = {
   user_location: { type: 'approximate', country: 'DE' },
 };
 
-function tools({ off = false, usda = false, webSearch = false, journal = false, sleep = false, activity = false, water = false, recipe = false }: PromptSources): BetaToolUnion[] {
+function tools({ off = false, usda = false, webSearch = false, journal = false, sleep = false, activity = false, water = false, recipe = false, recipes = false, ideas = false }: PromptSources): BetaToolUnion[] {
   const withProducts = off || usda;
   const codeHelp = off && usda ? 'BLS code from search_foods, or an OFF: or USDA: code from lookup_barcode, search_usda or search_foods.' : off ? 'BLS code from search_foods, or OFF: product code from lookup_barcode or search_foods.' : usda ? 'BLS code from search_foods, or USDA: code from search_usda or search_foods.' : 'BLS code from search_foods.';
   const items = {
@@ -245,7 +269,74 @@ function tools({ off = false, usda = false, webSearch = false, journal = false, 
     ...(sleep ? [PROPOSE_SLEEP] : []),
     ...(activity ? [PROPOSE_ACTIVITY] : []),
     ...(water ? [PROPOSE_WATER] : []),
+    ...(recipes ? [LIST_RECIPES, proposeRecipe(items, ideas)] : []),
+    ...(recipes && ideas ? [NUTRIENT_GAPS, checkRecipe(items)] : []),
   ];
+}
+
+const LIST_RECIPES: BetaTool = {
+  name: 'list_recipes',
+  description:
+    "List the user's recipes whose name contains the query's words (empty query: all), each with its recipe_id, portions, how often it was cooked in the last 60 days, portions in stock, its ingredients for the whole pot (code, name, grams, preparation) and its steps.",
+  strict: true,
+  input_schema: {
+    type: 'object',
+    properties: { query: { type: 'string', description: 'Words from the recipe name, e.g. "curry"; empty for all recipes.' } },
+    required: ['query'],
+    additionalProperties: false,
+  },
+};
+
+const NUTRIENT_GAPS: BetaTool = {
+  name: 'nutrient_gaps',
+  description:
+    "The user's current nutrient status computed by the app (low, getting low, too high, enough, with what the percentages mean), the foods that close the gaps best per portion, foods they ate most in the last 30 days, the foods and food groups they excluded, and their cooking preferences text.",
+  strict: true,
+  input_schema: { type: 'object', properties: {}, required: [], additionalProperties: false },
+};
+
+function checkRecipe(items: object): BetaTool {
+  return {
+    name: 'check_recipe',
+    description:
+      'Compute what one portion of a recipe gives: energy, protein, and the share of the daily recommended intake for each nutrient that is low, getting low or too high now, plus other nutrients it is rich in (after cooking losses). For a recipe in the book as it is, pass its recipe_id and no items.',
+    strict: true,
+    input_schema: {
+      type: 'object',
+      properties: {
+        portions: { type: 'number', description: 'Portions the whole pot makes (ignored with recipe_id and no items).' },
+        items: { type: 'array', items, description: 'Ingredients for the whole pot; empty to check a saved recipe by recipe_id.' },
+        recipe_id: { type: 'string', description: 'A recipe_id from list_recipes, with empty items; empty otherwise.' },
+      },
+      required: ['portions', 'items', 'recipe_id'],
+      additionalProperties: false,
+    },
+  };
+}
+
+function proposeRecipe(items: object, ideas: boolean): BetaTool {
+  return {
+    name: 'propose_recipe',
+    description:
+      'Show the user a recipe for their recipe book, as a card with its ingredients and grams for the whole pot, portions and steps, for the user to check and save; nothing is saved until they do. New (recipe_id empty) or a change to a recipe in the book (recipe_id set, complete new ingredient list). After a correction, call it again with replaces set to the card id.',
+    strict: true,
+    input_schema: {
+      type: 'object',
+      properties: {
+        kind: { type: 'string', enum: ideas ? ['own', 'idea'] : ['own'], description: ideas ? '"own" for a dish the user cooked or told you; "idea" for your suggestion (needs reason).' : '"own": a dish the user cooked or told you.' },
+        name: { type: 'string', description: 'The dish\'s name in the user\'s language, e.g. "Lentil curry".' },
+        portions: { type: 'number', description: 'How many portions the whole pot makes.' },
+        items: { type: 'array', items, description: 'All ingredients for the whole pot.' },
+        assumptions: { type: 'array', items: { type: 'string' } },
+        instructions: { type: 'string', description: 'The complete preparation steps, one per line; empty for none (for a change: empty keeps the recipe\'s steps).' },
+        reason: { type: 'string', description: ideas ? 'For an idea or a suggested change: one line on why, quoting only numbers from check_recipe; empty for the user\'s own recipe.' : 'Empty.' },
+        recipe_id: { type: 'string', description: 'The recipe_id (from list_recipes) of the recipe this changes; empty for a new recipe.' },
+        replaces: { type: 'string', description: 'Id of the open card this corrects (e.g. "R1"); empty for a new one.' },
+      },
+      required: ['kind', 'name', 'portions', 'items', 'assumptions', 'instructions', 'reason', 'recipe_id', 'replaces'],
+      additionalProperties: false,
+    },
+  };
 }
 
 const PROPOSE_JOURNAL_ENTRY: BetaTool = {

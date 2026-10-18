@@ -97,6 +97,7 @@ export const settingsSchema = z.object({
   favourites: z.array(foodRef).optional(),
   favouriteMeals: z.array(favouriteMeal).optional(),
   logCollapsed: z.record(z.string(), z.boolean()).optional(),
+  cookingPreferences: z.string().optional(),
 });
 
 export const recipeRecordSchema = z.object({

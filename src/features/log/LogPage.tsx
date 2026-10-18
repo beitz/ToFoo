@@ -204,7 +204,7 @@ export function LogPage({ day: dayParam, foodCode }: { day?: string; foodCode?: 
       )}
 
       {isOn(d.settings.features, 'aiAssistant') && (
-        <a className="btn btn-primary btn-block assistant-entry" href={dayParam ? href('assistant', day) : href('assistant')}>
+        <a className="btn btn-primary btn-block assistant-entry" href={href('assistant', day)}>
           <Icon name="camera" /> {t('ai.entry')}
         </a>
       )}

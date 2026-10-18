@@ -19,7 +19,12 @@ import {
   validateActivityProposal,
   validateWaterProposal,
   validateIngredientsProposal,
+  validateRecipeProposal,
+  runListRecipes,
+  runNutrientGaps,
+  runCheckRecipe,
   type IngredientsProposal,
+  type RecipeProposal,
   type JournalProposal,
   type Proposal,
   type SleepProposal,
@@ -36,9 +41,10 @@ export const DEFAULT_AI_MODEL: AiModel = 'claude-opus-5-5';
 
 /**
  * Tool rounds per user message before giving up: a normal meal needs one to three; a long message
- * covering a day or two (searches, barcodes, a correction after a rejected proposal) needs more.
+ * covering a day or two (searches, barcodes, a correction after a rejected proposal) needs more,
+ * and recipe ideas add a check of each idea, sometimes twice.
  */
-const MAX_STEPS = 20;
+const MAX_STEPS = 30;
 
 export interface Conversation {
   messages: Beta.BetaMessageParam[];
@@ -57,7 +63,7 @@ export interface Conversation {
   activities?: number;
   /** Water cards shown so far; the next one gets id W(waters + 1). */
   waters?: number;
-  /** Ingredient cards shown so far (recipe editor); the next one gets id R(recipes + 1). */
+  /** Ingredient cards (recipe editor) or recipe cards (main chat) shown so far; the next one gets id R(recipes + 1). */
   recipes?: number;
 }
 
@@ -83,10 +89,24 @@ export type ShownActivity = ActivityProposal & { id: string };
 export type ShownWater = WaterProposal & { id: string };
 /** Recipe ingredients as shown: with their card id (R1, R2, …). */
 export type ShownIngredients = IngredientsProposal & { id: string };
+/** A recipe for the book as shown (main chat): with its card id (R1, R2, …). */
+export type ShownRecipe = RecipeProposal & { id: string };
 
 export type TurnOutcome =
   | { kind: 'reply'; text: string }
-  | { kind: 'proposal'; text: string; proposals: ShownProposal[]; notes: ShownNote[]; sleeps: ShownSleep[]; activities: ShownActivity[]; waters: ShownWater[]; ingredients: ShownIngredients[] }
+  | {
+      kind: 'proposal';
+      text: string;
+      proposals: ShownProposal[];
+      notes: ShownNote[];
+      sleeps: ShownSleep[];
+      activities: ShownActivity[];
+      waters: ShownWater[];
+      ingredients: ShownIngredients[];
+      recipes: ShownRecipe[];
+      /** Every card id, in the order the assistant proposed them (meals, recipes and trackers mixed). */
+      order: string[];
+    }
   | { kind: 'error'; reason: 'refusal' | 'tooLong' | 'tooManySteps' };
 
 /** Request parameters per model (fallbacks re-run a declined request on another model). */
@@ -157,7 +177,7 @@ export async function sendMessage(
   if (user.text.trim()) content.push({ type: 'text', text: user.text.trim() });
   if (user.appNote) content.push({ type: 'text', text: user.appNote });
   messages.push({ role: 'user', content });
-  const sources = sourcesOf(ctx.products, ctx.journal, ctx.sleep, ctx.activity, ctx.water, ctx.recipe);
+  const sources = sourcesOf(ctx);
 
   let cards = conversation.cards;
   let notes = conversation.notes ?? 0;
@@ -187,6 +207,7 @@ export async function sendMessage(
     const activitiesProposed: Array<{ id: string; proposal: ActivityProposal }> = [];
     const watersProposed: Array<{ id: string; proposal: WaterProposal }> = [];
     const ingredientsProposed: Array<{ id: string; proposal: IngredientsProposal }> = [];
+    const recipesProposed: Array<{ id: string; proposal: RecipeProposal }> = [];
     let rejected = false;
     for (const use of uses) {
       if (use.name === 'search_foods') {
@@ -201,6 +222,22 @@ export async function sendMessage(
       } else if (use.name === 'propose_ingredients' && sources.recipe) {
         const r = validateIngredientsProposal(use.input, ctx.db, ctx.products);
         if (r.ok) ingredientsProposed.push({ id: use.id, proposal: r.proposal });
+        else {
+          rejected = true;
+          results.push({ type: 'tool_result', tool_use_id: use.id, content: r.error, is_error: true });
+        }
+      } else if (use.name === 'list_recipes' && sources.recipes) {
+        const r = runListRecipes(use.input, ctx);
+        results.push({ type: 'tool_result', tool_use_id: use.id, content: r.text, is_error: !r.ok });
+      } else if (use.name === 'nutrient_gaps' && sources.ideas) {
+        const r = runNutrientGaps(ctx);
+        results.push({ type: 'tool_result', tool_use_id: use.id, content: r.text, is_error: !r.ok });
+      } else if (use.name === 'check_recipe' && sources.ideas) {
+        const r = runCheckRecipe(use.input, ctx);
+        results.push({ type: 'tool_result', tool_use_id: use.id, content: r.text, is_error: !r.ok });
+      } else if (use.name === 'propose_recipe' && sources.recipes) {
+        const r = validateRecipeProposal(use.input, ctx);
+        if (r.ok) recipesProposed.push({ id: use.id, proposal: r.proposal });
         else {
           rejected = true;
           results.push({ type: 'tool_result', tool_use_id: use.id, content: r.error, is_error: true });
@@ -246,13 +283,25 @@ export async function sendMessage(
     }
 
     // Cards are shown all together or not at all, so the user never sees half a batch.
-    if ((proposals.length || notesProposed.length || sleepsProposed.length || activitiesProposed.length || watersProposed.length || ingredientsProposed.length) && !rejected) {
+    const anyProposed = proposals.length + notesProposed.length + sleepsProposed.length + activitiesProposed.length + watersProposed.length + ingredientsProposed.length + recipesProposed.length > 0;
+    if (anyProposed && !rejected) {
       const shown = proposals.map(({ proposal }): ShownProposal => ({ ...proposal, id: `M${++cards}` }));
       const shownNotes = notesProposed.map(({ proposal }): ShownNote => ({ ...proposal, id: `J${++notes}` }));
       const shownSleeps = sleepsProposed.map(({ proposal }): ShownSleep => ({ ...proposal, id: `S${++sleeps}` }));
       const shownActivities = activitiesProposed.map(({ proposal }): ShownActivity => ({ ...proposal, id: `A${++activities}` }));
       const shownWaters = watersProposed.map(({ proposal }): ShownWater => ({ ...proposal, id: `W${++waters}` }));
       const shownIngredients = ingredientsProposed.map(({ proposal }): ShownIngredients => ({ ...proposal, id: `R${++recipes}` }));
+      const shownRecipes = recipesProposed.map(({ proposal }): ShownRecipe => ({ ...proposal, id: `R${++recipes}` }));
+      const cardOfUse = new Map<string, string>([
+        ...proposals.map(({ id }, i) => [id, shown[i]!.id] as const),
+        ...notesProposed.map(({ id }, i) => [id, shownNotes[i]!.id] as const),
+        ...sleepsProposed.map(({ id }, i) => [id, shownSleeps[i]!.id] as const),
+        ...activitiesProposed.map(({ id }, i) => [id, shownActivities[i]!.id] as const),
+        ...watersProposed.map(({ id }, i) => [id, shownWaters[i]!.id] as const),
+        ...ingredientsProposed.map(({ id }, i) => [id, shownIngredients[i]!.id] as const),
+        ...recipesProposed.map(({ id }, i) => [id, shownRecipes[i]!.id] as const),
+      ]);
+      const order = uses.map((u) => cardOfUse.get(u.id)).filter((id): id is string => !!id);
       const shownResult = (id: string, card: string, verb: string): Beta.BetaToolResultBlockParam => ({ type: 'tool_result', tool_use_id: id, content: `Shown to the user as card ${card}. Not ${verb} yet; their reply follows.` });
       const shownResults = [
         ...proposals.map(({ id }, i) => shownResult(id, shown[i]!.id, 'logged')),
@@ -261,9 +310,21 @@ export async function sendMessage(
         ...activitiesProposed.map(({ id }, i) => shownResult(id, shownActivities[i]!.id, 'saved')),
         ...watersProposed.map(({ id }, i) => shownResult(id, shownWaters[i]!.id, 'saved')),
         ...ingredientsProposed.map(({ id }, i) => shownResult(id, shownIngredients[i]!.id, 'added to the recipe')),
+        ...recipesProposed.map(({ id }, i) => shownResult(id, shownRecipes[i]!.id, 'saved')),
       ];
       return done(
-        { kind: 'proposal', text: textOf(res.content), proposals: shown, notes: shownNotes, sleeps: shownSleeps, activities: shownActivities, waters: shownWaters, ingredients: shownIngredients },
+        {
+          kind: 'proposal',
+          text: textOf(res.content),
+          proposals: shown,
+          notes: shownNotes,
+          sleeps: shownSleeps,
+          activities: shownActivities,
+          waters: shownWaters,
+          ingredients: shownIngredients,
+          recipes: shownRecipes,
+          order,
+        },
         [...results, ...shownResults],
       );
     }
@@ -282,6 +343,9 @@ export async function sendMessage(
     for (const { id } of activitiesProposed) {
       results.push({ type: 'tool_result', tool_use_id: id, content: 'Not shown: another proposal in this response had errors. Call propose_activity again for this activity too.', is_error: true });
     }
+    for (const { id } of recipesProposed) {
+      results.push({ type: 'tool_result', tool_use_id: id, content: 'Not shown: another proposal in this response had errors. Call propose_recipe again for this recipe too.', is_error: true });
+    }
     for (const { id } of ingredientsProposed) {
       results.push({ type: 'tool_result', tool_use_id: id, content: 'Not shown: another proposal in this response had errors. Call propose_ingredients again for these ingredients too.', is_error: true });
     }
@@ -292,7 +356,7 @@ export async function sendMessage(
 
 /** The system prompt and tools a request with this context carries (kept with saved chats). */
 export function chatSetup(ctx: ToolContext): { system: string; tools: unknown[] } {
-  const sources = sourcesOf(ctx.products, ctx.journal, ctx.sleep, ctx.activity, ctx.water, ctx.recipe);
+  const sources = sourcesOf(ctx);
   return { system: systemPromptFor(sources), tools: toolsFor(sources) };
 }
 

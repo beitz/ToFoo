@@ -14,13 +14,15 @@ import { hasOwnMicros, isProductCode, productFood, productId, productLabel } fro
 import { normalize, search, type SearchIndex } from '../foods/search';
 import { parseLocalDateTime } from './photoTime';
 import { fmtNumber } from '../lib/format';
+import { refKey } from '../lib/refs';
 import { MAX_SLEEP_MS } from '../logic/sleep';
 import { MAX_ACTIVITY_MINUTES } from '../logic/activity';
 import { MAX_WATER_ML } from '../logic/water';
 import type { Preparation } from '../model/paramTypes';
 import type { RawValue } from '../model/types';
 import type { SkinExposure } from '../model/sun';
-import { ACTIVITY_KINDS, INTENSITIES, type ActivityKind, type Intensity, type Product } from '../storage/types';
+import { excludedFoods, type RecipeInfo } from '../logic/recipeIdeas';
+import { ACTIVITY_KINDS, INTENSITIES, type ActivityKind, type Ingredient, type Intensity, type Product, type Profile } from '../storage/types';
 
 export const PREPARATIONS = ['asListed', 'raw', 'boiled', 'steamed', 'baked', 'fried'] as const satisfies readonly Preparation[];
 const SKIN_EXPOSURES = ['faceHands', 'faceHandsForearms', 'faceHandsArms', 'armsLegs', 'mostOfBody'] as const satisfies readonly SkinExposure[];
@@ -91,6 +93,33 @@ export const ingredientsProposalInput = z.object({
   /** Id of the open card this proposal replaces (e.g. "R1"); empty for new ingredients. */
   replaces: z.string().optional(),
 });
+
+/** A recipe for the recipe book (main chat): one the user cooked, an idea, or a change to one of theirs. */
+export const recipeProposalInput = z.object({
+  /** "own": a dish the user cooked or told; "idea": the assistant's suggestion (only with recipe ideas on). */
+  kind: z.enum(['own', 'idea']),
+  name: z.string(),
+  portions: z.number(),
+  items: z.array(proposalInput.shape.items.element),
+  assumptions: z.array(z.string()),
+  /** The complete preparation steps; empty for none (or, for a change, to keep the recipe's). */
+  instructions: z.string().optional(),
+  /** One line on why it is suggested, quoting the app's numbers; empty for the user's own recipe. */
+  reason: z.string().optional(),
+  /** Id of the recipe in the book this changes; empty for a new recipe. */
+  recipe_id: z.string().optional(),
+  /** Id of the open card this proposal replaces (e.g. "R1"); empty for a new one. */
+  replaces: z.string().optional(),
+});
+
+export const checkRecipeInput = z.object({
+  portions: z.number(),
+  items: z.array(proposalInput.shape.items.element),
+  /** Check a recipe in the book as it is (items empty) instead. */
+  recipe_id: z.string().optional(),
+});
+
+export const listRecipesInput = z.object({ query: z.string() });
 
 export const journalProposalInput = z.object({
   text: z.string(),
@@ -177,6 +206,24 @@ export interface IngredientsProposal {
   replaces?: string;
 }
 
+/** A recipe the assistant proposes for the recipe book, for the user to check. */
+export interface RecipeProposal {
+  kind: 'own' | 'idea';
+  name: string;
+  portions: number;
+  items: ProposedItem[];
+  assumptions: string[];
+  /** The complete steps; absent for none (a change then keeps the recipe's steps). */
+  instructions?: string;
+  reason?: string;
+  /** The recipe in the book this changes. */
+  recipeId?: string;
+  replaces?: string;
+}
+
+/** Longest reason line on an idea: one line, not a paragraph. */
+const MAX_REASON_CHARS = 300;
+
 /** Longest proposed journal entry: a few paragraphs, not a transcript of the whole chat. */
 const MAX_JOURNAL_CHARS = 4000;
 
@@ -254,20 +301,55 @@ export interface ToolContext {
    * instead of meals, and nothing else (no journal, sleep, activity or water).
    */
   recipe?: boolean;
+  /** The main chat's recipe book: save, change and (with recipe ideas on) suggest recipes. Absent in the recipe editor. */
+  recipes?: RecipeTools;
+}
+
+/** The recipe book as the assistant may read it, and the app's numbers for ideas. */
+export interface RecipeTools {
+  list: readonly RecipeInfo[];
+  /** An ingredient's current name (its food or product). */
+  nameOf: (ing: Ingredient) => string;
+  /** Recipe ideas on: the app's numbers for ideas and improvements. */
+  ideas?: IdeaTools;
+}
+
+export interface IdeaTools {
+  /** nutrient_gaps' answer: status, foods that fill the gaps, foods eaten often, exclusions, preferences. */
+  gaps: () => string;
+  /** check_recipe's answer: what one portion gives against the current gaps. */
+  check: (items: readonly ProposedItem[], portions: number) => string;
+  /** The same for a recipe in the book as it is saved (undefined if there is no such recipe). */
+  checkSaved: (recipeId: string) => string | undefined;
+  exclusions: Profile['exclusions'];
 }
 
 /** Which online sources the assistant is offered (decides the prompt and tool variant). */
-export function sourcesOf(
-  products: ProductTools | undefined,
-  journal = false,
-  sleep = false,
-  activity = false,
-  water = false,
-  recipe = false,
-): { off: boolean; usda: boolean; webSearch: boolean; journal: boolean; sleep: boolean; activity: boolean; water: boolean; recipe: boolean } {
+export function sourcesOf(ctx: Pick<ToolContext, 'products' | 'journal' | 'sleep' | 'activity' | 'water' | 'recipe' | 'recipes'>): {
+  off: boolean;
+  usda: boolean;
+  webSearch: boolean;
+  journal: boolean;
+  sleep: boolean;
+  activity: boolean;
+  water: boolean;
+  recipe: boolean;
+  recipes: boolean;
+  ideas: boolean;
+} {
+  const { products } = ctx;
   const online = { off: !!products?.find, usda: !!products?.searchUsda, webSearch: !!products?.find && !!products.webSearch };
-  if (recipe) return { ...online, journal: false, sleep: false, activity: false, water: false, recipe: true };
-  return { ...online, journal, sleep, activity, water, recipe: false };
+  if (ctx.recipe) return { ...online, journal: false, sleep: false, activity: false, water: false, recipe: true, recipes: false, ideas: false };
+  return {
+    ...online,
+    journal: !!ctx.journal,
+    sleep: !!ctx.sleep,
+    activity: !!ctx.activity,
+    water: !!ctx.water,
+    recipe: false,
+    recipes: !!ctx.recipes,
+    ideas: !!ctx.recipes?.ideas,
+  };
 }
 
 const LABEL_FIELDS: Array<[string, string, string]> = [
@@ -560,6 +642,113 @@ export function validateIngredientsProposal(
       items,
       assumptions: parsed.data.assumptions.map((a) => a.trim()).filter(Boolean),
       ...(instructions ? { instructions } : {}),
+      ...(replaces ? { replaces } : {}),
+    },
+  };
+}
+
+/** An ingredient's code as the assistant writes it: a BLS code, or OFF:… / USDA:… for a product. */
+export function ingredientCode(ing: Ingredient): string {
+  return ing.ref.source === 'BLS' ? ing.ref.code : refKey(ing.ref);
+}
+
+/** Run `list_recipes`: the user's recipes whose name has all the query's words (all for an empty query). */
+export function runListRecipes(input: unknown, ctx: ToolContext): { ok: boolean; text: string } {
+  const recipes = ctx.recipes;
+  if (!recipes) return { ok: false, text: 'The recipe book is not available here.' };
+  const parsed = listRecipesInput.safeParse(input);
+  if (!parsed.success) return { ok: false, text: 'Invalid input: expected {"query": "…"} (empty for all recipes).' };
+  const words = normalize(parsed.data.query).split(' ').filter(Boolean);
+  const hits = recipes.list.filter((r) => words.every((w) => normalize(r.name).includes(w)));
+  if (recipes.list.length === 0) return { ok: true, text: 'The recipe book is empty.' };
+  if (hits.length === 0) return { ok: true, text: `No recipe matches "${parsed.data.query}". The book has: ${recipes.list.map((r) => r.name).join('; ')}.` };
+  const blocks = hits.map((r) => {
+    const head = [
+      `recipe_id ${r.id}`,
+      r.name,
+      `${r.portions} portions`,
+      `cooked ${r.cookedLately}× in the last 60 days`,
+      r.inStock ? `${r.inStock} portions in stock` : 'none in stock',
+    ].join(' | ');
+    const ings = r.ingredients.map((i) => `${ingredientCode(i)} ${recipes.nameOf(i)} ${Math.round(i.grams * 10) / 10} g, ${i.preparation}`);
+    return [head, `Ingredients (whole pot): ${ings.length ? ings.join('; ') : 'none'}`, r.instructions ? `Steps:\n${r.instructions}` : 'Steps: none'].join('\n');
+  });
+  return { ok: true, text: blocks.join('\n\n') };
+}
+
+/** Run `nutrient_gaps` (recipe ideas on). */
+export function runNutrientGaps(ctx: ToolContext): { ok: boolean; text: string } {
+  const ideas = ctx.recipes?.ideas;
+  if (!ideas) return { ok: false, text: 'Recipe ideas are turned off.' };
+  return { ok: true, text: ideas.gaps() };
+}
+
+/** Run `check_recipe` (recipe ideas on): the app's numbers for one portion of the given (or a saved) recipe. */
+export function runCheckRecipe(input: unknown, ctx: ToolContext): { ok: boolean; text: string } {
+  const ideas = ctx.recipes?.ideas;
+  if (!ideas || !ctx.recipes) return { ok: false, text: 'Recipe ideas are turned off.' };
+  const parsed = checkRecipeInput.safeParse(input);
+  if (!parsed.success) return { ok: false, text: `Invalid input: ${parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}` };
+  const id = parsed.data.recipe_id?.trim();
+  if (id && parsed.data.items.length === 0) {
+    const r = ctx.recipes.list.find((x) => x.id === id);
+    const text = r && ideas.checkSaved(id);
+    if (!r || !text) return { ok: false, text: `Unknown recipe_id ${id}: use an id from list_recipes.` };
+    return { ok: true, text: `${r.name} as saved:\n${text}` };
+  }
+  const { items, problems } = validateItems(parsed.data.items, ctx.db, ctx.products, MAX_INGREDIENT_GRAMS);
+  const { portions } = parsed.data;
+  if (!Number.isInteger(portions) || portions < 1 || portions > MAX_PORTIONS) problems.push(`portions ${portions} is not plausible (a whole number from 1 to ${MAX_PORTIONS}).`);
+  if (items.length === 0 && problems.length === 0) problems.push('items is empty.');
+  if (problems.length) return { ok: false, text: `${problems.join('\n')}\nFix these and call check_recipe again.` };
+  return { ok: true, text: ideas.check(items, portions) };
+}
+
+/**
+ * Check a `propose_recipe` call: known codes and plausible grams for a whole pot, a name, whole
+ * portions, a known recipe for a change; an idea needs recipe ideas on, a reason line and no
+ * excluded food (the hard filter: the preferences text is only guidance).
+ */
+export function validateRecipeProposal(input: unknown, ctx: ToolContext): { ok: true; proposal: RecipeProposal } | { ok: false; error: string } {
+  const parsed = recipeProposalInput.safeParse(input);
+  if (!parsed.success) return { ok: false, error: `Invalid input: ${parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}` };
+  const p = parsed.data;
+  const { items, problems } = validateItems(p.items, ctx.db, ctx.products, MAX_INGREDIENT_GRAMS);
+  if (p.items.length === 0) problems.push('items is empty: a recipe needs its ingredients.');
+  const name = p.name.trim();
+  if (!name) problems.push('name is empty.');
+  if (!Number.isInteger(p.portions) || p.portions < 1 || p.portions > MAX_PORTIONS) problems.push(`portions ${p.portions} is not plausible (a whole number from 1 to ${MAX_PORTIONS}; estimate it from the pot if the user did not say, and say so in assumptions).`);
+  const instructions = p.instructions?.trim() ?? '';
+  if (instructions.length > MAX_INSTRUCTIONS_CHARS) problems.push(`instructions are ${instructions.length} characters; keep them under ${MAX_INSTRUCTIONS_CHARS}.`);
+  const reason = p.reason?.trim() ?? '';
+  if (reason.length > MAX_REASON_CHARS) problems.push(`reason is ${reason.length} characters; keep it to one line under ${MAX_REASON_CHARS}.`);
+  const recipeId = p.recipe_id?.trim() ?? '';
+  if (recipeId && !ctx.recipes?.list.some((r) => r.id === recipeId)) problems.push(`Unknown recipe_id ${recipeId}: use an id from list_recipes, or leave it empty for a new recipe.`);
+  if (p.kind === 'idea') {
+    const ideas = ctx.recipes?.ideas;
+    if (!ideas) problems.push('kind "idea" needs recipe ideas, which are turned off; use kind "own" for the user\'s own recipe.');
+    else {
+      if (!reason) problems.push('reason is empty: an idea needs one line on why, quoting numbers from check_recipe.');
+      const excluded = excludedFoods(
+        items.map((i) => i.food),
+        ideas.exclusions,
+      );
+      if (excluded.length) problems.push(`The user excluded these foods: ${excluded.join(', ')}. Ideas must not contain them; replace them.`);
+    }
+  }
+  if (problems.length) return { ok: false, error: `${problems.join('\n')}\nFix these and call propose_recipe again.` };
+  const replaces = p.replaces?.trim();
+  return {
+    ok: true,
+    proposal: {
+      kind: p.kind,
+      name,
+      portions: p.portions,
+      items,
+      assumptions: p.assumptions.map((a) => a.trim()).filter(Boolean),
+      ...(instructions ? { instructions } : {}),
+      ...(reason ? { reason } : {}),
+      ...(recipeId ? { recipeId } : {}),
       ...(replaces ? { replaces } : {}),
     },
   };

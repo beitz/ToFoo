@@ -20,7 +20,7 @@ Questions and assumptions that need an answer or a better source. Each model val
 - [ ] **Trend arrows** (`trendDisplay` in model/parameters.ts, display choices): 7-day lookback, at least 3 days of history, arrows by days to the next status line (3 ≤ 7 days, 2 ≤ 30 days, else 1), steady below 2 points per week. Above an upper limit the limit line is approximated as value ÷ (intake ÷ UL). Revisit once there is real usage.
 - [ ] **Day status:** a past day with at least one entry counts as "logged" unless marked "partly logged". Today counts only once something is logged or it is marked fasted.
 
-- [ ] **Recipe ideas vs "Foods that fill your gaps"** (2026-10-17): proposed to keep the food row, smaller, under the AI recipe ideas (no key, offline, free, and the model's ranking tool). Alternative: drop it once ideas exist.
+- [ ] **Recipe ideas vs "Foods that fill your gaps"** (2026-10-17): proposed to keep the food row, smaller, under the AI recipe ideas (no key, offline, free, and the model's ranking tool). Alternative: drop it once ideas exist. Update 2026-10-18: ideas were built inside the assistant chat, not on Home, so the row stays as it is for now.
 
 ## Source check (2026-10-15)
 
