@@ -55,7 +55,7 @@ export function IngredientSearch({ onPick, onScan }: { onPick: (p: PickedFood) =
           </button>
         )}
       </div>
-      {q && products.length > 0 && <ProductList products={products} onPick={(product) => pick({ product })} />}
+      {q && products.length > 0 && <ProductList pinnable products={products} onPick={(product) => pick({ product })} />}
       {q && <FoodList foods={results} onPick={(food) => pick({ food })} />}
       {q && results.length === 0 && products.length === 0 && <p className="muted">{t(offOn ? 'edit.noResultsScan' : 'edit.noResults')}</p>}
       {q && usdaOn && <UsdaResults key={q} query={q} onPick={(product) => pick({ product })} />}

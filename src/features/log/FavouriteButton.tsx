@@ -16,3 +16,15 @@ export function FavouriteButton({ foodRef }: { foodRef: FoodRef }) {
     </button>
   );
 }
+
+/** The same toggle as a star at the end of a list row, so a food can be pinned without opening it. */
+export function FavouriteStar({ foodRef, name }: { foodRef: FoodRef; name: string }) {
+  const d = useData();
+  const key = refKey(foodRef);
+  const on = (d.settings.favourites ?? []).some((r) => refKey(r) === key);
+  return (
+    <button className={`icon-btn fav-star${on ? ' on' : ''}`} aria-pressed={on} aria-label={t(on ? 'fav.unpin' : 'fav.pin', { name })} onClick={() => void repo.toggleFavourite(foodRef)}>
+      <Icon name="star" filled={on} />
+    </button>
+  );
+}
