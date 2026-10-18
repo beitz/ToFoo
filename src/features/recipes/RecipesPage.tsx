@@ -10,11 +10,14 @@ import type { Batch } from '../../storage/types';
 import { Icon } from '../../ui/Icon';
 import { Segmented, Sheet } from '../../ui/controls';
 import { logPortion, nextStorage, totalLeft } from '../home/StockChips';
+import { fmtGrams } from '../../lib/format';
+import { BatchSheet } from './BatchSheet';
 
 export function RecipesPage() {
   const d = useData();
   const toast = useToast();
   const [removing, setRemoving] = useState<Batch | null>(null);
+  const [potOf, setPotOf] = useState<Batch | null>(null);
   const inStock = d.batches.filter((b) => totalLeft(b) > 0).sort((a, b) => a.cookedAt - b.cookedAt);
   const recipes = [...d.recipes].filter((r) => !r.archived).sort((a, b) => a.name.localeCompare(b.name));
   const lastCooked = (id: string) => d.batches.filter((b) => b.recipeId === id).reduce<string | null>((m, b) => (m === null || b.cookedDay > m ? b.cookedDay : m), null);
@@ -40,6 +43,7 @@ export function RecipesPage() {
               </a>
               <span className="muted small">{t('stock.cooked', { day: formatDay(b.cookedDay, d.today) })}</span>
             </div>
+            {b.cookedGrams ? <p className="muted small">{t('batch.weighedLine', { grams: fmtGrams(b.cookedGrams), per: fmtGrams(b.cookedGrams / b.recipe.portions) })}</p> : null}
             <div className="stock-counts">
               <span>
                 <Icon name="pot" size={16} /> {t('storage.fresh')} {b.remaining.fresh}
@@ -62,6 +66,9 @@ export function RecipesPage() {
               )}
               <button className="btn btn-small btn-ghost" onClick={() => setRemoving(b)}>
                 {t('stock.removeOne')}
+              </button>
+              <button className="btn btn-small btn-ghost" onClick={() => setPotOf(b)}>
+                <Icon name="pot" size={16} /> {t(b.cookedGrams ? 'batch.thisPot' : 'batch.weighPot')}
               </button>
             </div>
           </div>
@@ -87,6 +94,7 @@ export function RecipesPage() {
         })}
       </ul>
       {removing && <RemoveSheet batch={removing} onClose={() => setRemoving(null)} />}
+      {potOf && <BatchSheet batch={d.batchesById.get(potOf.id) ?? potOf} onClose={() => setPotOf(null)} />}
     </section>
   );
 }

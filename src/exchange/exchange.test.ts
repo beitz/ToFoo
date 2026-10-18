@@ -7,6 +7,7 @@ import { parseExchange } from './parse';
 import { defaultProfile, defaultSettings } from '../storage/defaults';
 import type { Snapshot } from '../storage/repo';
 
+const lentils = { ref: { source: 'BLS' as const, version: '4.0', code: 'H700000' }, name: 'Lentils', grams: 400, preparation: 'boiled' as const };
 const snapshot: Snapshot = {
   profile: defaultProfile('2026-10-15'),
   settings: {
@@ -22,14 +23,32 @@ const snapshot: Snapshot = {
       },
     ],
     logCollapsed: { saved: true },
+    potGrams: 1200,
   },
-  recipes: [],
-  batches: [],
+  recipes: [
+    { id: 'r1', schemaVersion: 1, name: 'Chili', portions: 4, ingredients: [lentils], tags: [], potGrams: 1200, createdAt: 1, updatedAt: 1 },
+  ],
+  batches: [
+    {
+      id: 'b1',
+      schemaVersion: 1,
+      recipeId: 'r1',
+      recipe: { name: 'Chili', portions: 4, ingredients: [{ ...lentils, grams: 300 }] },
+      recipeIngredients: [lentils],
+      cookedGrams: 1600,
+      cookedDay: '2026-10-15',
+      cookedAt: 1,
+      plan: { fresh: 1, fridge: 1, freezer: 2 },
+      remaining: { fresh: 1, fridge: 1, freezer: 1 },
+      corrections: [],
+    },
+  ],
   log: [
     { id: '1', schemaVersion: 1, time: 1, day: '2026-10-15', confidence: 'A', label: 'Hafer', kind: 'food', ref: { source: 'BLS', version: '4.0', code: 'C133000' }, grams: 60.5, preparation: 'asListed' },
     { id: '2', schemaVersion: 1, time: 2, day: '2026-10-15', confidence: 'C', label: 'Tea', kind: 'drink', drink: 'tea' },
     { id: '3', schemaVersion: 1, time: 3, day: '2026-10-15', confidence: 'A', label: 'Giotto', kind: 'food', ref: { source: 'OFF', code: '8000500319475' }, grams: 4.3, preparation: 'asListed' },
     { id: '4', schemaVersion: 1, time: 4, day: '2026-10-15', confidence: 'C', label: 'Kimchi', kind: 'food', ref: { source: 'USDA', code: '170392' }, grams: 50, preparation: 'asListed' },
+    { id: '5', schemaVersion: 1, time: 5, day: '2026-10-15', confidence: 'A', label: 'Chili', kind: 'portion', batchId: 'b1', storage: 'freezer', portions: 1, grams: 380, ingredients: [{ ...lentils, grams: 200 }] },
   ],
   customFoods: [],
   dayStatus: [{ day: '2026-10-14', status: 'fasted', schemaVersion: 1 }],
@@ -81,7 +100,7 @@ describe('exchange format', () => {
     expect(parsed.ok).toBe(true);
     if (parsed.ok && parsed.value.type === 'backup') {
       expect(parsed.value.data).toEqual(snapshot);
-      expect(snapshotCounts(parsed.value.data)).toMatchObject({ log: 4, journal: 1, portionSizes: 1 });
+      expect(snapshotCounts(parsed.value.data)).toMatchObject({ log: 5, journal: 1, portionSizes: 1 });
     }
   });
 

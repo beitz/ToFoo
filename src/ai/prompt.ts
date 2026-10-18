@@ -59,13 +59,19 @@ export interface PromptSources {
 // Recipes in the main chat (docs/SPEC.md, "One assistant"): the same pot rules as in the recipe
 // editor, but the result is a recipe for the book, new or changed.
 const RECIPES = (ideas: boolean) => `- Recipes: the user keeps a recipe book of dishes cooked as a pot and split into portions (batch cooking). When they tell you about a dish they cooked or want to keep ("I just made a lentil curry with …", a photo of a recipe), propose it with propose_recipe, kind "own": every ingredient with grams for the whole pot as it goes in (convert cups, spoons, pieces, cans and packs; use label weights; put conversions that are not obvious in assumptions, e.g. "2 onions ≈ 200 g"), one ingredient per item and never a BLS dish for the whole recipe. preparation is how it is cooked in the dish: boiled (also simmered), steamed (also stewed), baked (also roasted), fried, raw if eaten uncooked, asListed when the BLS food already matches (bread, canned or cooked entries, oil, spices, salt, sauces). Use the plain BLS salt (the app uses the user's salt). Include water that stays in the dish (soups, curries) as tap water; leave out water poured away. portions: what they said, else estimate from the pot and say so in assumptions. instructions: the steps only when they said or showed how it is made, one short step per line, in their words; add none of your own.
-- If they also ate some of the dish, propose a meal too, with each ingredient's share of what they ate (one portion is the pot divided by the portions), at the time they ate. The recipe card is for the book, the meal card for the diary; mention once that cooking it as a batch from the recipe page keeps track of the portions in stock.
+- If they also ate some of a new dish (not in the book yet), propose a meal too, with each ingredient's share of what they ate (one portion is the pot divided by the portions), at the time they ate. The recipe card is for the book, the meal card for the diary; mention once that once it is saved, cooking it again as a batch keeps track of the portions in stock.
+${BATCHES}
 - To change a recipe in the book ("add spinach to my curry", "I use 300 g lentils now"), find it with list_recipes and call propose_recipe with recipe_id set, its name and portions, and the complete new list of ingredients (all of them, changed or not, with the codes list_recipes shows). instructions: the complete new steps if they change, else empty to keep the recipe's. Ask which recipe when several fit. Only change what the user asked for${ideas ? ' or what your suggestion is about' : ''}.
 ${
   ideas
     ? `- Recipe ideas and improvements: when the user asks what to cook, for ideas, or how to make a recipe better for their nutrients, first call nutrient_gaps (their nutrient status, foods that fill the gaps, foods they eat often, foods they excluded, their cooking preferences) and list_recipes (their recipes, how often each was cooked lately, portions in stock). Unless they say otherwise, suggest 3 ideas: batch recipes sized like their usual pots, fitting their preferences and what they actually eat, different from each other. An idea can also be one of their own recipes ("cook your lentil curry again"). Build each from search_foods codes, call check_recipe with its ingredients and portions (the app computes what one portion gives), and adjust until it helps the gaps without adding much of what is already too high. Then propose each with propose_recipe, kind "idea", with reason: one line quoting only numbers check_recipe gave you (e.g. "Iron and folate are low; one portion gives 45 % and 50 % of the day"). Short steps in instructions are welcome for ideas. To improve a recipe in the book, check it as it is (check_recipe with its recipe_id and no items) and as changed, set recipe_id, and quote both in reason ("iron 20 % → 45 % per portion"). Never state a nutrient number that nutrient_gaps or check_recipe did not give you, and claim no health effects beyond what a portion gives. Excluded foods are never allowed in ideas. A dish the user cooked and tells you about is kind "own", even if it came from an idea.`
     : `- Recipe ideas are turned off: if the user asks what to cook or for ideas based on their nutrients, say they can turn on "Recipe ideas" in Settings → AI assistant. Saving and changing their own recipes works without it.`
 }`;
+
+// Batch cooking (docs/SPEC.md, "Cooked weight per batch", "Changing a dish when logging it"): the
+// stock and pots come from list_recipes; the app keeps the numbers, the model only picks the batch,
+// the amount and the changed foods.
+const BATCHES = `- Batches and stock: list_recipes also shows each recipe's batches in stock (batch_id, when cooked, portions left where, the cooked food's weight if the pot was weighed, and what went into a pot made differently). When the user eats from a batch ("had a bowl of the chili from the freezer", "350 g of the curry"), call propose_portion with its batch_id, never propose_meal for it: portions, or grams of a weighed pot (then portions 0). Pick the batch they mean (fridge before freezer, oldest first, unless they say). Changes for this serving only ("with tofu instead of the beef", "without the rice", "with 30 g cheese on top") go in changes, with amounts for what they ate: replaces is the code of the pot's ingredient that is swapped, re-weighed or taken out (code empty to take it out), empty for an added food. Other foods in the same meal (bread, a drink) go in a propose_meal card at the same time. When they cooked a recipe from the book again ("cooked my chili, 2 portions in the fridge, the pot weighs 3.4 kg"), call propose_batch with its recipe_id: the day it was cooked, the storage plan if they said one (fresh = eaten on cooking day, fridge, the rest is frozen; else usual_plan true), pot_grams as the full pot they weighed (the app takes off the empty pot it remembers) or food_grams when they weighed the food alone, changes to the recipe for this pot ("this time with tofu"; amounts for the whole pot), and what they ate of it right away (ate_portions, or ate_grams of a weighed pot, with ate_time). A dish not in the book is saved with propose_recipe first; it can be cooked as a batch once saved. To change an open card, call the same tool again with replaces set to its id (P1, B1, …).`;
 
 // Answers with several cards are shown as pages (docs/SPEC.md, "One assistant"): the text first,
 // then one card per page, then a summary where the user accepts all or replies with comments.
@@ -216,6 +222,19 @@ function tools({ off = false, usda = false, webSearch = false, journal = false, 
     required: ['code', 'grams', 'preparation', 'note', ...(withProducts ? ['micros_from'] : [])],
     additionalProperties: false,
   };
+  // A change to a pot or a serving: which ingredient it replaces (or none, for an added food) and the food now.
+  const changeItems = {
+    type: 'object',
+    properties: {
+      replaces: { type: 'string', description: 'Code (as list_recipes shows it) of the ingredient this swaps, re-weighs or takes out; empty for an added food.' },
+      code: { type: 'string', description: `The food now: ${codeHelp} Empty to take the replaced ingredient out.` },
+      grams: { type: 'number', description: 'Grams of the food now (0 when taking out).' },
+      preparation: { type: 'string', enum: [...PREPARATIONS] },
+      ...(withProducts ? { micros_from: items.properties.micros_from } : {}),
+    },
+    required: ['replaces', 'code', 'grams', 'preparation', ...(withProducts ? ['micros_from'] : [])],
+    additionalProperties: false,
+  };
   const lookups = [SEARCH_FOODS, ...(off ? [LOOKUP_BARCODE] : []), ...(off && webSearch ? [WEB_SEARCH_TOOL] : []), ...(usda ? [SEARCH_USDA] : [])];
   if (recipe) {
     return [
@@ -269,7 +288,7 @@ function tools({ off = false, usda = false, webSearch = false, journal = false, 
     ...(sleep ? [PROPOSE_SLEEP] : []),
     ...(activity ? [PROPOSE_ACTIVITY] : []),
     ...(water ? [PROPOSE_WATER] : []),
-    ...(recipes ? [LIST_RECIPES, proposeRecipe(items, ideas)] : []),
+    ...(recipes ? [LIST_RECIPES, proposeRecipe(items, ideas), proposePortion(changeItems), proposeBatch(changeItems)] : []),
     ...(recipes && ideas ? [NUTRIENT_GAPS, checkRecipe(items)] : []),
   ];
 }
@@ -277,7 +296,7 @@ function tools({ off = false, usda = false, webSearch = false, journal = false, 
 const LIST_RECIPES: BetaTool = {
   name: 'list_recipes',
   description:
-    "List the user's recipes whose name contains the query's words (empty query: all), each with its recipe_id, portions, how often it was cooked in the last 60 days, portions in stock, its ingredients for the whole pot (code, name, grams, preparation) and its steps.",
+    "List the user's recipes whose name contains the query's words (empty query: all), each with its recipe_id, portions, how often it was cooked in the last 60 days, portions in stock, its ingredients for the whole pot (code, name, grams, preparation), its steps, and its batches in stock (batch_id, cooked day, portions left where, cooked weight, and the pot's ingredients if it was made differently).",
   strict: true,
   input_schema: {
     type: 'object',
@@ -286,6 +305,58 @@ const LIST_RECIPES: BetaTool = {
     additionalProperties: false,
   },
 };
+
+function proposePortion(changes: object): BetaTool {
+  return {
+    name: 'propose_portion',
+    description:
+      'Show the user a serving eaten from one of their batches in stock, as a card with the amount, any changes for this serving and the time, for the user to check and log; nothing is logged until they do. The app computes the nutrients from the pot. After a correction, call it again with replaces set to the card id.',
+    strict: true,
+    input_schema: {
+      type: 'object',
+      properties: {
+        batch_id: { type: 'string', description: 'A batch_id from list_recipes (batches in stock).' },
+        portions: { type: 'number', description: 'Portions eaten, e.g. 1; 0 when giving grams.' },
+        grams: { type: 'number', description: 'Grams eaten, only for a pot that was weighed; 0 otherwise.' },
+        changes: { type: 'array', items: changes, description: 'How this serving differed from the pot, amounts for what was eaten; empty if not at all.' },
+        assumptions: { type: 'array', items: { type: 'string' } },
+        time: { type: 'string', description: 'When it was eaten, local "YYYY-MM-DD HH:MM"; empty for the chat\'s default time.' },
+        replaces: { type: 'string', description: 'Id of the open card this corrects (e.g. "P1"); empty for a new one.' },
+      },
+      required: ['batch_id', 'portions', 'grams', 'changes', 'assumptions', 'time', 'replaces'],
+      additionalProperties: false,
+    },
+  };
+}
+
+function proposeBatch(changes: object): BetaTool {
+  return {
+    name: 'propose_batch',
+    description:
+      'Show the user a batch they cooked of a recipe in their book, as a card with the day, storage plan, pot weight, changes for this pot and what they ate of it right away, for the user to check and save; nothing is saved until they do. After a correction, call it again with replaces set to the card id.',
+    strict: true,
+    input_schema: {
+      type: 'object',
+      properties: {
+        recipe_id: { type: 'string', description: 'The recipe_id from list_recipes.' },
+        day: { type: 'string', description: 'The day it was cooked, local "YYYY-MM-DD"; empty for today (or the chat\'s day).' },
+        usual_plan: { type: 'boolean', description: 'true to use the recipe\'s usual storage plan (fresh and fridge are then ignored).' },
+        fresh: { type: 'number', description: 'Portions eaten on cooking day (not stored).' },
+        fridge: { type: 'number', description: 'Portions kept in the fridge; the rest goes in the freezer.' },
+        pot_grams: { type: 'number', description: 'The full pot as weighed, in grams (the app takes off the empty pot); 0 if not said.' },
+        food_grams: { type: 'number', description: 'The cooked food weighed without the pot, in grams; 0 if not said.' },
+        changes: { type: 'array', items: changes, description: 'How this pot differed from the recipe, amounts for the whole pot; empty if not at all.' },
+        ate_portions: { type: 'number', description: 'Portions of it eaten right away; 0 for none.' },
+        ate_grams: { type: 'number', description: 'Or grams of it eaten right away (pot weighed); 0 otherwise.' },
+        ate_time: { type: 'string', description: 'When that was eaten, local "YYYY-MM-DD HH:MM"; empty for the chat\'s default time.' },
+        assumptions: { type: 'array', items: { type: 'string' } },
+        replaces: { type: 'string', description: 'Id of the open card this corrects (e.g. "B1"); empty for a new one.' },
+      },
+      required: ['recipe_id', 'day', 'usual_plan', 'fresh', 'fridge', 'pot_grams', 'food_grams', 'changes', 'ate_portions', 'ate_grams', 'ate_time', 'assumptions', 'replaces'],
+      additionalProperties: false,
+    },
+  };
+}
 
 const NUTRIENT_GAPS: BetaTool = {
   name: 'nutrient_gaps',

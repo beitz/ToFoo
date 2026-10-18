@@ -4,6 +4,7 @@
 import { newId } from '../lib/id';
 import { refKey } from '../lib/refs';
 import { overlaps, sleepDay } from '../logic/sleep';
+import { withPot, type PotDetails } from '../logic/batch';
 import { dailyBackupDue, keepCount, PORTIONS_PREFIX, pruneAutoBackups, readSnapshot, SNAPSHOT_TABLES, writeAutoBackup } from './autoBackup';
 import { db as defaultDb, runMigrations, type ToFooDB } from './db';
 import { defaultProfile, defaultSettings } from './defaults';
@@ -161,8 +162,12 @@ export function createRepo(db: ToFooDB) {
     async restoreRecipe(recipe: Recipe): Promise<void> {
       await db.recipes.put(recipe);
     },
-    async cookBatch(recipe: Recipe, plan: { fresh: number; fridge: number; freezer: number }, day: string, rememberPlan?: StoragePlan): Promise<Batch> {
-      const batch: Batch = {
+    /**
+     * Cook a batch of a recipe: a copy of the recipe, and optionally what this pot had instead of
+     * the recipe's ingredients, its cooked weight and the empty pot's weight (remembered for next time).
+     */
+    async cookBatch(recipe: Recipe, plan: { fresh: number; fridge: number; freezer: number }, day: string, rememberPlan?: StoragePlan, pot?: Partial<PotDetails> & { emptyPotGrams?: number }): Promise<Batch> {
+      const cooked: Batch = {
         id: newId(),
         recipeId: recipe.id,
         recipe: { name: recipe.name, portions: recipe.portions, ingredients: recipe.ingredients.map((i) => ({ ...i })), ...(recipe.saltOverride ? { saltOverride: recipe.saltOverride } : {}) },
@@ -173,11 +178,26 @@ export function createRepo(db: ToFooDB) {
         corrections: [],
         schemaVersion: v,
       };
-      await db.transaction('rw', db.batches, db.recipes, async () => {
+      const batch = pot ? withPot(cooked, { ingredients: pot.ingredients ?? cooked.recipe.ingredients, cookedGrams: pot.cookedGrams }) : cooked;
+      await db.transaction('rw', db.batches, db.recipes, db.settings, async () => {
         await db.batches.put(batch);
         if (rememberPlan) await db.recipes.update(recipe.id, { defaultPlan: rememberPlan });
+        await rememberPot(recipe.id, pot?.emptyPotGrams);
       });
       return batch;
+    },
+    /** Change what a cooked pot had, or its weight; returns the batch as it was, for undo via restoreBatch. */
+    async updateBatchPot(batchId: string, pot: PotDetails & { emptyPotGrams?: number }): Promise<Batch | undefined> {
+      return db.transaction('rw', db.batches, db.recipes, db.settings, async () => {
+        const old = await db.batches.get(batchId);
+        if (!old) return undefined;
+        await db.batches.put(withPot(old, pot));
+        await rememberPot(old.recipeId, pot.emptyPotGrams);
+        return old;
+      });
+    },
+    async restoreBatch(batch: Batch): Promise<void> {
+      await db.batches.put(batch);
     },
     async correctBatch(batchId: string, storage: Storage, delta: number, reason: Batch['corrections'][number]['reason']): Promise<void> {
       await db.transaction('rw', db.batches, async () => {
@@ -474,6 +494,14 @@ export function createRepo(db: ToFooDB) {
       });
     },
   };
+
+  /** Remember the empty pot's weight for the recipe and as the general default. */
+  async function rememberPot(recipeId: string, emptyPotGrams: number | undefined) {
+    if (!emptyPotGrams || !(emptyPotGrams > 0)) return;
+    await db.recipes.update(recipeId, { potGrams: emptyPotGrams });
+    const s = (await db.settings.get('settings')) ?? defaultSettings();
+    await db.settings.put({ ...s, potGrams: emptyPotGrams, id: 'settings', schemaVersion: v });
+  }
 
   async function changeRemaining(batchId: string, storage: Storage, delta: number) {
     const b = await db.batches.get(batchId);

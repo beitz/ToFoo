@@ -9,7 +9,7 @@ export function entryAmount(e: LogEntry, d: Pick<AppData, 'customFoodsById'>): s
     case 'food':
       return fmtGrams(e.grams);
     case 'portion':
-      return `${t('entry.portions', { n: fmtNumber(e.portions, 2) })} · ${t(`storage.${e.storage}`)}`;
+      return [e.grams ? fmtGrams(e.grams) : t('entry.portions', { n: fmtNumber(e.portions, 2) }), t(`storage.${e.storage}`), ...(e.ingredients ? [t('entry.changed')] : [])].join(' · ');
     case 'custom': {
       const c = d.customFoodsById.get(e.customFoodId);
       return `${fmtNumber(e.servings, 2)} × ${c?.servingLabel ?? t('entry.serving')}`;

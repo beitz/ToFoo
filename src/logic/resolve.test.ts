@@ -61,6 +61,16 @@ describe('resolve', () => {
     expect(e.parts[1]!.grams).toBe(2);
   });
 
+  it('counts a serving by grams of the weighed pot, with its own changed ingredients', () => {
+    const weighed = new Map([['b1', { ...batch, cookedGrams: 1600 }]]);
+    const byWeight = resolveEntry(log({ kind: 'portion', batchId: 'b1', storage: 'fridge', portions: 1, grams: 200 }), { ...ctx, batches: weighed })!;
+    expect(byWeight.parts[0]!.grams).toBe(50); // 200 g of a 1600 g pot is an eighth: 50 g of the 400 g lentils
+    const lentilsOnly = [batch.recipe.ingredients[0]!];
+    const changed = resolveEntry(log({ kind: 'portion', batchId: 'b1', storage: 'fridge', portions: 1, ingredients: lentilsOnly }), ctx)!;
+    expect(changed.parts).toHaveLength(1);
+    expect(changed.parts[0]!.grams).toBe(100);
+  });
+
   it('turns drinks into meal modifiers', () => {
     const e = resolveEntry(log({ kind: 'drink', drink: 'tea' }), ctx)!;
     expect(e.modifiers).toEqual({ tea: true });

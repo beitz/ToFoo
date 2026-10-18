@@ -18,6 +18,7 @@ import { fmtNumber } from '../lib/format';
 import type { Batch, Ingredient, LogEntry, Profile, Recipe } from '../storage/types';
 import { batchParts, type ResolveContext } from './resolve';
 import { totalLeft } from './stock';
+import { sameIngredients } from './batch';
 
 type RecipeLike = Pick<Recipe, 'name' | 'portions' | 'ingredients' | 'saltOverride'>;
 
@@ -34,7 +35,7 @@ export function portionIntake(recipe: RecipeLike, ctx: ResolveContext, storage: 
     remaining: { fresh: 1, fridge: 0, freezer: 0 },
     corrections: [],
   };
-  const parts = batchParts(batch, 1, storage, ctx);
+  const parts = batchParts(batch, 1 / recipe.portions, storage, ctx);
   const res = entryIntake({ id: 'portion', label: recipe.name, time: 0, dayKey: '', confidence: 'A', isSupplement: false, parts }, 'central', { retention: true });
   return { intake: res.intake, missing: res.missing };
 }
@@ -193,6 +194,22 @@ export interface RecipeInfo {
   cookedLately: number;
   /** Portions left in stock across its batches. */
   inStock: number;
+  /** Weight of the empty pot it was last cooked in (g), if weighed. */
+  potGrams?: number;
+  /** Its batches with portions left, oldest first: what the user can eat from stock. */
+  stock: StockBatch[];
+}
+
+/** A batch with portions left, as the assistant is told about it. */
+export interface StockBatch {
+  id: string;
+  cookedDay: string;
+  left: Batch['remaining'];
+  cookedGrams?: number;
+  /** What went into this pot (the recipe's ingredients unless the pot was made differently). */
+  ingredients: Ingredient[];
+  /** The pot was made differently from the recipe. */
+  changed: boolean;
 }
 
 /** Days counted as "lately" for how often a recipe was cooked. */
@@ -212,6 +229,18 @@ export function recipeInfos(recipes: readonly Recipe[], batches: readonly Batch[
         ...(r.instructions?.trim() ? { instructions: r.instructions.trim() } : {}),
         cookedLately: own.filter((b) => b.cookedDay >= since).length,
         inStock: own.reduce((n, b) => n + totalLeft(b), 0),
+        ...(r.potGrams ? { potGrams: r.potGrams } : {}),
+        stock: own
+          .filter((b) => totalLeft(b) > 0)
+          .sort((a, b) => a.cookedAt - b.cookedAt)
+          .map((b) => ({
+            id: b.id,
+            cookedDay: b.cookedDay,
+            left: b.remaining,
+            ...(b.cookedGrams ? { cookedGrams: b.cookedGrams } : {}),
+            ingredients: b.recipe.ingredients,
+            changed: !!b.recipeIngredients && !sameIngredients(b.recipeIngredients, b.recipe.ingredients),
+          })),
       };
     });
 }

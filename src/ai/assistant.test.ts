@@ -3,7 +3,7 @@ import type * as Beta from '@anthropic-ai/sdk/resources/beta/messages/messages';
 import type { Food } from '../foods/foodDb';
 import { buildIndex } from '../foods/search';
 import { appNote, emptyConversation, requestParams, retirePhotos, sendMessage, textOf, type CreateMessage } from './assistant';
-import { describeFood, MAX_INGREDIENT_GRAMS, MAX_ITEM_GRAMS, runCheckRecipe, runListRecipes, validateRecipeProposal, validateIngredientsProposal, runLookupBarcode, runSearchFoods, runSearchUsda, validateJournalProposal, validateProposal, validateSleepProposal, validateActivityProposal, validateWaterProposal, type ProductTools, type ToolContext } from './tools';
+import { describeFood, validateBatchProposal, validatePortionProposal, MAX_INGREDIENT_GRAMS, MAX_ITEM_GRAMS, runCheckRecipe, runListRecipes, validateRecipeProposal, validateIngredientsProposal, runLookupBarcode, runSearchFoods, runSearchUsda, validateJournalProposal, validateProposal, validateSleepProposal, validateActivityProposal, validateWaterProposal, type ProductTools, type ToolContext } from './tools';
 import type { Product } from '../storage/types';
 import type { FindResult } from '../foods/findProduct';
 
@@ -659,6 +659,18 @@ describe('recipes in the main chat', () => {
     instructions: 'Bake.',
     cookedLately: 2,
     inStock: 3,
+    potGrams: 1200,
+    stock: [
+      {
+        id: 'bat1',
+        cookedDay: '2026-10-10',
+        left: { fresh: 0, fridge: 1, freezer: 2 },
+        cookedGrams: 900,
+        ingredients: [{ ref: { source: 'BLS' as const, version: '4.0', code: 'D7A5400' }, name: 'Milk roll', grams: 600, preparation: 'baked' as const }],
+        changed: false,
+      },
+      { id: 'bat2', cookedDay: '2026-10-12', left: { fresh: 0, fridge: 0, freezer: 1 }, ingredients: [], changed: false },
+    ],
   };
   const checked: Array<[number, number]> = [];
   const recipes = (ideas: boolean): ToolContext['recipes'] => ({
@@ -696,8 +708,8 @@ describe('recipes in the main chat', () => {
 
   it('offers list_recipes and propose_recipe, and the idea tools only with recipe ideas on', () => {
     const names = (sources: Parameters<typeof requestParams>[2]) => requestParams('claude-opus-5-5', [], sources).tools!.map((t) => (t as { name: string }).name);
-    expect(names({ recipes: true })).toEqual(['search_foods', 'propose_meal', 'list_recipes', 'propose_recipe']);
-    expect(names({ recipes: true, ideas: true })).toEqual(['search_foods', 'propose_meal', 'list_recipes', 'propose_recipe', 'nutrient_gaps', 'check_recipe']);
+    expect(names({ recipes: true })).toEqual(['search_foods', 'propose_meal', 'list_recipes', 'propose_recipe', 'propose_portion', 'propose_batch']);
+    expect(names({ recipes: true, ideas: true })).toEqual(['search_foods', 'propose_meal', 'list_recipes', 'propose_recipe', 'propose_portion', 'propose_batch', 'nutrient_gaps', 'check_recipe']);
     expect(names({})).toEqual(['search_foods', 'propose_meal']);
     const off = requestParams('claude-opus-5-5', [], { recipes: true }).system as string;
     expect(off).toContain('Recipe ideas are turned off');
@@ -712,6 +724,9 @@ describe('recipes in the main chat', () => {
     expect(r.text).toContain('recipe_id rec1 | Nougat rolls | 6 portions | cooked 2× in the last 60 days | 3 portions in stock');
     expect(r.text).toContain('D7A5400 Milk roll 600 g, baked');
     expect(r.text).toContain('Steps:\nBake.');
+    expect(r.text).toContain('Empty pot (remembered): 1200 g');
+    expect(r.text).toContain('- batch_id bat1 | cooked 2026-10-10 | 1 in the fridge, 2 in the freezer | cooked food 900 g, about 150 g a portion');
+    expect(r.text).toContain('- batch_id bat2 | cooked 2026-10-12 | 1 in the freezer | not weighed');
     expect(runListRecipes({ query: 'soup' }, { ...ctx, recipes: recipes(false) }).text).toContain('No recipe matches "soup". The book has: Nougat rolls.');
     expect(runListRecipes({ query: '' }, ctx).ok).toBe(false);
   });
@@ -740,6 +755,70 @@ describe('recipes in the main chat', () => {
     expect(change.ok && change.proposal.recipeId).toBe('rec1');
     expect(!validateRecipeProposal(recipe({ portions: 0 }), { ...ctx, recipes: recipes(false) }).ok).toBe(true);
     expect(!validateRecipeProposal(recipe({ name: ' ' }), { ...ctx, recipes: recipes(false) }).ok).toBe(true);
+  });
+
+  const portion = (over: object = {}) => ({ batch_id: 'bat1', portions: 1, grams: 0, changes: [], assumptions: [], time: '', replaces: '', ...over });
+  const cookAgain = (over: object = {}) => ({
+    recipe_id: 'rec1',
+    day: '',
+    usual_plan: true,
+    fresh: 0,
+    fridge: 0,
+    pot_grams: 0,
+    food_grams: 0,
+    changes: [],
+    ate_portions: 0,
+    ate_grams: 0,
+    ate_time: '',
+    assumptions: [],
+    replaces: '',
+    ...over,
+  });
+
+  it('checks servings from stock: a known batch, grams only for a weighed pot, enough left, changes to what the pot has', () => {
+    const c = { ...ctx, recipes: recipes(false) };
+    const one = validatePortionProposal(portion(), c);
+    expect(one.ok && [one.proposal.batchId, one.proposal.name, one.proposal.portions, one.proposal.grams]).toEqual(['bat1', 'Nougat rolls', 1, undefined]);
+    const byWeight = validatePortionProposal(portion({ portions: 0, grams: 180.4 }), c);
+    expect(byWeight.ok && [byWeight.proposal.portions, byWeight.proposal.grams]).toEqual([0, 180]);
+    expect(!validatePortionProposal(portion({ batch_id: 'bat2', portions: 0, grams: 200 }), c).ok && 'rejected').toBe('rejected');
+    const tooMany = validatePortionProposal(portion({ portions: 4 }), c);
+    expect(!tooMany.ok && tooMany.error).toContain('only 3 left');
+    expect(!validatePortionProposal(portion({ batch_id: 'nope' }), c).ok).toBe(true);
+    const swap = validatePortionProposal(portion({ changes: [{ replaces: 'D7A5400', code: 'S450000', grams: 50, preparation: 'asListed', micros_from: '' }, { replaces: '', code: 'S450000', grams: 10, preparation: 'asListed', micros_from: '' }] }), c);
+    expect(swap.ok && swap.proposal.changes.map((ch) => [ch.replaces, ch.item?.food.code, ch.item?.grams])).toEqual([
+      ['BLS:D7A5400', 'S450000', 50],
+      [undefined, 'S450000', 10],
+    ]);
+    const out = validatePortionProposal(portion({ changes: [{ replaces: 'D7A5400', code: '', grams: 0, preparation: 'asListed', micros_from: '' }] }), c);
+    expect(out.ok && out.proposal.changes).toEqual([{ replaces: 'BLS:D7A5400' }]);
+    const notInPot = validatePortionProposal(portion({ changes: [{ replaces: 'S450000', code: '', grams: 0, preparation: 'asListed', micros_from: '' }] }), c);
+    expect(!notInPot.ok && notInPot.error).toContain('S450000 is not an ingredient of this pot');
+  });
+
+  it('checks a cooked batch: a recipe in the book, a plan within its portions, one pot weight, eaten grams only when weighed', () => {
+    const now = new Date(2026, 9, 18, 20, 0).getTime();
+    const c = { ...ctx, now, recipes: recipes(false) };
+    const usual = validateBatchProposal(cookAgain({ pot_grams: 3150 }), c);
+    expect(usual.ok && usual.proposal).toEqual({ recipeId: 'rec1', name: 'Nougat rolls', potGrams: 3150, changes: [], assumptions: [] });
+    const planned = validateBatchProposal(cookAgain({ usual_plan: false, fresh: 1, fridge: 2, day: '2026-10-17', ate_portions: 1, ate_time: '2026-10-17 19:30' }), c);
+    expect(planned.ok && [planned.proposal.plan, planned.proposal.day, planned.proposal.ate?.portions]).toEqual([{ fresh: 1, fridge: 2 }, '2026-10-17', 1]);
+    expect(!validateBatchProposal(cookAgain({ usual_plan: false, fresh: 4, fridge: 3 }), c).ok).toBe(true);
+    expect(!validateBatchProposal(cookAgain({ pot_grams: 3000, food_grams: 1800 }), c).ok).toBe(true);
+    const grams = validateBatchProposal(cookAgain({ ate_grams: 400 }), c);
+    expect(!grams.ok && grams.error).toContain('ate_grams needs the pot weighed');
+    expect(!validateBatchProposal(cookAgain({ day: '2026-11-30' }), c).ok).toBe(true);
+    expect(!validateBatchProposal(cookAgain({ recipe_id: 'x' }), c).ok).toBe(true);
+    const tofu = validateBatchProposal(cookAgain({ changes: [{ replaces: 'D7A5400', code: 'S450000', grams: 500, preparation: 'asListed', micros_from: '' }] }), c);
+    expect(tofu.ok && tofu.proposal.changes[0]?.replaces).toBe('BLS:D7A5400');
+  });
+
+  it('shows a serving from stock and a cooked batch as P and B cards', async () => {
+    const api = scripted(reply([toolUse('a', 'propose_batch', cookAgain()), toolUse('b', 'propose_portion', portion())], 'tool_use'));
+    const { outcome, conversation } = await sendMessage(api.create, 'claude-opus-5-5', emptyConversation(), { text: 'cooked rolls again; had one from the fridge', images: [] }, { ...ctx, recipes: recipes(false) });
+    expect(outcome.kind === 'proposal' && [outcome.batches.map((b) => b.id), outcome.portions.map((p) => p.id), outcome.order]).toEqual([['B1'], ['P1'], ['B1', 'P1']]);
+    expect(conversation.portions).toBe(1);
+    expect(conversation.batches).toBe(1);
   });
 
   it('shows a recipe and a meal from one message together, numbered R and M', async () => {

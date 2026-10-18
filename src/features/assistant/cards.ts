@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import type { useToast } from '../../app/toast';
-import type { RecipeSoFar, ShownActivity, ShownIngredients, ShownNote, ShownProposal, ShownRecipe, ShownSleep, ShownWater } from '../../ai/assistant';
+import type { RecipeSoFar, ShownActivity, ShownBatch, ShownIngredients, ShownNote, ShownPortion, ShownProposal, ShownRecipe, ShownSleep, ShownWater } from '../../ai/assistant';
 import type { ProposedItem } from '../../ai/tools';
 import { t } from '../../i18n';
 import { formatTime } from '../../lib/dates';
@@ -10,8 +10,8 @@ import { waterText } from '../water/format';
 
 /**
  * A proposed meal (M1, …), journal entry (J1, …), sleep (S1, …), activity (A1, …), water (W1, …),
- * recipe ingredients (R1, …, recipe editor) or recipe for the book (R1, …, main chat), and whether
- * the user logged, saved or added it.
+ * recipe ingredients (R1, …, recipe editor), recipe for the book (R1, …, main chat), serving from
+ * stock (P1, …) or cooked batch (B1, …), and whether the user logged, saved or added it.
  */
 export type Card =
   | { kind: 'meal'; proposal: ShownProposal; logged: boolean }
@@ -20,22 +20,32 @@ export type Card =
   | { kind: 'activity'; activity: ShownActivity; logged: boolean }
   | { kind: 'water'; water: ShownWater; logged: boolean }
   | { kind: 'ingredients'; ingredients: ShownIngredients; logged: boolean }
-  | { kind: 'recipe'; recipe: ShownRecipe; logged: boolean };
+  | { kind: 'recipe'; recipe: ShownRecipe; logged: boolean }
+  | { kind: 'portion'; portion: ShownPortion; logged: boolean }
+  | { kind: 'batch'; batch: ShownBatch; logged: boolean };
 
-export const cardOf = (c: Card) =>
-  c.kind === 'meal'
-    ? c.proposal
-    : c.kind === 'note'
-      ? c.note
-      : c.kind === 'sleep'
-        ? c.sleep
-        : c.kind === 'activity'
-          ? c.activity
-          : c.kind === 'water'
-            ? c.water
-            : c.kind === 'ingredients'
-              ? c.ingredients
-              : c.recipe;
+export function cardOf(c: Card) {
+  switch (c.kind) {
+    case 'meal':
+      return c.proposal;
+    case 'note':
+      return c.note;
+    case 'sleep':
+      return c.sleep;
+    case 'activity':
+      return c.activity;
+    case 'water':
+      return c.water;
+    case 'ingredients':
+      return c.ingredients;
+    case 'recipe':
+      return c.recipe;
+    case 'portion':
+      return c.portion;
+    case 'batch':
+      return c.batch;
+  }
+}
 export const cardId = (c: Card) => cardOf(c).id;
 
 /** A few words naming a card, for the page title and the summary page. */
@@ -57,6 +67,10 @@ export function cardTitle(c: Card): string {
       return c.ingredients.name || t('ai.ingredientsTitle');
     case 'recipe':
       return c.recipe.name;
+    case 'portion':
+      return c.portion.name;
+    case 'batch':
+      return t('ai.batchTitle', { name: c.batch.name });
   }
 }
 

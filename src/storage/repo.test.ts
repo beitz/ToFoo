@@ -34,6 +34,26 @@ describe('repository', () => {
     expect(b.corrections).toHaveLength(1);
   });
 
+  it('cooks a pot that differs from the recipe, weighs it, remembers the empty pot, and undoes a change', async () => {
+    const repo = await fresh();
+    const beef = { ref: { source: 'BLS' as const, version: '4.0', code: 'U010000' }, name: 'Beef', grams: 600, preparation: 'boiled' as const };
+    const tofu = { ...beef, ref: { source: 'BLS' as const, version: '4.0', code: 'H910000' }, name: 'Tofu' };
+    const recipe = await repo.saveRecipe({ name: 'Chili', portions: 4, ingredients: [beef], tags: [] });
+    const batch = await repo.cookBatch(recipe, { fresh: 1, fridge: 1, freezer: 2 }, '2026-10-15', undefined, { ingredients: [tofu], cookedGrams: 1950, emptyPotGrams: 1200 });
+    expect([batch.recipe.ingredients, batch.recipeIngredients, batch.cookedGrams]).toEqual([[tofu], [beef], 1950]);
+    expect((await repo.db.recipes.get(recipe.id))!.potGrams).toBe(1200);
+    expect((await repo.getSettings())!.potGrams).toBe(1200);
+    expect((await repo.db.recipes.get(recipe.id))!.ingredients).toEqual([beef]);
+    const old = await repo.updateBatchPot(batch.id, { ingredients: [beef], cookedGrams: 2000 });
+    const now = (await repo.db.batches.get(batch.id))!;
+    expect([now.recipeIngredients, now.cookedGrams]).toEqual([undefined, 2000]);
+    await repo.restoreBatch(old!);
+    expect((await repo.db.batches.get(batch.id))!.recipe.ingredients).toEqual([tofu]);
+    // A serving by weight takes the portions it says from stock, possibly none.
+    await repo.addLog({ kind: 'portion', batchId: batch.id, storage: 'fresh', portions: 0, grams: 150, time: 1, day: '2026-10-15', confidence: 'A', label: 'Chili' });
+    expect((await repo.db.batches.get(batch.id))!.remaining.fresh).toBe(1);
+  });
+
   it('restores a snapshot', async () => {
     const a = await fresh();
     await a.updateProfile({ sex: 'female', birthYear: 1985 });

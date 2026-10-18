@@ -7,7 +7,7 @@ import { formatDay, formatTime } from '../../lib/dates';
 import { search } from '../../foods/search';
 import type { Food } from '../../foods/foodDb';
 import { repo } from '../../storage/repo';
-import type { CustomFood, FavouriteMeal, FoodRef, LogEntry, Product } from '../../storage/types';
+import type { Batch, CustomFood, FavouriteMeal, FoodRef, LogEntry, Product } from '../../storage/types';
 import { productLabel } from '../../foods/products';
 import { UsdaResults } from './UsdaResults';
 import { FoodList } from './FoodList';
@@ -15,7 +15,8 @@ import { EditEntrySheet } from '../diary/EditEntrySheet';
 import { ProductList, productTag } from './ProductList';
 import { Icon } from '../../ui/Icon';
 import { isOn } from '../../settings/features';
-import { nextStorage, totalLeft, logPortion } from '../home/StockChips';
+import { nextStorage, totalLeft } from '../home/StockChips';
+import { PortionSheet } from './PortionSheet';
 import { AmountSheet } from './AmountSheet';
 import { BarcodeSheet } from './BarcodeSheet';
 import { CustomSheet } from './CustomSheet';
@@ -36,6 +37,7 @@ type Selected =
   | { kind: 'barcode' }
   | { kind: 'custom'; food: CustomFood }
   | { kind: 'manual'; supplement: boolean }
+  | { kind: 'portion'; batch: Batch }
   | null;
 
 /** Saved products shown under "Packaged products" when nothing is searched. */
@@ -273,11 +275,7 @@ export function LogPage({ day: dayParam, foodCode }: { day?: string; foodCode?: 
                       key={b.id}
                       className="chip"
                       disabled={!s}
-                      onClick={async () => {
-                        if (!s) return;
-                        await logPortion(b, s, toast, mealTime);
-                        navigate();
-                      }}
+                      onClick={() => s && setSelected({ kind: 'portion', batch: b })}
                     >
                       <Icon name={s === 'freezer' ? 'snow' : s === 'fridge' ? 'fridge' : 'pot'} size={16} />
                       {b.recipe.name} · {t('stock.left', { n: totalLeft(b) })}
@@ -419,6 +417,7 @@ export function LogPage({ day: dayParam, foodCode }: { day?: string; foodCode?: 
       {selected?.kind === 'barcode' && (
         <BarcodeSheet onFound={(product) => setSelected({ kind: 'product', product })} onManual={() => setSelected({ kind: 'manual', supplement: false })} onClose={() => setSelected(null)} />
       )}
+      {selected?.kind === 'portion' && <PortionSheet batch={selected.batch} day={day} time={mealTime} onClose={() => setSelected(null)} onAdded={onAdded} />}
       {selected?.kind === 'custom' && <CustomSheet food={selected.food} day={day} time={mealTime} onClose={() => setSelected(null)} onAdded={onAdded} />}
       {editing && <EditEntrySheet entry={editing} onClose={() => setEditing(null)} />}
       {selected?.kind === 'manual' && <ManualSheet supplement={selected.supplement} day={day} time={mealTime} onClose={() => setSelected(null)} onAdded={onAdded} />}

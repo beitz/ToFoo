@@ -66,9 +66,17 @@ describe('recipe ideas: what the user eats and keeps', () => {
 
   it('lists recipes with batches cooked lately and portions in stock, archived ones left out', () => {
     const r = (id: string, archived = false) => ({ id, name: id, portions: 4, ingredients: [], tags: [], createdAt: 0, updatedAt: 0, schemaVersion: 1, ...(archived ? { archived } : {}) }) as Recipe;
-    const b = (recipeId: string, cookedDay: string, freezer: number) => ({ recipeId, cookedDay, remaining: { fresh: 0, fridge: 0, freezer } }) as Batch;
-    const infos = recipeInfos([r('dal'), r('old', true)], [b('dal', '2026-10-01', 3), b('dal', '2026-06-01', 1)], '2026-10-18');
-    expect(infos.map((i) => [i.id, i.cookedLately, i.inStock])).toEqual([['dal', 1, 4]]);
+    const lentils = { ref: { source: 'BLS' as const, version: '4.0', code: 'H700000' }, name: 'Lentils', grams: 400, preparation: 'boiled' as const };
+    const b = (id: string, cookedDay: string, freezer: number, cookedAt: number, more: Partial<Batch> = {}) =>
+      ({ id, recipeId: 'dal', cookedDay, cookedAt, recipe: { name: 'dal', portions: 4, ingredients: [lentils] }, remaining: { fresh: 0, fridge: 0, freezer }, ...more }) as Batch;
+    const batches = [b('new', '2026-10-01', 3, 2, { cookedGrams: 1600, recipeIngredients: [{ ...lentils, grams: 300 }] }), b('old', '2026-06-01', 1, 1), b('gone', '2026-09-01', 0, 3)];
+    const infos = recipeInfos([r('dal'), r('old', true)], batches, '2026-10-18');
+    expect(infos.map((i) => [i.id, i.cookedLately, i.inStock])).toEqual([['dal', 2, 4]]);
+    // Batches with portions left, oldest first, with their weight and whether the pot differed.
+    expect(infos[0]!.stock.map((s) => [s.id, s.cookedGrams, s.changed])).toEqual([
+      ['old', undefined, false],
+      ['new', 1600, true],
+    ]);
   });
 
   it('finds excluded foods by food and by group', () => {

@@ -179,7 +179,13 @@ This split is the global default, but any split is possible: each recipe can sto
 
 **Cooked weight per batch** (decided 2026-10-16): the usual workflow is one large pot divided into portions, and every pot comes out slightly different. So each batch can record the weight of the cooked food (pot weighed full minus the empty pot's weight, which the app remembers), and portions can then be logged by grams ("350 g of the curry") as well as by portion. A batch without a cooked weight works as today, by portion.
 
+Built 2026-10-18: "Weigh the pot (optional)" when cooking a batch, and later under Recipes → In stock → "Weigh the pot" / "This pot" or a batch on the recipe page: "Pot with food" minus "Empty pot" gives the cooked food and the grams per portion. The empty pot's weight is remembered per recipe and as the general default (a recipe usually goes in the same pot). With a weighed pot, logging from stock offers Portions or Grams; by grams it starts at the pot's average portion and also says how many portions it takes from stock (the nearest whole number, at least one; editable, 0 for a taste straight from the pot). Nutrients follow the grams: 350 g of a 2,100 g pot is 1/6 of every ingredient. Changing a batch's weight later changes the servings already logged from it by grams. On the log screen a stock chip now opens this sheet (amount, storage, "Change ingredients", time) and adds the serving to "This meal"; the chips on Home still log one portion with one tap.
+
 **Changing a dish when logging it** (decided 2026-10-16): a logged portion of a recipe can differ from the recipe, e.g. this time 150 g tofu instead of 200 g beef. When logging, "Change ingredients" lets the user swap, remove, add or re-weigh ingredients for that entry only; the recipe and the batch stay as they are. The entry stores the changes, so the history stays recomputable. Changes can also apply to a whole batch when it is cooked ("this pot had tofu").
+
+Built 2026-10-18: "Change ingredients" when logging from stock and when editing a logged portion in the diary shows the serving's ingredients in the amounts eaten (the pot's grams × the share eaten); each can be swapped for another food (BLS, saved products, USDA, barcode, as in the recipe editor), re-weighed, given another preparation, taken out (and put back) or added to, with "new", "was 200 g" and "Taken out" marks against the pot. The entry stores its own complete ingredient list in grams for the whole pot, so it scales when the amount is changed later and stays recomputable even if the pot is changed afterwards. For a whole pot, "Change ingredients for this pot" when cooking, or "What went into this pot" on a cooked batch, changes the batch's copy of the recipe and keeps the recipe's own list beside it to show what differed; this counts for every portion of that pot, including ones already eaten. The recipe itself never changes.
+
+The assistant can do both (with the recipe book in the main chat): `list_recipes` also lists each recipe's batches in stock (batch_id, cooked day, portions left where, the cooked weight and a pot's own ingredients) and the remembered empty pot. `propose_portion` makes a P card (a serving from stock by portions or by grams of a weighed pot, with changes for that serving in the amounts eaten), checked against the stock left; `propose_batch` makes a B card (a recipe cooked again: day, storage plan or the usual one, the full pot or the food's own weight, changes for this pot, and what was eaten of it right away, logged with the batch). Both cards use the same fields as the screens above, and the app computes every number from the pot.
 
 **Swap preview in the recipe editor** (decided 2026-10-16): while editing a recipe, show how a change moves the user's gaps, e.g. "adding 100 g spinach: iron gap 40 % → 65 % covered". This is the recipe preview (below) made live inside the editor, where the decision happens.
 
@@ -603,8 +609,9 @@ v1 is the smallest app that is useful every day; each later version adds to the 
 
 **Feature review 2026-10-16** (comparison with Cronometer, MyFitnessPal, Yazio, Paprika and others; owner's decisions). Needed, in no fixed order yet:
 
-- [ ] Cooked weight per batch, log portions by grams
-- [ ] Change a dish's ingredients when logging it; swap preview in the recipe editor
+- [x] Cooked weight per batch, log portions by grams (built 2026-10-18)
+- [x] Change a dish's ingredients when logging it, or for a whole pot (built 2026-10-18)
+- [ ] Swap preview in the recipe editor
 - [x] Repeat a past meal; favourite foods; home-screen shortcuts (built 2026-10-16)
 - [x] Day and range nutrient breakdown; calendar of day statuses (built 2026-10-16)
 - [x] Edit a logged entry, including replacing its food by search or barcode (built 2026-10-17)
