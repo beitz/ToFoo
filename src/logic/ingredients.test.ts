@@ -39,11 +39,17 @@ describe('recipe ingredients', () => {
 
   it("takes the assistant's name and portions only where the user set none", () => {
     const ing = foodIngredient(lentils, '4.0', salt, 250, 'boiled');
-    const fresh = addProposed({ name: '', portions: 4, ingredients: [] }, [ing], { name: 'Lentil curry', portions: 6 });
-    expect(fresh).toEqual({ name: 'Lentil curry', portions: 6, ingredients: [ing] });
-    const own = addProposed({ name: 'Dal', portions: 3, ingredients: [ing] }, [ing], { name: 'Lentil curry', portions: 6 });
-    expect(own).toEqual({ name: 'Dal', portions: 3, ingredients: [ing, ing] });
-    expect(addProposed({ name: '', portions: 4, ingredients: [] }, [ing], { name: '' }).portions).toBe(4);
+    const fresh = addProposed({ name: '', portions: 4, ingredients: [], instructions: '' }, [ing], { name: 'Lentil curry', portions: 6 });
+    expect(fresh).toEqual({ name: 'Lentil curry', portions: 6, ingredients: [ing], instructions: '' });
+    const own = addProposed({ name: 'Dal', portions: 3, ingredients: [ing], instructions: '' }, [ing], { name: 'Lentil curry', portions: 6 });
+    expect(own).toEqual({ name: 'Dal', portions: 3, ingredients: [ing, ing], instructions: '' });
+    expect(addProposed({ name: '', portions: 4, ingredients: [], instructions: '' }, [ing], { name: '' }).portions).toBe(4);
+  });
+
+  it("takes the assistant's complete steps, and keeps the recipe's when it brings none", () => {
+    const draft = { name: 'Dal', portions: 4, ingredients: [], instructions: 'Fry onions.' };
+    expect(addProposed(draft, [], { name: '', instructions: ' Fry onions.\nAdd lentils. ' }).instructions).toBe('Fry onions.\nAdd lentils.');
+    expect(addProposed(draft, [], { name: '', instructions: ' ' }).instructions).toBe('Fry onions.');
   });
 
   it('describes an ingredient for the assistant', () => {

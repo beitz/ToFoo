@@ -69,7 +69,8 @@ ${off && webSearch ? `${WEB_SEARCH}\n` : ''}${usda ? `${USDA('propose_ingredient
 - preparation: recipes list ingredients raw (or dried, or canned). Choose that BLS food and set preparation to how it is cooked in the dish: boiled (also simmered in a curry or soup), steamed (also stewed), baked (also roasted), fried; raw if it is eaten uncooked; "asListed" when the BLS food already matches how it is eaten (bread, canned or cooked entries, oil, spices, salt, sauces).
 - Salt: use the plain BLS salt; the app replaces it with the user's choice of iodised salt.
 - Portions: from the recipe ("serves 4", "makes 12 muffins") or what the user says; 0 if nothing says. name: the dish's name in the user's language, or empty if unknown.
-- The app tells you what the recipe already has (name, portions, ingredients). Propose only ingredients to add, never ones it already has: the user changes those in the editor. If the user asks you to change one already added, tell them to change it there.
+- Preparation steps: when the user says or shows how the dish is made (spoken, typed, or on the photographed recipe), put the steps in instructions, one short step per line, in their words and language, lightly tidied; add no steps of your own and no nutrition advice. instructions replace the recipe's steps when the card is added, so give the complete steps: those the recipe already has (the app shows them to you) with the user's changes and additions. Leave instructions empty when the user said nothing about how to make it. A card may bring only steps, with no items, when the ingredients are already in the recipe.
+- The app tells you what the recipe already has (name, portions, ingredients, steps). Propose only ingredients to add, never ones it already has: the user changes those in the editor (tap an ingredient to change its food or amount). If the user asks you to change one already added, tell them to change it there.
 - Ask when the answer would noticeably change the result (an unknown main ingredient, an amount that could easily be double or half). Ask everything that matters in one message, as a short numbered list with a default for each the user can just accept; do not ask about details that barely matter, and do not ask for more photos when you can work with what you have.
 - Cards: each proposal is shown as a card with an id (R1, R2, …). The user can add it to the recipe, edit grams on it, or keep chatting. To change an open card, call propose_ingredients with the whole corrected list and replaces set to its id; the app swaps the card. The app tells you which cards were added; never propose those again. For one recipe, propose one card.
 - assumptions: short phrases the user should see, e.g. "1 can of tomatoes ≈ 400 g".
@@ -205,11 +206,15 @@ function tools({ off = false, usda = false, webSearch = false, journal = false, 
           properties: {
             name: { type: 'string', description: 'The dish\'s name, e.g. "Lentil curry"; empty if unknown.' },
             portions: { type: 'number', description: 'How many portions the whole recipe makes; 0 if unknown.' },
-            items: { type: 'array', items },
+            items: { type: 'array', items, description: 'Ingredients to add; may be empty when the card only brings preparation steps.' },
             assumptions: { type: 'array', items: { type: 'string' } },
+            instructions: {
+              type: 'string',
+              description: 'The complete preparation steps for the recipe, in the user\'s words and language, one step per line; empty to leave the recipe\'s steps as they are.',
+            },
             replaces: { type: 'string', description: 'Id of the open card this corrects (e.g. "R1"); empty for new ingredients.' },
           },
-          required: ['name', 'portions', 'items', 'assumptions', 'replaces'],
+          required: ['name', 'portions', 'items', 'assumptions', 'instructions', 'replaces'],
           additionalProperties: false,
         },
       },

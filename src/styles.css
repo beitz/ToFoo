@@ -1103,6 +1103,37 @@ textarea:focus-visible,
 .ingredient-line {
   gap: 12px;
 }
+/* An ingredient's name opens its sheet (change the food, amount or preparation). */
+.ingredient-name {
+  display: block;
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  padding: 4px 0;
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.ingredient-name svg {
+  color: var(--text-muted);
+  vertical-align: -2px;
+}
+.ingredient-name .link-like {
+  color: var(--accent);
+}
+.recipe-steps {
+  white-space: pre-wrap;
+}
+/* Steps grow with their text (wrapped lines included), so the whole recipe is readable while editing. */
+.steps-text {
+  field-sizing: content;
+  min-height: 6lh;
+  max-height: 70dvh;
+}
 .plan-row {
   display: grid;
   grid-template-columns: 1fr 96px;

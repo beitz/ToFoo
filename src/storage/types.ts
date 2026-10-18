@@ -151,6 +151,8 @@ export interface Recipe extends Versioned {
   name: string;
   portions: number;
   ingredients: Ingredient[];
+  /** Preparation steps, as the user wrote or told them. */
+  instructions?: string;
   notes?: string;
   tags: string[];
   defaultPlan?: StoragePlan;

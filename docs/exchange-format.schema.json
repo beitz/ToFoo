@@ -938,6 +938,9 @@
                       ]
                     }
                   },
+                  "instructions": {
+                    "type": "string"
+                  },
                   "notes": {
                     "type": "string"
                   },

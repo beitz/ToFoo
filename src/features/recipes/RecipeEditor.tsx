@@ -3,9 +3,9 @@ import { useData } from '../../app/data';
 import { closeView, useBackCloses } from '../../app/history';
 import { href, navigate } from '../../app/router';
 import { t } from '../../i18n';
-import { productLabel } from '../../foods/products';
+import { productFood, productLabel } from '../../foods/products';
 import { refKey } from '../../lib/refs';
-import { addProposed, foodIngredient, ingredientLine, itemIngredient, productIngredient, type RecipeDraft } from '../../logic/ingredients';
+import { addProposed, foodIngredient, ingredientLine, itemIngredient, type RecipeDraft } from '../../logic/ingredients';
 import { isOn } from '../../settings/features';
 import { repo } from '../../storage/repo';
 import type { Ingredient, Product, Recipe, StoragePlan } from '../../storage/types';
@@ -19,7 +19,7 @@ import { productTag } from '../log/ProductList';
 import { IngredientSearch } from './IngredientSearch';
 import { PortionNutrients } from './PortionNutrients';
 import { PlanEditor } from './PlanEditor';
-import { ProductIngredientSheet } from './ProductIngredientSheet';
+import { IngredientSheet, type IngredientDraft, type SavedIngredient } from './IngredientSheet';
 
 /** Create or edit a recipe. Route: #/recipes/new or #/recipes/<id>/edit. */
 export function RecipeEditor({ id }: { id?: string }) {
@@ -28,12 +28,14 @@ export function RecipeEditor({ id }: { id?: string }) {
   const [name, setName] = useState(existing?.name ?? '');
   const [portions, setPortions] = useState<number | undefined>(existing?.portions ?? 4);
   const [ingredients, setIngredients] = useState<Ingredient[]>(existing?.ingredients ?? []);
+  const [instructions, setInstructions] = useState(existing?.instructions ?? '');
   const [notes, setNotes] = useState(existing?.notes ?? '');
   const [tags, setTags] = useState((existing?.tags ?? []).join(', '));
   const [plan, setPlan] = useState<StoragePlan | undefined>(existing?.defaultPlan);
   const [saltOverride, setSaltOverride] = useState(existing?.saltOverride);
   const hasSalt = ingredients.some((i) => i.isSalt);
-  const [picked, setPicked] = useState<Product | null>(null);
+  /** The ingredient sheet: adding a product (no index) or changing ingredient `index`. */
+  const [sheet, setSheet] = useState<{ index?: number; initial: IngredientDraft; label?: string } | null>(null);
   const [scanning, setScanning] = useState(false);
   // The assistant replaces the form while open, but stays mounted once started, so going back to
   // the form and returning keeps the chat.
@@ -55,14 +57,29 @@ export function RecipeEditor({ id }: { id?: string }) {
     window.scrollTo(0, 0);
   }
 
+  // A BLS food is added at once (its grams are typed in the list); a product first shows its label
+  // and the food for its missing micronutrients.
   function pick(p: PickedFood) {
-    if (p.product) setPicked(p.product);
+    if (p.product) openProduct(p.product);
     else setIngredients((list) => [...list, foodIngredient(p.food, d.foods.version, d.profile.salt)]);
   }
 
-  function addProduct(product: Product, grams: number) {
-    setIngredients((list) => [...list, productIngredient(product, grams)]);
-    setPicked(null);
+  function openProduct(product: Product) {
+    setSheet({ initial: { food: productFood(product, d.foods), product, preparation: 'asListed' } });
+  }
+
+  /** The sheet's starting point for an ingredient in the list. */
+  function draftOf(ing: Ingredient): IngredientDraft {
+    if (ing.ref.source === 'BLS') return { food: d.foods.byCode.get(ing.ref.code), grams: ing.grams || undefined, preparation: ing.preparation };
+    const product = d.productsById.get(refKey(ing.ref));
+    return { ...(product ? { food: productFood(product, d.foods), product } : {}), grams: ing.grams || undefined, preparation: ing.preparation };
+  }
+
+  function saveSheet(saved: SavedIngredient) {
+    const ing = itemIngredient(saved, d.foods.version, d.profile.salt);
+    const index = sheet?.index;
+    setIngredients((list) => (index === undefined ? [...list, ing] : list.map((x, j) => (j === index ? ing : x))));
+    setSheet(null);
   }
 
   /** Display name and second line of an ingredient: the food's names, or the product's label and source. */
@@ -85,8 +102,8 @@ export function RecipeEditor({ id }: { id?: string }) {
   }
 
   // The chat reads the editor's latest state when it sends or adds, not the state it was opened with.
-  const latest = useRef<RecipeDraft>({ name, portions, ingredients });
-  latest.current = { name, portions, ingredients };
+  const latest = useRef<RecipeDraft>({ name, portions, ingredients, instructions });
+  latest.current = { name, portions, ingredients, instructions };
   const [recipeChat] = useState<RecipeChat>(() => ({
     soFar: () => {
       const r = latest.current;
@@ -94,6 +111,7 @@ export function RecipeEditor({ id }: { id?: string }) {
         name: r.name.trim(),
         portions: r.portions,
         ingredients: r.ingredients.map((ing) => ingredientLine(ing, describeRef.current(ing).name)),
+        instructions: r.instructions.trim(),
       };
     },
     add: (proposal) => {
@@ -103,10 +121,12 @@ export function RecipeEditor({ id }: { id?: string }) {
       setName(next.name);
       setPortions(next.portions);
       setIngredients((list) => [...list, ...added]);
+      setInstructions(next.instructions);
       return () => {
         setIngredients((list) => list.filter((ing) => !added.includes(ing)));
         if (next.name !== before.name) setName((n) => (n === next.name ? before.name : n));
         if (next.portions !== before.portions) setPortions((n) => (n === next.portions ? before.portions : n));
+        if (next.instructions !== before.instructions) setInstructions((x) => (x === next.instructions ? before.instructions : x));
       };
     },
     // Only while the chat is shown: going back otherwise would leave the editor.
@@ -148,6 +168,7 @@ export function RecipeEditor({ id }: { id?: string }) {
       name: name.trim(),
       portions: Math.round(portions!),
       ingredients,
+      instructions: instructions.trim() || undefined,
       notes: notes.trim() || undefined,
       tags: tags
         .split(',')
@@ -190,10 +211,12 @@ export function RecipeEditor({ id }: { id?: string }) {
             return (
               <li key={`${refKey(ing.ref)}-${i}`} className="card ingredient">
                 <div className="row-between">
-                  <div>
-                    <strong>{ingName}</strong>
-                    <div className="muted small">{detail}</div>
-                  </div>
+                  <button className="ingredient-name" onClick={() => setSheet({ index: i, initial: draftOf(ing), label: ing.name })} aria-label={t('recipes.changeIngredient', { name: ingName })}>
+                    <strong>
+                      {ingName} <Icon name="edit" size={14} />
+                    </strong>
+                    <span className="muted small block">{detail}</span>
+                  </button>
                   <div className="row">
                     <button className="icon-btn" onClick={() => move(i, -1)} aria-label={t('recipes.moveUp')} disabled={i === 0}>
                       ↑
@@ -223,12 +246,28 @@ export function RecipeEditor({ id }: { id?: string }) {
           <BarcodeSheet
             onFound={(product) => {
               setScanning(false);
-              setPicked(product);
+              openProduct(product);
             }}
             onClose={() => setScanning(false)}
           />
         )}
-        {picked && <ProductIngredientSheet product={picked} onAdd={addProduct} onClose={() => setPicked(null)} />}
+        {sheet && (
+          <IngredientSheet
+            key={sheet.index ?? 'new'}
+            initial={sheet.initial}
+            label={sheet.label}
+            onSave={saveSheet}
+            onRemove={
+              sheet.index === undefined
+                ? undefined
+                : () => {
+                    remove(sheet.index!);
+                    setSheet(null);
+                  }
+            }
+            onClose={() => setSheet(null)}
+          />
+        )}
 
         {hasSalt && (
           <div className="field">
@@ -255,6 +294,10 @@ export function RecipeEditor({ id }: { id?: string }) {
             </select>
           </div>
         )}
+
+        <Field label={t('recipes.instructions')} hint={t(assistantOn ? 'recipes.instructionsHintAi' : 'recipes.instructionsHint')}>
+          {(fid) => <textarea id={fid} className="steps-text" rows={4} value={instructions} onChange={(e) => setInstructions(e.target.value)} />}
+        </Field>
 
         <h2 className="section-title">{t('recipes.storagePlan')}</h2>
         <PlanEditor plan={plan ?? d.settings.defaultPlan} portions={portions ?? 1} onChange={setPlan} />

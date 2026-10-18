@@ -33,18 +33,22 @@ export interface RecipeDraft {
   name: string;
   portions: number | undefined;
   ingredients: Ingredient[];
+  instructions: string;
 }
 
 /**
  * Add the assistant's ingredients to the recipe being edited. Its name is taken only when the
  * recipe has none, its portions only while the recipe has no ingredients yet (a new recipe's
- * portions are just the default then); the user's own entries always win.
+ * portions are just the default then); the user's own entries always win. Its steps replace the
+ * recipe's: the assistant was shown them and proposes the complete steps (the user checked them
+ * on the card, and the undo brings the old ones back).
  */
-export function addProposed(draft: RecipeDraft, added: readonly Ingredient[], proposal: { name: string; portions?: number }): RecipeDraft {
+export function addProposed(draft: RecipeDraft, added: readonly Ingredient[], proposal: { name: string; portions?: number; instructions?: string }): RecipeDraft {
   return {
     name: draft.name.trim() ? draft.name : proposal.name,
     portions: draft.ingredients.length === 0 && proposal.portions ? proposal.portions : draft.portions,
     ingredients: [...draft.ingredients, ...added],
+    instructions: proposal.instructions?.trim() ? proposal.instructions.trim() : draft.instructions,
   };
 }
 

@@ -43,6 +43,8 @@ export const MAX_ITEM_GRAMS = 3000;
 export const MAX_INGREDIENT_GRAMS = 10000;
 /** Sanity limit for a recipe's portions (a party pot), not a physiological number. */
 const MAX_PORTIONS = 100;
+/** Longest proposed preparation steps: a long recipe, not a transcript of the whole chat. */
+const MAX_INSTRUCTIONS_CHARS = 8000;
 /** Sanity limits for a proposed meal time: clock skew ahead, about a year back. */
 const FUTURE_SLACK_MS = 10 * 60_000;
 const MAX_PAST_MS = 400 * 86_400_000;
@@ -81,8 +83,11 @@ export const ingredientsProposalInput = z.object({
   name: z.string(),
   /** Portions the whole recipe makes; 0 if unknown. */
   portions: z.number(),
-  items: proposalInput.shape.items,
+  /** May be empty when the card only brings the preparation steps. */
+  items: z.array(proposalInput.shape.items.element),
   assumptions: z.array(z.string()),
+  /** The recipe's preparation steps, complete, in the user's words; empty to leave them as they are. */
+  instructions: z.string().optional(),
   /** Id of the open card this proposal replaces (e.g. "R1"); empty for new ingredients. */
   replaces: z.string().optional(),
 });
@@ -167,6 +172,8 @@ export interface IngredientsProposal {
   portions?: number;
   items: ProposedItem[];
   assumptions: string[];
+  /** The complete preparation steps; absent to leave the recipe's as they are. */
+  instructions?: string;
   replaces?: string;
 }
 
@@ -540,6 +547,9 @@ export function validateIngredientsProposal(
   const { items, problems } = validateItems(parsed.data.items, db, products, MAX_INGREDIENT_GRAMS);
   const { portions } = parsed.data;
   if (portions < 0 || portions > MAX_PORTIONS || !Number.isInteger(portions)) problems.push(`portions ${portions} is not plausible (a whole number up to ${MAX_PORTIONS}, or 0 if unknown).`);
+  const instructions = parsed.data.instructions?.trim() ?? '';
+  if (instructions.length > MAX_INSTRUCTIONS_CHARS) problems.push(`instructions are ${instructions.length} characters; keep them under ${MAX_INSTRUCTIONS_CHARS}.`);
+  if (parsed.data.items.length === 0 && !instructions) problems.push('items is empty: propose at least one ingredient, or the preparation steps.');
   if (problems.length) return { ok: false, error: `${problems.join('\n')}\nFix these and call propose_ingredients again.` };
   const replaces = parsed.data.replaces?.trim();
   return {
@@ -549,6 +559,7 @@ export function validateIngredientsProposal(
       ...(portions > 0 ? { portions } : {}),
       items,
       assumptions: parsed.data.assumptions.map((a) => a.trim()).filter(Boolean),
+      ...(instructions ? { instructions } : {}),
       ...(replaces ? { replaces } : {}),
     },
   };

@@ -69,6 +69,15 @@ export function RecipeView({ id }: { id: string }) {
           );
         })}
       </ul>
+      <a className="btn btn-small btn-ghost" href={href('recipes', recipe.id, 'edit')}>
+        <Icon name="edit" size={16} /> {t('recipes.changeIngredients')}
+      </a>
+      {recipe.instructions && (
+        <>
+          <h2 className="section-title">{t('recipes.instructions')}</h2>
+          <p className="recipe-steps">{recipe.instructions}</p>
+        </>
+      )}
       {recipe.notes && <p className="notes">{recipe.notes}</p>}
 
       <h2 className="section-title">{t('recipes.perPortion')}</h2>
