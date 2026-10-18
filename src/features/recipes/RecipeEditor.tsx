@@ -1,16 +1,25 @@
-import { useMemo, useState } from 'react';
+import { useRef, useState } from 'react';
 import { useData } from '../../app/data';
+import { closeView, useBackCloses } from '../../app/history';
 import { href, navigate } from '../../app/router';
 import { t } from '../../i18n';
-import { search } from '../../foods/search';
-import { ALL_SALT_CODES, saltCode } from '../../foods/foodDb';
+import { productLabel } from '../../foods/products';
+import { refKey } from '../../lib/refs';
+import { addProposed, foodIngredient, ingredientLine, itemIngredient, productIngredient, type RecipeDraft } from '../../logic/ingredients';
+import { isOn } from '../../settings/features';
 import { repo } from '../../storage/repo';
-import type { Ingredient, Recipe, StoragePlan } from '../../storage/types';
+import type { Ingredient, Product, Recipe, StoragePlan } from '../../storage/types';
 import { Field, NumberInput } from '../../ui/controls';
 import { Icon } from '../../ui/Icon';
+import { RecipeAssistant, type RecipeChat } from '../assistant/AssistantPage';
+import { BarcodeSheet } from '../log/BarcodeSheet';
+import type { PickedFood } from '../log/FoodPicker';
 import { PreparationSelect } from '../log/PreparationSelect';
+import { productTag } from '../log/ProductList';
+import { IngredientSearch } from './IngredientSearch';
 import { PortionNutrients } from './PortionNutrients';
 import { PlanEditor } from './PlanEditor';
+import { ProductIngredientSheet } from './ProductIngredientSheet';
 
 /** Create or edit a recipe. Route: #/recipes/new or #/recipes/<id>/edit. */
 export function RecipeEditor({ id }: { id?: string }) {
@@ -24,17 +33,87 @@ export function RecipeEditor({ id }: { id?: string }) {
   const [plan, setPlan] = useState<StoragePlan | undefined>(existing?.defaultPlan);
   const [saltOverride, setSaltOverride] = useState(existing?.saltOverride);
   const hasSalt = ingredients.some((i) => i.isSalt);
-  const [query, setQuery] = useState('');
+  const [picked, setPicked] = useState<Product | null>(null);
+  const [scanning, setScanning] = useState(false);
+  // The assistant replaces the form while open, but stays mounted once started, so going back to
+  // the form and returning keeps the chat.
+  const [assistantOpen, setAssistantOpen] = useState(false);
+  const [assistantStarted, setAssistantStarted] = useState(false);
+  const ingredientsRef = useRef<HTMLHeadingElement>(null);
+  const openRef = useRef(assistantOpen);
+  openRef.current = assistantOpen;
+  const assistantOn = isOn(d.settings.features, 'aiAssistant');
+  useBackCloses(assistantOpen, () => {
+    setAssistantOpen(false);
+    // Back at the form: show the ingredients, where the assistant's additions landed.
+    requestAnimationFrame(() => ingredientsRef.current?.scrollIntoView?.({ block: 'start' }));
+  });
 
-  const results = useMemo(() => (query.trim() ? search(d.searchIndex, query, { limit: 12, recent: d.recentFoods, boost: d.searchBoost }) : []), [query, d.searchIndex, d.recentFoods, d.searchBoost]);
-
-  function addIngredient(code: string) {
-    const food = d.foods.byCode.get(code);
-    if (!food) return;
-    const isSalt = ALL_SALT_CODES.has(code);
-    setIngredients((list) => [...list, { ref: { source: 'BLS', version: d.foods.version, code: isSalt ? saltCode(d.profile.salt) : code }, name: food.nameEn, grams: 0, preparation: 'asListed', ...(isSalt ? { isSalt: true } : {}) }]);
-    setQuery('');
+  function openAssistant() {
+    setAssistantStarted(true);
+    setAssistantOpen(true);
+    window.scrollTo(0, 0);
   }
+
+  function pick(p: PickedFood) {
+    if (p.product) setPicked(p.product);
+    else setIngredients((list) => [...list, foodIngredient(p.food, d.foods.version, d.profile.salt)]);
+  }
+
+  function addProduct(product: Product, grams: number) {
+    setIngredients((list) => [...list, productIngredient(product, grams)]);
+    setPicked(null);
+  }
+
+  /** Display name and second line of an ingredient: the food's names, or the product's label and source. */
+  function describe(ing: Ingredient): { name: string; detail: string } {
+    if (ing.isSalt) return { name: t('recipes.salt'), detail: t('recipes.saltHint') };
+    if (ing.ref.source === 'BLS') {
+      const food = d.foods.byCode.get(ing.ref.code);
+      return {
+        name: food?.nameEn ?? ing.name,
+        detail: food?.nameDe ?? t('recipes.missingFood'),
+      };
+    }
+    const product = d.productsById.get(refKey(ing.ref));
+    if (!product) return { name: ing.name, detail: t('recipes.missingFood') };
+    const match = product.match ? d.foods.byCode.get(product.match.code) : undefined;
+    return {
+      name: productLabel(product),
+      detail: match ? `${productTag(product)} · ${t('recipes.microsFrom', { name: match.nameEn })}` : productTag(product),
+    };
+  }
+
+  // The chat reads the editor's latest state when it sends or adds, not the state it was opened with.
+  const latest = useRef<RecipeDraft>({ name, portions, ingredients });
+  latest.current = { name, portions, ingredients };
+  const [recipeChat] = useState<RecipeChat>(() => ({
+    soFar: () => {
+      const r = latest.current;
+      return {
+        name: r.name.trim(),
+        portions: r.portions,
+        ingredients: r.ingredients.map((ing) => ingredientLine(ing, describeRef.current(ing).name)),
+      };
+    },
+    add: (proposal) => {
+      const before = latest.current;
+      const added = proposal.items.map((it) => itemIngredient(it, d.foods.version, d.profile.salt));
+      const next = addProposed(before, added, proposal);
+      setName(next.name);
+      setPortions(next.portions);
+      setIngredients((list) => [...list, ...added]);
+      return () => {
+        setIngredients((list) => list.filter((ing) => !added.includes(ing)));
+        if (next.name !== before.name) setName((n) => (n === next.name ? before.name : n));
+        if (next.portions !== before.portions) setPortions((n) => (n === next.portions ? before.portions : n));
+      };
+    },
+    // Only while the chat is shown: going back otherwise would leave the editor.
+    done: () => openRef.current && closeView(),
+  }));
+  const describeRef = useRef(describe);
+  describeRef.current = describe;
   const update = (i: number, patch: Partial<Ingredient>) => setIngredients((list) => list.map((ing, j) => (j === i ? { ...ing, ...patch } : ing)));
   const remove = (i: number) => setIngredients((list) => list.filter((_, j) => j !== i));
   const move = (i: number, dir: -1 | 1) =>
@@ -80,104 +159,125 @@ export function RecipeEditor({ id }: { id?: string }) {
     navigate('recipes', rec.id);
   }
 
+  const assistant = assistantStarted && (
+    <div hidden={!assistantOpen}>
+      <RecipeAssistant recipe={recipeChat} onClose={closeView} />
+    </div>
+  );
+
   return (
-    <section>
-      <header className="page-head row">
-        <a className="icon-btn" href={existing ? href('recipes', existing.id) : href('recipes')} aria-label={t('common.back')}>
-          <Icon name="back" />
-        </a>
-        <h1>{existing ? t('recipes.edit') : t('recipes.new')}</h1>
-      </header>
+    <>
+      {assistant}
+      {/* Hidden, not unmounted, while the assistant is open: the search and any open sheet stay as they were. */}
+      <section hidden={assistantOpen}>
+        <header className="page-head row">
+          <a className="icon-btn" href={existing ? href('recipes', existing.id) : href('recipes')} aria-label={t('common.back')}>
+            <Icon name="back" />
+          </a>
+          <h1>{existing ? t('recipes.edit') : t('recipes.new')}</h1>
+        </header>
 
-      <Field label={t('recipes.name')}>{(fid) => <input id={fid} value={name} onChange={(e) => setName(e.target.value)} placeholder="Linsencurry" />}</Field>
-      <Field label={t('recipes.portionsLabel')}>{(fid) => <NumberInput id={fid} value={portions} onChange={setPortions} min={1} />}</Field>
+        <Field label={t('recipes.name')}>{(fid) => <input id={fid} value={name} onChange={(e) => setName(e.target.value)} placeholder="Linsencurry" />}</Field>
+        <Field label={t('recipes.portionsLabel')}>{(fid) => <NumberInput id={fid} value={portions} onChange={setPortions} min={1} />}</Field>
 
-      <h2 className="section-title">{t('recipes.ingredientsTitle')}</h2>
-      <p className="muted small">{t('recipes.ingredientsHint')}</p>
-      <ul className="plain-list ingredient-list">
-        {ingredients.map((ing, i) => {
-          const food = ing.ref.source === 'BLS' ? d.foods.byCode.get(ing.ref.code) : undefined;
-          return (
-            <li key={`${ing.ref.source === 'custom' ? ing.ref.id : ing.ref.code}-${i}`} className="card ingredient">
-              <div className="row-between">
-                <div>
-                  <strong>{ing.isSalt ? t('recipes.salt') : (food?.nameEn ?? ing.name)}</strong>
-                  <div className="muted small">{ing.isSalt ? t('recipes.saltHint') : (food?.nameDe ?? t('recipes.missingFood'))}</div>
+        <h2 className="section-title" ref={ingredientsRef}>
+          {t('recipes.ingredientsTitle')}
+        </h2>
+        <p className="muted small">{t('recipes.ingredientsHint')}</p>
+        <ul className="plain-list ingredient-list">
+          {ingredients.map((ing, i) => {
+            const { name: ingName, detail } = describe(ing);
+            return (
+              <li key={`${refKey(ing.ref)}-${i}`} className="card ingredient">
+                <div className="row-between">
+                  <div>
+                    <strong>{ingName}</strong>
+                    <div className="muted small">{detail}</div>
+                  </div>
+                  <div className="row">
+                    <button className="icon-btn" onClick={() => move(i, -1)} aria-label={t('recipes.moveUp')} disabled={i === 0}>
+                      ↑
+                    </button>
+                    <button className="icon-btn" onClick={() => remove(i)} aria-label={t('common.delete')}>
+                      <Icon name="trash" size={18} />
+                    </button>
+                  </div>
                 </div>
-                <div className="row">
-                  <button className="icon-btn" onClick={() => move(i, -1)} aria-label={t('recipes.moveUp')} disabled={i === 0}>
-                    ↑
-                  </button>
-                  <button className="icon-btn" onClick={() => remove(i)} aria-label={t('common.delete')}>
-                    <Icon name="trash" size={18} />
-                  </button>
+                <div className="grid-2">
+                  <Field label={t('log.amount')}>
+                    {(fid) => <NumberInput id={fid} value={ing.grams || undefined} onChange={(v) => update(i, { grams: v ?? 0 })} suffix="g" min={0} autoFocus={ing.grams === 0} />}
+                  </Field>
+                  <PreparationSelect id={`prep-${i}`} hint={false} value={ing.preparation} onChange={(p) => update(i, { preparation: p })} />
                 </div>
-              </div>
-              <div className="grid-2">
-                <Field label={t('log.amount')}>{(fid) => <NumberInput id={fid} value={ing.grams || undefined} onChange={(v) => update(i, { grams: v ?? 0 })} suffix="g" min={0} autoFocus={ing.grams === 0} />}</Field>
-                <PreparationSelect id={`prep-${i}`} hint={false} value={ing.preparation} onChange={(p) => update(i, { preparation: p })} />
-              </div>
-            </li>
-          );
-        })}
-      </ul>
-      <div className="search-box">
-        <Icon name="search" />
-        <input type="search" placeholder={t('recipes.addIngredient')} value={query} onChange={(e) => setQuery(e.target.value)} aria-label={t('recipes.addIngredient')} />
-      </div>
-      {results.length > 0 && (
-        <ul className="result-list">
-          {results.map((r) => (
-            <li key={r.key}>
-              <button className="result" onClick={() => addIngredient(r.key)}>
-                <span className="result-name">{r.nameEn}</span>
-                <span className="muted small">{r.nameDe}</span>
-              </button>
-            </li>
-          ))}
+              </li>
+            );
+          })}
         </ul>
-      )}
-
-      {hasSalt && (
-        <div className="field">
-          <label htmlFor="salt-choice">{t('recipes.saltChoice')}</label>
-          <select
-            id="salt-choice"
-            value={saltOverride ? `${saltOverride.iodised ? 'i' : ''}${saltOverride.fluoridated ? 'f' : ''}` || 'plain' : 'default'}
-            onChange={(e) => {
-              const v = e.target.value;
-              setSaltOverride(v === 'default' ? undefined : { iodised: v.includes('i'), fluoridated: v.includes('f') });
+        {assistantOn && (
+          <button className="btn btn-secondary btn-block assistant-entry" onClick={openAssistant}>
+            <Icon name="camera" /> {t('recipes.assistant')}
+          </button>
+        )}
+        <IngredientSearch onPick={pick} onScan={() => setScanning(true)} />
+        {scanning && (
+          <BarcodeSheet
+            onFound={(product) => {
+              setScanning(false);
+              setPicked(product);
             }}
-          >
-            <option value="default">{t('recipes.saltDefault')}</option>
-            <option value="i">{t('recipes.saltIodised')}</option>
-            <option value="if">{t('recipes.saltIodisedFluoride')}</option>
-            <option value="plain">{t('recipes.saltPlain')}</option>
-          </select>
+            onClose={() => setScanning(false)}
+          />
+        )}
+        {picked && <ProductIngredientSheet product={picked} onAdd={addProduct} onClose={() => setPicked(null)} />}
+
+        {hasSalt && (
+          <div className="field">
+            <label htmlFor="salt-choice">{t('recipes.saltChoice')}</label>
+            <select
+              id="salt-choice"
+              value={saltOverride ? `${saltOverride.iodised ? 'i' : ''}${saltOverride.fluoridated ? 'f' : ''}` || 'plain' : 'default'}
+              onChange={(e) => {
+                const v = e.target.value;
+                setSaltOverride(
+                  v === 'default'
+                    ? undefined
+                    : {
+                        iodised: v.includes('i'),
+                        fluoridated: v.includes('f'),
+                      },
+                );
+              }}
+            >
+              <option value="default">{t('recipes.saltDefault')}</option>
+              <option value="i">{t('recipes.saltIodised')}</option>
+              <option value="if">{t('recipes.saltIodisedFluoride')}</option>
+              <option value="plain">{t('recipes.saltPlain')}</option>
+            </select>
+          </div>
+        )}
+
+        <h2 className="section-title">{t('recipes.storagePlan')}</h2>
+        <PlanEditor plan={plan ?? d.settings.defaultPlan} portions={portions ?? 1} onChange={setPlan} />
+
+        <Field label={t('recipes.notes')}>{(fid) => <textarea id={fid} rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} />}</Field>
+        <Field label={t('recipes.tags')} hint={t('recipes.tagsHint')}>
+          {(fid) => <input id={fid} value={tags} onChange={(e) => setTags(e.target.value)} />}
+        </Field>
+
+        {draft && (
+          <>
+            <h2 className="section-title">{t('recipes.perPortion')}</h2>
+            <PortionNutrients recipe={draft} />
+          </>
+        )}
+
+        <div className="sticky-actions">
+          <button className="btn btn-primary btn-block" disabled={!valid} onClick={() => void save()}>
+            {t('common.save')}
+          </button>
+          {!valid && <p className="muted small">{t('recipes.incomplete')}</p>}
         </div>
-      )}
-
-      <h2 className="section-title">{t('recipes.storagePlan')}</h2>
-      <PlanEditor plan={plan ?? d.settings.defaultPlan} portions={portions ?? 1} onChange={setPlan} />
-
-      <Field label={t('recipes.notes')}>{(fid) => <textarea id={fid} rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} />}</Field>
-      <Field label={t('recipes.tags')} hint={t('recipes.tagsHint')}>
-        {(fid) => <input id={fid} value={tags} onChange={(e) => setTags(e.target.value)} />}
-      </Field>
-
-      {draft && (
-        <>
-          <h2 className="section-title">{t('recipes.perPortion')}</h2>
-          <PortionNutrients recipe={draft} />
-        </>
-      )}
-
-      <div className="sticky-actions">
-        <button className="btn btn-primary btn-block" disabled={!valid} onClick={() => void save()}>
-          {t('common.save')}
-        </button>
-        {!valid && <p className="muted small">{t('recipes.incomplete')}</p>}
-      </div>
-    </section>
+      </section>
+    </>
   );
 }

@@ -5,7 +5,21 @@ import { href, navigate } from '../../app/router';
 import { t, type MessageKey } from '../../i18n';
 import { dayKey, formatDay, formatTime } from '../../lib/dates';
 import { fmtNumber } from '../../lib/format';
-import { appNote, emptyConversation, sendMessage, type AiModel, type Conversation, type ShownNote, type ShownProposal, type ShownSleep, type ShownActivity, type ShownWater, type TurnOutcome } from '../../ai/assistant';
+import {
+  appNote,
+  emptyConversation,
+  sendMessage,
+  type AiModel,
+  type Conversation,
+  type RecipeSoFar,
+  type ShownIngredients,
+  type ShownNote,
+  type ShownProposal,
+  type ShownSleep,
+  type ShownActivity,
+  type ShownWater,
+  type TurnOutcome,
+} from '../../ai/assistant';
 import { classifyError, getAiSettings, makeCreate, saveUsage } from '../../ai/client';
 import { mergeModelTokens, type ModelTokens } from '../../ai/pricing';
 import { prepareImage, type PreparedImage } from '../../ai/image';
@@ -35,14 +49,34 @@ import { ActivityForm, activityName, DEFAULT_ACTIVITY_SKIN, recordOf, type Activ
 
 type Bubble = { role: 'user'; text: string; previews: string[] } | { role: 'assistant'; text: string } | { role: 'card'; id: string };
 type ComposerPhoto = PreparedImage & { barcodes: string[]; time: PhotoTime };
-/** A proposed meal (M1, …), journal entry (J1, …), sleep (S1, …), activity (A1, …) or water (W1, …), and whether the user logged or saved it. */
-type Card = { kind: 'meal'; proposal: ShownProposal; logged: boolean } | { kind: 'note'; note: ShownNote; logged: boolean } | { kind: 'sleep'; sleep: ShownSleep; logged: boolean } | { kind: 'activity'; activity: ShownActivity; logged: boolean } | { kind: 'water'; water: ShownWater; logged: boolean };
-const cardOf = (c: Card) => (c.kind === 'meal' ? c.proposal : c.kind === 'note' ? c.note : c.kind === 'sleep' ? c.sleep : c.kind === 'activity' ? c.activity : c.water);
+/**
+ * A proposed meal (M1, …), journal entry (J1, …), sleep (S1, …), activity (A1, …), water (W1, …)
+ * or recipe ingredients (R1, …), and whether the user logged, saved or added it.
+ */
+type Card =
+  | { kind: 'meal'; proposal: ShownProposal; logged: boolean }
+  | { kind: 'note'; note: ShownNote; logged: boolean }
+  | { kind: 'sleep'; sleep: ShownSleep; logged: boolean }
+  | { kind: 'activity'; activity: ShownActivity; logged: boolean }
+  | { kind: 'water'; water: ShownWater; logged: boolean }
+  | { kind: 'ingredients'; ingredients: ShownIngredients; logged: boolean };
+const cardOf = (c: Card) =>
+  c.kind === 'meal' ? c.proposal : c.kind === 'note' ? c.note : c.kind === 'sleep' ? c.sleep : c.kind === 'activity' ? c.activity : c.kind === 'water' ? c.water : c.ingredients;
 const cardId = (c: Card) => cardOf(c).id;
 /** Undoes one saved card. */
 type Undo = () => Promise<void>;
 /** Saves a card as it is shown (with the user's edits); undefined if it cannot be saved as it is. */
 type Saver = () => Promise<Undo | undefined>;
+
+/** The recipe editor's chat: confirmed cards become ingredients of the recipe being edited. */
+export interface RecipeChat {
+  /** What the recipe has right now, for the assistant. */
+  soFar: () => RecipeSoFar;
+  /** Add confirmed ingredients (the name and portions only where the recipe has none yet); returns its undo. */
+  add: (p: { name: string; portions?: number; items: ProposedItem[] }) => () => void;
+  /** Every card in the chat was added: back to the editor. */
+  done: () => void;
+}
 
 /** Photos per message: enough for a couple of days of meals; each one adds to the cost of every request in the chat. */
 const MAX_PHOTOS = 50;
@@ -52,21 +86,16 @@ const MAX_PHOTOS = 50;
  */
 const MAX_PHOTO_BYTES = 24 * 1024 * 1024;
 
-/** Log a meal by chatting: photos and/or text in, a checked list of BLS foods out. Route: #/assistant[/day]. */
-export function AssistantPage({ day: dayParam }: { day?: string }) {
+/** The chat once the assistant is on and has a key; otherwise why not, with a way to the settings. */
+function ChatOrNotice({ chat }: { chat: (ai: { apiKey: string; model: AiModel }) => ReactNode }) {
   const d = useData();
   const on = isOn(d.settings.features, 'aiAssistant');
   const [ai, setAi] = useState<{ apiKey: string; model: AiModel }>();
   useEffect(() => {
     void getAiSettings().then(setAi);
   }, []);
-
-  const day = dayParam && /^\d{4}-\d{2}-\d{2}$/.test(dayParam) ? dayParam : d.today;
-  const back = dayParam ? href('log', day) : href('log');
-
-  let body;
   if (!on || (ai && !ai.apiKey)) {
-    body = (
+    return (
       <div className="card">
         <p>{t(on ? 'ai.needsKey' : 'ai.off')}</p>
         <a className="btn btn-primary" href={href('settings', 'assistant')}>
@@ -74,9 +103,36 @@ export function AssistantPage({ day: dayParam }: { day?: string }) {
         </a>
       </div>
     );
-  } else if (ai) {
-    body = <Chat apiKey={ai.apiKey} model={ai.model} day={day} />;
-  } else body = <p className="muted">{t('common.loading')}</p>;
+  }
+  if (ai) return <>{chat(ai)}</>;
+  return <p className="muted">{t('common.loading')}</p>;
+}
+
+/**
+ * The assistant inside the recipe editor: photos of a recipe, a typed or spoken list, packages and
+ * barcodes in; ingredients with grams out, added to the recipe once the user confirms them.
+ */
+export function RecipeAssistant({ recipe, onClose }: { recipe: RecipeChat; onClose: () => void }) {
+  const d = useData();
+  return (
+    <section className="assistant-page">
+      <header className="page-head row">
+        <button className="icon-btn" onClick={onClose} aria-label={t('recipes.backToRecipe')}>
+          <Icon name="back" />
+        </button>
+        <h1>{t('ai.recipeTitle')}</h1>
+      </header>
+      <ChatOrNotice chat={(ai) => <Chat apiKey={ai.apiKey} model={ai.model} day={d.today} recipe={recipe} />} />
+    </section>
+  );
+}
+
+/** Log a meal by chatting: photos and/or text in, a checked list of BLS foods out. Route: #/assistant[/day]. */
+export function AssistantPage({ day: dayParam }: { day?: string }) {
+  const d = useData();
+  const day = dayParam && /^\d{4}-\d{2}-\d{2}$/.test(dayParam) ? dayParam : d.today;
+  const back = dayParam ? href('log', day) : href('log');
+  const body = <ChatOrNotice chat={(ai) => <Chat apiKey={ai.apiKey} model={ai.model} day={day} />} />;
 
   return (
     <section className="assistant-page">
@@ -103,7 +159,7 @@ const ERROR_TEXT: Record<string, MessageKey> = {
   tooManySteps: 'ai.error.tooManySteps',
 };
 
-function Chat({ apiKey, model, day }: { apiKey: string; model: AiModel; day: string }) {
+function Chat({ apiKey, model, day, recipe }: { apiKey: string; model: AiModel; day: string; recipe?: RecipeChat }) {
   const d = useData();
   const toast = useToast();
   const [conversation, setConversation] = useState<Conversation>(emptyConversation);
@@ -187,6 +243,7 @@ function Chat({ apiKey, model, day }: { apiKey: string; model: AiModel; day: str
       open: all.filter((c) => !c.logged).map(cardId),
       barcodes: [...new Set(images.flatMap((i) => i.barcodes))],
       dictated: dictated && !!text.trim(),
+      ...(recipe ? { recipe: recipe.soFar() } : {}),
     });
     const labelled = images.map((img, i) => ({ ...img, label: photoLabel(photoCount + i + 1, img.time) }));
     const msg = { text, images: labelled, appNote: note };
@@ -218,10 +275,15 @@ function Chat({ apiKey, model, day }: { apiKey: string; model: AiModel; day: str
         boost: d.searchBoost,
         products,
         now: Date.now(),
-        journal: isOn(d.settings.features, 'journal'),
-        sleep: isOn(d.settings.features, 'sleep'),
-        activity: isOn(d.settings.features, 'activity'),
-        water: isOn(d.settings.features, 'water'),
+        // The recipe editor's assistant proposes ingredients and nothing else.
+        ...(recipe
+          ? { recipe: true }
+          : {
+              journal: isOn(d.settings.features, 'journal'),
+              sleep: isOn(d.settings.features, 'sleep'),
+              activity: isOn(d.settings.features, 'activity'),
+              water: isOn(d.settings.features, 'water'),
+            }),
       };
       const r = await sendMessage(create, model, conversation, msg, ctx, onUsage);
       setConversation(r.conversation);
@@ -254,6 +316,7 @@ function Chat({ apiKey, model, day }: { apiKey: string; model: AiModel; day: str
         ...outcome.sleeps.map((s): Card => ({ kind: 'sleep', sleep: s, logged: false })),
         ...outcome.activities.map((a): Card => ({ kind: 'activity', activity: a, logged: false })),
         ...outcome.waters.map((w): Card => ({ kind: 'water', water: w, logged: false })),
+        ...outcome.ingredients.map((r): Card => ({ kind: 'ingredients', ingredients: r, logged: false })),
       ];
       const replaced = new Set(shown.map((c) => cardOf(c).replaces).filter((id): id is string => !!id && cardsRef.current.get(id)?.logged === false));
       setCards((all) => {
@@ -272,10 +335,14 @@ function Chat({ apiKey, model, day }: { apiKey: string; model: AiModel; day: str
     });
   }
 
-  // Everything proposed in this chat is logged: back to the log.
+  // Everything proposed in this chat is logged: back to the log (or the recipe).
+  const recipeDone = recipe?.done;
   useEffect(() => {
-    if (cards.size > 0 && [...cards.values()].every((c) => c.logged)) navigate();
-  }, [cards]);
+    if (cards.size > 0 && [...cards.values()].every((c) => c.logged)) {
+      if (recipeDone) recipeDone();
+      else navigate();
+    }
+  }, [cards, recipeDone]);
 
   const timedOut = images.filter((i) => i.time.source !== 'photo').length;
   const openCards = [...cards.values()].filter((c) => !c.logged).map(cardId);
@@ -334,16 +401,20 @@ function Chat({ apiKey, model, day }: { apiKey: string; model: AiModel; day: str
     <>
       {/* While a photo is open, everything behind it is out of reach for touch and screen readers. */}
       <div className="chat" aria-live="polite" inert={viewing !== undefined}>
-        <div className="bubble bubble-assistant">
-          {t('ai.intro')}
-          {isOn(d.settings.features, 'journal') && ` ${t('ai.introJournal')}`}
-          {isOn(d.settings.features, 'sleep') && ` ${t('ai.introSleep')}`}
-          {isOn(d.settings.features, 'activity') && ` ${t('ai.introActivity')}`}
-          {isOn(d.settings.features, 'water') && ` ${t('ai.introWater')}`}
-        </div>
+        {recipe ? (
+          <div className="bubble bubble-assistant">{t('ai.recipeIntro')}</div>
+        ) : (
+          <div className="bubble bubble-assistant">
+            {t('ai.intro')}
+            {isOn(d.settings.features, 'journal') && ` ${t('ai.introJournal')}`}
+            {isOn(d.settings.features, 'sleep') && ` ${t('ai.introSleep')}`}
+            {isOn(d.settings.features, 'activity') && ` ${t('ai.introActivity')}`}
+            {isOn(d.settings.features, 'water') && ` ${t('ai.introWater')}`}
+          </div>
+        )}
         {bubbles.map((b, i) =>
           b.role === 'card' ? (
-            cards.has(b.id) && <CardView key={b.id} card={cards.get(b.id)!} day={day} toast={toast} onLogged={(v) => setLogged(b.id, v)} register={register} />
+            cards.has(b.id) && <CardView key={b.id} card={cards.get(b.id)!} day={day} toast={toast} onLogged={(v) => setLogged(b.id, v)} register={register} recipe={recipe} />
           ) : b.role === 'user' ? (
             <div key={i} className="bubble bubble-user">
               {b.previews.length > 0 && (
@@ -361,7 +432,7 @@ function Chat({ apiKey, model, day }: { apiKey: string; model: AiModel; day: str
             </div>
           ),
         )}
-        {openCards.length >= 2 && !busy && (
+        {openCards.length >= 2 && !busy && !recipe && (
           <div className="log-all">
             <button className="btn btn-primary" disabled={savingAll} onClick={() => void logAll()}>
               {t('ai.logAll', { n: openCards.length })}
@@ -406,8 +477,8 @@ function Chat({ apiKey, model, day }: { apiKey: string; model: AiModel; day: str
           <textarea
             rows={1}
             value={text}
-            placeholder={t('ai.placeholder')}
-            aria-label={t('ai.placeholder')}
+            placeholder={t(recipe ? 'ai.recipePlaceholder' : 'ai.placeholder')}
+            aria-label={t(recipe ? 'ai.recipePlaceholder' : 'ai.placeholder')}
             onChange={(e) => setText(e.target.value)}
             enterKeyHint="enter"
             onKeyDown={(e) => {
@@ -520,6 +591,7 @@ type CardProps<C extends Card> = {
   toast: ReturnType<typeof useToast>;
   onLogged: (logged: boolean) => void;
   register: (id: string, save: Saver | undefined) => void;
+  recipe?: RecipeChat;
 };
 
 /** Keep the chat's "Log all" pointed at this card's latest save (with the user's edits) while it is open. */
@@ -535,6 +607,7 @@ function CardView({ card, ...rest }: CardProps<Card>) {
   if (card.kind === 'sleep') return <SleepCard card={card} {...rest} />;
   if (card.kind === 'activity') return <ActivityCard card={card} {...rest} />;
   if (card.kind === 'water') return <WaterProposalCard card={card} {...rest} />;
+  if (card.kind === 'ingredients') return <IngredientsCard card={card} {...rest} />;
   return <NoteCard card={card} {...rest} />;
 }
 
@@ -939,6 +1012,115 @@ function ProposalCard({ card, day, toast, onLogged, register }: CardProps<Extrac
         <span className="muted">{fmtNumber(kcal)} kcal</span>
         <button className="btn btn-primary" disabled={!valid || saving} onClick={() => void log()}>
           {t('ai.log')}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** Ingredients the assistant proposes for the recipe being edited: check, adjust grams, remove items, then add. */
+function IngredientsCard({ card, toast, onLogged, register, recipe }: CardProps<Extract<Card, { kind: 'ingredients' }>>) {
+  const { ingredients: proposal } = card;
+  const d = useData();
+  const [items, setItems] = useState<Array<Omit<ProposedItem, 'grams'> & { grams: number | undefined }>>(proposal.items);
+  const [saving, setSaving] = useState(false);
+  const [count, setCount] = useState(proposal.items.length);
+  const valid = !!recipe && items.length > 0 && items.every((i) => i.grams && i.grams > 0);
+  const kcal = items.reduce((sum, i) => {
+    const v = i.food.per100.ENERCC;
+    return typeof v === 'number' && i.grams ? sum + (v * i.grams) / 100 : sum;
+  }, 0);
+
+  async function save(): Promise<Undo | undefined> {
+    if (!valid || saving || !recipe) return;
+    setSaving(true);
+    try {
+      // Products and USDA foods are saved on this phone, as when a meal is logged, so the recipe can refer to them.
+      for (const it of items) {
+        if (!it.product) continue;
+        await repo.saveProduct(it.product);
+        await repo.setProductMatch(it.product.id, it.product.match ?? null);
+      }
+    } finally {
+      setSaving(false);
+    }
+    const undo = recipe.add({ name: proposal.name, portions: proposal.portions, items: items.map((it) => ({ ...it, grams: it.grams! })) });
+    setCount(items.length);
+    onLogged(true);
+    return async () => {
+      undo();
+      onLogged(false);
+    };
+  }
+  useRegister(proposal.id, card.logged ? undefined : save, register);
+
+  async function add() {
+    const undo = await save();
+    if (undo) toast(t('ai.ingredientsAdded', { n: items.length }), undo);
+  }
+
+  const title = proposal.name || t('ai.ingredientsTitle');
+  if (card.logged) {
+    return (
+      <div className="card proposal-done row">
+        <Icon name="check" size={18} />
+        <span>{t('ai.ingredientsDone', { n: count })}</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="card proposal">
+      <div className="row-between">
+        <strong>
+          {title}
+          {proposal.portions ? <span className="muted small"> · {t('recipes.portions', { n: proposal.portions })}</span> : null}
+        </strong>
+        <span className="muted small" title={t('ai.cardIdRecipe')}>
+          {proposal.id}
+        </span>
+      </div>
+      <ul className="plain-list">
+        {items.map((it, i) => (
+          <li key={`${it.food.code}-${i}`} className="proposal-item">
+            <div className="proposal-name">
+              {it.product ? (
+                <a href={productPageUrl(it.product)} target="_blank" rel="noreferrer">
+                  {productLabel(it.product)}
+                </a>
+              ) : (
+                <span>{it.food.nameEn}</span>
+              )}
+              <span className="muted small block">
+                {it.note || it.food.nameDe}
+                {it.preparation !== 'asListed' && ` · ${t(`prep.${it.preparation}` as MessageKey)}`}
+              </span>
+              {it.product?.match && (
+                <span className="muted small block">{t('ai.microsFrom', { name: d.foods.byCode.get(it.product.match.code)?.nameEn ?? it.product.match.code })}</span>
+              )}
+            </div>
+            <NumberInput value={it.grams} onChange={(g) => setItems((all) => all.map((x, j) => (j === i ? { ...x, grams: g } : x)))} suffix="g" min={0} />
+            <button className="icon-btn" aria-label={t('ai.removeItem', { name: it.food.nameEn })} onClick={() => setItems((all) => all.filter((_, j) => j !== i))}>
+              <Icon name="trash" size={18} />
+            </button>
+          </li>
+        ))}
+      </ul>
+      {proposal.assumptions.length > 0 && (
+        <div className="small">
+          <span className="muted">{t('ai.assumptions')}</span>
+          <ul className="assumptions">
+            {proposal.assumptions.map((a, i) => (
+              <li key={i}>{a}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      <p className="muted small">{t('ai.correctHintRecipe')}</p>
+      <div className="sheet-actions">
+        <span className="muted">{t('ai.kcalInAll', { kcal: fmtNumber(kcal) })}</span>
+        <button className="btn btn-primary" disabled={!valid || saving} onClick={() => void add()}>
+          {t('ai.addIngredients', { n: items.length })}
         </button>
       </div>
     </div>

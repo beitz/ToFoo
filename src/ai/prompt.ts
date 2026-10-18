@@ -1,6 +1,7 @@
 /**
  * System prompt and tool definitions for the AI assistant, in fixed variants (with or without the
- * Open Food Facts lookup, its web search, and USDA), each kept stable so prompt caching works.
+ * Open Food Facts lookup, its web search, USDA and the trackers; for logging or for the recipe
+ * editor), each kept stable so prompt caching works.
  */
 import type { BetaTool, BetaToolUnion, BetaWebSearchTool20250305 } from '@anthropic-ai/sdk/resources/beta/messages/messages';
 import { ACTIVITY_KINDS, INTENSITIES } from '../storage/types';
@@ -10,14 +11,14 @@ const GENERIC_NOTE = `say so in assumptions (e.g. "generic hazelnut praline, not
 
 const BRANDED_BLS_ONLY = `- Branded or unknown products: choose the closest generic BLS food (a filled hazelnut praline for a Giotto, for example) and ${GENERIC_NOTE}. Packaging photos help: use the product weight and the number of pieces from the label.`;
 
-const BRANDED_WITH_PRODUCTS = `- Packaged products can be looked up by barcode in Open Food Facts with lookup_barcode, which returns the label values. Barcodes the app read from the user's photos are given to you in the message; you may also read the digits printed under a barcode in a photo, or the user may type them. Products the user logged before are also listed by search_foods, with codes like OFF:4008400121925. Use the product's OFF: code in propose_meal and set micros_from to the BLS code of the most similar generic food (from search_foods; a filled hazelnut praline for a Giotto, for example), which supplies the vitamins and minerals the label lacks. If the product already has a similar food chosen by the user, micros_from can be empty. Do not guess barcodes. When there is no barcode or the product is not found, choose the closest generic BLS food instead and ${GENERIC_NOTE}. Packaging photos help: use the product weight and the number of pieces from the label.`;
+const BRANDED_WITH_PRODUCTS = (propose: string) => `- Packaged products can be looked up by barcode in Open Food Facts with lookup_barcode, which returns the label values. Barcodes the app read from the user's photos are given to you in the message; you may also read the digits printed under a barcode in a photo, or the user may type them. Products the user logged before are also listed by search_foods, with codes like OFF:4008400121925. Use the product's OFF: code in ${propose} and set micros_from to the BLS code of the most similar generic food (from search_foods; a filled hazelnut praline for a Giotto, for example), which supplies the vitamins and minerals the label lacks. If the product already has a similar food chosen by the user, micros_from can be empty. Do not guess barcodes. When there is no barcode or the product is not found, choose the closest generic BLS food instead and ${GENERIC_NOTE}. Packaging photos help: use the product weight and the number of pieces from the label.`;
 
 // Open Food Facts' own name search refuses browser apps (docs/OPEN_QUESTIONS.md), so the model
 // finds the barcode through Anthropic's web search, limited to openfoodfacts.org, and then looks it
 // up like a scanned one: the values still come from Open Food Facts, never from a web page.
 const WEB_SEARCH = `- A package without a readable barcode (only the front, brand and name visible): before falling back to a generic food, find the product with web_search, which searches openfoodfacts.org only. Search with the brand, product name and pack size from the photo, e.g. "Ferrero Giotto 38,7 g". A product's barcode is the long number in its result address (world.openfoodfacts.org/product/4008400121925/giotto-ferrero, or /produkt/ on de.openfoodfacts.org); a barcode taken from a result is not a guess. Pick the result whose name, brand and size match the package, call lookup_barcode with its barcode, and check that the product returned is the one in the photo; if two sizes or variants fit, take the one that matches the photo best and say which in assumptions. One or two searches are enough. Never take nutrient values from search results. If nothing matches, use the generic food. Do not ask the user for a barcode photo just to find the product.`;
 
-const USDA = `- When no BLS food fits a single food or ingredient well (foods common outside Germany, a specific variety), search USDA FoodData Central with search_usda, in English. Its generic foods (branded: false; codes like USDA:168462) have their own full nutrient data: use the USDA: code in propose_meal and set micros_from to the BLS code of the most similar food if one is close (it fills the few gaps, such as iodine), else leave it empty. For a US packaged product, search with branded: true; micros_from is then required, as for a label. Prefer a fitting BLS food over USDA, and split mixed dishes into BLS ingredients rather than taking a USDA dish, unless the USDA dish matches closely. USDA foods the user logged before are also listed by search_foods. Each USDA search is an online request, so search only when the BLS has nothing good.`;
+const USDA = (propose: string) => `- When no BLS food fits a single food or ingredient well (foods common outside Germany, a specific variety), search USDA FoodData Central with search_usda, in English. Its generic foods (branded: false; codes like USDA:168462) have their own full nutrient data: use the USDA: code in ${propose} and set micros_from to the BLS code of the most similar food if one is close (it fills the few gaps, such as iodine), else leave it empty. For a US packaged product, search with branded: true; micros_from is then required, as for a label. Prefer a fitting BLS food over USDA, and split mixed dishes into BLS ingredients rather than taking a USDA dish, unless the USDA dish matches closely. USDA foods the user logged before are also listed by search_foods. Each USDA search is an online request, so search only when the BLS has nothing good.`;
 
 // The journal (docs/SPEC.md, "Journal"): the assistant only passes on the user's words, for
 // patterns to be looked for later; it never interprets them.
@@ -47,9 +48,38 @@ export interface PromptSources {
   activity?: boolean;
   /** Water is on: the assistant may propose plain water. */
   water?: boolean;
+  /** The recipe editor's assistant: ingredients for one recipe, nothing else (the trackers are ignored). */
+  recipe?: boolean;
 }
 
-function systemPrompt({ off = false, usda = false, webSearch = false, journal = false, sleep = false, activity = false, water = false }: PromptSources): string {
+// The recipe editor's assistant (docs/SPEC.md, "AI assistant logging"): the same lookups as for a
+// meal, but the result is ingredients for the whole pot, added to the recipe being edited.
+function recipeSystemPrompt({ off = false, usda = false, webSearch = false }: PromptSources): string {
+  const extra = [off && ' Packaged products can also be looked up by barcode in Open Food Facts.', usda && ' Foods the BLS lacks can be searched in USDA FoodData Central.'].filter(Boolean).join('');
+  return `You help the user enter a recipe in ToFoo, a personal nutrition diary built around batch cooking: a recipe is cooked as a pot and split into portions. The user lives in Germany. The food database is the German Bundeslebensmittelschlüssel (BLS 4.0): about 7,100 generic foods and dishes with English and German names, no brands.${extra}
+
+Your job: work out the recipe's ingredients and how many grams of each go into the whole pot, then call propose_ingredients. The user is in the recipe editor; the ingredients are added to the recipe they are editing once they confirm. You never state nutrient values; the app computes them from the database. A wrong food or amount is visible to the user and easy to fix; an invented number is not, so never make numbers up beyond food choice and grams.
+
+How to work:
+- Find foods with search_foods. Search short, generic terms, in English and German (e.g. ["red lentils", "Linsen rot"]); send several queries in one call. Only use codes that search_foods returned.
+${off ? BRANDED_WITH_PRODUCTS('propose_ingredients') : BRANDED_BLS_ONLY}
+${off && webSearch ? `${WEB_SEARCH}\n` : ''}${usda ? `${USDA('propose_ingredients')}\n` : ''}- What the user sends: a photo of a recipe (a cookbook page, a handwritten card, a screenshot), a typed or spoken list or description, photos of the ingredients or their packages, or a mix. Take every ingredient it names, including oil, butter, salt, spices, broth and garnishes, and add nothing that is not in it. Include water that stays in the dish (in a soup or curry, as tap water); leave out what is only used for cooking and poured away (pasta water, frying oil left in the pan).
+- One ingredient, one item: do not use a BLS dish for the whole recipe; the user wants the recipe built from its ingredients.
+- Amounts are for the whole recipe, in grams as they go into the pot. Convert cups, spoons, pieces, cans and packs to grams; use the weight printed on a package or label when there is one; put each conversion that is not obvious in assumptions (e.g. "2 onions ≈ 200 g"). For "a pinch" or "to taste", estimate a small amount and say so.
+- preparation: recipes list ingredients raw (or dried, or canned). Choose that BLS food and set preparation to how it is cooked in the dish: boiled (also simmered in a curry or soup), steamed (also stewed), baked (also roasted), fried; raw if it is eaten uncooked; "asListed" when the BLS food already matches how it is eaten (bread, canned or cooked entries, oil, spices, salt, sauces).
+- Salt: use the plain BLS salt; the app replaces it with the user's choice of iodised salt.
+- Portions: from the recipe ("serves 4", "makes 12 muffins") or what the user says; 0 if nothing says. name: the dish's name in the user's language, or empty if unknown.
+- The app tells you what the recipe already has (name, portions, ingredients). Propose only ingredients to add, never ones it already has: the user changes those in the editor. If the user asks you to change one already added, tell them to change it there.
+- Ask when the answer would noticeably change the result (an unknown main ingredient, an amount that could easily be double or half). Ask everything that matters in one message, as a short numbered list with a default for each the user can just accept; do not ask about details that barely matter, and do not ask for more photos when you can work with what you have.
+- Cards: each proposal is shown as a card with an id (R1, R2, …). The user can add it to the recipe, edit grams on it, or keep chatting. To change an open card, call propose_ingredients with the whole corrected list and replaces set to its id; the app swaps the card. The app tells you which cards were added; never propose those again. For one recipe, propose one card.
+- assumptions: short phrases the user should see, e.g. "1 can of tomatoes ≈ 400 g".
+
+Style: brief, friendly, plain text (no headings or tables). Answer in the language the user writes in.`;
+}
+
+function systemPrompt(sources: PromptSources): string {
+  if (sources.recipe) return recipeSystemPrompt(sources);
+  const { off = false, usda = false, webSearch = false, journal = false, sleep = false, activity = false, water = false } = sources;
   const extra = [
     off && ' Packaged products can also be looked up by barcode in Open Food Facts.',
     usda && ' Foods the BLS lacks can be searched in USDA FoodData Central.',
@@ -66,8 +96,8 @@ Your job: work out which foods the user ate and how many grams of each, then cal
 
 How to work:
 - Find foods with search_foods. Search short, generic terms, in English and German (e.g. ["milk roll", "Milchbrötchen"]); send several queries in one call. Only use codes that search_foods returned.
-${off ? BRANDED_WITH_PRODUCTS : BRANDED_BLS_ONLY}
-${off && webSearch ? `${WEB_SEARCH}\n` : ''}${usda ? `${USDA}\n` : ''}${journal ? `${JOURNAL(activity)}\n` : ''}${sleep ? `${SLEEP(journal)}\n` : ''}${activity ? `${ACTIVITY}\n` : ''}${water ? `${WATER}\n` : ''}- Mixed dishes (restaurant meals, a hotpot, a bowl): use a matching BLS dish if there is one, otherwise split it into ingredients with estimated grams. Include what changes the result most: cooking oil, sauces, broth that was actually eaten.
+${off ? BRANDED_WITH_PRODUCTS('propose_meal') : BRANDED_BLS_ONLY}
+${off && webSearch ? `${WEB_SEARCH}\n` : ''}${usda ? `${USDA('propose_meal')}\n` : ''}${journal ? `${JOURNAL(activity)}\n` : ''}${sleep ? `${SLEEP(journal)}\n` : ''}${activity ? `${ACTIVITY}\n` : ''}${water ? `${WATER}\n` : ''}- Mixed dishes (restaurant meals, a hotpot, a bowl): use a matching BLS dish if there is one, otherwise split it into ingredients with estimated grams. Include what changes the result most: cooking oil, sauces, broth that was actually eaten.
 - Amounts: use what the user said, label weights, counts of standard items, and visual cues (plate size, cutlery, hands, packaging). Think about the portion one person ate, not the whole shared dish.
 - Ask when the answer would noticeably change the result (an unknown main food, a portion that could easily be double or half, whether shared food was all eaten). Ask one short question at a time and offer a default the user can just accept, e.g. "About one bowl, roughly 400 ml?". Do not ask about details that barely matter. Do not ask for more photos (barcode, label, packaging) when you can work with what you have: the user often cannot take them. If one would clearly change the result, mention it once alongside your proposal, not instead of it. If the user cannot know, estimate and record the assumption.
 - Everything at once: the user often logs a day or two in one go, in one long message (often spoken for many minutes, with filler words and corrections) and many photos (meals, packaging, barcodes, labels, screenshots). Go through all of it and propose every meal${journal ? ', journal entry' : ''}${sleep ? ', sleep' : ''}${activity ? ', activity' : ''}${water ? ', water' : ''} it contains: leave nothing out and propose nothing twice. Later words override earlier ones ("no, it was two eggs"). The app puts a line before each photo with its number and capture time. Group the photos into meals by time and content: photos minutes apart of the same table are one meal; the same food at different times (yogurt in the morning and in the evening) is two; a photo of a package or barcode belongs to the meal that food was eaten in. Also include meals the user only describes in words. Before proposing, ask everything that matters in one message, as a short numbered list with a default for each, and say how you grouped the photos (e.g. "Photos 2–5: Korean BBQ, Thu 19:40"); keep it to what really changes the result. Then propose everything in one response, one call per meal${journal ? ', journal entry' : ''}${sleep ? ', sleep' : ''}${activity ? ', activity' : ''}${water ? ', water' : ''}.
@@ -80,8 +110,8 @@ ${off && webSearch ? `${WEB_SEARCH}\n` : ''}${usda ? `${USDA}\n` : ''}${journal 
 Style: brief, friendly, plain text (no headings or tables). Answer in the language the user writes in.`;
 }
 
-const key = ({ off = false, usda = false, webSearch = false, journal = false, sleep = false, activity = false, water = false }: PromptSources) =>
-  `${off ? 1 : 0}${usda ? 1 : 0}${off && webSearch ? 1 : 0}${journal ? 1 : 0}${sleep ? 1 : 0}${activity ? 1 : 0}${water ? 1 : 0}`;
+const key = ({ off = false, usda = false, webSearch = false, journal = false, sleep = false, activity = false, water = false, recipe = false }: PromptSources) =>
+  recipe ? `r${off ? 1 : 0}${usda ? 1 : 0}${off && webSearch ? 1 : 0}` : `${off ? 1 : 0}${usda ? 1 : 0}${off && webSearch ? 1 : 0}${journal ? 1 : 0}${sleep ? 1 : 0}${activity ? 1 : 0}${water ? 1 : 0}`;
 const prompts = new Map<string, string>();
 const toolSets = new Map<string, BetaToolUnion[]>();
 
@@ -144,16 +174,16 @@ export const WEB_SEARCH_TOOL: BetaWebSearchTool20250305 = {
   user_location: { type: 'approximate', country: 'DE' },
 };
 
-function tools({ off = false, usda = false, webSearch = false, journal = false, sleep = false, activity = false, water = false }: PromptSources): BetaToolUnion[] {
+function tools({ off = false, usda = false, webSearch = false, journal = false, sleep = false, activity = false, water = false, recipe = false }: PromptSources): BetaToolUnion[] {
   const withProducts = off || usda;
   const codeHelp = off && usda ? 'BLS code from search_foods, or an OFF: or USDA: code from lookup_barcode, search_usda or search_foods.' : off ? 'BLS code from search_foods, or OFF: product code from lookup_barcode or search_foods.' : usda ? 'BLS code from search_foods, or USDA: code from search_usda or search_foods.' : 'BLS code from search_foods.';
   const items = {
     type: 'object',
     properties: {
       code: { type: 'string', description: codeHelp },
-      grams: { type: 'number', description: 'Grams eaten (for drinks, ml ≈ g).' },
+      grams: { type: 'number', description: recipe ? 'Grams in the whole recipe (for liquids, ml ≈ g).' : 'Grams eaten (for drinks, ml ≈ g).' },
       preparation: { type: 'string', enum: [...PREPARATIONS] },
-      note: { type: 'string', description: 'What this item stands for, if not obvious from the food name (e.g. "Giotto, 1 ball"); empty otherwise.' },
+      note: { type: 'string', description: recipe ? 'What this item stands for as written in the recipe, if not obvious from the food name (e.g. "2 cans chopped tomatoes"); empty otherwise.' : 'What this item stands for, if not obvious from the food name (e.g. "Giotto, 1 ball"); empty otherwise.' },
       ...(withProducts
         ? { micros_from: { type: 'string', description: `For ${off && usda ? 'OFF: and USDA: codes' : off ? 'OFF: products' : 'USDA: foods'} only: BLS code of the most similar generic food, for the nutrients the source lacks${usda ? ' (may be empty for USDA generic foods)' : ''}. Empty for BLS foods.` } }
         : {}),
@@ -161,11 +191,32 @@ function tools({ off = false, usda = false, webSearch = false, journal = false, 
     required: ['code', 'grams', 'preparation', 'note', ...(withProducts ? ['micros_from'] : [])],
     additionalProperties: false,
   };
+  const lookups = [SEARCH_FOODS, ...(off ? [LOOKUP_BARCODE] : []), ...(off && webSearch ? [WEB_SEARCH_TOOL] : []), ...(usda ? [SEARCH_USDA] : [])];
+  if (recipe) {
+    return [
+      ...lookups,
+      {
+        name: 'propose_ingredients',
+        description:
+          'Show the user ingredients to add to the recipe they are editing, as a card with the items and grams for the user to check and confirm; nothing is added until they do. After a correction, call it again with the complete list and replaces set to the card id.',
+        strict: true,
+        input_schema: {
+          type: 'object',
+          properties: {
+            name: { type: 'string', description: 'The dish\'s name, e.g. "Lentil curry"; empty if unknown.' },
+            portions: { type: 'number', description: 'How many portions the whole recipe makes; 0 if unknown.' },
+            items: { type: 'array', items },
+            assumptions: { type: 'array', items: { type: 'string' } },
+            replaces: { type: 'string', description: 'Id of the open card this corrects (e.g. "R1"); empty for new ingredients.' },
+          },
+          required: ['name', 'portions', 'items', 'assumptions', 'replaces'],
+          additionalProperties: false,
+        },
+      },
+    ];
+  }
   return [
-    SEARCH_FOODS,
-    ...(off ? [LOOKUP_BARCODE] : []),
-    ...(off && webSearch ? [WEB_SEARCH_TOOL] : []),
-    ...(usda ? [SEARCH_USDA] : []),
+    ...lookups,
     {
       name: 'propose_meal',
       description:

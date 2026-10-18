@@ -1,6 +1,7 @@
 /**
  * The assistant conversation loop: send the user's message, run the tools the model calls, and
- * stop when it asks the user something (plain text) or proposes a meal. The API call is injected
+ * stop when it asks the user something (plain text) or proposes a meal (or, in the recipe editor,
+ * ingredients). The API call is injected
  * so the loop can be tested without a network.
  */
 import type * as Beta from '@anthropic-ai/sdk/resources/beta/messages/messages';
@@ -17,6 +18,8 @@ import {
   validateSleepProposal,
   validateActivityProposal,
   validateWaterProposal,
+  validateIngredientsProposal,
+  type IngredientsProposal,
   type JournalProposal,
   type Proposal,
   type SleepProposal,
@@ -54,9 +57,11 @@ export interface Conversation {
   activities?: number;
   /** Water cards shown so far; the next one gets id W(waters + 1). */
   waters?: number;
+  /** Ingredient cards shown so far (recipe editor); the next one gets id R(recipes + 1). */
+  recipes?: number;
 }
 
-export const emptyConversation = (): Conversation => ({ messages: [], pendingResults: [], cards: 0, notes: 0, sleeps: 0, activities: 0, waters: 0 });
+export const emptyConversation = (): Conversation => ({ messages: [], pendingResults: [], cards: 0, notes: 0, sleeps: 0, activities: 0, waters: 0, recipes: 0 });
 
 export interface UserImage {
   mediaType: 'image/jpeg' | 'image/png' | 'image/webp';
@@ -76,10 +81,12 @@ export type ShownSleep = SleepProposal & { id: string };
 export type ShownActivity = ActivityProposal & { id: string };
 /** Plain water as shown: with its card id (W1, W2, …). */
 export type ShownWater = WaterProposal & { id: string };
+/** Recipe ingredients as shown: with their card id (R1, R2, …). */
+export type ShownIngredients = IngredientsProposal & { id: string };
 
 export type TurnOutcome =
   | { kind: 'reply'; text: string }
-  | { kind: 'proposal'; text: string; proposals: ShownProposal[]; notes: ShownNote[]; sleeps: ShownSleep[]; activities: ShownActivity[]; waters: ShownWater[] }
+  | { kind: 'proposal'; text: string; proposals: ShownProposal[]; notes: ShownNote[]; sleeps: ShownSleep[]; activities: ShownActivity[]; waters: ShownWater[]; ingredients: ShownIngredients[] }
   | { kind: 'error'; reason: 'refusal' | 'tooLong' | 'tooManySteps' };
 
 /** Request parameters per model (fallbacks re-run a declined request on another model). */
@@ -150,14 +157,15 @@ export async function sendMessage(
   if (user.text.trim()) content.push({ type: 'text', text: user.text.trim() });
   if (user.appNote) content.push({ type: 'text', text: user.appNote });
   messages.push({ role: 'user', content });
-  const sources = sourcesOf(ctx.products, ctx.journal, ctx.sleep, ctx.activity, ctx.water);
+  const sources = sourcesOf(ctx.products, ctx.journal, ctx.sleep, ctx.activity, ctx.water, ctx.recipe);
 
   let cards = conversation.cards;
   let notes = conversation.notes ?? 0;
   let sleeps = conversation.sleeps ?? 0;
   let activities = conversation.activities ?? 0;
   let waters = conversation.waters ?? 0;
-  const done = (outcome: TurnOutcome, pendingResults: Beta.BetaToolResultBlockParam[] = []) => ({ conversation: { messages, pendingResults, cards, notes, sleeps, activities, waters }, outcome });
+  let recipes = conversation.recipes ?? 0;
+  const done = (outcome: TurnOutcome, pendingResults: Beta.BetaToolResultBlockParam[] = []) => ({ conversation: { messages, pendingResults, cards, notes, sleeps, activities, waters, recipes }, outcome });
 
   for (let step = 0; step < MAX_STEPS; step++) {
     const res = await create(requestParams(model, messages, sources));
@@ -178,6 +186,7 @@ export async function sendMessage(
     const sleepsProposed: Array<{ id: string; proposal: SleepProposal }> = [];
     const activitiesProposed: Array<{ id: string; proposal: ActivityProposal }> = [];
     const watersProposed: Array<{ id: string; proposal: WaterProposal }> = [];
+    const ingredientsProposed: Array<{ id: string; proposal: IngredientsProposal }> = [];
     let rejected = false;
     for (const use of uses) {
       if (use.name === 'search_foods') {
@@ -189,7 +198,14 @@ export async function sendMessage(
       } else if (use.name === 'search_usda' && sources.usda) {
         const r = await runSearchUsda(use.input, ctx);
         results.push({ type: 'tool_result', tool_use_id: use.id, content: r.text, is_error: !r.ok });
-      } else if (use.name === 'propose_meal') {
+      } else if (use.name === 'propose_ingredients' && sources.recipe) {
+        const r = validateIngredientsProposal(use.input, ctx.db, ctx.products);
+        if (r.ok) ingredientsProposed.push({ id: use.id, proposal: r.proposal });
+        else {
+          rejected = true;
+          results.push({ type: 'tool_result', tool_use_id: use.id, content: r.error, is_error: true });
+        }
+      } else if (use.name === 'propose_meal' && !sources.recipe) {
         const r = validateProposal(use.input, ctx.db, ctx.products, ctx.now);
         if (r.ok) proposals.push({ id: use.id, proposal: r.proposal });
         else {
@@ -230,12 +246,13 @@ export async function sendMessage(
     }
 
     // Cards are shown all together or not at all, so the user never sees half a batch.
-    if ((proposals.length || notesProposed.length || sleepsProposed.length || activitiesProposed.length || watersProposed.length) && !rejected) {
+    if ((proposals.length || notesProposed.length || sleepsProposed.length || activitiesProposed.length || watersProposed.length || ingredientsProposed.length) && !rejected) {
       const shown = proposals.map(({ proposal }): ShownProposal => ({ ...proposal, id: `M${++cards}` }));
       const shownNotes = notesProposed.map(({ proposal }): ShownNote => ({ ...proposal, id: `J${++notes}` }));
       const shownSleeps = sleepsProposed.map(({ proposal }): ShownSleep => ({ ...proposal, id: `S${++sleeps}` }));
       const shownActivities = activitiesProposed.map(({ proposal }): ShownActivity => ({ ...proposal, id: `A${++activities}` }));
       const shownWaters = watersProposed.map(({ proposal }): ShownWater => ({ ...proposal, id: `W${++waters}` }));
+      const shownIngredients = ingredientsProposed.map(({ proposal }): ShownIngredients => ({ ...proposal, id: `R${++recipes}` }));
       const shownResult = (id: string, card: string, verb: string): Beta.BetaToolResultBlockParam => ({ type: 'tool_result', tool_use_id: id, content: `Shown to the user as card ${card}. Not ${verb} yet; their reply follows.` });
       const shownResults = [
         ...proposals.map(({ id }, i) => shownResult(id, shown[i]!.id, 'logged')),
@@ -243,8 +260,12 @@ export async function sendMessage(
         ...sleepsProposed.map(({ id }, i) => shownResult(id, shownSleeps[i]!.id, 'saved')),
         ...activitiesProposed.map(({ id }, i) => shownResult(id, shownActivities[i]!.id, 'saved')),
         ...watersProposed.map(({ id }, i) => shownResult(id, shownWaters[i]!.id, 'saved')),
+        ...ingredientsProposed.map(({ id }, i) => shownResult(id, shownIngredients[i]!.id, 'added to the recipe')),
       ];
-      return done({ kind: 'proposal', text: textOf(res.content), proposals: shown, notes: shownNotes, sleeps: shownSleeps, activities: shownActivities, waters: shownWaters }, [...results, ...shownResults]);
+      return done(
+        { kind: 'proposal', text: textOf(res.content), proposals: shown, notes: shownNotes, sleeps: shownSleeps, activities: shownActivities, waters: shownWaters, ingredients: shownIngredients },
+        [...results, ...shownResults],
+      );
     }
     for (const { id } of proposals) {
       results.push({ type: 'tool_result', tool_use_id: id, content: 'Not shown: another proposal in this response had errors. Call propose_meal again for this meal too.', is_error: true });
@@ -261,21 +282,36 @@ export async function sendMessage(
     for (const { id } of activitiesProposed) {
       results.push({ type: 'tool_result', tool_use_id: id, content: 'Not shown: another proposal in this response had errors. Call propose_activity again for this activity too.', is_error: true });
     }
+    for (const { id } of ingredientsProposed) {
+      results.push({ type: 'tool_result', tool_use_id: id, content: 'Not shown: another proposal in this response had errors. Call propose_ingredients again for these ingredients too.', is_error: true });
+    }
     messages.push({ role: 'user', content: results });
   }
   return done({ kind: 'error', reason: 'tooManySteps' });
 }
 
+/** The recipe being edited, as the recipe editor's assistant is told about it. */
+export interface RecipeSoFar {
+  name: string;
+  portions?: number;
+  /** One line per ingredient, e.g. "Red lentils, dried 250 g, boiled". */
+  ingredients: string[];
+}
+
 /**
  * The app's note on each user message: the current time and the chat's day (so "yesterday" and
  * photo times can be placed), cards already logged or still open, barcodes read from photos, and
- * whether the text was dictated.
+ * whether the text was dictated. In the recipe editor: what the recipe already has instead of the day.
  */
-export function appNote(o: { now: number; day: string; today: string; logged: string[]; open: string[]; barcodes: string[]; dictated?: boolean }): string {
+export function appNote(o: { now: number; day: string; today: string; logged: string[]; open: string[]; barcodes: string[]; dictated?: boolean; recipe?: RecipeSoFar }): string {
   const parts = [`Now: ${fmtLocalDateTime(o.now)}.`];
   if (o.dictated) parts.push('The text was spoken and turned into text by a speech model: expect misheard words, especially food and brand names, and corrections the user made while talking.');
-  if (o.day !== o.today) parts.push(`The user opened this chat for ${o.day}.`);
-  if (o.logged.length) parts.push(`Cards already logged: ${o.logged.join(', ')}.`);
+  if (o.recipe) {
+    const r = o.recipe;
+    const head = [r.name ? `name "${r.name}"` : 'no name yet', r.portions ? `${r.portions} portions` : 'portions not set'].join(', ');
+    parts.push(`The recipe in the editor: ${head}; ${r.ingredients.length ? `ingredients: ${r.ingredients.join('; ')}` : 'no ingredients yet'}.`);
+  } else if (o.day !== o.today) parts.push(`The user opened this chat for ${o.day}.`);
+  if (o.logged.length) parts.push(`Cards already ${o.recipe ? 'added to the recipe' : 'logged'}: ${o.logged.join(', ')}.`);
   if (o.open.length) parts.push(`Cards still open: ${o.open.join(', ')}.`);
   if (o.barcodes.length) parts.push(`Barcodes the app read from the photos: ${o.barcodes.join(', ')}.`);
   return `(${parts.join(' ')})`;
