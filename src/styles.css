@@ -1103,6 +1103,10 @@ textarea:focus-visible,
 .ingredient-line {
   gap: 12px;
 }
+.ingredient-line > :last-child {
+  flex: none;
+  white-space: nowrap;
+}
 /* An ingredient's name opens its sheet (change the food, amount or preparation). */
 .ingredient-name {
   display: block;
@@ -1124,6 +1128,21 @@ textarea:focus-visible,
 }
 .ingredient-name .link-like {
   color: var(--accent);
+}
+/* Where an ingredient's numbers come from: small, but text, so it does not rely on colour. */
+.source-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0 6px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 11px;
+  line-height: 18px;
+  font-weight: 500;
+  color: var(--text-muted);
+  white-space: nowrap;
+  vertical-align: 1px;
 }
 .recipe-steps {
   white-space: pre-wrap;

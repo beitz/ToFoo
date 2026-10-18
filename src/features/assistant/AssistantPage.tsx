@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useData } from '../../app/data';
 import { useToast } from '../../app/toast';
 import { href, navigate } from '../../app/router';
+import { useBackCloses } from '../../app/history';
+import { SourceTag } from '../recipes/SourceTag';
 import { t, type MessageKey } from '../../i18n';
 import { dayKey, formatDay, formatTime } from '../../lib/dates';
 import { fmtNumber } from '../../lib/format';
@@ -548,6 +550,7 @@ function PhotoViewer({
   const img = images[index]!;
   const touchX = useRef<number | undefined>(undefined);
   const go = (delta: number) => onIndex(Math.min(images.length - 1, Math.max(0, index + delta)));
+  useBackCloses(true, onClose);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -1115,11 +1118,11 @@ function IngredientsCard({ card, toast, onLogged, register, recipe }: CardProps<
                 {it.product ? productLabel(it.product) : it.food.nameEn} <Icon name="edit" size={14} />
               </span>
               <span className="muted small block">
-                {it.note || it.food.nameDe}
+                <SourceTag source={it.product?.source ?? 'BLS'} product={it.product} /> {it.note || it.food.nameDe}
                 {it.preparation !== 'asListed' && ` · ${t(`prep.${it.preparation}` as MessageKey)}`}
               </span>
               {it.product?.match && (
-                <span className="muted small block">{t('ai.microsFrom', { name: d.foods.byCode.get(it.product.match.code)?.nameEn ?? it.product.match.code })}</span>
+                <span className="muted small block">{t('recipes.microsFromLine', { name: d.foods.byCode.get(it.product.match.code)?.nameEn ?? it.product.match.code })}</span>
               )}
             </button>
             <NumberInput value={it.grams} onChange={(g) => setItems((all) => all.map((x, j) => (j === i ? { ...x, grams: g } : x)))} suffix="g" min={0} />
