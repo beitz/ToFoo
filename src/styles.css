@@ -2129,7 +2129,7 @@ body:has(.composer) .toast-area {
 
 /* ── Home: floating log and fasting buttons ──────────────────── */
 .page:has(.fab-stack) {
-  padding-bottom: calc(var(--nav-h) + 210px + env(safe-area-inset-bottom));
+  padding-bottom: calc(var(--nav-h) + 96px + env(safe-area-inset-bottom));
 }
 .fab-stack {
   position: fixed;
@@ -2169,6 +2169,144 @@ body:has(.composer) .toast-area {
   outline: 3px solid var(--text);
   outline-offset: 2px;
 }
+/* Home: the round button opens a menu of quick actions; the closed menu takes one button's space. */
+.fab-stack.dial {
+  align-items: flex-end;
+  pointer-events: none;
+}
+.dial-items {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 12px;
+  /* Centre the small buttons over the big one. */
+  padding-right: 6px;
+}
+.dial-item,
+.dial-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.dial-item {
+  min-height: 48px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  pointer-events: auto;
+}
+.dial .fab {
+  pointer-events: auto;
+}
+.dial-label {
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 0.95rem;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+.dial-item.on .fab-small {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.dial-item:focus-visible {
+  outline: none;
+}
+.dial-item:focus-visible .fab-small {
+  outline: 3px solid var(--text);
+  outline-offset: 2px;
+}
+/* Hidden items stay in place, invisible, so they can fade out; visibility waits for the fade. */
+.dial-item,
+.dial-main .dial-label {
+  opacity: 0;
+  transform: translateY(14px) scale(0.85);
+  transform-origin: right center;
+  visibility: hidden;
+  transition:
+    opacity 0.14s ease-in,
+    transform 0.14s ease-in,
+    visibility 0s linear 0.14s;
+}
+.dial.open .dial-item,
+.dial.open .dial-main .dial-label {
+  opacity: 1;
+  transform: none;
+  visibility: visible;
+  transition:
+    opacity 0.2s ease-out var(--dial-delay, 0s),
+    transform 0.26s cubic-bezier(0.2, 0.9, 0.3, 1.25) var(--dial-delay, 0s),
+    visibility 0s linear var(--dial-delay, 0s);
+}
+/* Fan out from the bottom up. */
+.dial.open .dial-item:nth-last-child(1) {
+  --dial-delay: 0.02s;
+}
+.dial.open .dial-item:nth-last-child(2) {
+  --dial-delay: 0.05s;
+}
+.dial.open .dial-item:nth-last-child(3) {
+  --dial-delay: 0.08s;
+}
+.dial.open .dial-item:nth-last-child(4) {
+  --dial-delay: 0.11s;
+}
+.dial.open .dial-item:nth-last-child(n + 5) {
+  --dial-delay: 0.14s;
+}
+.dial .fab > .dial-icon {
+  grid-area: 1 / 1;
+  display: grid;
+  transition:
+    opacity 0.2s ease,
+    transform 0.26s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+}
+.dial .dial-icon-open {
+  opacity: 0;
+  transform: rotate(-135deg) scale(0.5);
+}
+.dial.open .dial-icon-closed {
+  opacity: 0;
+  transform: rotate(135deg) scale(0.5);
+}
+.dial.open .dial-icon-open {
+  opacity: 1;
+  transform: none;
+}
+.dial-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 39;
+  background: rgba(0, 0, 0, 0.45);
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 0.18s ease,
+    visibility 0s linear 0.18s;
+}
+.dial-scrim.open {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 0.18s ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .dial-item,
+  .dial.open .dial-item,
+  .dial-main .dial-label,
+  .dial.open .dial-main .dial-label,
+  .dial .fab > .dial-icon,
+  .dial-scrim,
+  .dial-scrim.open {
+    transition: none;
+  }
+}
 /* Toasts sit left of the buttons so undo stays reachable. */
 body:has(.fab-stack) .toast-area {
   justify-content: flex-start;
@@ -2198,9 +2336,6 @@ body:has(.fab-stack) .toast-area {
 /* With a third button (sleep), "Log for this day" takes the whole first row. */
 .diary-actions:has(> :nth-child(3)) > :first-child {
   grid-column: 1 / -1;
-}
-.page:has(.fab-stack > :nth-child(4)) {
-  padding-bottom: calc(var(--nav-h) + 266px + env(safe-area-inset-bottom));
 }
 .diary-actions:has(> :nth-child(4)) {
   grid-template-columns: repeat(3, 1fr);

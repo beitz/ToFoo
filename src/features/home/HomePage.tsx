@@ -18,7 +18,7 @@ import type { NutrientResult } from '../../model/simulate';
 import { Prompts } from './Prompts';
 import { SleepQuestion } from '../sleep/SleepQuestion';
 import { WaterCard } from '../water/WaterCard';
-import { SleepButton } from '../sleep/SleepButton';
+import { QuickActions } from './QuickActions';
 import { StockChips } from './StockChips';
 import { GroupInfoButton, hasGroupInfo } from '../info/GroupInfo';
 import { attentionCounts, COLLAPSED_BY_DEFAULT, groupNutrients, type HomeGrouping } from './grouping';
@@ -216,26 +216,7 @@ export function HomePage() {
         </div>
       )}
       <p className="muted small disclaimer">{t('home.disclaimer')}</p>
-      <div className="fab-stack">
-        {isOn(d.settings.features, 'journal') && (
-          <a className="fab fab-small" href={href('journal')} aria-label={t('home.journal')} title={t('home.journal')}>
-            <Icon name="journal" />
-          </a>
-        )}
-        {isOn(d.settings.features, 'sleep') && <SleepButton />}
-        <button
-          className={`fab fab-small${d.activeFast ? ' on' : ''}`}
-          onClick={toggleFast}
-          aria-pressed={!!d.activeFast}
-          aria-label={d.activeFast ? t('home.endFast') : t('home.startFast')}
-          title={d.activeFast ? t('home.endFast') : t('home.startFast')}
-        >
-          <Icon name="moon" />
-        </button>
-        <a className="fab" href={href('log')} aria-label={t('home.logMeal')} title={t('home.logMeal')}>
-          <Icon name="plus" size={28} />
-        </a>
-      </div>
+      <QuickActions onFast={() => void toggleFast()} />
       {fastSheet && (
         <Sheet title={t('home.fasting')} onClose={() => setFastSheet(false)}>
           <Field label={t('home.fastSince')} hint={t('home.fastHint')}>

@@ -87,6 +87,8 @@ export const en = {
   // Home
   'home.logMeal': 'Log meal',
   'home.journal': 'Write in journal',
+  'home.quickActions': 'Quick actions',
+  'home.logActivity': 'Log activity',
   'home.fasting': 'Fasting',
   'home.endFast': 'End fast',
   'home.fastStarted': 'Fast started. Every day counts as fasted until you log a meal.',
