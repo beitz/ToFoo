@@ -6,6 +6,7 @@ import { t, type MessageKey } from '../../i18n';
 import { search } from '../../foods/search';
 import { fmtPercent } from '../../lib/format';
 import { formatDay } from '../../lib/dates';
+import { shareOrDownload } from '../../lib/shareFile';
 import { NUTRIENT_GROUPS, NUTRIENTS, type NutrientDef } from '../../model/nutrients';
 import { storage } from '../../../model/parameters';
 import type { BackupFile } from '../../exchange/schema';
@@ -255,21 +256,8 @@ export function BackupPage() {
     const now = new Date();
     const { buildBackup, backupFileName } = await import('../../exchange/parse');
     const file = buildBackup(await repo.snapshot(), __APP_VERSION__, now);
-    const json = JSON.stringify(file, null, 1);
-    const name = backupFileName(now);
-    const blob = new Blob([json], { type: 'application/json' });
-    const shareFile = new File([blob], name, { type: 'application/json' });
     try {
-      if (navigator.canShare?.({ files: [shareFile] })) {
-        await navigator.share({ files: [shareFile], title: name });
-      } else {
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = name;
-        a.click();
-        URL.revokeObjectURL(url);
-      }
+      await shareOrDownload(backupFileName(now), JSON.stringify(file, null, 1));
       await repo.setMeta('lastBackupDay', d.today);
       toast(t('backup.done'));
     } catch (e) {

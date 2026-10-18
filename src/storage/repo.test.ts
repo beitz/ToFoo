@@ -145,4 +145,20 @@ describe('repository', () => {
     await b.restore(await repo.snapshot());
     expect((await b.getSettings())!.favouriteMeals).toEqual([meal('a'), meal('b'), meal('c')]);
   });
+
+  it('keeps saved chats out of backups, and deletes them with their photos (undoable)', async () => {
+    const repo = await fresh();
+    const chat = { id: 'c1', schemaVersion: 1, kind: 'log' as const, startedAt: 1, updatedAt: 2, model: 'm', title: 'lunch', features: {}, messages: [], events: [], photos: 2, tokens: {} };
+    const photos = [1, 2].map((n) => ({ id: `c1:${n}`, chatId: 'c1', n, mediaType: 'image/jpeg', data: 'AAAA' }));
+    await repo.saveChat(chat, photos);
+    await repo.saveChat({ ...chat, id: 'c2' }, [{ ...photos[0]!, id: 'c2:1', chatId: 'c2' }]);
+    expect((await repo.chatPhotos('c1')).map((p) => p.n)).toEqual([1, 2]);
+    expect((await repo.chatPhotoSizes()).get('c1')).toBe(8);
+    expect(JSON.stringify(await repo.snapshot())).not.toContain('lunch');
+    const old = await repo.deleteChats(['c1']);
+    expect(await repo.db.chats.count()).toBe(1);
+    expect(await repo.db.chatPhotos.count()).toBe(1);
+    await repo.restoreChats(old);
+    expect(await repo.chatPhotos('c1')).toHaveLength(2);
+  });
 });

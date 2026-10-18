@@ -5,6 +5,8 @@ import { href } from '../../app/router';
 import { t, type MessageKey } from '../../i18n';
 import type { AiModel } from '../../ai/assistant';
 import { classifyError, getAiSettings, makeCreate, saveUsage } from '../../ai/client';
+import { ChatRecorder } from '../../ai/chatStore';
+import { INSIGHT_SYSTEM, INSIGHT_TOOLS } from '../../ai/insightsPrompt';
 import { askInsights, fmtChance, fmtMeasure, insightNote, type Check, type InsightConversation } from '../../ai/insights';
 import { mergeModelTokens, type ModelTokens } from '../../ai/pricing';
 import { JOURNAL_TRANSCRIBE_PROMPT } from '../../ai/transcribe';
@@ -18,6 +20,7 @@ import { Icon } from '../../ui/Icon';
 import { appendText, useDictation } from '../assistant/useDictation';
 import { RecordingTime } from '../assistant/RecordingTime';
 import { UsageLine } from '../assistant/UsageLine';
+import { ChatExport } from '../assistant/ChatExport';
 import { VoiceFailed } from '../assistant/VoiceFailed';
 import { useJournal } from '../journal/useJournal';
 import { describeConditions, verdict } from './describe';
@@ -34,6 +37,8 @@ interface ChatState {
   conversation: InsightConversation;
   bubbles: Bubble[];
   tokens: ModelTokens;
+  /** Saves the chat on the phone (Settings → AI assistant → Saved chats). */
+  recorder: ChatRecorder;
 }
 /** The open chat, kept while the user looks at a day in the diary and comes back. */
 let lastChat: ChatState | undefined;
@@ -124,7 +129,17 @@ function useInsightData(): InsightData | undefined {
 function Chat({ apiKey, model }: { apiKey: string; model: AiModel }) {
   const d = useData();
   const data = useInsightData();
-  const [state, setState] = useState<ChatState>(() => lastChat ?? { period: '3m', conversation: { messages: [] }, bubbles: [], tokens: {} });
+  const [state, setState] = useState<ChatState>(
+    () =>
+      lastChat ?? {
+        period: '3m',
+        conversation: { messages: [] },
+        bubbles: [],
+        tokens: {},
+        recorder: new ChatRecorder({ kind: 'insights', model, features: d.settings.features }, isOn(d.settings.features, 'saveChats')),
+      },
+  );
+  const { recorder } = state;
   useEffect(() => {
     lastChat = state.bubbles.length ? state : undefined;
   }, [state]);
@@ -153,28 +168,36 @@ function Chat({ apiKey, model }: { apiKey: string; model: AiModel }) {
     setTurnTokens({});
     const before = state;
     setState((s) => ({ ...s, bubbles: [...s.bubbles, { role: 'user', text: question.trim() }] }));
+    recorder.event({ type: 'user', text: question.trim(), photos: [] });
     const onUsage = (tokens: ModelTokens) => {
       setState((s) => ({ ...s, tokens: mergeModelTokens(s.tokens, tokens) }));
+      recorder.usage(tokens);
       setTurnTokens((c) => mergeModelTokens(c, tokens));
       void saveUsage(tokens);
     };
     try {
       const note = insightNote(Date.now(), ov, before.conversation.messages.length === 0);
       const r = await askInsights(create, model, before.conversation, { text: question, appNote: note }, data, onUsage);
+      recorder.conversation(r.conversation.messages, { system: INSIGHT_SYSTEM, tools: INSIGHT_TOOLS });
       if (r.outcome.kind === 'error') {
         const reason = r.outcome.reason;
+        recorder.event({ type: 'error', reason });
         setState((s) => ({ ...s, conversation: r.conversation, bubbles: s.bubbles.slice(0, -1) }));
         setText(question);
         setError({ key: ERROR_TEXT[reason]! });
       } else {
         const reply = r.outcome;
+        recorder.event({ type: 'assistant', text: reply.text, checks: reply.checks });
         setState((s) => ({ ...s, conversation: r.conversation, bubbles: [...s.bubbles, { role: 'assistant', text: reply.text, checks: reply.checks }] }));
       }
     } catch (e) {
       // Nothing was added to the conversation: put the question back so Ask retries it.
       setState((s) => ({ ...s, bubbles: s.bubbles.slice(0, -1) }));
       setText(question);
-      setError({ key: ERROR_TEXT[await classifyError(e)]!, detail: e instanceof Error ? e.message : String(e) });
+      const kind = await classifyError(e);
+      const detail = e instanceof Error ? e.message : String(e);
+      recorder.event({ type: 'error', reason: kind, detail });
+      setError({ key: ERROR_TEXT[kind]!, detail });
     } finally {
       setBusy(false);
     }
@@ -244,6 +267,7 @@ function Chat({ apiKey, model }: { apiKey: string; model: AiModel }) {
         )}
         <UsageLine chat={state.tokens} turn={turnTokens} model={model} />
         <p className="muted small disclaimer">{t('insights.disclaimer')}</p>
+        {recorder.enabled && started && !busy && <ChatExport recorder={recorder} />}
         <div ref={endRef} />
       </div>
 

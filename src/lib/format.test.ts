@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fmtAmount, fmtFill, fmtPercent, fmtTokens, fmtUsd } from './format';
+import { fmtAmount, fmtBytes, fmtFill, fmtPercent, fmtTokens, fmtUsd } from './format';
 
 describe('format', () => {
   it('shows large µg amounts in mg', () => {
@@ -21,6 +21,9 @@ describe('format', () => {
     expect(fmtUsd(0)).toBe('$0.000');
     expect(fmtUsd(12.5)).toBe('$12.50');
     expect(fmtTokens(950)).toBe('950');
+    expect(fmtBytes(300)).toBe('1 kB');
+    expect(fmtBytes(820_400)).toBe('820 kB');
+    expect(fmtBytes(4_230_000)).toBe('4.2 MB');
     expect(fmtTokens(23_456)).toBe('23.5k');
     expect(fmtTokens(1_250_000)).toBe('1.25M');
   });

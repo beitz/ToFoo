@@ -11,11 +11,11 @@ import { Field, NumberInput, Segmented } from '../../ui/controls';
 import { Icon } from '../../ui/Icon';
 import { EnergyTargetCard } from './EnergyTarget';
 
-export function SubPage({ title, children }: { title: string; children: React.ReactNode }) {
+export function SubPage({ title, children, back = href('settings') }: { title: string; children: React.ReactNode; back?: string }) {
   return (
     <section>
       <header className="page-head row">
-        <a className="icon-btn" href={href('settings')} aria-label={t('common.back')}>
+        <a className="icon-btn" href={back} aria-label={t('common.back')}>
           <Icon name="back" />
         </a>
         <h1>{title}</h1>

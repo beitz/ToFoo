@@ -7,6 +7,7 @@ import { dayKey, formatDay, formatTime } from '../../lib/dates';
 import { fmtNumber } from '../../lib/format';
 import {
   appNote,
+  chatSetup,
   emptyConversation,
   sendMessage,
   type AiModel,
@@ -21,6 +22,9 @@ import {
   type TurnOutcome,
 } from '../../ai/assistant';
 import { classifyError, getAiSettings, makeCreate, saveUsage } from '../../ai/client';
+import { cardSummary, itemSummary, localTimes } from '../../ai/chatRecord';
+import { ChatRecorder } from '../../ai/chatStore';
+import { ChatExport } from './ChatExport';
 import { mergeModelTokens, type ModelTokens } from '../../ai/pricing';
 import { prepareImage, type PreparedImage } from '../../ai/image';
 import { photoLabel, readPhotoTime, type PhotoTime } from '../../ai/photoTime';
@@ -192,6 +196,10 @@ function Chat({ apiKey, model, day, recipe }: { apiKey: string; model: AiModel; 
   const fileRef = useRef<HTMLInputElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const [create] = useState(() => makeCreate(apiKey));
+  /** Saves the chat on the phone as it goes, for exporting it later (Settings → AI assistant → Saved chats). */
+  const [recorder] = useState(
+    () => new ChatRecorder({ kind: recipe ? 'recipe' : 'log', model, ...(recipe ? {} : { day }), features: d.settings.features }, isOn(d.settings.features, 'saveChats')),
+  );
   /** Billed tokens: the whole chat, and the user's latest message (all requests it caused). */
   const [chatTokens, setChatTokens] = useState<ModelTokens>({});
   const [turnTokens, setTurnTokens] = useState<ModelTokens>({});
@@ -249,6 +257,7 @@ function Chat({ apiKey, model, day, recipe }: { apiKey: string; model: AiModel; 
     const msg = { text, images: labelled, appNote: note };
     setBusy(true);
     setError(undefined);
+    recorder.event({ type: 'user', text: msg.text.trim(), photos: labelled.map((i) => i.label), ...(dictated && msg.text.trim() ? { dictated: true } : {}) });
     setBubbles((b) => [...b, { role: 'user', text: msg.text.trim(), previews: msg.images.map((i) => i.preview) }]);
     setText('');
     setImages([]);
@@ -257,6 +266,7 @@ function Chat({ apiKey, model, day, recipe }: { apiKey: string; model: AiModel; 
     const onUsage = (tokens: ModelTokens) => {
       setChatTokens((c) => mergeModelTokens(c, tokens));
       setTurnTokens((c) => mergeModelTokens(c, tokens));
+      recorder.usage(tokens);
       void saveUsage(tokens);
     };
     try {
@@ -287,6 +297,7 @@ function Chat({ apiKey, model, day, recipe }: { apiKey: string; model: AiModel; 
       };
       const r = await sendMessage(create, model, conversation, msg, ctx, onUsage);
       setConversation(r.conversation);
+      recorder.conversation(r.conversation.messages, chatSetup(ctx));
       setPhotoCount((n) => n + msg.images.length);
       setPhotoBytes((n) => n + msg.images.reduce((sum, i) => sum + i.data.length, 0));
       show(r.outcome);
@@ -296,7 +307,9 @@ function Chat({ apiKey, model, day, recipe }: { apiKey: string; model: AiModel; 
       setText(msg.text);
       setImages(images);
       setDictated(dictated);
-      setError(ERROR_TEXT[await classifyError(e)]);
+      const kind = await classifyError(e);
+      recorder.event({ type: 'error', reason: kind, detail: e instanceof Error ? e.message : String(e) });
+      setError(ERROR_TEXT[kind]);
     } finally {
       setBusy(false);
     }
@@ -304,6 +317,7 @@ function Chat({ apiKey, model, day, recipe }: { apiKey: string; model: AiModel; 
 
   function show(outcome: TurnOutcome) {
     if (outcome.kind === 'error') {
+      recorder.event({ type: 'error', reason: outcome.reason });
       setError(ERROR_TEXT[outcome.reason]);
       return;
     }
@@ -318,6 +332,7 @@ function Chat({ apiKey, model, day, recipe }: { apiKey: string; model: AiModel; 
         ...outcome.waters.map((w): Card => ({ kind: 'water', water: w, logged: false })),
         ...outcome.ingredients.map((r): Card => ({ kind: 'ingredients', ingredients: r, logged: false })),
       ];
+      recorder.event({ type: 'cards', text: outcome.text, cards: shown.map((c) => cardSummary(cardOf(c))) });
       const replaced = new Set(shown.map((c) => cardOf(c).replaces).filter((id): id is string => !!id && cardsRef.current.get(id)?.logged === false));
       setCards((all) => {
         const next = new Map([...all].filter(([id]) => !replaced.has(id)));
@@ -325,10 +340,15 @@ function Chat({ apiKey, model, day, recipe }: { apiKey: string; model: AiModel; 
         return next;
       });
       setBubbles((b) => [...b.filter((x) => !(x.role === 'card' && replaced.has(x.id))), ...added, ...shown.map((c): Bubble => ({ role: 'card', id: cardId(c) }))]);
-    } else setBubbles((b) => [...b, ...added]);
+    } else {
+      recorder.event({ type: 'assistant', text: outcome.text });
+      setBubbles((b) => [...b, ...added]);
+    }
   }
 
-  function setLogged(id: string, logged: boolean) {
+  /** A card was saved (with what was saved, for the saved chat) or its save undone. */
+  function setLogged(id: string, logged: boolean, saved?: Record<string, unknown>) {
+    recorder.event(logged ? { type: 'saved', card: id, saved: saved ?? {} } : { type: 'undone', card: id });
     setCards((all) => {
       const card = all.get(id);
       return card ? new Map(all).set(id, { ...card, logged }) : all;
@@ -414,7 +434,7 @@ function Chat({ apiKey, model, day, recipe }: { apiKey: string; model: AiModel; 
         )}
         {bubbles.map((b, i) =>
           b.role === 'card' ? (
-            cards.has(b.id) && <CardView key={b.id} card={cards.get(b.id)!} day={day} toast={toast} onLogged={(v) => setLogged(b.id, v)} register={register} recipe={recipe} />
+            cards.has(b.id) && <CardView key={b.id} card={cards.get(b.id)!} day={day} toast={toast} onLogged={(v, saved) => setLogged(b.id, v, saved)} register={register} recipe={recipe} />
           ) : b.role === 'user' ? (
             <div key={i} className="bubble bubble-user">
               {b.previews.length > 0 && (
@@ -446,6 +466,7 @@ function Chat({ apiKey, model, day, recipe }: { apiKey: string; model: AiModel; 
           </div>
         )}
         <UsageLine chat={chatTokens} turn={turnTokens} model={model} />
+        {recorder.enabled && bubbles.length > 0 && !busy && <ChatExport recorder={recorder} />}
         <div ref={endRef} />
       </div>
 
@@ -589,7 +610,8 @@ type CardProps<C extends Card> = {
   card: C;
   day: string;
   toast: ReturnType<typeof useToast>;
-  onLogged: (logged: boolean) => void;
+  /** Saved (with what was saved, for the saved chat) or undone. */
+  onLogged: (logged: boolean, saved?: Record<string, unknown>) => void;
   register: (id: string, save: Saver | undefined) => void;
   recipe?: RecipeChat;
 };
@@ -624,7 +646,7 @@ function SleepCard({ card, toast, onLogged, register }: CardProps<Extract<Card, 
     setSaving(true);
     try {
       const { saved, replaced } = await repo.saveSleep({ start, end });
-      onLogged(true);
+      onLogged(true, localTimes({ start, end }));
       return async () => {
         await repo.undoSleep(saved, replaced);
         onLogged(false);
@@ -689,7 +711,7 @@ function WaterProposalCard({ card, day, toast, onLogged, register }: CardProps<E
     setSaving(true);
     try {
       const added = await repo.addWater({ ml: Math.round(ml), time, day: dayKey(new Date(time)) });
-      onLogged(true);
+      onLogged(true, localTimes({ ml: added.ml, time }));
       return async () => {
         await repo.deleteWater(added.id);
         onLogged(false);
@@ -764,7 +786,7 @@ function ActivityCard({ card, toast, onLogged, register }: CardProps<Extract<Car
     setSaving(true);
     try {
       const added = await repo.addActivity({ ...r.fields, day: dayKey(new Date(r.fields.time)) });
-      onLogged(true);
+      onLogged(true, localTimes({ ...r.fields }));
       return async () => {
         await repo.deleteActivity(added.id);
         onLogged(false);
@@ -848,7 +870,7 @@ function NoteCard({ card, day, toast, onLogged, register }: CardProps<Extract<Ca
     setSaving(true);
     try {
       const added = await repo.addJournal({ time, day: dayKey(new Date(time)), text: text.trim() });
-      onLogged(true);
+      onLogged(true, localTimes({ text: added.text, time }));
       return async () => {
         await repo.deleteJournal(added.id);
         onLogged(false);
@@ -938,7 +960,7 @@ function ProposalCard({ card, day, toast, onLogged, register }: CardProps<Extrac
     } finally {
       setSaving(false);
     }
-    onLogged(true);
+    onLogged(true, localTimes({ time, confidence, items: items.map(itemSummary) }));
     return async () => {
       for (const id of ids) await repo.deleteLog(id);
       onLogged(false);
@@ -1046,7 +1068,7 @@ function IngredientsCard({ card, toast, onLogged, register, recipe }: CardProps<
     }
     const undo = recipe.add({ name: proposal.name, portions: proposal.portions, items: items.map((it) => ({ ...it, grams: it.grams! })) });
     setCount(items.length);
-    onLogged(true);
+    onLogged(true, { items: items.map(itemSummary) });
     return async () => {
       undo();
       onLogged(false);

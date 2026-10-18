@@ -44,6 +44,12 @@ export function fmtUsd(v: number): string {
   return `$${v.toLocaleString('en-US', { minimumFractionDigits: v < 1 ? 3 : 2, maximumFractionDigits: v < 1 ? 3 : 2 })}`;
 }
 
+/** File sizes: "820 kB", "4.2 MB". */
+export function fmtBytes(n: number): string {
+  if (n >= 1_000_000) return `${fmtNumber(n / 1_000_000, 1)} MB`;
+  return `${fmtNumber(Math.max(1, Math.round(n / 1000)))} kB`;
+}
+
 /** Token counts in thousands or millions ("12.3k"). */
 export function fmtTokens(n: number): string {
   if (n >= 1_000_000) return `${fmtNumber(n / 1_000_000, 2)}M`;
