@@ -2835,3 +2835,11 @@ body:has(.fab-stack) .toast-area {
     transform: none;
   }
 }
+
+/* ── Automatic backups (Settings → Backup) ───────────────────── */
+.plain-list.auto-backups > li {
+  padding: 10px 0;
+}
+.auto-backup p {
+  margin: 2px 0 8px;
+}

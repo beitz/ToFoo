@@ -6,8 +6,9 @@
  * Unknown fields are ignored (stripped), so the format can grow.
  */
 import { z } from 'zod';
+import { FORMAT_VERSION } from './build';
 
-export const FORMAT_VERSION = 1;
+export { FORMAT_VERSION };
 
 const confidence = z.enum(['A', 'B', 'C']);
 const preparation = z.enum(['asListed', 'raw', 'boiled', 'steamed', 'baked', 'fried']);
@@ -90,6 +91,7 @@ export const settingsSchema = z.object({
   longWindowDays: z.number().int().positive(),
   theme: z.enum(['system', 'light', 'dark']),
   backupReminderDays: z.number().int().positive(),
+  autoBackupKeep: z.number().int().positive().optional(),
   defaultPlan: plan,
   homeView: z.enum(['compact', 'detailed']).optional(),
   homeGrouping: z.enum(['status', 'type', 'none']).optional(),
@@ -196,6 +198,10 @@ export const waterSchema = z
   .object({ id: z.string(), ...versioned, time: z.number(), day, ml: z.number().nonnegative() })
   .describe('Plain water drunk: when (epoch ms) and how much (ml); drinks with nutrients are food log entries');
 
+export const portionSizesSchema = z
+  .object({ food: z.string().min(1), sizes: z.array(z.object({ label: z.string(), grams: z.number().positive() })) })
+  .describe('Portion sizes the user saved for one food ("My bowl", 60 g), by the food code they were saved under');
+
 const header = {
   format: z.literal('tofoo', { error: 'not a ToFoo file (expected "format": "tofoo")' }),
   formatVersion: z.number().int().positive(),
@@ -221,6 +227,9 @@ export const backupSchema = z.object({
     sleep: z.array(sleepRecordSchema).default([]),
     activities: z.array(activitySchema).default([]),
     water: z.array(waterSchema).default([]),
+    // Optional, not defaulted: restoring a backup from before portion sizes were in backups keeps the
+    // sizes on the phone instead of clearing them.
+    portionSizes: z.array(portionSizesSchema).optional(),
   }),
 });
 

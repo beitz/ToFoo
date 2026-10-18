@@ -6,6 +6,7 @@ import { dayRange, todayKey, addDays } from '../lib/dates';
 import { refKey } from '../lib/refs';
 import { isOn } from '../settings/features';
 import { repo } from '../storage/repo';
+import { startAutoBackups } from './autoBackup';
 import type { Batch, CustomFood, DayStatusRecord, Fast, LogEntry, Product, Profile, Recipe, Settings, SunEntry } from '../storage/types';
 import { resolveRequirements, type ResolvedRequirements } from '../model/requirements';
 import { simulate, type SimulationResult } from '../model/simulate';
@@ -85,6 +86,8 @@ export function DataProvider({ children, fallback }: { children: ReactNode; fall
     // Ask the browser to keep our data (Android may otherwise clear it under storage pressure).
     void navigator.storage?.persist?.().catch(() => undefined);
   }, []);
+  // The daily automatic backup, once the database is open and migrated.
+  useEffect(() => (initialised ? startAutoBackups() : undefined), [initialised]);
 
   const profile = useLiveQuery(() => (initialised ? repo.getProfile() : undefined), [initialised]);
   const settings = useLiveQuery(() => (initialised ? repo.getSettings() : undefined), [initialised]);

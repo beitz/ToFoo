@@ -38,7 +38,7 @@ export function SettingsPage() {
         <LinkRow to={['settings', 'exclusions']} label={t('settings.exclusions')} detail={t('settings.exclusionsDetail', { n: p.exclusions.groups.length + p.exclusions.foods.length })} />
         <LinkRow to={['settings', 'nutrients']} label={t('settings.nutrients')} detail={hiddenCount ? t('settings.hidden', { n: hiddenCount }) : t('settings.allVisible')} />
         <LinkRow to={['settings', 'saved']} label={t('settings.saved')} detail={t('settings.savedDetail', { n: d.customFoods.length })} />
-        <LinkRow to={['settings', 'backup']} label={t('settings.backup')} />
+        <LinkRow to={['settings', 'backup']} label={t('settings.backup')} detail={isOn(s.features, 'autoBackup') ? t('backup.linkOn') : t('backup.linkOff')} />
         <LinkRow to={['settings', 'assistant']} label={t('ai.settingsTitle')} detail={isOn(s.features, 'aiAssistant') ? t('ai.statusOn') : t('ai.statusOff')} />
         <LinkRow to={['settings', 'usda']} label={t('usda.heading')} detail={isOn(s.features, 'usda') ? t('ai.statusOn') : t('ai.statusOff')} />
       </ul>
@@ -51,7 +51,7 @@ export function SettingsPage() {
 
       <h2 className="section-title">{t('settings.features')}</h2>
       <div className="card">
-        {FEATURES.map((f) => (
+        {FEATURES.filter((f) => !f.page).map((f) => (
           <Toggle
             key={f.key}
             checked={isOn(s.features, f.key)}
@@ -77,9 +77,6 @@ export function SettingsPage() {
           </Field>
         </div>
         <p className="muted small">{t('settings.windowHint')}</p>
-        <Field label={t('settings.backupDays')}>
-          {(id) => <NumberInput id={id} value={s.backupReminderDays} onChange={(v) => v && v >= 1 && repo.updateSettings({ backupReminderDays: Math.round(v) })} suffix={t('settings.days')} min={1} />}
-        </Field>
       </div>
 
       <h2 className="section-title">{t('settings.appearance')}</h2>

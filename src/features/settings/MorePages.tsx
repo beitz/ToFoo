@@ -5,16 +5,21 @@ import { diag } from '../../app/diagnostics';
 import { useToast } from '../../app/toast';
 import { t, type MessageKey } from '../../i18n';
 import { search } from '../../foods/search';
-import { fmtPercent } from '../../lib/format';
-import { formatDay } from '../../lib/dates';
+import { fmtBytes, fmtPercent } from '../../lib/format';
+import { dayKey, formatDay, formatTime } from '../../lib/dates';
 import { shareOrDownload } from '../../lib/shareFile';
 import { NUTRIENT_GROUPS, NUTRIENTS, type NutrientDef } from '../../model/nutrients';
 import { storage } from '../../../model/parameters';
 import type { BackupFile } from '../../exchange/schema';
+import { backupFileName, COUNTED, snapshotCounts, type CountedKey } from '../../exchange/build';
+import { autoBackupNow, checkAutoBackups } from '../../app/autoBackup';
+import { FEATURES, isOn } from '../../settings/features';
+import { keepCount } from '../../storage/autoBackup';
+import type { AutoBackup } from '../../storage/types';
 import type { Snapshot } from '../../storage/repo';
 import { repo } from '../../storage/repo';
 import type { StartingLevelChoice } from '../../model/simulate';
-import { Toggle } from '../../ui/controls';
+import { Field, NumberInput, Sheet, Toggle } from '../../ui/controls';
 import { Icon } from '../../ui/Icon';
 import { SubPage } from './ProfilePage';
 
@@ -241,18 +246,36 @@ export function SavedPage() {
 
 // ── Backup ──
 
+const REASON_LABEL: Record<AutoBackup['reason'], MessageKey> = { daily: 'backup.reasonDaily', restore: 'backup.reasonRestore', upgrade: 'backup.reasonUpgrade' };
+
+/** "Log entries 320 · Recipes 12 · …", only lists that have records. */
+function countsLine(counts: Partial<Record<CountedKey, number>>): string {
+  return COUNTED.filter((k) => counts[k])
+    .map((k) => `${t(`backup.count.${k}` as MessageKey)} ${counts[k]}`)
+    .join(' · ');
+}
+
+/** The newest saved file: saving an older automatic copy does not make the reminder younger than its data. */
+async function noteFileSaved(day: string) {
+  const last = await repo.getMeta<string>('lastBackupDay');
+  if (!last || day > last) await repo.setMeta('lastBackupDay', day);
+}
+
 export function BackupPage() {
   const toast = useToast();
   const lastBackup = useLiveQuery(() => repo.getMeta<string>('lastBackupDay'), []);
+  const autoBackups = useLiveQuery(() => repo.listAutoBackups(), []);
   const d = useData();
+  const s = d.settings;
+  const autoOn = isOn(s.features, 'autoBackup');
   const [pending, setPending] = useState<BackupFile | null>(null);
-  const [summary, setSummary] = useState<Array<[string, number]>>([]);
   const [error, setError] = useState<string>();
   const [exportProblem, setExportProblem] = useState<string>();
   const [paste, setPaste] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
-  // Preload the exchange module so sharing stays within the tap's user activation.
-  useEffect(() => void import('../../exchange/parse'), []);
+  // Preload the exchange module so sharing stays within the tap's user activation, and read back any
+  // automatic backup not checked yet.
+  useEffect(() => void import('../../exchange/parse').then(() => checkAutoBackups()), []);
 
   async function exportAll() {
     const now = new Date();
@@ -265,7 +288,17 @@ export function BackupPage() {
     if (!check.ok) diag('backup.selfCheckFailed', { error: check.error });
     try {
       await shareOrDownload(backupFileName(now), json);
-      await repo.setMeta('lastBackupDay', d.today);
+      await noteFileSaved(d.today);
+      toast(t('backup.done'));
+    } catch (e) {
+      if ((e as Error).name !== 'AbortError') toast(t('backup.failed'));
+    }
+  }
+
+  async function saveAuto(b: AutoBackup) {
+    try {
+      await shareOrDownload(backupFileName(new Date(b.at)), b.json);
+      await noteFileSaved(dayKey(new Date(b.at)));
       toast(t('backup.done'));
     } catch (e) {
       if ((e as Error).name !== 'AbortError') toast(t('backup.failed'));
@@ -275,27 +308,41 @@ export function BackupPage() {
   async function readText(text: string) {
     setError(undefined);
     // Loaded on demand: the validator is only needed here.
-    const { parseExchange, backupSummary } = await import('../../exchange/parse');
+    const { parseExchange } = await import('../../exchange/parse');
     const res = parseExchange(text);
     if (!res.ok) return setError(res.error);
     if (res.value.type !== 'backup') return setError(t('backup.notBackup'));
-    setSummary(backupSummary(res.value));
+    setPending(res.value);
+  }
+
+  async function restoreAuto(b: AutoBackup) {
+    const { parseExchange } = await import('../../exchange/parse');
+    const res = parseExchange(b.json);
+    if (!res.ok || res.value.type !== 'backup') {
+      await repo.setAutoBackupProblem(b.id, res.ok ? t('backup.notBackup') : res.error);
+      return;
+    }
     setPending(res.value);
   }
 
   async function restore() {
     if (!pending) return;
     const before = await repo.snapshot();
-    await repo.restore(pending.data as Snapshot);
+    await repo.restore(pending.data as Snapshot, { backupFirst: true });
     setPending(null);
     toast(t('backup.restored'), () => void repo.restore(before));
   }
+
+  const newest = autoBackups?.[0];
+  const when = (at: number) => `${formatDay(dayKey(new Date(at)), d.today)}, ${formatTime(at)}`;
 
   return (
     <SubPage title={t('settings.backup')}>
       <div className="card">
         <p>{t('backup.intro')}</p>
-        <p className="muted small">{lastBackup ? t('backup.last', { day: formatDay(lastBackup, d.today) }) : t('backup.never')}</p>
+        <p className="muted small">
+          {lastBackup ? t('backup.last', { day: formatDay(lastBackup, d.today) }) : t('backup.never')} {newest ? t('backup.newestAuto', { when: when(newest.at) }) : t('backup.noAuto')}
+        </p>
         <button className="btn btn-primary btn-block" onClick={() => void exportAll()}>
           <Icon name="download" /> {t('backup.export')}
         </button>
@@ -306,6 +353,71 @@ export function BackupPage() {
           </div>
         )}
       </div>
+
+      <h2 className="section-title">{t('backup.autoTitle')}</h2>
+      <div className="card">
+        <Toggle
+          checked={autoOn}
+          onChange={async (v) => {
+            await repo.updateSettings({ features: { ...s.features, autoBackup: v } });
+            if (v) void autoBackupNow();
+          }}
+          label={t('backup.autoTitle')}
+          description={FEATURES.find((f) => f.key === 'autoBackup')?.description}
+        />
+        <Field label={t('backup.autoKeep')}>
+          {(id) => <NumberInput id={id} value={keepCount(s)} onChange={(v) => v && v >= 1 && void repo.setAutoBackupKeep(Math.round(v))} suffix={t('backup.autoKeepUnit')} min={1} />}
+        </Field>
+        <p className="muted small">{t('backup.autoLimit')}</p>
+        {!autoOn && <p className="notice small">{t('backup.autoOff')}</p>}
+        {autoBackups && !autoBackups.length && <p className="muted small">{t('backup.autoNone')}</p>}
+        {!!autoBackups?.length && (
+          <ul className="plain-list auto-backups">
+            {autoBackups.map((b) => (
+              <li key={b.id} className="auto-backup">
+                <div className="row-between">
+                  <strong>{when(b.at)}</strong>
+                  <span className="muted small">{fmtBytes(b.size)}</span>
+                </div>
+                <p className="muted small">
+                  {t(REASON_LABEL[b.reason])}
+                  {countsLine(b.counts) && ` · ${countsLine(b.counts)}`}
+                </p>
+                {b.problem && (
+                  <div className="error-box" role="alert">
+                    <strong>{t('backup.autoProblem')}</strong>
+                    <pre>{b.problem}</pre>
+                  </div>
+                )}
+                <div className="row">
+                  <button className="btn btn-small btn-secondary" onClick={() => void restoreAuto(b)}>
+                    <Icon name="upload" /> {t('backup.restore')}
+                  </button>
+                  <button className="btn btn-small btn-secondary" onClick={() => void saveAuto(b)}>
+                    <Icon name="download" /> {t('backup.saveFile')}
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <h2 className="section-title">{t('backup.reminderTitle')}</h2>
+      <div className="card">
+        <Toggle
+          checked={isOn(s.features, 'backupReminder')}
+          onChange={(v) => repo.updateSettings({ features: { ...s.features, backupReminder: v } })}
+          label={FEATURES.find((f) => f.key === 'backupReminder')?.label ?? ''}
+          description={FEATURES.find((f) => f.key === 'backupReminder')?.description}
+        />
+        {isOn(s.features, 'backupReminder') && (
+          <Field label={t('settings.backupDays')}>
+            {(id) => <NumberInput id={id} value={s.backupReminderDays} onChange={(v) => v && v >= 1 && repo.updateSettings({ backupReminderDays: Math.round(v) })} suffix={t('settings.days')} min={1} />}
+          </Field>
+        )}
+      </div>
+
       <h2 className="section-title">{t('backup.import')}</h2>
       <div className="card">
         <p className="muted small">{t('backup.importIntro')}</p>
@@ -336,31 +448,32 @@ export function BackupPage() {
             <pre>{error}</pre>
           </div>
         )}
-        {pending && (
-          <div className="preview">
-            <p>
-              <strong>{t('backup.preview', { date: new Date(pending.exportedAt).toLocaleString('en-GB') })}</strong>
-            </p>
-            <ul className="plain-list small">
-              {summary.map(([label, n]) => (
-                <li key={label} className="row-between">
-                  <span>{label}</span>
-                  <span>{n}</span>
-                </li>
-              ))}
-            </ul>
-            <p className="notice small">{t('backup.replaceWarning')}</p>
-            <div className="row">
-              <button className="btn btn-primary" onClick={() => void restore()}>
-                {t('backup.restore')}
-              </button>
-              <button className="btn btn-ghost" onClick={() => setPending(null)}>
-                {t('common.cancel')}
-              </button>
-            </div>
-          </div>
-        )}
       </div>
+
+      {pending && (
+        <Sheet title={t('backup.previewTitle')} onClose={() => setPending(null)}>
+          <p>
+            <strong>{t('backup.preview', { date: new Date(pending.exportedAt).toLocaleString('en-GB') })}</strong>
+          </p>
+          <ul className="plain-list small">
+            {COUNTED.map((k) => (
+              <li key={k} className="row-between">
+                <span>{t(`backup.count.${k}` as MessageKey)}</span>
+                <span>{k === 'portionSizes' && !pending.data.portionSizes ? '–' : snapshotCounts(pending.data)[k]}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="notice small">{autoOn ? t('backup.replaceWarningAuto') : t('backup.replaceWarning')}</p>
+          <div className="row">
+            <button className="btn btn-primary" onClick={() => void restore()}>
+              {t('backup.restore')}
+            </button>
+            <button className="btn btn-ghost" onClick={() => setPending(null)}>
+              {t('common.cancel')}
+            </button>
+          </div>
+        </Sheet>
+      )}
     </SubPage>
   );
 }

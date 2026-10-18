@@ -322,6 +322,11 @@
                       "exclusiveMinimum": 0,
                       "maximum": 9007199254740991
                     },
+                    "autoBackupKeep": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
                     "defaultPlan": {
                       "type": "object",
                       "properties": {
@@ -2122,6 +2127,42 @@
                   "ml"
                 ],
                 "description": "Plain water drunk: when (epoch ms) and how much (ml); drinks with nutrients are food log entries"
+              }
+            },
+            "portionSizes": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "food": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "sizes": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "label": {
+                          "type": "string"
+                        },
+                        "grams": {
+                          "type": "number",
+                          "exclusiveMinimum": 0
+                        }
+                      },
+                      "required": [
+                        "label",
+                        "grams"
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "food",
+                  "sizes"
+                ],
+                "description": "Portion sizes the user saved for one food (\"My bowl\", 60 g), by the food code they were saved under"
               }
             }
           },
