@@ -68,7 +68,7 @@ export function mealSignature(meal: readonly LogEntry[], batches: ReadonlyMap<st
         case 'food':
           return `${refKey(e.ref)}×${e.grams}`;
         case 'portion':
-          return `portion:${batches.get(e.batchId)?.recipeId ?? e.label}×${e.portions}`;
+          return `portion:${batches.get(e.batchId)?.recipeId ?? e.label}×${e.grams ? `${e.grams}g` : e.portions}${e.ingredients ? '*' : ''}`;
         case 'custom':
           return `custom:${e.customFoodId}×${e.servings}`;
         case 'manual':

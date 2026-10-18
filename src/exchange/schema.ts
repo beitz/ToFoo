@@ -38,6 +38,16 @@ const ingredient = z.object({
 
 const versioned = { schemaVersion: z.number().int().nonnegative() };
 
+// A recipe portion eaten from a batch: by portions, or by grams of a weighed pot (then portions is
+// what it took from stock, possibly 0), with the serving's own ingredients when it differed from the pot.
+const portionFields = {
+  batchId: z.string(),
+  storage: storageKind,
+  portions: z.number().nonnegative(),
+  grams: z.number().positive().optional().describe('Grams eaten of the batch\'s cooked weight; sets the nutrients instead of portions'),
+  ingredients: z.array(ingredient).optional().describe('This serving\'s ingredients when it differed from the pot, in grams for the whole pot'),
+};
+
 // A pinned meal's items: log entries without id, time and day; offsetMinutes = minutes before the meal's last item.
 const mealItemBase = { confidence, label: z.string(), offsetMinutes: z.number().int().nonnegative() };
 const favouriteMeal = z.object({
@@ -46,7 +56,7 @@ const favouriteMeal = z.object({
     .array(
       z.discriminatedUnion('kind', [
         z.object({ ...mealItemBase, kind: z.literal('food'), ref: foodRef, grams: z.number().positive(), preparation }),
-        z.object({ ...mealItemBase, kind: z.literal('portion'), batchId: z.string(), storage: storageKind, portions: z.number().positive() }),
+        z.object({ ...mealItemBase, kind: z.literal('portion'), ...portionFields }),
         z.object({ ...mealItemBase, kind: z.literal('custom'), customFoodId: z.string(), servings: z.number().positive() }),
         z.object({ ...mealItemBase, kind: z.literal('manual'), nutrients, isSupplement: z.boolean() }),
         z.object({ ...mealItemBase, kind: z.literal('drink'), drink: z.enum(['tea', 'coffee']) }),
@@ -100,6 +110,7 @@ export const settingsSchema = z.object({
   favouriteMeals: z.array(favouriteMeal).optional(),
   logCollapsed: z.record(z.string(), z.boolean()).optional(),
   cookingPreferences: z.string().optional(),
+  potGrams: z.number().positive().optional(),
 });
 
 export const recipeRecordSchema = z.object({
@@ -113,6 +124,7 @@ export const recipeRecordSchema = z.object({
   tags: z.array(z.string()),
   defaultPlan: plan.optional(),
   saltOverride: z.object({ iodised: z.boolean(), fluoridated: z.boolean() }).optional(),
+  potGrams: z.number().positive().optional(),
   createdAt: z.number(),
   updatedAt: z.number(),
   archived: z.boolean().optional(),
@@ -123,6 +135,8 @@ export const batchSchema = z.object({
   ...versioned,
   recipeId: z.string(),
   recipe: z.object({ name: z.string(), portions: z.number().int().positive(), ingredients: z.array(ingredient), saltOverride: z.object({ iodised: z.boolean(), fluoridated: z.boolean() }).optional() }),
+  recipeIngredients: z.array(ingredient).optional().describe("The recipe's ingredients when this pot was made differently (recipe.ingredients is what went in)"),
+  cookedGrams: z.number().positive().optional().describe('Weight of the cooked food without the pot, in grams'),
   cookedDay: day,
   cookedAt: z.number(),
   plan: planResolved,
@@ -133,7 +147,7 @@ export const batchSchema = z.object({
 const logBase = { id: z.string(), ...versioned, time: z.number(), day, confidence, label: z.string() };
 export const logEntrySchema = z.discriminatedUnion('kind', [
   z.object({ ...logBase, kind: z.literal('food'), ref: foodRef, grams: z.number().positive(), preparation }),
-  z.object({ ...logBase, kind: z.literal('portion'), batchId: z.string(), storage: storageKind, portions: z.number().positive() }),
+  z.object({ ...logBase, kind: z.literal('portion'), ...portionFields }),
   z.object({ ...logBase, kind: z.literal('custom'), customFoodId: z.string(), servings: z.number().positive() }),
   z.object({ ...logBase, kind: z.literal('manual'), nutrients, isSupplement: z.boolean() }),
   z.object({ ...logBase, kind: z.literal('drink'), drink: z.enum(['tea', 'coffee']) }),

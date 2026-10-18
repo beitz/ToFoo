@@ -148,7 +148,9 @@ export function localTimes(o: object): Record<string, unknown> {
 /** A proposal card as saved: foods summarized, times readable, everything else as it is. */
 export function cardSummary(card: object): Record<string, unknown> {
   const c = localTimes(card);
-  return Array.isArray(c.items) ? { ...c, items: c.items.map((it) => itemSummary(it as ItemLike)) } : c;
+  const out = Array.isArray(c.items) ? { ...c, items: c.items.map((it) => itemSummary(it as ItemLike)) } : c;
+  // Changes to a pot or a serving carry whole foods too (batch cooking cards).
+  return Array.isArray(out.changes) ? { ...out, changes: out.changes.map((ch: { item?: ItemLike }) => (ch.item ? { ...ch, item: itemSummary(ch.item) } : ch)) } : out;
 }
 
 /** Title for the list: the first words of the first message, or what it held. */

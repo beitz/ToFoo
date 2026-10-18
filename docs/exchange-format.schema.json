@@ -634,7 +634,123 @@
                                     },
                                     "portions": {
                                       "type": "number",
+                                      "minimum": 0
+                                    },
+                                    "grams": {
+                                      "description": "Grams eaten of the batch's cooked weight; sets the nutrients instead of portions",
+                                      "type": "number",
                                       "exclusiveMinimum": 0
+                                    },
+                                    "ingredients": {
+                                      "description": "This serving's ingredients when it differed from the pot, in grams for the whole pot",
+                                      "type": "array",
+                                      "items": {
+                                        "type": "object",
+                                        "properties": {
+                                          "ref": {
+                                            "oneOf": [
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "source": {
+                                                    "type": "string",
+                                                    "const": "BLS"
+                                                  },
+                                                  "version": {
+                                                    "type": "string"
+                                                  },
+                                                  "code": {
+                                                    "type": "string",
+                                                    "pattern": "^[A-Z][0-9A-Z]{6}$"
+                                                  }
+                                                },
+                                                "required": [
+                                                  "source",
+                                                  "version",
+                                                  "code"
+                                                ]
+                                              },
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "source": {
+                                                    "type": "string",
+                                                    "const": "custom"
+                                                  },
+                                                  "id": {
+                                                    "type": "string"
+                                                  }
+                                                },
+                                                "required": [
+                                                  "source",
+                                                  "id"
+                                                ]
+                                              },
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "source": {
+                                                    "type": "string",
+                                                    "const": "OFF"
+                                                  },
+                                                  "code": {
+                                                    "type": "string",
+                                                    "pattern": "^\\d{4,14}$"
+                                                  }
+                                                },
+                                                "required": [
+                                                  "source",
+                                                  "code"
+                                                ]
+                                              },
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "source": {
+                                                    "type": "string",
+                                                    "const": "USDA"
+                                                  },
+                                                  "code": {
+                                                    "type": "string",
+                                                    "pattern": "^\\d{1,10}$"
+                                                  }
+                                                },
+                                                "required": [
+                                                  "source",
+                                                  "code"
+                                                ]
+                                              }
+                                            ]
+                                          },
+                                          "name": {
+                                            "type": "string"
+                                          },
+                                          "grams": {
+                                            "type": "number",
+                                            "exclusiveMinimum": 0
+                                          },
+                                          "preparation": {
+                                            "type": "string",
+                                            "enum": [
+                                              "asListed",
+                                              "raw",
+                                              "boiled",
+                                              "steamed",
+                                              "baked",
+                                              "fried"
+                                            ]
+                                          },
+                                          "isSalt": {
+                                            "type": "boolean"
+                                          }
+                                        },
+                                        "required": [
+                                          "ref",
+                                          "name",
+                                          "grams",
+                                          "preparation"
+                                        ]
+                                      }
                                     }
                                   },
                                   "required": [
@@ -794,6 +910,10 @@
                     },
                     "cookingPreferences": {
                       "type": "string"
+                    },
+                    "potGrams": {
+                      "type": "number",
+                      "exclusiveMinimum": 0
                     }
                   },
                   "required": [
@@ -1005,6 +1125,10 @@
                       "fluoridated"
                     ]
                   },
+                  "potGrams": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
                   "createdAt": {
                     "type": "number"
                   },
@@ -1185,6 +1309,122 @@
                       "portions",
                       "ingredients"
                     ]
+                  },
+                  "recipeIngredients": {
+                    "description": "The recipe's ingredients when this pot was made differently (recipe.ingredients is what went in)",
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "ref": {
+                          "oneOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "source": {
+                                  "type": "string",
+                                  "const": "BLS"
+                                },
+                                "version": {
+                                  "type": "string"
+                                },
+                                "code": {
+                                  "type": "string",
+                                  "pattern": "^[A-Z][0-9A-Z]{6}$"
+                                }
+                              },
+                              "required": [
+                                "source",
+                                "version",
+                                "code"
+                              ]
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "source": {
+                                  "type": "string",
+                                  "const": "custom"
+                                },
+                                "id": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "source",
+                                "id"
+                              ]
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "source": {
+                                  "type": "string",
+                                  "const": "OFF"
+                                },
+                                "code": {
+                                  "type": "string",
+                                  "pattern": "^\\d{4,14}$"
+                                }
+                              },
+                              "required": [
+                                "source",
+                                "code"
+                              ]
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "source": {
+                                  "type": "string",
+                                  "const": "USDA"
+                                },
+                                "code": {
+                                  "type": "string",
+                                  "pattern": "^\\d{1,10}$"
+                                }
+                              },
+                              "required": [
+                                "source",
+                                "code"
+                              ]
+                            }
+                          ]
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "grams": {
+                          "type": "number",
+                          "exclusiveMinimum": 0
+                        },
+                        "preparation": {
+                          "type": "string",
+                          "enum": [
+                            "asListed",
+                            "raw",
+                            "boiled",
+                            "steamed",
+                            "baked",
+                            "fried"
+                          ]
+                        },
+                        "isSalt": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "ref",
+                        "name",
+                        "grams",
+                        "preparation"
+                      ]
+                    }
+                  },
+                  "cookedGrams": {
+                    "description": "Weight of the cooked food without the pot, in grams",
+                    "type": "number",
+                    "exclusiveMinimum": 0
                   },
                   "cookedDay": {
                     "type": "string",
@@ -1480,7 +1720,123 @@
                       },
                       "portions": {
                         "type": "number",
+                        "minimum": 0
+                      },
+                      "grams": {
+                        "description": "Grams eaten of the batch's cooked weight; sets the nutrients instead of portions",
+                        "type": "number",
                         "exclusiveMinimum": 0
+                      },
+                      "ingredients": {
+                        "description": "This serving's ingredients when it differed from the pot, in grams for the whole pot",
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "ref": {
+                              "oneOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "source": {
+                                      "type": "string",
+                                      "const": "BLS"
+                                    },
+                                    "version": {
+                                      "type": "string"
+                                    },
+                                    "code": {
+                                      "type": "string",
+                                      "pattern": "^[A-Z][0-9A-Z]{6}$"
+                                    }
+                                  },
+                                  "required": [
+                                    "source",
+                                    "version",
+                                    "code"
+                                  ]
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "source": {
+                                      "type": "string",
+                                      "const": "custom"
+                                    },
+                                    "id": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "source",
+                                    "id"
+                                  ]
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "source": {
+                                      "type": "string",
+                                      "const": "OFF"
+                                    },
+                                    "code": {
+                                      "type": "string",
+                                      "pattern": "^\\d{4,14}$"
+                                    }
+                                  },
+                                  "required": [
+                                    "source",
+                                    "code"
+                                  ]
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "source": {
+                                      "type": "string",
+                                      "const": "USDA"
+                                    },
+                                    "code": {
+                                      "type": "string",
+                                      "pattern": "^\\d{1,10}$"
+                                    }
+                                  },
+                                  "required": [
+                                    "source",
+                                    "code"
+                                  ]
+                                }
+                              ]
+                            },
+                            "name": {
+                              "type": "string"
+                            },
+                            "grams": {
+                              "type": "number",
+                              "exclusiveMinimum": 0
+                            },
+                            "preparation": {
+                              "type": "string",
+                              "enum": [
+                                "asListed",
+                                "raw",
+                                "boiled",
+                                "steamed",
+                                "baked",
+                                "fried"
+                              ]
+                            },
+                            "isSalt": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "ref",
+                            "name",
+                            "grams",
+                            "preparation"
+                          ]
+                        }
                       }
                     },
                     "required": [

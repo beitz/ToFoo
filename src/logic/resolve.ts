@@ -5,6 +5,7 @@ import type { Food, FoodDb } from '../foods/foodDb';
 import { ALL_SALT_CODES, saltCode } from '../foods/foodDb';
 import { productFood } from '../foods/products';
 import { refKey } from '../lib/refs';
+import { potShare, servingIngredients } from './batch';
 import { addDays, dayRange, parseDay, utcOffsetHours } from '../lib/dates';
 import { sun as sunParams } from '../../model/parameters';
 import type { Range } from '../model/paramTypes';
@@ -55,14 +56,14 @@ function partFromFood(food: Food, grams: number, preparation: FoodPart['preparat
   };
 }
 
-/** Parts for one portion (or fraction) of a batch. */
-export function batchParts(batch: Batch, portions: number, storage: FoodPart['storage'], ctx: ResolveContext): FoodPart[] {
+/** Parts for a share of a batch's pot (1 / portions for one portion), of its ingredients or a serving's changed ones. */
+export function batchParts(batch: Batch, share: number, storage: FoodPart['storage'], ctx: ResolveContext, ingredients: readonly Ingredient[] = batch.recipe.ingredients): FoodPart[] {
   const parts: FoodPart[] = [];
   const saltCtx = batch.recipe.saltOverride ? { ...ctx, salt: batch.recipe.saltOverride } : ctx;
-  for (const ing of batch.recipe.ingredients) {
+  for (const ing of ingredients) {
     const food = ingredientFood(ing, saltCtx);
     if (!food) continue;
-    parts.push(partFromFood(food, (ing.grams / batch.recipe.portions) * portions, ing.preparation, storage));
+    parts.push(partFromFood(food, ing.grams * share, ing.preparation, storage));
   }
   return parts;
 }
@@ -79,7 +80,7 @@ export function resolveEntry(e: LogEntry, ctx: ResolveContext): ModelEntry | nul
     case 'portion': {
       const batch = ctx.batches.get(e.batchId);
       if (!batch) return null;
-      return { ...base, isSupplement: false, parts: batchParts(batch, e.portions, e.storage, ctx) };
+      return { ...base, isSupplement: false, parts: batchParts(batch, potShare(e, batch), e.storage, ctx, servingIngredients(e, batch)) };
     }
     case 'custom': {
       const cf = ctx.customFoods.get(e.customFoodId);

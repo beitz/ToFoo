@@ -34,6 +34,8 @@ export function IngredientSheet({
   initial,
   label,
   startWith = 'edit',
+  gramsLabel,
+  addLabel,
   onSave,
   onRemove,
   onClose,
@@ -42,6 +44,10 @@ export function IngredientSheet({
   /** Shown when the food is missing (the name the ingredient was saved with). */
   label?: string;
   startWith?: 'edit' | 'pick';
+  /** The amount field's label; default "grams in the recipe". */
+  gramsLabel?: string;
+  /** The button's label for a new ingredient; default "Add to recipe". */
+  addLabel?: string;
   onSave: (i: SavedIngredient) => void;
   onRemove?: () => void;
   onClose: () => void;
@@ -111,7 +117,7 @@ export function IngredientSheet({
           <button className="btn btn-secondary btn-block" onClick={() => setMode('pick')}>
             <Icon name="search" /> {t('edit.changeFood')}
           </button>
-          <Field label={t('recipes.gramsInRecipe')}>
+          <Field label={gramsLabel ?? t('recipes.gramsInRecipe')}>
             {(id) => <NumberInput id={id} value={grams} onChange={setGrams} placeholder="0" suffix={productDraft?.perMl ? 'ml' : 'g'} min={0} autoFocus={!grams} />}
           </Field>
           {productDraft && <MatchPicker key={productDraft.id} product={productDraft} match={match} onChange={setMatch} />}
@@ -123,7 +129,7 @@ export function IngredientSheet({
               </button>
             )}
             <button className="btn btn-primary" disabled={!valid} onClick={() => void save()}>
-              {t(onRemove ? 'common.save' : 'recipes.addToRecipe')}
+              {onRemove ? t('common.save') : (addLabel ?? t('recipes.addToRecipe'))}
             </button>
           </div>
         </>

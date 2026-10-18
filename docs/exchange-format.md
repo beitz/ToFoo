@@ -50,12 +50,14 @@ Water (`data.water[]`): `id`, `schemaVersion`, `time` (epoch ms it was drunk), `
 
 Products (`data.products[]`) are foods from online databases as fetched: Open Food Facts products (data licence ODbL) and USDA FoodData Central foods (public domain). Fields: `id` (`OFF:<barcode>` or `USDA:<fdcId>`), `source` (`"OFF"` or `"USDA"`), `code` (barcode or FoodData Central id), `usdaType` (USDA only: `Foundation`, `SR Legacy`, `Survey (FNDDS)` or `Branded`), `name`, optional `brand`, `quantity`, `serving` (`{ label, grams }`), `per100` (values per 100 g, or per 100 ml if `perMl`, by BLS component code in BLS units: label values, or the USDA database values for USDA generic foods; a nutrient without a value is absent, not 0), `categories`, optional `lastModified`, `fetchedAt`, and optional `match` (`{ version, code }`: the BLS food whose values fill in what the source lacks).
 
+Batches (`data.batches[]`) carry a copy of the recipe as cooked (`recipe`: name, portions, ingredients, optional salt), `cookedDay`, `cookedAt`, `plan`, `remaining` and `corrections`; since 2026-10-18 also optional `cookedGrams` (the cooked food's weight without the pot) and `recipeIngredients` (the recipe's own ingredients, present only when this pot was made differently; `recipe.ingredients` is what went in). Recipes and settings may carry `potGrams`, the empty pot's weight last weighed.
+
 Log entries (`data.log[]`) have `id`, `time` (epoch ms), `day` (local `YYYY-MM-DD`), `confidence`, `label` and a `kind`:
 
 | kind | fields |
 | --- | --- |
 | `food` | `ref` (food reference), `grams`, `preparation` |
-| `portion` | `batchId`, `storage` (`fresh` / `fridge` / `freezer`), `portions` |
+| `portion` | `batchId`, `storage` (`fresh` / `fridge` / `freezer`), `portions` (taken from stock; may be 0 for some eaten by weight), optional `grams` (eaten of the batch's `cookedGrams`; then it sets the nutrients), optional `ingredients` (this serving's ingredients when it differed from the pot, in grams for the whole pot) |
 | `custom` | `customFoodId`, `servings` |
 | `manual` | `nutrients` (absolute amounts), `isSupplement` |
 | `drink` | `drink`: `tea` or `coffee` (meal modifier for iron absorption) |

@@ -7,17 +7,25 @@ import { refKey } from '../../lib/refs';
 import type { Food } from '../../foods/foodDb';
 import { productFood, productLabel, productRef } from '../../foods/products';
 import { canReplaceFood, completeDraft, replaceFood, type EntryDraft } from '../../logic/editEntry';
-import type { Storage } from '../../model/paramTypes';
 import { repo } from '../../storage/repo';
 import type { LogEntry, Product } from '../../storage/types';
-import { Field, NumberInput, Segmented, Sheet } from '../../ui/controls';
+import { Field, NumberInput, Sheet } from '../../ui/controls';
 import { Icon } from '../../ui/Icon';
 import { BarcodeSheet } from '../log/BarcodeSheet';
 import { ConfidenceField } from '../log/ConfidenceField';
 import { FoodPicker, type PickedFood } from '../log/FoodPicker';
 import { PreparationSelect } from '../log/PreparationSelect';
+import { PortionFields, portionDraftValid, type PortionDraft } from '../log/PortionFields';
 import { MatchPicker, ProductInfo } from '../log/ProductParts';
 import { TimeField } from '../log/TimeField';
+
+/** A portion entry with changed fields; a field set to undefined is left out (not stored as undefined). */
+function withPortion<E extends PortionDraft>(e: E, patch: Partial<PortionDraft>): E {
+  const next = { ...e, ...patch };
+  if (next.grams === undefined) delete next.grams;
+  if (next.ingredients === undefined) delete next.ingredients;
+  return next;
+}
 
 /** Change a logged entry: amount, time, confidence, and for foods the food itself (search or barcode). */
 export function EditEntrySheet({ entry, onClose }: { entry: LogEntry; onClose: () => void }) {
@@ -40,7 +48,8 @@ export function EditEntrySheet({ entry, onClose }: { entry: LogEntry; onClose: (
   const replaced = draft.kind === 'food' && (entry.kind !== 'food' || refKey(draft.ref) !== refKey(entry.ref));
   // A product with no label values and no matched food would count nothing but a name.
   const hasValues = !productDraft || Object.keys(productDraft.per100).length > 0 || !!match;
-  const finished = completeDraft(draft);
+  const batch = draft.kind === 'portion' ? d.batchesById.get(draft.batchId) : undefined;
+  const finished = draft.kind === 'portion' && batch && !portionDraftValid(draft, batch) ? undefined : completeDraft(draft);
 
   /** The BLS food behind the old entry: a good first guess for a product's missing vitamins and minerals. */
   function oldFood(): Food | undefined {
@@ -120,24 +129,7 @@ export function EditEntrySheet({ entry, onClose }: { entry: LogEntry; onClose: (
               <PreparationSelect value={draft.preparation} onChange={(p) => set({ preparation: p })} />
             </>
           )}
-          {draft.kind === 'portion' && (
-            <>
-              <Field label={t('diary.portions')}>{(id) => <NumberInput id={id} value={draft.portions} onChange={(v) => v && set({ portions: v })} min={0} />}</Field>
-              <div className="field">
-                <span className="field-label">{t('diary.storage')}</span>
-                <Segmented<Storage>
-                  label={t('diary.storage')}
-                  value={draft.storage}
-                  onChange={(s) => set({ storage: s })}
-                  options={[
-                    { value: 'fresh', label: t('storage.fresh') },
-                    { value: 'fridge', label: t('storage.fridge') },
-                    { value: 'freezer', label: t('storage.freezer') },
-                  ]}
-                />
-              </div>
-            </>
-          )}
+          {draft.kind === 'portion' && batch && <PortionFields batch={batch} value={draft} onChange={(patch) => setDraft((e) => (e.kind === 'portion' ? withPortion(e, patch) : e))} />}
           {draft.kind === 'custom' && (
             <Field label={t('diary.servings')}>{(id) => <NumberInput id={id} value={draft.servings} onChange={(v) => v && set({ servings: v })} min={0} />}</Field>
           )}

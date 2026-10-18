@@ -49,6 +49,7 @@ import { IngredientSheet } from '../recipes/IngredientSheet';
 import { ActivityForm, activityName, DEFAULT_ACTIVITY_SKIN, recordOf, type ActivityDraft } from '../activity/ActivityForm';
 import { cardId, cardOf, cardTitle, useRegister, type Card, type CardProps, type RecipeChat, type Saver, type Undo } from './cards';
 import { RecipeCard } from './RecipeCard';
+import { BatchCard, PortionCard } from './BatchCards';
 import { Pages, type DictationTarget } from './Pages';
 import { refKey } from '../../lib/refs';
 import { itemIngredient } from '../../logic/ingredients';
@@ -363,6 +364,8 @@ function Chat({ apiKey, model, day, recipe }: { apiKey: string; model: AiModel; 
         ...outcome.waters.map((w): Card => ({ kind: 'water', water: w, logged: false })),
         ...outcome.ingredients.map((r): Card => ({ kind: 'ingredients', ingredients: r, logged: false })),
         ...outcome.recipes.map((r): Card => ({ kind: 'recipe', recipe: r, logged: false })),
+        ...outcome.portions.map((p): Card => ({ kind: 'portion', portion: p, logged: false })),
+        ...outcome.batches.map((b): Card => ({ kind: 'batch', batch: b, logged: false })),
       ];
       // In the order the assistant proposed them, so a day reads in order and related cards sit together.
       const rank = (c: Card) => outcome.order.indexOf(cardId(c));
@@ -734,6 +737,8 @@ function CardView({ card, ...rest }: CardProps<Card>) {
   if (card.kind === 'water') return <WaterProposalCard card={card} {...rest} />;
   if (card.kind === 'ingredients') return <IngredientsCard card={card} {...rest} />;
   if (card.kind === 'recipe') return <RecipeCard card={card} {...rest} />;
+  if (card.kind === 'portion') return <PortionCard card={card} {...rest} />;
+  if (card.kind === 'batch') return <BatchCard card={card} {...rest} />;
   return <NoteCard card={card} {...rest} />;
 }
 

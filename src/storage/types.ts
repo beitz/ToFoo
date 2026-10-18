@@ -122,6 +122,8 @@ export interface Settings extends Versioned {
   logCollapsed?: Record<string, boolean>;
   /** Recipe ideas: diet, likes, kitchen, time, batch size, in the user's words (guidance for the assistant, not a filter). */
   cookingPreferences?: string;
+  /** Weight of the empty pot last weighed (g), offered when the next pot is weighed. */
+  potGrams?: number;
 }
 
 /**
@@ -163,6 +165,8 @@ export interface Recipe extends Versioned {
   tags: string[];
   defaultPlan?: StoragePlan;
   saltOverride?: { iodised: boolean; fluoridated: boolean };
+  /** Weight of the empty pot this recipe was last cooked in (g), offered when its next pot is weighed. */
+  potGrams?: number;
   createdAt: number;
   updatedAt: number;
   archived?: boolean;
@@ -171,8 +175,15 @@ export interface Recipe extends Versioned {
 export interface Batch extends Versioned {
   id: string;
   recipeId: string;
-  /** Copy of the recipe at cooking time, so later edits do not change history. */
+  /**
+   * Copy of the recipe at cooking time, so later edits do not change history. Its ingredients are
+   * what went into this pot, which may differ from the recipe ("this pot had tofu").
+   */
   recipe: { name: string; portions: number; ingredients: Ingredient[]; saltOverride?: { iodised: boolean; fluoridated: boolean } };
+  /** The recipe's own ingredients, kept only when this pot was made differently (to show what changed). */
+  recipeIngredients?: Ingredient[];
+  /** Weight of the cooked food in the pot (g, without the pot), so portions can be logged by grams. */
+  cookedGrams?: number;
   cookedDay: string;
   cookedAt: number;
   plan: { fresh: number; fridge: number; freezer: number };
@@ -192,7 +203,20 @@ interface LogBase extends Versioned {
 
 export type LogEntry =
   | (LogBase & { kind: 'food'; ref: FoodRef; grams: number; preparation: Preparation })
-  | (LogBase & { kind: 'portion'; batchId: string; storage: Storage; portions: number })
+  | (LogBase & {
+      kind: 'portion';
+      batchId: string;
+      storage: Storage;
+      /** Portions taken from stock (may be 0 when some was eaten straight from the pot by weight). */
+      portions: number;
+      /** Amount eaten by weight (g of the batch's cooked weight); then it, not `portions`, sets the nutrients. */
+      grams?: number;
+      /**
+       * This serving's ingredients when it differed from the pot ("150 g tofu instead of 200 g beef"),
+       * in grams for the whole pot like the batch's, so they scale with the amount eaten.
+       */
+      ingredients?: Ingredient[];
+    })
   | (LogBase & { kind: 'custom'; customFoodId: string; servings: number })
   | (LogBase & { kind: 'manual'; nutrients: Record<string, number>; isSupplement: boolean })
   | (LogBase & { kind: 'drink'; drink: 'tea' | 'coffee' });
