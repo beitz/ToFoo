@@ -37,6 +37,23 @@ const ingredient = z.object({
 
 const versioned = { schemaVersion: z.number().int().nonnegative() };
 
+// A pinned meal's items: log entries without id, time and day; offsetMinutes = minutes before the meal's last item.
+const mealItemBase = { confidence, label: z.string(), offsetMinutes: z.number().int().nonnegative() };
+const favouriteMeal = z.object({
+  id: z.string(),
+  items: z
+    .array(
+      z.discriminatedUnion('kind', [
+        z.object({ ...mealItemBase, kind: z.literal('food'), ref: foodRef, grams: z.number().positive(), preparation }),
+        z.object({ ...mealItemBase, kind: z.literal('portion'), batchId: z.string(), storage: storageKind, portions: z.number().positive() }),
+        z.object({ ...mealItemBase, kind: z.literal('custom'), customFoodId: z.string(), servings: z.number().positive() }),
+        z.object({ ...mealItemBase, kind: z.literal('manual'), nutrients, isSupplement: z.boolean() }),
+        z.object({ ...mealItemBase, kind: z.literal('drink'), drink: z.enum(['tea', 'coffee']) }),
+      ]),
+    )
+    .min(1),
+});
+
 // ── Stored records (backup) ──
 
 export const profileSchema = z.object({
@@ -78,6 +95,8 @@ export const settingsSchema = z.object({
   homeGrouping: z.enum(['status', 'type', 'none']).optional(),
   homeCollapsed: z.record(z.string(), z.boolean()).optional(),
   favourites: z.array(foodRef).optional(),
+  favouriteMeals: z.array(favouriteMeal).optional(),
+  logCollapsed: z.record(z.string(), z.boolean()).optional(),
 });
 
 export const recipeRecordSchema = z.object({

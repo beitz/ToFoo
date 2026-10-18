@@ -8,7 +8,20 @@ import type { Snapshot } from '../storage/repo';
 
 const snapshot: Snapshot = {
   profile: defaultProfile('2026-10-15'),
-  settings: { ...defaultSettings(), favourites: [{ source: 'BLS', version: '4.0', code: 'C133000' }, { source: 'OFF', code: '8000500319475' }] },
+  settings: {
+    ...defaultSettings(),
+    favourites: [{ source: 'BLS', version: '4.0', code: 'C133000' }, { source: 'OFF', code: '8000500319475' }],
+    favouriteMeals: [
+      {
+        id: 'm1',
+        items: [
+          { kind: 'food', ref: { source: 'BLS', version: '4.0', code: 'C133000' }, grams: 60, preparation: 'asListed', confidence: 'A', label: 'Oats', offsetMinutes: 0 },
+          { kind: 'drink', drink: 'coffee', confidence: 'A', label: 'Coffee', offsetMinutes: 0 },
+        ],
+      },
+    ],
+    logCollapsed: { saved: true },
+  },
   recipes: [],
   batches: [],
   log: [

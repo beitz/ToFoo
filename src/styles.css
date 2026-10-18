@@ -1007,6 +1007,29 @@ textarea:focus-visible,
 .fav-btn.on {
   color: var(--accent);
 }
+/* Log screen sections: the heading is the toggle, so sections sit closer than page section titles. */
+.log-section {
+  margin-top: 10px;
+}
+.log-section > div {
+  padding-top: 4px;
+}
+.fav-row {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+}
+.fav-row .result {
+  flex: 1;
+  min-width: 0;
+  border-bottom: none;
+}
+.fav-star {
+  color: var(--text-muted);
+}
+.fav-star.on {
+  color: var(--accent);
+}
 .entry-row {
   display: grid;
   grid-template-columns: 1fr;
@@ -1815,7 +1838,8 @@ body:has(.composer) .toast-area {
 .home-group {
   margin-bottom: 6px;
 }
-.home-group-head {
+.home-group-head,
+.fold-head {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1830,14 +1854,17 @@ body:has(.composer) .toast-area {
   text-align: left;
   cursor: pointer;
 }
-.home-group-head:focus-visible {
+.home-group-head:focus-visible,
+.fold-head:focus-visible {
   outline: 3px solid var(--accent);
   outline-offset: 1px;
 }
-.home-group-title {
+.home-group-title,
+.fold-title {
   font-weight: 700;
 }
-.home-group-count {
+.home-group-count,
+.fold-count {
   font-weight: 400;
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
