@@ -197,6 +197,7 @@ export const en = {
   'fav.pinMeal': 'Add this meal to favourites: {name}',
   'fav.unpinMeal': 'Remove this meal from favourites: {name}',
   'fav.unpin': 'Remove from favourites: {name}',
+  'fav.pin': 'Add to favourites: {name}',
   'fav.mealPinned': 'Meal added to favourites.',
   'fav.mealRemoved': 'Meal removed from favourites.',
   'fav.removed': 'Removed from favourites: {name}.',

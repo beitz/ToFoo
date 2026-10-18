@@ -6,6 +6,7 @@ import { search } from '../../foods/search';
 import { isOn } from '../../settings/features';
 import type { Product } from '../../storage/types';
 import { Icon } from '../../ui/Icon';
+import { refKey } from '../../lib/refs';
 import { FoodList } from './FoodList';
 import { ProductList } from './ProductList';
 import { UsdaResults } from './UsdaResults';
@@ -29,19 +30,34 @@ export function FoodPicker({ onPick, onScan, onCancel }: { onPick: (p: PickedFoo
     () => (q ? search(d.searchIndex, q, { limit: 30, recent: d.recentFoods, boost: d.searchBoost }).map((r) => d.foods.byCode.get(r.key)).filter((f): f is Food => !!f) : []),
     [q, d.searchIndex, d.recentFoods, d.searchBoost, d.foods],
   );
+  // Pinned foods and products first: what is at home is usually what goes in. Saved items are no food in grams.
+  const favourites = useMemo(() => {
+    const foods: Food[] = [];
+    const products: Product[] = [];
+    for (const ref of d.settings.favourites ?? []) {
+      if (ref.source === 'BLS') {
+        const food = d.foods.byCode.get(ref.code);
+        if (food) foods.push(food);
+      } else if (ref.source === 'OFF' || ref.source === 'USDA') {
+        const product = d.productsById.get(refKey(ref));
+        if (product) products.push(product);
+      }
+    }
+    return { foods, products };
+  }, [d.settings.favourites, d.foods, d.productsById]);
   const products = useMemo(() => {
-    if (!q) return d.products.slice(0, SUGGESTIONS);
+    if (!q) return d.products.filter((p) => !favourites.products.includes(p)).slice(0, SUGGESTIONS);
     const lower = q.toLowerCase();
     return d.products.filter((p) => `${p.name} ${p.brand ?? ''} ${p.code}`.toLowerCase().includes(lower));
-  }, [q, d.products]);
+  }, [q, d.products, favourites]);
   const recent = useMemo(
     () =>
       [...d.recentFoods.entries()]
-        .filter(([, v]) => v > 0.3)
+        .filter(([code, v]) => v > 0.3 && !favourites.foods.some((f) => f.code === code))
         .slice(0, SUGGESTIONS)
         .map(([code]) => d.foods.byCode.get(code))
         .filter((f): f is Food => !!f),
-    [d.recentFoods, d.foods],
+    [d.recentFoods, d.foods, favourites],
   );
 
   return (
@@ -64,10 +80,19 @@ export function FoodPicker({ onPick, onScan, onCancel }: { onPick: (p: PickedFoo
         )}
       </div>
       {!q && offOn && <p className="muted small">{t('edit.scanHint')}</p>}
+      {!q && favourites.foods.length + favourites.products.length > 0 && (
+        <>
+          <h3 className="section-title">
+            <Icon name="star" size={16} filled /> {t('log.favourites')}
+          </h3>
+          <ProductList pinnable products={favourites.products} onPick={(product) => onPick({ product })} />
+          <FoodList foods={favourites.foods} onPick={(food) => onPick({ food })} />
+        </>
+      )}
       {(offOn || usdaOn) && products.length > 0 && (
         <>
           {!q && <h3 className="section-title">{t(usdaOn ? 'products.saved' : 'off.products')}</h3>}
-          <ProductList products={products} onPick={(product) => onPick({ product })} />
+          <ProductList pinnable products={products} onPick={(product) => onPick({ product })} />
         </>
       )}
       {!q && recent.length > 0 && (

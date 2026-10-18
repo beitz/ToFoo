@@ -26,6 +26,7 @@ import { logMealAgain, mealTitle } from './logAgain';
 import { favouriteAsMeal, favouriteFromMeal, mealSignature, recentMeals } from '../../logic/repeat';
 import { newId } from '../../lib/id';
 import { LogSection } from './LogSection';
+import { FavouriteStar } from './FavouriteButton';
 import { refKey } from '../../lib/refs';
 import { WaterSheet } from '../water/WaterSheet';
 
@@ -262,6 +263,31 @@ export function LogPage({ day: dayParam, foodCode }: { day?: string; foodCode?: 
             )}
           </LogSection>
 
+          {stock.length > 0 && (
+            <LogSection id="stock" title={t('stock.title')} count={stock.length}>
+              <div className="chips">
+                {stock.map((b) => {
+                  const s = nextStorage(b, day);
+                  return (
+                    <button
+                      key={b.id}
+                      className="chip"
+                      disabled={!s}
+                      onClick={async () => {
+                        if (!s) return;
+                        await logPortion(b, s, toast, mealTime);
+                        navigate();
+                      }}
+                    >
+                      <Icon name={s === 'freezer' ? 'snow' : s === 'fridge' ? 'fridge' : 'pot'} size={16} />
+                      {b.recipe.name} · {t('stock.left', { n: totalLeft(b) })}
+                    </button>
+                  );
+                })}
+              </div>
+            </LogSection>
+          )}
+
           {pastMeals.length > 0 && (
             <LogSection id="recentMeals" title={t('log.recentMeals')} count={pastMeals.length}>
               <ul className="result-list">
@@ -300,30 +326,6 @@ export function LogPage({ day: dayParam, foodCode }: { day?: string; foodCode?: 
             </LogSection>
           )}
 
-          {stock.length > 0 && (
-            <LogSection id="stock" title={t('stock.title')} count={stock.length}>
-              <div className="chips">
-                {stock.map((b) => {
-                  const s = nextStorage(b, day);
-                  return (
-                    <button
-                      key={b.id}
-                      className="chip"
-                      disabled={!s}
-                      onClick={async () => {
-                        if (!s) return;
-                        await logPortion(b, s, toast, mealTime);
-                        navigate();
-                      }}
-                    >
-                      <Icon name={s === 'freezer' ? 'snow' : s === 'fridge' ? 'fridge' : 'pot'} size={16} />
-                      {b.recipe.name} · {t('stock.left', { n: totalLeft(b) })}
-                    </button>
-                  );
-                })}
-              </div>
-            </LogSection>
-          )}
 
           <LogSection id="quickAdd" title={t('log.quickAdd')}>
             <div className="quick-actions">
@@ -353,13 +355,14 @@ export function LogPage({ day: dayParam, foodCode }: { day?: string; foodCode?: 
             <LogSection id="saved" title={t('log.saved')} count={d.customFoods.length}>
               <ul className="result-list">
                 {d.customFoods.map((c) => (
-                  <li key={c.id}>
+                  <li key={c.id} className="fav-row">
                     <button className="result" onClick={() => setSelected({ kind: 'custom', food: c })}>
                       <span className="result-name">
                         {c.isSupplement && <Icon name="pill" size={14} />} {c.name}
                       </span>
                       <span className="muted small">{c.servingLabel}</span>
                     </button>
+                    <FavouriteStar foodRef={{ source: 'custom', id: c.id }} name={c.name} />
                   </li>
                 ))}
               </ul>
@@ -368,7 +371,7 @@ export function LogPage({ day: dayParam, foodCode }: { day?: string; foodCode?: 
 
           {(offOn || usdaOn) && d.products.length > 0 && (
             <LogSection id="products" title={t(usdaOn ? 'products.saved' : 'off.products')}>
-              <ProductList products={d.products.slice(0, RECENT_PRODUCTS)} onPick={(product) => setSelected({ kind: 'product', product })} />
+              <ProductList pinnable products={d.products.slice(0, RECENT_PRODUCTS)} onPick={(product) => setSelected({ kind: 'product', product })} />
             </LogSection>
           )}
 
@@ -390,7 +393,7 @@ export function LogPage({ day: dayParam, foodCode }: { day?: string; foodCode?: 
               ))}
             </ul>
           )}
-          {productMatches.length > 0 && <ProductList products={productMatches} onPick={(product) => setSelected({ kind: 'product', product })} />}
+          {productMatches.length > 0 && <ProductList pinnable products={productMatches} onPick={(product) => setSelected({ kind: 'product', product })} />}
           <FoodList foods={results.map((r) => d.foods.byCode.get(r.key)!).filter(Boolean)} onPick={(food) => setSelected({ kind: 'food', food })} />
           {results.length === 0 && customMatches.length === 0 && productMatches.length === 0 && (
             <div className="empty">
