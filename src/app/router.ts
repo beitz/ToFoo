@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { onLayerEntry } from './history';
 
 /**
  * Minimal hash router: routes look like `#/recipes/abc`. Hash routing works on GitHub Pages
@@ -29,5 +30,7 @@ export function href(...parts: string[]): string {
 }
 
 export function navigate(...parts: string[]): void {
-  window.location.hash = href(...parts);
+  // From a sheet's own history entry, replace it: back from the new page should not land on it.
+  if (onLayerEntry()) window.location.replace(href(...parts));
+  else window.location.hash = href(...parts);
 }

@@ -1,4 +1,5 @@
 import { useEffect, useId, useState, type ReactNode } from 'react';
+import { useBackCloses } from '../app/history';
 
 export function Field({ label, hint, children }: { label: string; hint?: ReactNode; children: (id: string) => ReactNode }) {
   const id = useId();
@@ -85,6 +86,7 @@ export function Toggle({ checked, onChange, label, description, disabled }: { ch
 }
 
 export function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+  useBackCloses(true, onClose);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
     window.addEventListener('keydown', onKey);

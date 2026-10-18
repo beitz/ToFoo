@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { useData } from '../../app/data';
-import { closeView, useBackCloses } from '../../app/history';
+import { useBackCloses } from '../../app/history';
 import { href, navigate } from '../../app/router';
 import { t } from '../../i18n';
 import { productFood, productLabel } from '../../foods/products';
@@ -15,7 +15,7 @@ import { RecipeAssistant, type RecipeChat } from '../assistant/AssistantPage';
 import { BarcodeSheet } from '../log/BarcodeSheet';
 import type { PickedFood } from '../log/FoodPicker';
 import { PreparationSelect } from '../log/PreparationSelect';
-import { productTag } from '../log/ProductList';
+import { SourceTag } from './SourceTag';
 import { IngredientSearch } from './IngredientSearch';
 import { PortionNutrients } from './PortionNutrients';
 import { PlanEditor } from './PlanEditor';
@@ -45,11 +45,12 @@ export function RecipeEditor({ id }: { id?: string }) {
   const openRef = useRef(assistantOpen);
   openRef.current = assistantOpen;
   const assistantOn = isOn(d.settings.features, 'aiAssistant');
-  useBackCloses(assistantOpen, () => {
+  function closeAssistant() {
     setAssistantOpen(false);
     // Back at the form: show the ingredients, where the assistant's additions landed.
     requestAnimationFrame(() => ingredientsRef.current?.scrollIntoView?.({ block: 'start' }));
-  });
+  }
+  useBackCloses(assistantOpen, closeAssistant);
 
   function openAssistant() {
     setAssistantStarted(true);
@@ -97,7 +98,7 @@ export function RecipeEditor({ id }: { id?: string }) {
     const match = product.match ? d.foods.byCode.get(product.match.code) : undefined;
     return {
       name: productLabel(product),
-      detail: match ? `${productTag(product)} · ${t('recipes.microsFrom', { name: match.nameEn })}` : productTag(product),
+      detail: match ? t('recipes.microsFromLine', { name: match.nameEn }) : '',
     };
   }
 
@@ -130,7 +131,7 @@ export function RecipeEditor({ id }: { id?: string }) {
       };
     },
     // Only while the chat is shown: going back otherwise would leave the editor.
-    done: () => openRef.current && closeView(),
+    done: () => openRef.current && closeAssistant(),
   }));
   const describeRef = useRef(describe);
   describeRef.current = describe;
@@ -182,7 +183,7 @@ export function RecipeEditor({ id }: { id?: string }) {
 
   const assistant = assistantStarted && (
     <div hidden={!assistantOpen}>
-      <RecipeAssistant recipe={recipeChat} onClose={closeView} />
+      <RecipeAssistant recipe={recipeChat} onClose={closeAssistant} />
     </div>
   );
 
@@ -215,7 +216,9 @@ export function RecipeEditor({ id }: { id?: string }) {
                     <strong>
                       {ingName} <Icon name="edit" size={14} />
                     </strong>
-                    <span className="muted small block">{detail}</span>
+                    <span className="muted small block">
+                      {!ing.isSalt && <SourceTag source={ing.ref.source} product={d.productsById.get(refKey(ing.ref))} />} {detail}
+                    </span>
                   </button>
                   <div className="row">
                     <button className="icon-btn" onClick={() => move(i, -1)} aria-label={t('recipes.moveUp')} disabled={i === 0}>

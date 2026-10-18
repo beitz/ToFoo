@@ -13,6 +13,8 @@ import { Icon } from '../../ui/Icon';
 import { prepLabel } from '../log/PreparationSelect';
 import { PlanEditor } from './PlanEditor';
 import { PortionNutrients } from './PortionNutrients';
+import { SourceTag } from './SourceTag';
+import { refKey } from '../../lib/refs';
 
 export function RecipeView({ id }: { id: string }) {
   const d = useData();
@@ -62,6 +64,12 @@ export function RecipeView({ id }: { id: string }) {
             <li key={i} className="row-between ingredient-line">
               <span>
                 {ing.isSalt ? t('recipes.salt') : (food?.nameEn ?? ing.name)}
+                {!ing.isSalt && (
+                  <>
+                    {' '}
+                    <SourceTag source={ing.ref.source} product={d.productsById.get(refKey(ing.ref))} />
+                  </>
+                )}
                 {ing.preparation !== 'asListed' && <span className="muted small"> · {prepLabel(ing.preparation)}</span>}
               </span>
               <span className="muted">{fmtGrams(ing.grams)}</span>
