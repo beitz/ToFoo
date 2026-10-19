@@ -1163,7 +1163,7 @@ export const en = {
   'chats.shared': 'Chat shared.',
   'chats.downloaded': 'Chat saved as a file.',
   'chats.missing': 'This chat is no longer saved.',
-  'chats.exportFailed': 'Could not export the chat.',
+  'chats.exportFailed': 'Could not export the chat: {detail}',
   'about.version': 'App version',
   'about.dataVersion': 'Food database',
 } as const;

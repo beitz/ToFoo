@@ -1,6 +1,7 @@
 /** Browser glue for the assistant: the API client, its settings on the device, and error texts. */
 import { repo } from '../storage/repo';
 import { diag } from '../app/diagnostics';
+import { errorText } from '../lib/shareFile';
 import { dayKey } from '../lib/dates';
 import { AI_MODELS, DEFAULT_AI_MODEL, type AiModel, type CreateMessage } from './assistant';
 import { recordUsage, type ModelTokens, type UsageDay } from './pricing';
@@ -105,11 +106,6 @@ export async function describeAiError(e: unknown): Promise<AiFailure> {
   // The SDK's own complaints (e.g. a stream that ended early) versus a fault in the app's own code.
   if (e instanceof Anthropic.AnthropicError) return { kind: 'other', detail: errorText(e) };
   return { kind: 'app', detail: errorText(e) };
-}
-
-function errorText(e: unknown): string {
-  if (e instanceof Error) return e.name && e.name !== 'Error' ? `${e.name}: ${e.message}` : e.message;
-  return String(e);
 }
 
 /**

@@ -3,6 +3,8 @@ import { useToast } from '../../app/toast';
 import { href } from '../../app/router';
 import { t } from '../../i18n';
 import { exportChat, type ChatRecorder } from '../../ai/chatStore';
+import { diag } from '../../app/diagnostics';
+import { errorText } from '../../lib/shareFile';
 import { Icon } from '../../ui/Icon';
 
 /** Share a saved chat as a file and say how it went; a cancelled share says nothing. */
@@ -11,7 +13,10 @@ export async function shareChat(id: string, photos: boolean, toast: ReturnType<t
     const r = await exportChat(id, photos);
     toast(t(r === 'missing' ? 'chats.missing' : r === 'shared' ? 'chats.shared' : 'chats.downloaded'));
   } catch (e) {
-    if ((e as Error).name !== 'AbortError') toast(t('chats.exportFailed'));
+    if (e instanceof Error && e.name === 'AbortError') return;
+    // The exact cause, on screen and in the diagnostics log, so a failed export can be traced.
+    diag('chat.export', { error: errorText(e) });
+    toast(t('chats.exportFailed', { detail: errorText(e) }));
   }
 }
 

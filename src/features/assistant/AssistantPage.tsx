@@ -18,6 +18,7 @@ import {
   type TurnOutcome,
 } from '../../ai/assistant';
 import { describeAiError, getAiSettings, logAiError, makeCreate, saveUsage } from '../../ai/client';
+import { errorText } from '../../lib/shareFile';
 import { cardSummary, itemSummary, localTimes } from '../../ai/chatRecord';
 import { ChatRecorder } from '../../ai/chatStore';
 import { ChatExport } from './ChatExport';
@@ -233,7 +234,7 @@ function Chat({ apiKey, model, day, recipe }: { apiKey: string; model: AiModel; 
       // Oldest first, photos without a time last: the order the meals happened in.
       setImages((imgs) => [...imgs, ...prepared].sort((a, b) => (a.time.time ?? Infinity) - (b.time.time ?? Infinity)));
     } catch (e) {
-      const detail = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
+      const detail = errorText(e);
       logAiError('photo', model, { kind: 'photo', detail }, e);
       setError({ key: 'ai.error.photo', detail });
     }
@@ -531,7 +532,8 @@ function Chat({ apiKey, model, day, recipe }: { apiKey: string; model: AiModel; 
           </div>
         )}
         <UsageLine chat={chatTokens} turn={turnTokens} model={model} />
-        {recorder.enabled && bubbles.length > 0 && !busy && <ChatExport recorder={recorder} />}
+        {/* Also after a first message that failed: the saved chat holds the error to share. */}
+        {recorder.enabled && (bubbles.length > 0 || !!error) && !busy && <ChatExport recorder={recorder} />}
         <div ref={endRef} />
       </div>
 
