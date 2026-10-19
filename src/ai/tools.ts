@@ -64,7 +64,8 @@ export const proposalInput = z.object({
         code: z.string(),
         grams: z.number(),
         preparation: z.enum(PREPARATIONS),
-        note: z.string(),
+        // Missing is fine for tools that are not strict (see STRICT_NESTED in ./prompt.ts).
+        note: z.string().default(''),
         /** Products and USDA foods only: BLS code of the most similar food, for what the source lacks. */
         micros_from: z.string().optional(),
       }),
@@ -102,7 +103,7 @@ export const recipeProposalInput = z.object({
   name: z.string(),
   portions: z.number(),
   items: z.array(proposalInput.shape.items.element),
-  assumptions: z.array(z.string()),
+  assumptions: z.array(z.string()).default([]),
   /** The complete preparation steps; empty for none (or, for a change, to keep the recipe's). */
   instructions: z.string().optional(),
   /** One line on why it is suggested, quoting the app's numbers; empty for the user's own recipe. */
@@ -783,11 +784,11 @@ const changeInput = z.object({
 export const portionProposalInput = z.object({
   batch_id: z.string(),
   /** Portions eaten; 0 when eaten by grams. */
-  portions: z.number(),
+  portions: z.number().default(0),
   /** Grams eaten of a weighed pot; 0 when eaten by portions. */
-  grams: z.number(),
-  changes: z.array(changeInput),
-  assumptions: z.array(z.string()),
+  grams: z.number().default(0),
+  changes: z.array(changeInput).default([]),
+  assumptions: z.array(z.string()).default([]),
   time: z.string().optional(),
   replaces: z.string().optional(),
 });
@@ -795,22 +796,22 @@ export const portionProposalInput = z.object({
 export const batchProposalInput = z.object({
   recipe_id: z.string(),
   /** Local "YYYY-MM-DD" it was cooked; empty for today (or the chat's day). */
-  day: z.string(),
+  day: z.string().default(''),
   /** Use the recipe's usual storage plan (then fresh and fridge are ignored). */
   usual_plan: z.boolean(),
   fresh: z.number(),
   fridge: z.number(),
   /** The full pot's weight as the user said it (the app takes off the empty pot it remembers); 0 if not said. */
-  pot_grams: z.number(),
+  pot_grams: z.number().default(0),
   /** The cooked food's own weight, when weighed without the pot; 0 if not said. */
-  food_grams: z.number(),
-  changes: z.array(changeInput),
+  food_grams: z.number().default(0),
+  changes: z.array(changeInput).default([]),
   /** Portions of this pot eaten right away (fresh); 0 for none. */
-  ate_portions: z.number(),
+  ate_portions: z.number().default(0),
   /** Or grams of this pot eaten right away (needs its weight); 0 for none. */
-  ate_grams: z.number(),
+  ate_grams: z.number().default(0),
   ate_time: z.string().optional(),
-  assumptions: z.array(z.string()),
+  assumptions: z.array(z.string()).default([]),
   replaces: z.string().optional(),
 });
 
