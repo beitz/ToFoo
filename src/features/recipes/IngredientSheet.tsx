@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { useData } from '../../app/data';
 import { t } from '../../i18n';
 import type { Food } from '../../foods/foodDb';
@@ -36,6 +36,7 @@ export function IngredientSheet({
   startWith = 'edit',
   gramsLabel,
   addLabel,
+  preview,
   onSave,
   onRemove,
   onClose,
@@ -48,6 +49,8 @@ export function IngredientSheet({
   gramsLabel?: string;
   /** The button's label for a new ingredient; default "Add to recipe". */
   addLabel?: string;
+  /** What saving the ingredient as it stands would change (the recipe editor's swap preview); `undefined` while it is incomplete. */
+  preview?: (item: SavedIngredient | undefined) => ReactNode;
   onSave: (i: SavedIngredient) => void;
   onRemove?: () => void;
   onClose: () => void;
@@ -69,6 +72,11 @@ export function IngredientSheet({
   // A product with no label values and no matched food would count nothing but a name.
   const hasValues = !productDraft || Object.keys(productDraft.per100).length > 0 || !!match;
   const valid = !!current && !!grams && grams > 0 && hasValues;
+  const item = useMemo<SavedIngredient | undefined>(
+    () => (valid && current ? { food: current, ...(productDraft ? { product: productDraft } : {}), grams: grams!, preparation } : undefined),
+    // `current` is rebuilt every render from the same inputs.
+    [valid, food, productDraft, grams, preparation],
+  );
 
   /** The BLS food the ingredient had: a good first guess for a product's missing vitamins and minerals. */
   function blsBefore(): Food | undefined {
@@ -96,7 +104,7 @@ export function IngredientSheet({
       await repo.saveProduct(productDraft);
       await repo.setProductMatch(productDraft.id, productDraft.match ?? null);
     }
-    onSave({ food: current, ...(productDraft ? { product: productDraft } : {}), grams: grams!, preparation });
+    onSave(item!);
   }
 
   if (mode === 'scan') return <BarcodeSheet onFound={(p) => pick({ product: p })} onClose={() => setMode('pick')} />;
@@ -122,6 +130,7 @@ export function IngredientSheet({
           </Field>
           {productDraft && <MatchPicker key={productDraft.id} product={productDraft} match={match} onChange={setMatch} />}
           <PreparationSelect id="ingredient-prep" value={preparation} onChange={setPreparation} />
+          {preview?.(item)}
           <div className="sheet-actions">
             {onRemove && (
               <button className="btn btn-danger-ghost" onClick={onRemove}>

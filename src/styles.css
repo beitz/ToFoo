@@ -2806,6 +2806,34 @@ body:has(.fab-stack) .toast-area {
   border: 1px dashed var(--border);
   border-radius: var(--radius-sm);
 }
+/* Recipe editor: what the latest change does to one portion. */
+.swap-preview {
+  border-left: 4px solid var(--accent);
+}
+.swap-title {
+  font-size: 1rem;
+  margin: 0 0 4px;
+}
+.swap-what {
+  font-weight: 600;
+  margin: 6px 0 2px;
+}
+.swap-table td:nth-child(2) {
+  width: 1%;
+  white-space: nowrap;
+}
+.swap-move strong {
+  font-weight: 700;
+}
+.swap-line {
+  margin: 8px 0 0;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+}
+.nowrap {
+  white-space: nowrap;
+}
 /* Home: the assistant's button stays above the round button while the menu is closed. */
 .dial-pinned {
   padding-right: 6px;

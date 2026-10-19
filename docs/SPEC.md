@@ -189,6 +189,8 @@ The assistant can do both (with the recipe book in the main chat): `list_recipes
 
 **Swap preview in the recipe editor** (decided 2026-10-16): while editing a recipe, show how a change moves the user's gaps, e.g. "adding 100 g spinach: iron gap 40 % → 65 % covered". This is the recipe preview (below) made live inside the editor, where the decision happens.
 
+Built 2026-10-19: every edit in the recipe editor (adding, taking out, re-weighing or swapping an ingredient, another preparation, the portions, the salt, the assistant's additions) shows what it does to one portion, eaten fresh after cooking losses, before the recipe is saved. A line under the ingredient being changed names the biggest moves ("Per portion: Iron 40 % → 65 % ↑ · Folate 28 % → 41 % ↑"); a card under the ingredient list says the change in words ("Adding 100 g Spinach", "400 g Beef → 300 g Tofu", "Portions: 4 → 6"), the energy before → after, and the nutrients that move with the user's status now (Low, Getting low, Too high as a badge), six at first, "Show all" for every nutrient that moves by a whole percent. For a saved recipe the card can also compare with the saved recipe ("Saved recipe"), for all changes together. The ingredient sheet shows the same line while a food is being swapped or re-weighed, before "Save". Further edits of the same ingredient count as one change, so typing 1, 0, 0 reads as 0 → 100 g. Percentages are shares of the daily reference intake (of the limit for limit-only nutrients), as on the recipe page, never absorbed amounts. Order: gaps' moves count double, getting low and too high one and a half; for a nutrient to get enough of, what a portion gives beyond a whole day does not count (187 % → 110 % is no loss worth listing first). These weights only order the list. The app computes every number from the database values (`src/logic/swapPreview.ts`).
+
 **Later, for other workflows** (feature review 2026-10-16, not needed by the owner now): duplicate a recipe to make a variant; scale a recipe when cooking a batch (e.g. 8 portions instead of 6, without editing the recipe); a shopping list for the next batch from the recipe's ingredients, with tick-offs and the Android share sheet. Shopping list first, scaling last.
 
 **Freezer stock**: the app tracks remaining portions per batch, with cook date. Logging a portion from the dashboard ("Linsencurry · 3 left") removes it and applies the right storage losses. Manual corrections are allowed (portion thrown away, given away).
@@ -619,7 +621,7 @@ v1 is the smallest app that is useful every day; each later version adds to the 
 
 - [x] Cooked weight per batch, log portions by grams (built 2026-10-18)
 - [x] Change a dish's ingredients when logging it, or for a whole pot (built 2026-10-18)
-- [ ] Swap preview in the recipe editor
+- [x] Swap preview in the recipe editor: what each change does to one portion, before saving (built 2026-10-19)
 - [x] Repeat a past meal; favourite foods; home-screen shortcuts (built 2026-10-16)
 - [x] Day and range nutrient breakdown; calendar of day statuses (built 2026-10-16)
 - [x] Edit a logged entry, including replacing its food by search or barcode (built 2026-10-17)
