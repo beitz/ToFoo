@@ -191,7 +191,21 @@ The assistant can do both (with the recipe book in the main chat): `list_recipes
 
 Built 2026-10-19: every edit in the recipe editor (adding, taking out, re-weighing or swapping an ingredient, another preparation, the portions, the salt, the assistant's additions) shows what it does to one portion, eaten fresh after cooking losses, before the recipe is saved. A line under the ingredient being changed names the biggest moves ("Per portion: Iron 40 % → 65 % ↑ · Folate 28 % → 41 % ↑"); a card under the ingredient list says the change in words ("Adding 100 g Spinach", "400 g Beef → 300 g Tofu", "Portions: 4 → 6"), the energy before → after, and the nutrients that move with the user's status now (Low, Getting low, Too high as a badge), six at first, "Show all" for every nutrient that moves by a whole percent. For a saved recipe the card can also compare with the saved recipe ("Saved recipe"), for all changes together. The ingredient sheet shows the same line while a food is being swapped or re-weighed, before "Save". Further edits of the same ingredient count as one change, so typing 1, 0, 0 reads as 0 → 100 g. Percentages are shares of the daily reference intake (of the limit for limit-only nutrients), as on the recipe page, never absorbed amounts. Order: gaps' moves count double, getting low and too high one and a half; for a nutrient to get enough of, what a portion gives beyond a whole day does not count (187 % → 110 % is no loss worth listing first). These weights only order the list. The app computes every number from the database values (`src/logic/swapPreview.ts`).
 
-**Later, for other workflows** (feature review 2026-10-16, not needed by the owner now): duplicate a recipe to make a variant; scale a recipe when cooking a batch (e.g. 8 portions instead of 6, without editing the recipe); a shopping list for the next batch from the recipe's ingredients, with tick-offs and the Android share sheet. Shopping list first, scaling last.
+**Shopping list** (owner's request 2026-10-19: simple, usable offline in the shop). Built 2026-10-19, route `#/shopping`, optional feature (on by default):
+
+- Everything is on the phone (IndexedDB, `shopping` table, database v9), so the list works without a connection; it is in backups.
+- Add by typing one line ("milk 2 l", "500 g oats", "6 eggs"): an amount in g or kg becomes grams, any other amount stays as typed. While typing, things bought before come first ("Bought before"), then up to three foods from the BLS.
+- "Add a recipe's ingredients" (on the list, and "Add to shopping list" on every recipe): choose the recipe and the portions to cook; amounts scale with the portions; everything is ticked except salt (most kitchens have it); tap water is left out. Each line says which recipes it is for.
+- The same thing stays one line: the same food, or the same name when typed, adds up the grams, joins typed amounts ("2 l" + "1 l" = "3 l", otherwise "2 l + 1 pack") and the recipe names. Something already in the basket gets a new line.
+- Sorted by shop section (fruit and vegetables, bread, dairy and eggs, meat and fish, grains/pasta/pulses/nuts, oils/spices/sweets, drinks, ready meals, other). A food from the database or a recipe goes by its BLS main group (eggs apart from pasta, butter and margarine with dairy; a product by its paired BLS food). A typed name goes by a short list of common shopping words in English and German, else by the BLS foods that name every typed word (composite dishes ignored), else "Other". The section can be changed per line, and a name bought before keeps its section.
+- Tap a line to put it in the basket (ticked, struck through, moved to "In the basket"); tap again to take it back. "Clear" takes the basket off the list (undo). Cleared lines are kept as the list's memory for suggestions, one per name, at most 300.
+- The pen on a line changes its name, amount and section, or removes it (undo).
+- The share button sends what is still to buy as plain text (Android share sheet, else copied).
+- The screen stays on while the list is open (Screen Wake Lock, where the browser allows it).
+- The assistant (with the list on): "put milk and eggs on the list", "add the lentil curry for 6" makes an L card with the things named and the recipe's ingredients scaled, each tickable, added to the list on confirm ("Log all" included). Names as the user says them; the app sorts them. Not strict (see the grammar-size limit).
+- A quick action on Home shows how many things are still to buy; a cart button on the Recipes page opens the list.
+
+**Later, for other workflows** (feature review 2026-10-16, not needed by the owner now): duplicate a recipe to make a variant; scale a recipe when cooking a batch (e.g. 8 portions instead of 6, without editing the recipe). Scaling last.
 
 **Freezer stock**: the app tracks remaining portions per batch, with cook date. Logging a portion from the dashboard ("Linsencurry · 3 left") removes it and applies the right storage losses. Manual corrections are allowed (portion thrown away, given away).
 
@@ -546,6 +560,7 @@ Optional features are modules with an on/off switch, so the app can be tuned bet
 | Sleep | Off | Sleep and wake times: buttons, shortcuts, morning question |
 | Activity | Off | Simple activity log; outdoor activity feeds the sun estimate |
 | Water | Off | Plain water with one tap or via the assistant, plus water in foods, against the DGE guide value |
+| Shopping list | On | A list to take shopping, offline: by hand, from a recipe's ingredients for N portions, or through the assistant |
 | Save assistant chats | On | Keep each assistant chat on the phone to share as a file (not in backups) |
 | Automatic backups | On | A full backup on the phone once a day and before a restore or a storage upgrade; switched in Settings → Backup |
 | Backup reminder | On | A note on Home when the last saved backup file is older than N days; switched in Settings → Backup |
@@ -563,7 +578,7 @@ Settings also hold the profile, starting-level choice, salt defaults, meal windo
 
 All personal data stays on the phone in IndexedDB; a one-tap export file is the backup, and nothing personal ever goes into the public repo.
 
-- **Storage**: recipes, batches, freezer stock, log, journal, sleep and activity, profile, settings in IndexedDB, behind a repository layer (so sync can be added in v4). Request persistent storage from the browser so Android does not clear it.
+- **Storage**: recipes, batches, freezer stock, log, journal, sleep and activity, the shopping list, profile, settings in IndexedDB, behind a repository layer (so sync can be added in v4). Request persistent storage from the browser so Android does not clear it.
 - **Schema versioning**: every stored record has a schema version; migrations run on app start and are unit-tested.
 - **Saved assistant chats** are kept in IndexedDB too, but are not part of backups: they are logs for checking what the assistant did, and with photos they can be large (see AI assistant logging).
 - **Backup**: "Export everything" writes one JSON file in the exchange format (`type: backup`) via the Android share sheet or download. "Import backup" restores it with a preview. Saved portion sizes ("My bowl", 60 g) are part of backups since 2026-10-18; restoring an older backup without them keeps the sizes on the phone.
@@ -644,7 +659,8 @@ v1 is the smallest app that is useful every day; each later version adds to the 
 
 **Later, no version yet**:
 
-- [ ] Shopping list for the next batch; duplicate a recipe; scale a recipe when cooking (last)
+- [x] Shopping list: by hand, from a recipe for N portions, through the assistant; offline, sorted by shop section, tick off and clear (owner's request 2026-10-19, built 2026-10-19)
+- [ ] Duplicate a recipe; scale a recipe when cooking (last)
 - [ ] CSV export
 - [x] Automatic backups: up to 5 kept on the phone, listed in Settings → Backup with restore and "Save as file"; the reminder moves there (owner's request 2026-10-18, built 2026-10-18, see "Data storage, backup and privacy")
 - [ ] "At home" screen (owner's idea 2026-10-18, undecided, not to be built yet): one place that shows what is available at home, for quick logging and maybe recipe ideas. Options: (a) favourite items only, as on the log screen today; (b) a storage panel with places such as pantry, cupboard, fridge and freezer, holding cooked batches (already tracked as In stock) and bought foods like kinds of tea; (c) both, with favourites as the quick list and the panel for the full picture. Open: whether bought items get amounts or just "have / don't have", and how they are ticked off when used up.

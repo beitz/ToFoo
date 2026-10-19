@@ -48,6 +48,8 @@ export interface PromptSources {
   activity?: boolean;
   /** Water is on: the assistant may propose plain water. */
   water?: boolean;
+  /** The shopping list is on: the assistant may put things on it. */
+  shopping?: boolean;
   /** The recipe editor's assistant: ingredients for one recipe, nothing else (the trackers are ignored). */
   recipe?: boolean;
   /** The main chat's recipe book: save a recipe the user cooked, change one in the book. */
@@ -55,6 +57,11 @@ export interface PromptSources {
   /** Recipe ideas on: the assistant may read the nutrient status, check recipes and suggest ideas. */
   ideas?: boolean;
 }
+
+// The shopping list (docs/SPEC.md, "Shopping list"): names as the user says them; the app sorts
+// them into shop sections and adds a recipe's ingredients itself.
+const SHOPPING = (recipes: boolean) =>
+  `- Shopping list: when the user asks to put things on their shopping list ("put milk and eggs on the list", "I need to buy oats"), call propose_shopping with items named the way they would write them on a list ("Milk", "Eggs", "Oat flakes"), one item per thing, with an amount only when they said one ("2 l", "10", "500 g").${recipes ? ' For a recipe from their book ("add the lentil curry for 6"), give it under recipes with its recipe_id from list_recipes and the portions they plan (0 for the recipe\'s own); the app adds its ingredients, scaled, so do not list them as items.' : ''} No food search is needed for it. Only when the user asks; never put things on the list on your own. To change an open shopping card, call it again with the complete list and replaces set to its id (L1, L2, …).`;
 
 // Recipes in the main chat (docs/SPEC.md, "One assistant"): the same pot rules as in the recipe
 // editor, but the result is a recipe for the book, new or changed.
@@ -105,7 +112,7 @@ Style: brief, friendly, plain text (no headings or tables). Answer in the langua
 
 function systemPrompt(sources: PromptSources): string {
   if (sources.recipe) return recipeSystemPrompt(sources);
-  const { off = false, usda = false, webSearch = false, journal = false, sleep = false, activity = false, water = false, recipes = false, ideas = false } = sources;
+  const { off = false, usda = false, webSearch = false, journal = false, sleep = false, activity = false, water = false, shopping = false, recipes = false, ideas = false } = sources;
   const extra = [
     off && ' Packaged products can also be looked up by barcode in Open Food Facts.',
     usda && ' Foods the BLS lacks can be searched in USDA FoodData Central.',
@@ -113,6 +120,7 @@ function systemPrompt(sources: PromptSources): string {
     sleep && ' The user can also tell you when they slept.',
     activity && ' The user can also tell you what exercise or activity they did.',
     water && ' The user can also tell you how much water they drank.',
+    shopping && ' The user can also have you put things on their shopping list.',
     recipes && ' The user can also save recipes they cooked and change recipes in their recipe book.',
     ideas && ' You can also suggest recipes that fit their nutrient gaps, and improvements to their recipes.',
   ]
@@ -125,7 +133,7 @@ Your job: work out which foods the user ate and how many grams of each, then cal
 How to work:
 - Find foods with search_foods. Search short, generic terms, in English and German (e.g. ["milk roll", "Milchbrötchen"]); send several queries in one call. Only use codes that search_foods returned.
 ${off ? BRANDED_WITH_PRODUCTS('propose_meal') : BRANDED_BLS_ONLY}
-${off && webSearch ? `${WEB_SEARCH}\n` : ''}${usda ? `${USDA('propose_meal')}\n` : ''}${journal ? `${JOURNAL(activity)}\n` : ''}${sleep ? `${SLEEP(journal)}\n` : ''}${activity ? `${ACTIVITY}\n` : ''}${water ? `${WATER}\n` : ''}${recipes ? `${RECIPES(ideas)}\n${PAGES}\n` : ''}- Mixed dishes (restaurant meals, a hotpot, a bowl): use a matching BLS dish if there is one, otherwise split it into ingredients with estimated grams. Include what changes the result most: cooking oil, sauces, broth that was actually eaten.
+${off && webSearch ? `${WEB_SEARCH}\n` : ''}${usda ? `${USDA('propose_meal')}\n` : ''}${journal ? `${JOURNAL(activity)}\n` : ''}${sleep ? `${SLEEP(journal)}\n` : ''}${activity ? `${ACTIVITY}\n` : ''}${water ? `${WATER}\n` : ''}${shopping ? `${SHOPPING(recipes)}\n` : ''}${recipes ? `${RECIPES(ideas)}\n${PAGES}\n` : ''}- Mixed dishes (restaurant meals, a hotpot, a bowl): use a matching BLS dish if there is one, otherwise split it into ingredients with estimated grams. Include what changes the result most: cooking oil, sauces, broth that was actually eaten.
 - Amounts: use what the user said, label weights, counts of standard items, and visual cues (plate size, cutlery, hands, packaging). Think about the portion one person ate, not the whole shared dish.
 - Ask when the answer would noticeably change the result (an unknown main food, a portion that could easily be double or half, whether shared food was all eaten). Ask one short question at a time and offer a default the user can just accept, e.g. "About one bowl, roughly 400 ml?". Do not ask about details that barely matter. Do not ask for more photos (barcode, label, packaging) when you can work with what you have: the user often cannot take them. If one would clearly change the result, mention it once alongside your proposal, not instead of it. If the user cannot know, estimate and record the assumption.
 - Everything at once: the user often logs a day or two in one go, in one long message (often spoken for many minutes, with filler words and corrections) and many photos (meals, packaging, barcodes, labels, screenshots). Go through all of it and propose every meal${journal ? ', journal entry' : ''}${sleep ? ', sleep' : ''}${activity ? ', activity' : ''}${water ? ', water' : ''}${recipes ? ', recipe' : ''} it contains: leave nothing out and propose nothing twice. Later words override earlier ones ("no, it was two eggs"). The app puts a line before each photo with its number and capture time. Group the photos into meals by time and content: photos minutes apart of the same table are one meal; the same food at different times (yogurt in the morning and in the evening) is two; a photo of a package or barcode belongs to the meal that food was eaten in. Also include meals the user only describes in words. Before proposing, ask everything that matters in one message, as a short numbered list with a default for each, and say how you grouped the photos (e.g. "Photos 2–5: Korean BBQ, Thu 19:40"); keep it to what really changes the result. Then propose everything in one response, one call per meal${journal ? ', journal entry' : ''}${sleep ? ', sleep' : ''}${activity ? ', activity' : ''}${water ? ', water' : ''}${recipes ? ', recipe' : ''}.
@@ -139,10 +147,10 @@ ${recipes ? '- Questions: when the user just asks something (about their food, t
 Style: brief, friendly, plain text (no headings or tables). Answer in the language the user writes in.`;
 }
 
-const key = ({ off = false, usda = false, webSearch = false, journal = false, sleep = false, activity = false, water = false, recipe = false, recipes = false, ideas = false }: PromptSources) =>
+const key = ({ off = false, usda = false, webSearch = false, journal = false, sleep = false, activity = false, water = false, shopping = false, recipe = false, recipes = false, ideas = false }: PromptSources) =>
   recipe
     ? `r${off ? 1 : 0}${usda ? 1 : 0}${off && webSearch ? 1 : 0}`
-    : `${off ? 1 : 0}${usda ? 1 : 0}${off && webSearch ? 1 : 0}${journal ? 1 : 0}${sleep ? 1 : 0}${activity ? 1 : 0}${water ? 1 : 0}${recipes ? 1 : 0}${recipes && ideas ? 1 : 0}`;
+    : `${off ? 1 : 0}${usda ? 1 : 0}${off && webSearch ? 1 : 0}${journal ? 1 : 0}${sleep ? 1 : 0}${activity ? 1 : 0}${water ? 1 : 0}${shopping ? 1 : 0}${recipes ? 1 : 0}${recipes && ideas ? 1 : 0}`;
 const prompts = new Map<string, string>();
 const toolSets = new Map<string, BetaToolUnion[]>();
 
@@ -216,7 +224,7 @@ export const WEB_SEARCH_TOOL: BetaWebSearchTool20250305 = {
   user_location: { type: 'approximate', country: 'DE' },
 };
 
-function tools({ off = false, usda = false, webSearch = false, journal = false, sleep = false, activity = false, water = false, recipe = false, recipes = false, ideas = false }: PromptSources): BetaToolUnion[] {
+function tools({ off = false, usda = false, webSearch = false, journal = false, sleep = false, activity = false, water = false, shopping = false, recipe = false, recipes = false, ideas = false }: PromptSources): BetaToolUnion[] {
   const withProducts = off || usda;
   const codeHelp = off && usda ? 'BLS code from search_foods, or an OFF: or USDA: code from lookup_barcode, search_usda or search_foods.' : off ? 'BLS code from search_foods, or OFF: product code from lookup_barcode or search_foods.' : usda ? 'BLS code from search_foods, or USDA: code from search_usda or search_foods.' : 'BLS code from search_foods.';
   const items = {
@@ -299,6 +307,7 @@ function tools({ off = false, usda = false, webSearch = false, journal = false, 
     ...(sleep ? [PROPOSE_SLEEP] : []),
     ...(activity ? [PROPOSE_ACTIVITY] : []),
     ...(water ? [PROPOSE_WATER] : []),
+    ...(shopping ? [proposeShopping(recipes)] : []),
     ...(recipes ? [LIST_RECIPES, proposeRecipe(items, ideas), proposePortion(changeItems), proposeBatch(changeItems)] : []),
     ...(recipes && ideas ? [NUTRIENT_GAPS, checkRecipe(items)] : []),
   ];
@@ -493,6 +502,48 @@ const PROPOSE_WATER: BetaTool = {
     additionalProperties: false,
   },
 };
+
+function proposeShopping(recipes: boolean): BetaTool {
+  return {
+    name: 'propose_shopping',
+    description: `Show the user things to put on their shopping list, as a card for the user to check and confirm; nothing is added until they do. The app keeps the same thing on one line and adds amounts up.${recipes ? " A recipe's ingredients come from the app (recipes)." : ''} After a correction, call it again with the complete list and replaces set to the card id.`,
+    // Not strict: see STRICT_NESTED. The app validates the input itself and sends errors back.
+    input_schema: {
+      type: 'object',
+      properties: {
+        items: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              name: { type: 'string', description: 'What to buy, as the user would write it on a list, e.g. "Milk".' },
+              amount: { type: 'string', description: 'How much, only if the user said, e.g. "2 l", "10", "500 g"; empty otherwise.' },
+            },
+            required: ['name'],
+          },
+        },
+        ...(recipes
+          ? {
+              recipes: {
+                type: 'array',
+                description: 'Recipes from the book whose ingredients go on the list.',
+                items: {
+                  type: 'object',
+                  properties: {
+                    recipe_id: { type: 'string', description: 'The recipe_id from list_recipes.' },
+                    portions: { type: 'number', description: 'Portions the user plans to cook; 0 for the recipe\'s own.' },
+                  },
+                  required: ['recipe_id'],
+                },
+              },
+            }
+          : {}),
+        replaces: { type: 'string', description: 'Id of the open shopping card this corrects (e.g. "L1"); empty for a new one.' },
+      },
+      required: ['items'],
+    },
+  };
+}
 
 const SEARCH_FOODS: BetaTool = {
   name: 'search_foods',

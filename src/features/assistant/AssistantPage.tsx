@@ -50,6 +50,7 @@ import { IngredientSheet } from '../recipes/IngredientSheet';
 import { ActivityForm, activityName, DEFAULT_ACTIVITY_SKIN, recordOf, type ActivityDraft } from '../activity/ActivityForm';
 import { cardId, cardOf, cardTitle, useRegister, type Card, type CardProps, type RecipeChat, type Saver, type Undo } from './cards';
 import { RecipeCard } from './RecipeCard';
+import { ShoppingCard } from './ShoppingCard';
 import { BatchCard, PortionCard } from './BatchCards';
 import { Pages, type DictationTarget } from './Pages';
 import { refKey } from '../../lib/refs';
@@ -326,6 +327,7 @@ function Chat({ apiKey, model, day, recipe }: { apiKey: string; model: AiModel; 
               sleep: isOn(d.settings.features, 'sleep'),
               activity: isOn(d.settings.features, 'activity'),
               water: isOn(d.settings.features, 'water'),
+              shopping: isOn(d.settings.features, 'shoppingList'),
               recipes: recipeTools(),
             }),
       };
@@ -371,6 +373,7 @@ function Chat({ apiKey, model, day, recipe }: { apiKey: string; model: AiModel; 
         ...outcome.sleeps.map((s): Card => ({ kind: 'sleep', sleep: s, logged: false })),
         ...outcome.activities.map((a): Card => ({ kind: 'activity', activity: a, logged: false })),
         ...outcome.waters.map((w): Card => ({ kind: 'water', water: w, logged: false })),
+        ...outcome.shopping.map((l): Card => ({ kind: 'shopping', shopping: l, logged: false })),
         ...outcome.ingredients.map((r): Card => ({ kind: 'ingredients', ingredients: r, logged: false })),
         ...outcome.recipes.map((r): Card => ({ kind: 'recipe', recipe: r, logged: false })),
         ...outcome.portions.map((p): Card => ({ kind: 'portion', portion: p, logged: false })),
@@ -485,6 +488,7 @@ function Chat({ apiKey, model, day, recipe }: { apiKey: string; model: AiModel; 
               isOn(d.settings.features, 'sleep') && t('ai.introSleep'),
               isOn(d.settings.features, 'activity') && t('ai.introActivity'),
               isOn(d.settings.features, 'water') && t('ai.introWater'),
+              isOn(d.settings.features, 'shoppingList') && t('ai.introShopping'),
               t('ai.introRecipes'),
             ]
               .filter(Boolean)
@@ -749,6 +753,7 @@ function CardView({ card, ...rest }: CardProps<Card>) {
   if (card.kind === 'sleep') return <SleepCard card={card} {...rest} />;
   if (card.kind === 'activity') return <ActivityCard card={card} {...rest} />;
   if (card.kind === 'water') return <WaterProposalCard card={card} {...rest} />;
+  if (card.kind === 'shopping') return <ShoppingCard card={card} {...rest} />;
   if (card.kind === 'ingredients') return <IngredientsCard card={card} {...rest} />;
   if (card.kind === 'recipe') return <RecipeCard card={card} {...rest} />;
   if (card.kind === 'portion') return <PortionCard card={card} {...rest} />;

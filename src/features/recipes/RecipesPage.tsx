@@ -12,6 +12,7 @@ import { Segmented, Sheet } from '../../ui/controls';
 import { logPortion, nextStorage, totalLeft } from '../home/StockChips';
 import { fmtGrams } from '../../lib/format';
 import { BatchSheet } from './BatchSheet';
+import { isOn } from '../../settings/features';
 
 export function RecipesPage() {
   const d = useData();
@@ -25,7 +26,12 @@ export function RecipesPage() {
   return (
     <section>
       <header className="page-head row-between">
-        <h1>{t('recipes.title')}</h1>
+        <h1 className="grow">{t('recipes.title')}</h1>
+        {isOn(d.settings.features, 'shoppingList') && (
+          <a className="icon-btn" href={href('shopping')} aria-label={t('shopping.title')} title={t('shopping.title')}>
+            <Icon name="cart" />
+          </a>
+        )}
         <a className="btn btn-primary btn-small" href={href('recipes', 'new')}>
           <Icon name="plus" /> {t('recipes.new')}
         </a>

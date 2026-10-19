@@ -6,7 +6,7 @@ import Dexie, { type Table, type Transaction } from 'dexie';
 import { SNAPSHOT_TABLES, writeAutoBackup } from './autoBackup';
 import { migrateRecord, needsMigration, TABLES, type TableName } from './migrations';
 import type { ChatPhoto, ChatRecord } from '../ai/chatRecord';
-import type { ActivityRecord, AutoBackup, Batch, CustomFood, DayStatusRecord, Fast, JournalEntry, LogEntry, MetaRecord, Product, Profile, Recipe, Settings, SleepRecord, SunEntry, WaterRecord } from './types';
+import type { ActivityRecord, AutoBackup, Batch, CustomFood, DayStatusRecord, Fast, JournalEntry, LogEntry, MetaRecord, Product, Profile, Recipe, Settings, ShoppingItem, SleepRecord, SunEntry, WaterRecord } from './types';
 
 export class ToFooDB extends Dexie {
   profile!: Table<Profile, string>;
@@ -23,6 +23,7 @@ export class ToFooDB extends Dexie {
   sleep!: Table<SleepRecord, string>;
   activities!: Table<ActivityRecord, string>;
   water!: Table<WaterRecord, string>;
+  shopping!: Table<ShoppingItem, string>;
   meta!: Table<MetaRecord, string>;
   /** Saved assistant chats (not in backups: they are logs for debugging, see src/ai/chatRecord.ts). */
   chats!: Table<ChatRecord, string>;
@@ -64,6 +65,10 @@ export class ToFooDB extends Dexie {
     // first saves a copy of it. Dexie runs no upgrade functions for a new, empty database.
     this.version(8)
       .stores({ autoBackups: 'id, at' })
+      .upgrade((tx) => this.backupBeforeUpgrade(tx));
+    // v9: the shopping list.
+    this.version(9)
+      .stores({ shopping: 'id, addedAt' })
       .upgrade((tx) => this.backupBeforeUpgrade(tx));
   }
 

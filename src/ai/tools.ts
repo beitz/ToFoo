@@ -196,6 +196,26 @@ export interface WaterProposal {
   replaces?: string;
 }
 
+export const shoppingProposalInput = z.object({
+  /** Things to buy, in the user's words, with an amount only when they said one. */
+  items: z.array(z.object({ name: z.string(), amount: z.string().optional() })).default([]),
+  /** Recipes from the book whose ingredients go on the list, for this many portions (0 = the recipe's own). */
+  recipes: z.array(z.object({ recipe_id: z.string(), portions: z.number().optional() })).default([]),
+  /** Id of the open shopping card this replaces (e.g. "L1"); empty for a new one. */
+  replaces: z.string().optional(),
+});
+
+/** Things for the shopping list the assistant proposes, for the user to check. */
+export interface ShoppingProposal {
+  items: Array<{ name: string; amount?: string }>;
+  /** Recipes from the book, by id, with the portions to shop for. */
+  recipes: Array<{ recipeId: string; name: string; portions: number }>;
+  replaces?: string;
+}
+
+/** Most things on one card: a week's shopping, not a whole shop. */
+const MAX_SHOPPING_ITEMS = 60;
+
 /** Ingredients the assistant proposes for the recipe being edited, for the user to check. */
 export interface IngredientsProposal {
   name: string;
@@ -298,6 +318,8 @@ export interface ToolContext {
   activity?: boolean;
   /** Water is on: the assistant may propose plain water. */
   water?: boolean;
+  /** The shopping list is on: the assistant may propose things to put on it. */
+  shopping?: boolean;
   /**
    * The chat belongs to the recipe editor: the assistant proposes ingredients for the recipe
    * instead of meals, and nothing else (no journal, sleep, activity or water).
@@ -327,7 +349,7 @@ export interface IdeaTools {
 }
 
 /** Which online sources the assistant is offered (decides the prompt and tool variant). */
-export function sourcesOf(ctx: Pick<ToolContext, 'products' | 'journal' | 'sleep' | 'activity' | 'water' | 'recipe' | 'recipes'>): {
+export function sourcesOf(ctx: Pick<ToolContext, 'products' | 'journal' | 'sleep' | 'activity' | 'water' | 'shopping' | 'recipe' | 'recipes'>): {
   off: boolean;
   usda: boolean;
   webSearch: boolean;
@@ -335,19 +357,21 @@ export function sourcesOf(ctx: Pick<ToolContext, 'products' | 'journal' | 'sleep
   sleep: boolean;
   activity: boolean;
   water: boolean;
+  shopping: boolean;
   recipe: boolean;
   recipes: boolean;
   ideas: boolean;
 } {
   const { products } = ctx;
   const online = { off: !!products?.find, usda: !!products?.searchUsda, webSearch: !!products?.find && !!products.webSearch };
-  if (ctx.recipe) return { ...online, journal: false, sleep: false, activity: false, water: false, recipe: true, recipes: false, ideas: false };
+  if (ctx.recipe) return { ...online, journal: false, sleep: false, activity: false, water: false, shopping: false, recipe: true, recipes: false, ideas: false };
   return {
     ...online,
     journal: !!ctx.journal,
     sleep: !!ctx.sleep,
     activity: !!ctx.activity,
     water: !!ctx.water,
+    shopping: !!ctx.shopping,
     recipe: false,
     recipes: !!ctx.recipes,
     ideas: !!ctx.recipes?.ideas,
@@ -543,6 +567,30 @@ export function validateWaterProposal(input: unknown, now?: number): { ok: true;
   if (problems.length) return { ok: false, error: `${problems.join('\n')}\nFix these and call propose_water again.` };
   const replaces = parsed.data.replaces?.trim();
   return { ok: true, proposal: { ml: Math.round(ml), ...(time !== undefined ? { time } : {}), ...(replaces ? { replaces } : {}) } };
+}
+
+/** Check a `propose_shopping` call: something to buy, and recipes that are in the book. */
+export function validateShoppingProposal(input: unknown, recipes: readonly Pick<RecipeInfo, 'id' | 'name' | 'portions'>[] = []): { ok: true; proposal: ShoppingProposal } | { ok: false; error: string } {
+  const parsed = shoppingProposalInput.safeParse(input);
+  if (!parsed.success) return { ok: false, error: `Invalid input: ${parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}` };
+  const problems: string[] = [];
+  const items = parsed.data.items.map((i) => ({ name: i.name.trim(), amount: i.amount?.trim() })).filter((i) => i.name);
+  const chosen: ShoppingProposal['recipes'] = [];
+  for (const r of parsed.data.recipes) {
+    const recipe = recipes.find((x) => x.id === r.recipe_id.trim());
+    if (!recipe) {
+      problems.push(`recipe_id "${r.recipe_id}" is not in the recipe book; use a recipe_id from list_recipes.`);
+      continue;
+    }
+    const portions = r.portions && r.portions > 0 ? Math.round(r.portions) : recipe.portions;
+    if (portions > 100) problems.push(`${recipe.name}: ${portions} portions is more than 100; check the number.`);
+    chosen.push({ recipeId: recipe.id, name: recipe.name, portions });
+  }
+  if (items.length === 0 && parsed.data.recipes.length === 0) problems.push('Nothing to put on the list: give items or recipes.');
+  if (items.length > MAX_SHOPPING_ITEMS) problems.push(`${items.length} items is more than ${MAX_SHOPPING_ITEMS} on one card; split them over two cards.`);
+  if (problems.length) return { ok: false, error: `${problems.join('\n')}\nFix these and call propose_shopping again.` };
+  const replaces = parsed.data.replaces?.trim();
+  return { ok: true, proposal: { items: items.map((i) => ({ name: i.name, ...(i.amount ? { amount: i.amount } : {}) })), recipes: chosen, ...(replaces ? { replaces } : {}) } };
 }
 
 /** A product the assistant may use: looked up in this conversation or saved on this phone. */

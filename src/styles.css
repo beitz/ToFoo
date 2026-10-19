@@ -3106,3 +3106,107 @@ button.week-row:focus-visible {
 .week-review {
   margin-top: 16px;
 }
+
+/* ── Shopping list ───────────────────────────────────────────── */
+.shop-add {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.shop-add .search-box {
+  min-width: 0;
+}
+.shop-suggestions {
+  margin: -4px 0 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 0 12px;
+}
+.shop-suggestions li:last-child .result {
+  border-bottom: none;
+}
+.shop-section {
+  font-size: 0.95rem;
+  color: var(--text-muted);
+  margin: 1.1rem 0 0.2rem;
+}
+.shop-list > li,
+.shop-pick > li {
+  padding: 0;
+}
+.shop-item {
+  display: flex;
+  align-items: center;
+}
+.shop-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+  min-height: 52px;
+  padding: 6px 0;
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.shop-pick .shop-row {
+  width: 100%;
+  min-height: 48px;
+}
+.shop-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2px solid var(--text-muted);
+  color: var(--accent-text);
+}
+.shop-check.on {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.shop-text {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+.shop-name {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.shop-amount {
+  flex: none;
+  max-width: 40%;
+  text-align: right;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.shop-edit {
+  color: var(--text-muted);
+}
+/* In the basket: ticked, struck through and dimmed (never colour alone). */
+.shop-item.done .shop-name {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+.shop-item.done .shop-amount,
+.shop-item.done .shop-for {
+  opacity: 0.7;
+}
+.shop-card-head {
+  margin: 10px 0 0;
+}
+.shop-awake {
+  margin-top: 1.5rem;
+}

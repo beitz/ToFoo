@@ -92,7 +92,8 @@ export type FeatureKey =
   | 'water'
   | 'insights'
   | 'recipeIdeas'
-  | 'saveChats';
+  | 'saveChats'
+  | 'shoppingList';
 
 export interface Settings extends Versioned {
   id: 'settings';
@@ -350,6 +351,36 @@ export interface FoodPortionSizes {
   /** The food code the sizes were saved under (BLS code, or the product's code). */
   food: string;
   sizes: PortionSize[];
+}
+
+/** Where an item sits in the shop, for sorting the shopping list (src/logic/shopping.ts). */
+export const SHOP_SECTIONS = ['produce', 'bakery', 'dairy', 'meat', 'dry', 'pantry', 'drinks', 'ready', 'other'] as const;
+export type ShopSection = (typeof SHOP_SECTIONS)[number];
+
+/**
+ * One line on the shopping list (docs/SPEC.md, "Shopping list"). Lines cleared after shopping are
+ * kept, with `clearedAt`, as the list's memory of what was bought before: they come back as
+ * suggestions when typing. Only the newest line per name is kept for that.
+ */
+export interface ShoppingItem extends Versioned {
+  id: string;
+  /** What to buy, as shown. */
+  name: string;
+  /** The food it is, when picked from the food database or added from a recipe: the same food stays one line. */
+  ref?: FoodRef;
+  section: ShopSection;
+  /** How much in grams, when known (recipe ingredients, or typed in g or kg). */
+  grams?: number;
+  /** Any other amount, as typed ("2 l", "1 pack", "6"). */
+  amount?: string;
+  /** Names of the recipes it is for. */
+  recipes?: string[];
+  /** Epoch ms it was put on the list. */
+  addedAt: number;
+  /** Epoch ms it was ticked off; missing while still to buy. */
+  checkedAt?: number;
+  /** Epoch ms "Clear" took it off the list; missing while it is on the list. */
+  clearedAt?: number;
 }
 
 export const DEFAULT_AUTO_BACKUP_KEEP = 5;

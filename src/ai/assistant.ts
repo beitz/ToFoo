@@ -18,6 +18,7 @@ import {
   validateSleepProposal,
   validateActivityProposal,
   validateWaterProposal,
+  validateShoppingProposal,
   validateIngredientsProposal,
   validateRecipeProposal,
   validatePortionProposal,
@@ -34,6 +35,7 @@ import {
   type SleepProposal,
   type ActivityProposal,
   type WaterProposal,
+  type ShoppingProposal,
   type ToolContext,
 } from './tools';
 
@@ -67,6 +69,8 @@ export interface Conversation {
   activities?: number;
   /** Water cards shown so far; the next one gets id W(waters + 1). */
   waters?: number;
+  /** Shopping list cards shown so far; the next one gets id L(lists + 1). */
+  lists?: number;
   /** Ingredient cards (recipe editor) or recipe cards (main chat) shown so far; the next one gets id R(recipes + 1). */
   recipes?: number;
   /** Servings from stock shown so far; the next one gets id P(portions + 1). */
@@ -83,7 +87,7 @@ export interface PhotoTurn {
   cards: string[];
 }
 
-export const emptyConversation = (): Conversation => ({ messages: [], pendingResults: [], cards: 0, notes: 0, sleeps: 0, activities: 0, waters: 0, recipes: 0, portions: 0, batches: 0, photoTurns: [] });
+export const emptyConversation = (): Conversation => ({ messages: [], pendingResults: [], cards: 0, notes: 0, sleeps: 0, activities: 0, waters: 0, lists: 0, recipes: 0, portions: 0, batches: 0, photoTurns: [] });
 
 const RETIRED_PHOTO = '[photo removed]';
 const RETIRED_NOTE =
@@ -126,6 +130,8 @@ export type ShownSleep = SleepProposal & { id: string };
 export type ShownActivity = ActivityProposal & { id: string };
 /** Plain water as shown: with its card id (W1, W2, …). */
 export type ShownWater = WaterProposal & { id: string };
+/** Things for the shopping list as shown: with their card id (L1, L2, …). */
+export type ShownShopping = ShoppingProposal & { id: string };
 /** Recipe ingredients as shown: with their card id (R1, R2, …). */
 export type ShownIngredients = IngredientsProposal & { id: string };
 /** A recipe for the book as shown (main chat): with its card id (R1, R2, …). */
@@ -145,6 +151,7 @@ export type TurnOutcome =
       sleeps: ShownSleep[];
       activities: ShownActivity[];
       waters: ShownWater[];
+      shopping: ShownShopping[];
       ingredients: ShownIngredients[];
       recipes: ShownRecipe[];
       portions: ShownPortion[];
@@ -231,10 +238,11 @@ export async function sendMessage(
   let sleeps = conversation.sleeps ?? 0;
   let activities = conversation.activities ?? 0;
   let waters = conversation.waters ?? 0;
+  let lists = conversation.lists ?? 0;
   let recipes = conversation.recipes ?? 0;
   let portions = conversation.portions ?? 0;
   let batches = conversation.batches ?? 0;
-  const done = (outcome: TurnOutcome, pendingResults: Beta.BetaToolResultBlockParam[] = []) => ({ conversation: { messages, pendingResults, cards, notes, sleeps, activities, waters, recipes, portions, batches, photoTurns }, outcome });
+  const done = (outcome: TurnOutcome, pendingResults: Beta.BetaToolResultBlockParam[] = []) => ({ conversation: { messages, pendingResults, cards, notes, sleeps, activities, waters, lists, recipes, portions, batches, photoTurns }, outcome });
 
   for (let step = 0; step < MAX_STEPS; step++) {
     const res = await create(requestParams(model, messages, sources));
@@ -255,6 +263,7 @@ export async function sendMessage(
     const sleepsProposed: Array<{ id: string; proposal: SleepProposal }> = [];
     const activitiesProposed: Array<{ id: string; proposal: ActivityProposal }> = [];
     const watersProposed: Array<{ id: string; proposal: WaterProposal }> = [];
+    const listsProposed: Array<{ id: string; proposal: ShoppingProposal }> = [];
     const ingredientsProposed: Array<{ id: string; proposal: IngredientsProposal }> = [];
     const recipesProposed: Array<{ id: string; proposal: RecipeProposal }> = [];
     const portionsProposed: Array<{ id: string; proposal: PortionProposal }> = [];
@@ -342,19 +351,27 @@ export async function sendMessage(
           rejected = true;
           results.push({ type: 'tool_result', tool_use_id: use.id, content: r.error, is_error: true });
         }
+      } else if (use.name === 'propose_shopping' && sources.shopping) {
+        const r = validateShoppingProposal(use.input, ctx.recipes?.list);
+        if (r.ok) listsProposed.push({ id: use.id, proposal: r.proposal });
+        else {
+          rejected = true;
+          results.push({ type: 'tool_result', tool_use_id: use.id, content: r.error, is_error: true });
+        }
       } else {
         results.push({ type: 'tool_result', tool_use_id: use.id, content: `Unknown tool ${use.name}.`, is_error: true });
       }
     }
 
     // Cards are shown all together or not at all, so the user never sees half a batch.
-    const anyProposed = proposals.length + notesProposed.length + sleepsProposed.length + activitiesProposed.length + watersProposed.length + ingredientsProposed.length + recipesProposed.length + portionsProposed.length + batchesProposed.length > 0;
+    const anyProposed = proposals.length + notesProposed.length + sleepsProposed.length + activitiesProposed.length + watersProposed.length + listsProposed.length + ingredientsProposed.length + recipesProposed.length + portionsProposed.length + batchesProposed.length > 0;
     if (anyProposed && !rejected) {
       const shown = proposals.map(({ proposal }): ShownProposal => ({ ...proposal, id: `M${++cards}` }));
       const shownNotes = notesProposed.map(({ proposal }): ShownNote => ({ ...proposal, id: `J${++notes}` }));
       const shownSleeps = sleepsProposed.map(({ proposal }): ShownSleep => ({ ...proposal, id: `S${++sleeps}` }));
       const shownActivities = activitiesProposed.map(({ proposal }): ShownActivity => ({ ...proposal, id: `A${++activities}` }));
       const shownWaters = watersProposed.map(({ proposal }): ShownWater => ({ ...proposal, id: `W${++waters}` }));
+      const shownLists = listsProposed.map(({ proposal }): ShownShopping => ({ ...proposal, id: `L${++lists}` }));
       const shownIngredients = ingredientsProposed.map(({ proposal }): ShownIngredients => ({ ...proposal, id: `R${++recipes}` }));
       const shownRecipes = recipesProposed.map(({ proposal }): ShownRecipe => ({ ...proposal, id: `R${++recipes}` }));
       const shownPortions = portionsProposed.map(({ proposal }): ShownPortion => ({ ...proposal, id: `P${++portions}` }));
@@ -365,6 +382,7 @@ export async function sendMessage(
         ...sleepsProposed.map(({ id }, i) => [id, shownSleeps[i]!.id] as const),
         ...activitiesProposed.map(({ id }, i) => [id, shownActivities[i]!.id] as const),
         ...watersProposed.map(({ id }, i) => [id, shownWaters[i]!.id] as const),
+        ...listsProposed.map(({ id }, i) => [id, shownLists[i]!.id] as const),
         ...ingredientsProposed.map(({ id }, i) => [id, shownIngredients[i]!.id] as const),
         ...recipesProposed.map(({ id }, i) => [id, shownRecipes[i]!.id] as const),
         ...portionsProposed.map(({ id }, i) => [id, shownPortions[i]!.id] as const),
@@ -381,6 +399,7 @@ export async function sendMessage(
         ...sleepsProposed.map(({ id }, i) => shownResult(id, shownSleeps[i]!.id, 'saved')),
         ...activitiesProposed.map(({ id }, i) => shownResult(id, shownActivities[i]!.id, 'saved')),
         ...watersProposed.map(({ id }, i) => shownResult(id, shownWaters[i]!.id, 'saved')),
+        ...listsProposed.map(({ id }, i) => shownResult(id, shownLists[i]!.id, 'added to the list')),
         ...ingredientsProposed.map(({ id }, i) => shownResult(id, shownIngredients[i]!.id, 'added to the recipe')),
         ...recipesProposed.map(({ id }, i) => shownResult(id, shownRecipes[i]!.id, 'saved')),
         ...portionsProposed.map(({ id }, i) => shownResult(id, shownPortions[i]!.id, 'logged')),
@@ -395,6 +414,7 @@ export async function sendMessage(
           sleeps: shownSleeps,
           activities: shownActivities,
           waters: shownWaters,
+          shopping: shownLists,
           ingredients: shownIngredients,
           recipes: shownRecipes,
           portions: shownPortions,
@@ -415,6 +435,9 @@ export async function sendMessage(
     }
     for (const { id } of watersProposed) {
       results.push({ type: 'tool_result', tool_use_id: id, content: 'Not shown: another proposal in this response had errors. Call propose_water again for this water too.', is_error: true });
+    }
+    for (const { id } of listsProposed) {
+      results.push({ type: 'tool_result', tool_use_id: id, content: 'Not shown: another proposal in this response had errors. Call propose_shopping again for these items too.', is_error: true });
     }
     for (const { id } of activitiesProposed) {
       results.push({ type: 'tool_result', tool_use_id: id, content: 'Not shown: another proposal in this response had errors. Call propose_activity again for this activity too.', is_error: true });

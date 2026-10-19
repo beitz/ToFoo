@@ -8,6 +8,8 @@ import { Icon } from '../../ui/Icon';
 import { ActivitySheet } from '../activity/ActivitySheet';
 import { SleepButton } from '../sleep/SleepButton';
 import { DialItem } from './DialItem';
+import { useShopping } from '../shopping/useShopping';
+import { isOpen } from '../../logic/shopping';
 
 /**
  * The round button on Home, with the assistant's button right above it. Closed they take two
@@ -33,6 +35,7 @@ export function QuickActions({ onFast }: { onFast: () => void }) {
     navigate(...parts);
   };
   const on = (key: Parameters<typeof isOn>[1]) => isOn(d.settings.features, key);
+  const toBuy = useShopping()?.filter(isOpen).length ?? 0;
 
   return (
     <>
@@ -40,6 +43,7 @@ export function QuickActions({ onFast }: { onFast: () => void }) {
       <div className={`fab-stack dial${open ? ' open' : ''}`}>
         {/* Hidden items stay rendered so they can animate out; visibility keeps them out of reach. */}
         <div className="dial-items" id="home-actions" role="group" aria-label={t('home.quickActions')}>
+          {on('shoppingList') && <DialItem icon="cart" label={toBuy ? t('shopping.open', { n: toBuy }) : t('home.shopping')} onClick={() => go('shopping')} />}
           {on('journal') && <DialItem icon="journal" label={t('home.journal')} onClick={() => go('journal')} />}
           {on('activity') && (
             <DialItem

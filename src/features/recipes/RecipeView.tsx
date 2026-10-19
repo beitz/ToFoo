@@ -19,6 +19,8 @@ import { PlanEditor } from './PlanEditor';
 import { PortionNutrients } from './PortionNutrients';
 import { SourceTag } from './SourceTag';
 import { refKey } from '../../lib/refs';
+import { isOn } from '../../settings/features';
+import { RecipeToListSheet } from '../shopping/RecipeToListSheet';
 
 export function RecipeView({ id }: { id: string }) {
   const d = useData();
@@ -26,6 +28,7 @@ export function RecipeView({ id }: { id: string }) {
   const recipe = d.recipes.find((r) => r.id === id);
   const [cooking, setCooking] = useState(false);
   const [openBatch, setOpenBatch] = useState<Batch | null>(null);
+  const [toList, setToList] = useState(false);
   if (!recipe) {
     return (
       <section>
@@ -82,9 +85,16 @@ export function RecipeView({ id }: { id: string }) {
           );
         })}
       </ul>
-      <a className="btn btn-small btn-ghost" href={href('recipes', recipe.id, 'edit')}>
-        <Icon name="edit" size={16} /> {t('recipes.changeIngredients')}
-      </a>
+      <div className="row wrap">
+        <a className="btn btn-small btn-ghost" href={href('recipes', recipe.id, 'edit')}>
+          <Icon name="edit" size={16} /> {t('recipes.changeIngredients')}
+        </a>
+        {isOn(d.settings.features, 'shoppingList') && recipe.ingredients.length > 0 && (
+          <button className="btn btn-small btn-ghost" onClick={() => setToList(true)}>
+            <Icon name="cart" size={16} /> {t('shopping.toList')}
+          </button>
+        )}
+      </div>
       {recipe.instructions && (
         <>
           <h2 className="section-title">{t('recipes.instructions')}</h2>
@@ -118,6 +128,7 @@ export function RecipeView({ id }: { id: string }) {
       <button className="btn btn-danger-ghost" onClick={() => void remove()}>
         {t('recipes.delete')}
       </button>
+      {toList && <RecipeToListSheet recipe={recipe} onClose={() => setToList(false)} />}
       {cooking && <CookSheet recipe={recipe} onClose={() => setCooking(false)} />}
       {openBatch && <BatchSheet batch={d.batchesById.get(openBatch.id) ?? openBatch} onClose={() => setOpenBatch(null)} />}
     </section>

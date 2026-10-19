@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import type { useToast } from '../../app/toast';
-import type { RecipeSoFar, ShownActivity, ShownBatch, ShownIngredients, ShownNote, ShownPortion, ShownProposal, ShownRecipe, ShownSleep, ShownWater } from '../../ai/assistant';
+import type { RecipeSoFar, ShownActivity, ShownBatch, ShownIngredients, ShownNote, ShownPortion, ShownProposal, ShownRecipe, ShownShopping, ShownSleep, ShownWater } from '../../ai/assistant';
 import type { ProposedItem } from '../../ai/tools';
 import { t } from '../../i18n';
 import { formatTime } from '../../lib/dates';
@@ -10,6 +10,7 @@ import { waterText } from '../water/format';
 
 /**
  * A proposed meal (M1, …), journal entry (J1, …), sleep (S1, …), activity (A1, …), water (W1, …),
+ * things for the shopping list (L1, …),
  * recipe ingredients (R1, …, recipe editor), recipe for the book (R1, …, main chat), serving from
  * stock (P1, …) or cooked batch (B1, …), and whether the user logged, saved or added it.
  */
@@ -19,6 +20,7 @@ export type Card =
   | { kind: 'sleep'; sleep: ShownSleep; logged: boolean }
   | { kind: 'activity'; activity: ShownActivity; logged: boolean }
   | { kind: 'water'; water: ShownWater; logged: boolean }
+  | { kind: 'shopping'; shopping: ShownShopping; logged: boolean }
   | { kind: 'ingredients'; ingredients: ShownIngredients; logged: boolean }
   | { kind: 'recipe'; recipe: ShownRecipe; logged: boolean }
   | { kind: 'portion'; portion: ShownPortion; logged: boolean }
@@ -36,6 +38,8 @@ export function cardOf(c: Card) {
       return c.activity;
     case 'water':
       return c.water;
+    case 'shopping':
+      return c.shopping;
     case 'ingredients':
       return c.ingredients;
     case 'recipe':
@@ -63,6 +67,8 @@ export function cardTitle(c: Card): string {
       return `${activityName(c.activity)} · ${formatTime(c.activity.start)}`;
     case 'water':
       return `${t('water.title')} · ${waterText(c.water.ml)}`;
+    case 'shopping':
+      return `${t('shopping.title')} · ${[...c.shopping.recipes.map((r) => r.name), ...c.shopping.items.map((i) => i.name)].join(', ')}`;
     case 'ingredients':
       return c.ingredients.name || t('ai.ingredientsTitle');
     case 'recipe':
