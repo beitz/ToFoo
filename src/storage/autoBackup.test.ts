@@ -135,6 +135,24 @@ describe('backup before an app update changes how data is stored', () => {
     expect(JSON.parse(list[0]!.json).data.log).toContainEqual(tea);
   });
 
+  it('saves a copy when the shopping list arrives (database version 8 to 9)', async () => {
+    const old = new Dexie('upgrade-backup-3');
+    old.version(8).stores({
+      profile: 'id', settings: 'id', recipes: 'id, name, updatedAt', batches: 'id, recipeId, cookedDay', log: 'id, time, day, kind', customFoods: 'id, name',
+      dayStatus: 'day', fasts: 'id, startDay', sunEntries: 'id, day', meta: 'key', products: 'id, name', journal: 'id, time, day', sleep: 'id, start, day',
+      activities: 'id, time, day', water: 'id, time, day', chats: 'id, updatedAt', chatPhotos: 'id, chatId', autoBackups: 'id, at',
+    });
+    await old.open();
+    await old.table('log').put(oats);
+    old.close();
+    const repo = createRepo(new ToFooDB('upgrade-backup-3'));
+    await repo.init('2026-10-19');
+    const list = await repo.listAutoBackups();
+    expect(list.map((b) => b.reason)).toEqual(['upgrade']);
+    expect(data(list[0]!.json)).toMatchObject({ log: [oats], shopping: [] });
+    expect(await repo.db.shopping.count()).toBe(0);
+  });
+
   it('saves nothing on a new phone', async () => {
     const repo = await fresh();
     expect(await repo.db.autoBackups.count()).toBe(0);

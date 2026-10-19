@@ -3,7 +3,7 @@ import type * as Beta from '@anthropic-ai/sdk/resources/beta/messages/messages';
 import type { Food } from '../foods/foodDb';
 import { buildIndex } from '../foods/search';
 import { appNote, emptyConversation, requestParams, retirePhotos, sendMessage, textOf, type CreateMessage } from './assistant';
-import { describeFood, validateBatchProposal, validatePortionProposal, MAX_INGREDIENT_GRAMS, MAX_ITEM_GRAMS, runCheckRecipe, runListRecipes, validateRecipeProposal, validateIngredientsProposal, runLookupBarcode, runSearchFoods, runSearchUsda, validateJournalProposal, validateProposal, validateSleepProposal, validateActivityProposal, validateWaterProposal, type ProductTools, type ToolContext } from './tools';
+import { describeFood, validateBatchProposal, validatePortionProposal, MAX_INGREDIENT_GRAMS, MAX_ITEM_GRAMS, runCheckRecipe, runListRecipes, validateRecipeProposal, validateIngredientsProposal, runLookupBarcode, runSearchFoods, runSearchUsda, validateJournalProposal, validateProposal, validateSleepProposal, validateActivityProposal, validateWaterProposal, validateShoppingProposal, type ProductTools, type ToolContext } from './tools';
 import type { Product } from '../storage/types';
 import type { FindResult } from '../foods/findProduct';
 
@@ -587,6 +587,36 @@ describe('water', () => {
     expect(validateWaterProposal({ ml: 4000, time: '', replaces: '' }, now)).toMatchObject({ ok: false });
     expect(validateWaterProposal({ ml: 250, time: '2026-10-18 09:00', replaces: '' }, now)).toMatchObject({ ok: false });
     expect(validateWaterProposal({ ml: 249.6, time: '', replaces: 'W1' }, now)).toEqual({ ok: true, proposal: { ml: 250, replaces: 'W1' } });
+  });
+});
+
+describe('shopping list', () => {
+  const book = [{ id: 'r1', name: 'Lentil curry', portions: 4 }];
+
+  it('offers propose_shopping only with the list on, not strict, with recipes only beside the recipe book', () => {
+    const tool = (sources: Parameters<typeof requestParams>[2]) => (requestParams('claude-opus-5-5', [], sources).tools ?? []).find((t) => 'name' in t && t.name === 'propose_shopping') as { strict?: boolean; input_schema: { properties: object } } | undefined;
+    expect(tool({})).toBeUndefined();
+    expect(tool({ shopping: true, recipe: true })).toBeUndefined();
+    expect(tool({ shopping: true })!.strict).toBeUndefined();
+    expect(Object.keys(tool({ shopping: true })!.input_schema.properties)).toEqual(['items', 'replaces']);
+    expect(Object.keys(tool({ shopping: true, recipes: true })!.input_schema.properties)).toEqual(['items', 'recipes', 'replaces']);
+  });
+
+  it('shows a shopping card', async () => {
+    const api = scripted(reply([toolUse('s', 'propose_shopping', { items: [{ name: 'Milk', amount: '2 l' }, { name: 'Eggs' }] })], 'tool_use'));
+    const { conversation, outcome } = await sendMessage(api.create, 'claude-opus-5-5', emptyConversation(), { text: 'put milk and eggs on the list', images: [] }, { ...ctx, shopping: true });
+    expect(outcome.kind === 'proposal' && outcome.shopping).toEqual([{ id: 'L1', items: [{ name: 'Milk', amount: '2 l' }, { name: 'Eggs' }], recipes: [] }]);
+    expect(conversation.lists).toBe(1);
+  });
+
+  it('checks the recipes and that there is something to buy', () => {
+    expect(validateShoppingProposal({ items: [] }, book)).toMatchObject({ ok: false });
+    expect(validateShoppingProposal({ items: [{ name: ' ' }] }, book)).toMatchObject({ ok: false });
+    expect(validateShoppingProposal({ items: [], recipes: [{ recipe_id: 'nope' }] }, book)).toMatchObject({ ok: false, error: expect.stringContaining('list_recipes') });
+    expect(validateShoppingProposal({ items: [{ name: 'Rice', amount: '' }], recipes: [{ recipe_id: 'r1', portions: 0 }, { recipe_id: 'r1', portions: 6.4 }], replaces: 'L1' }, book)).toEqual({
+      ok: true,
+      proposal: { items: [{ name: 'Rice' }], recipes: [{ recipeId: 'r1', name: 'Lentil curry', portions: 4 }, { recipeId: 'r1', name: 'Lentil curry', portions: 6 }], replaces: 'L1' },
+    });
   });
 });
 

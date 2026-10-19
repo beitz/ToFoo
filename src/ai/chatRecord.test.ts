@@ -63,6 +63,9 @@ describe('saved chats', () => {
     const food = { code: 'C131000', nameEn: 'Muesli', nameDe: 'Müsli', per100: { ENERCC: 360 } };
     const card = cardSummary({ id: 'M1', summary: 'Breakfast', time: new Date(2026, 9, 18, 8, 0).getTime(), items: [{ food, grams: 60, preparation: 'asListed', note: '' }] });
     expect(card).toEqual({ id: 'M1', summary: 'Breakfast', time: 'Sun 2026-10-18 08:00', items: [{ code: 'C131000', name: 'Muesli', grams: 60, preparation: 'asListed' }] });
+    // A shopping card's things are not foods: kept as they are.
+    const list = { id: 'L1', items: [{ name: 'Milk', amount: '2 l' }], recipes: [] };
+    expect(cardSummary(list)).toEqual(list);
   });
 
   it('names chats by their first message and files by start time and kind', () => {

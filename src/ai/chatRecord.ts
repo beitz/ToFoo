@@ -125,6 +125,8 @@ export interface ItemLike {
   product?: Pick<Product, 'id' | 'name' | 'brand' | 'match'>;
 }
 
+const isFood = (it: unknown): it is ItemLike => typeof it === 'object' && it !== null && 'food' in it;
+
 /** A proposed food as it goes into a saved chat: what was chosen, not the food's whole nutrient table. */
 export function itemSummary(it: ItemLike) {
   const p = it.product;
@@ -148,7 +150,8 @@ export function localTimes(o: object): Record<string, unknown> {
 /** A proposal card as saved: foods summarized, times readable, everything else as it is. */
 export function cardSummary(card: object): Record<string, unknown> {
   const c = localTimes(card);
-  const out = Array.isArray(c.items) ? { ...c, items: c.items.map((it) => itemSummary(it as ItemLike)) } : c;
+  // Foods are cut down to what was chosen; other lists (a shopping card's things) stay as they are.
+  const out = Array.isArray(c.items) ? { ...c, items: c.items.map((it) => (isFood(it) ? itemSummary(it) : it)) } : c;
   // Changes to a pot or a serving carry whole foods too (batch cooking cards).
   return Array.isArray(out.changes) ? { ...out, changes: out.changes.map((ch: { item?: ItemLike }) => (ch.item ? { ...ch, item: itemSummary(ch.item) } : ch)) } : out;
 }

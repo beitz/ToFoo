@@ -2,6 +2,7 @@ import 'fake-indexeddb/auto';
 import { describe, expect, it } from 'vitest';
 import { ToFooDB } from './db';
 import { createRepo } from './repo';
+import { planAdd, planClear } from '../logic/shopping';
 import type { FavouriteMeal, Recipe } from './types';
 
 let n = 0;
@@ -180,5 +181,26 @@ describe('repository', () => {
     expect(await repo.db.chatPhotos.count()).toBe(1);
     await repo.restoreChats(old);
     expect(await repo.chatPhotos('c1')).toHaveLength(2);
+  });
+
+  it('adds to the shopping list, clears it after shopping, undoes both, and backs it up', async () => {
+    const repo = await fresh();
+    let k = 0;
+    const ids = () => `s${++k}`;
+    const added = await repo.changeShopping((items) => planAdd(items, [{ name: 'Milk', section: 'dairy', amount: '1 l' }, { name: 'Bread', section: 'bakery' }], 1, ids, 1));
+    expect(added.created).toEqual(['s1', 's2']);
+    const more = await repo.changeShopping((items) => planAdd(items, [{ name: 'milk', section: 'dairy', amount: '1 l' }], 2, ids, 1));
+    expect(await repo.db.shopping.get('s1')).toMatchObject({ amount: '2 l' });
+    await repo.undoShopping(more);
+    expect(await repo.db.shopping.get('s1')).toMatchObject({ amount: '1 l' });
+
+    await repo.db.shopping.update('s1', { checkedAt: 3 });
+    const cleared = await repo.changeShopping((items) => planClear(items, 4));
+    expect(await repo.db.shopping.get('s1')).toMatchObject({ clearedAt: 4 });
+    expect((await repo.snapshot()).shopping).toHaveLength(2);
+    await repo.undoShopping(cleared);
+    expect((await repo.db.shopping.get('s1'))!.clearedAt).toBeUndefined();
+    await repo.undoShopping(added);
+    expect(await repo.db.shopping.count()).toBe(0);
   });
 });

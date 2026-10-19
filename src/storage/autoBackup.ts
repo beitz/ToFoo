@@ -22,9 +22,23 @@ export const PORTIONS_PREFIX = 'portions:';
 /** Every table a snapshot reads (all personal data). */
 export const SNAPSHOT_TABLES: string[] = [...TABLES, 'meta'];
 
+/**
+ * Tables added after automatic backups began (database v8). An app update from before one of them
+ * runs the older versions' upgrade steps first, and the backup taken in the first of those steps
+ * cannot see a table that does not exist yet; it is empty then anyway.
+ */
+const LATER_TABLES = new Set(['shopping']);
+
 /** All personal data, as stored. The one reader behind "Export everything" and automatic backups. */
 export async function readSnapshot(table: GetTable): Promise<Snapshot> {
-  const all = (name: string) => table(name).toArray();
+  const all = async (name: string) => {
+    try {
+      return await table(name).toArray();
+    } catch (e) {
+      if (LATER_TABLES.has(name) && (e as Error).name === 'NotFoundError') return [];
+      throw e;
+    }
+  };
   const portions = (await table('meta').where('key').startsWith(PORTIONS_PREFIX).toArray()) as MetaRecord[];
   return {
     profile: ((await table('profile').get('profile')) as Profile | undefined) ?? null,
@@ -41,6 +55,7 @@ export async function readSnapshot(table: GetTable): Promise<Snapshot> {
     sleep: await all('sleep'),
     activities: await all('activities'),
     water: await all('water'),
+    shopping: await all('shopping'),
     portionSizes: portions.filter((r) => Array.isArray(r.value) && r.value.length).map((r) => ({ food: r.key.slice(PORTIONS_PREFIX.length), sizes: r.value as PortionSize[] })),
   };
 }

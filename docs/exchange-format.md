@@ -32,13 +32,13 @@ Everything personal, as stored on the device. Written by Settings → Backup →
     "profile": { "id": "profile", "schemaVersion": 1, "…": "…" },
     "settings": { "id": "settings", "schemaVersion": 1, "…": "…" },
     "recipes": [], "batches": [], "log": [], "customFoods": [],
-    "dayStatus": [], "fasts": [], "sunEntries": [], "products": [], "journal": [], "sleep": [], "activities": [], "water": [],
+    "dayStatus": [], "fasts": [], "sunEntries": [], "products": [], "journal": [], "sleep": [], "activities": [], "water": [], "shopping": [],
     "portionSizes": [{ "food": "C133000", "sizes": [{ "label": "My bowl", "grams": 60 }] }]
   }
 }
 ```
 
-Each record has a `schemaVersion`; older records are migrated on import. `products` may be missing in backups from before the Open Food Facts lookup, `journal` in backups from before the journal, `sleep` in backups from before sleep, `activities` in backups from before activities, and `water` in backups from before water; each then counts as empty. `portionSizes` (portion sizes the user saved per food, by the food code they were saved under) is missing in backups from before 2026-10-18; restoring such a backup leaves the portion sizes on the device as they are.
+Each record has a `schemaVersion`; older records are migrated on import. `products` may be missing in backups from before the Open Food Facts lookup, `journal` in backups from before the journal, `sleep` in backups from before sleep, `activities` in backups from before activities, `water` in backups from before water, and `shopping` in backups from before the shopping list; each then counts as empty. `portionSizes` (portion sizes the user saved per food, by the food code they were saved under) is missing in backups from before 2026-10-18; restoring such a backup leaves the portion sizes on the device as they are.
 
 Journal entries (`data.journal[]`): `id`, `schemaVersion`, `time` (epoch ms the entry is about), `day` (the local `YYYY-MM-DD` of `time`) and `text` (what the user wrote, plain text).
 
@@ -47,6 +47,8 @@ Sleep (`data.sleep[]`): `id`, `schemaVersion`, `start` (epoch ms the user fell a
 Activities (`data.activities[]`): `id`, `schemaVersion`, `kind` (`walk`, `run`, `cycling`, `strength` or `other`), optional `name` (the user's own word, e.g. "Football"), `time` (epoch ms it started), `day` (local `YYYY-MM-DD` it started), `minutes`, optional `intensity` (`easy`, `moderate` or `hard`), `outside` (boolean) and `sunSkin` (uncovered skin, same values as the sun routine's `skin`; present only when the activity counts toward the vitamin D sun estimate).
 
 Water (`data.water[]`): `id`, `schemaVersion`, `time` (epoch ms it was drunk), `day` (local `YYYY-MM-DD` of `time`) and `ml`. Plain water only; other drinks are log entries with a food.
+
+Shopping list (`data.shopping[]`): `id`, `schemaVersion`, `name`, optional `ref` (the food, as in log entries, when it was picked from the database or came from a recipe), `section` (`produce`, `bakery`, `dairy`, `meat`, `dry`, `pantry`, `drinks`, `ready` or `other`), optional `grams`, optional `amount` (any other amount as typed, e.g. "2 l"), optional `recipes` (names of the recipes it is for), `addedAt` (epoch ms), optional `checkedAt` (epoch ms it was put in the basket) and optional `clearedAt` (epoch ms "Clear" took it off the list; such lines are kept as suggestions).
 
 Products (`data.products[]`) are foods from online databases as fetched: Open Food Facts products (data licence ODbL) and USDA FoodData Central foods (public domain). Fields: `id` (`OFF:<barcode>` or `USDA:<fdcId>`), `source` (`"OFF"` or `"USDA"`), `code` (barcode or FoodData Central id), `usdaType` (USDA only: `Foundation`, `SR Legacy`, `Survey (FNDDS)` or `Branded`), `name`, optional `brand`, `quantity`, `serving` (`{ label, grams }`), `per100` (values per 100 g, or per 100 ml if `perMl`, by BLS component code in BLS units: label values, or the USDA database values for USDA generic foods; a nutrient without a value is absent, not 0), `categories`, optional `lastModified`, `fetchedAt`, and optional `match` (`{ version, code }`: the BLS food whose values fill in what the source lacks).
 
