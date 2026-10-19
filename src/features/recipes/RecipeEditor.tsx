@@ -1,25 +1,28 @@
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useData } from '../../app/data';
 import { useBackCloses } from '../../app/history';
 import { href, navigate } from '../../app/router';
 import { t } from '../../i18n';
 import { productFood, productLabel } from '../../foods/products';
+import { fmtGrams } from '../../lib/format';
 import { refKey } from '../../lib/refs';
 import { addProposed, foodIngredient, ingredientLine, itemIngredient, type RecipeDraft } from '../../logic/ingredients';
+import { moveChange, recordChange, type Change, type LastChange, type RecipeState } from '../../logic/swapPreview';
 import { isOn } from '../../settings/features';
 import { repo } from '../../storage/repo';
 import type { Ingredient, Product, Recipe, StoragePlan } from '../../storage/types';
-import { Field, NumberInput } from '../../ui/controls';
+import { Field, NumberInput, Segmented } from '../../ui/controls';
 import { Icon } from '../../ui/Icon';
 import { RecipeAssistant, type RecipeChat } from '../assistant/AssistantPage';
 import { BarcodeSheet } from '../log/BarcodeSheet';
 import type { PickedFood } from '../log/FoodPicker';
-import { PreparationSelect } from '../log/PreparationSelect';
+import { PreparationSelect, prepLabel } from '../log/PreparationSelect';
 import { SourceTag } from './SourceTag';
 import { IngredientSearch } from './IngredientSearch';
 import { PortionNutrients } from './PortionNutrients';
 import { PlanEditor } from './PlanEditor';
 import { IngredientSheet, type IngredientDraft, type SavedIngredient } from './IngredientSheet';
+import { IngredientSwapLine, SwapLine, SwapPreview, usePortionMove } from './SwapPreview';
 
 /** Create or edit a recipe. Route: #/recipes/new or #/recipes/<id>/edit. */
 export function RecipeEditor({ id }: { id?: string }) {
@@ -34,6 +37,18 @@ export function RecipeEditor({ id }: { id?: string }) {
   const [plan, setPlan] = useState<StoragePlan | undefined>(existing?.defaultPlan);
   const [saltOverride, setSaltOverride] = useState(existing?.saltOverride);
   const hasSalt = ingredients.some((i) => i.isSalt);
+  // Swap preview: the recipe now against the recipe just before the latest change (or as saved).
+  const state = useMemo<RecipeState>(() => ({ portions, ingredients, ...(saltOverride ? { saltOverride } : {}) }), [portions, ingredients, saltOverride]);
+  const stateRef = useRef(state);
+  stateRef.current = state;
+  const savedState = useMemo<RecipeState | undefined>(
+    () => existing && { portions: existing.portions, ingredients: existing.ingredients, ...(existing.saltOverride ? { saltOverride: existing.saltOverride } : {}) },
+    [existing],
+  );
+  const [last, setLast] = useState<LastChange>();
+  const [compare, setCompare] = useState<'change' | 'saved'>('change');
+  /** Called before an edit is applied, so the state read here is the recipe before it. */
+  const note = (change: Change) => setLast((l) => recordChange(l, change, stateRef.current));
   /** The ingredient sheet: adding a product (no index) or changing ingredient `index`. */
   const [sheet, setSheet] = useState<{ index?: number; initial: IngredientDraft; label?: string } | null>(null);
   const [scanning, setScanning] = useState(false);
@@ -62,7 +77,10 @@ export function RecipeEditor({ id }: { id?: string }) {
   // and the food for its missing micronutrients.
   function pick(p: PickedFood) {
     if (p.product) openProduct(p.product);
-    else setIngredients((list) => [...list, foodIngredient(p.food, d.foods.version, d.profile.salt)]);
+    else {
+      note({ kind: 'ingredient', index: stateRef.current.ingredients.length });
+      setIngredients((list) => [...list, foodIngredient(p.food, d.foods.version, d.profile.salt)]);
+    }
   }
 
   function openProduct(product: Product) {
@@ -79,6 +97,8 @@ export function RecipeEditor({ id }: { id?: string }) {
   function saveSheet(saved: SavedIngredient) {
     const ing = itemIngredient(saved, d.foods.version, d.profile.salt);
     const index = sheet?.index;
+    const list = stateRef.current.ingredients;
+    note(index === undefined ? { kind: 'ingredient', index: list.length } : { kind: 'ingredient', index, ...(list[index] ? { was: list[index] } : {}) });
     setIngredients((list) => (index === undefined ? [...list, ing] : list.map((x, j) => (j === index ? ing : x))));
     setSheet(null);
   }
@@ -119,6 +139,7 @@ export function RecipeEditor({ id }: { id?: string }) {
       const before = latest.current;
       const added = proposal.items.map((it) => itemIngredient(it, d.foods.version, d.profile.salt));
       const next = addProposed(before, added, proposal);
+      if (added.length) note({ kind: 'assistant', added: added.length });
       setName(next.name);
       setPortions(next.portions);
       setIngredients((list) => [...list, ...added]);
@@ -135,16 +156,56 @@ export function RecipeEditor({ id }: { id?: string }) {
   }));
   const describeRef = useRef(describe);
   describeRef.current = describe;
-  const update = (i: number, patch: Partial<Ingredient>) => setIngredients((list) => list.map((ing, j) => (j === i ? { ...ing, ...patch } : ing)));
-  const remove = (i: number) => setIngredients((list) => list.filter((_, j) => j !== i));
-  const move = (i: number, dir: -1 | 1) =>
+  const update = (i: number, patch: Partial<Ingredient>) => {
+    const was = stateRef.current.ingredients[i];
+    note({ kind: 'ingredient', index: i, ...(was ? { was } : {}) });
+    setIngredients((list) => list.map((ing, j) => (j === i ? { ...ing, ...patch } : ing)));
+  };
+  const remove = (i: number) => {
+    const was = stateRef.current.ingredients[i];
+    if (was) note({ kind: 'removed', was });
+    setIngredients((list) => list.filter((_, j) => j !== i));
+  };
+  const move = (i: number, dir: -1 | 1) => {
+    const j = i + dir;
+    if (j < 0 || j >= stateRef.current.ingredients.length) return;
+    setLast((l) => moveChange(l, i, j));
     setIngredients((list) => {
-      const j = i + dir;
-      if (j < 0 || j >= list.length) return list;
       const copy = [...list];
       [copy[i], copy[j]] = [copy[j]!, copy[i]!];
       return copy;
     });
+  };
+  const changePortions = (v: number | undefined) => {
+    note({ kind: 'portions', ...(portions !== undefined ? { was: portions } : {}) });
+    setPortions(v);
+  };
+
+  /** "100 g" or "250 ml" (a product sold by volume). */
+  const amountOf = (ing: Ingredient) => (d.productsById.get(refKey(ing.ref))?.perMl ? `${Math.round(ing.grams)} ml` : fmtGrams(ing.grams));
+
+  /** The latest change in words: "Adding 100 g Spinach", "200 g Beef → 150 g Tofu", "Portions: 4 → 6". */
+  function changeTitle(c: Change): { text: string; pending?: boolean } {
+    if (c.kind === 'removed') return { text: t('swap.removed', { amount: amountOf(c.was), name: describe(c.was).name }) };
+    if (c.kind === 'portions') return { text: t('swap.portions', { was: c.was ?? '–', now: portions ?? '–' }) };
+    if (c.kind === 'salt') return { text: t('swap.salt') };
+    if (c.kind === 'assistant') return { text: t('swap.assistant', { n: c.added }) };
+    const now = ingredients[c.index];
+    if (!now) return { text: '' };
+    const name = describe(now).name;
+    if (!c.was) return now.grams > 0 ? { text: t('swap.adding', { amount: amountOf(now), name }) } : { text: t('swap.addingNoAmount', { name }), pending: true };
+    const was = c.was;
+    const prep = was.preparation !== now.preparation;
+    const side = (ing: Ingredient) => `${amountOf(ing)}${prep ? `, ${prepLabel(ing.preparation).toLowerCase()}` : ''}`;
+    if (refKey(was.ref) !== refKey(now.ref)) return { text: t('swap.swapped', { was: `${side(was)} ${describe(was).name}`, now: `${side(now)} ${name}` }) };
+    if (was.grams === now.grams && !prep) return { text: t('swap.unchanged', { name }) };
+    if (now.grams === 0) return { text: t('swap.noAmount', { name }), pending: true };
+    return { text: t('swap.changed', { name, was: side(was), now: side(now) }) };
+  }
+
+  const changeMove = usePortionMove(last?.before ?? state, state);
+  const savedMove = usePortionMove(savedState ?? state, state);
+  const title = last && changeTitle(last.change);
 
   const valid = name.trim() && portions && portions >= 1 && ingredients.length > 0 && ingredients.every((i) => i.grams > 0);
   const draft: Recipe | null = valid
@@ -200,7 +261,7 @@ export function RecipeEditor({ id }: { id?: string }) {
         </header>
 
         <Field label={t('recipes.name')}>{(fid) => <input id={fid} value={name} onChange={(e) => setName(e.target.value)} placeholder="Linsencurry" />}</Field>
-        <Field label={t('recipes.portionsLabel')}>{(fid) => <NumberInput id={fid} value={portions} onChange={setPortions} min={1} />}</Field>
+        <Field label={t('recipes.portionsLabel')}>{(fid) => <NumberInput id={fid} value={portions} onChange={changePortions} min={1} />}</Field>
 
         <h2 className="section-title" ref={ingredientsRef}>
           {t('recipes.ingredientsTitle')}
@@ -235,10 +296,26 @@ export function RecipeEditor({ id }: { id?: string }) {
                   </Field>
                   <PreparationSelect id={`prep-${i}`} hint={false} value={ing.preparation} onChange={(p) => update(i, { preparation: p })} />
                 </div>
+                {last?.change.kind === 'ingredient' && last.change.index === i && <SwapLine move={changeMove} />}
               </li>
             );
           })}
         </ul>
+        {last && (
+          <SwapPreview title={compare === 'saved' ? t('swap.sinceSaved') : title?.text} move={compare === 'saved' ? savedMove : changeMove} pending={compare === 'change' && title?.pending}>
+            {savedState && (
+              <Segmented
+                label={t('swap.compareWith')}
+                value={compare}
+                onChange={setCompare}
+                options={[
+                  { value: 'change', label: t('swap.thisChange') },
+                  { value: 'saved', label: t('swap.savedRecipe') },
+                ]}
+              />
+            )}
+          </SwapPreview>
+        )}
         {assistantOn && (
           <button className="btn btn-secondary btn-block assistant-entry" onClick={openAssistant}>
             <Icon name="camera" /> {t('recipes.assistant')}
@@ -259,6 +336,7 @@ export function RecipeEditor({ id }: { id?: string }) {
             key={sheet.index ?? 'new'}
             initial={sheet.initial}
             label={sheet.label}
+            preview={(item) => <IngredientSwapLine state={state} index={sheet.index} item={item} />}
             onSave={saveSheet}
             onRemove={
               sheet.index === undefined
@@ -280,6 +358,7 @@ export function RecipeEditor({ id }: { id?: string }) {
               value={saltOverride ? `${saltOverride.iodised ? 'i' : ''}${saltOverride.fluoridated ? 'f' : ''}` || 'plain' : 'default'}
               onChange={(e) => {
                 const v = e.target.value;
+                note({ kind: 'salt' });
                 setSaltOverride(
                   v === 'default'
                     ? undefined
