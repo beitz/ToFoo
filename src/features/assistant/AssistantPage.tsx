@@ -17,7 +17,8 @@ import {
   type Conversation,
   type TurnOutcome,
 } from '../../ai/assistant';
-import { classifyError, getAiSettings, makeCreate, saveUsage } from '../../ai/client';
+import { describeAiError, getAiSettings, logAiError, makeCreate, saveUsage } from '../../ai/client';
+import { errorText } from '../../lib/shareFile';
 import { cardSummary, itemSummary, localTimes } from '../../ai/chatRecord';
 import { ChatRecorder } from '../../ai/chatStore';
 import { ChatExport } from './ChatExport';
@@ -144,6 +145,8 @@ const ERROR_TEXT: Record<string, MessageKey> = {
   overloaded: 'ai.error.overloaded',
   network: 'ai.error.network',
   webSearchOff: 'ai.error.webSearchOff',
+  rejected: 'ai.error.rejected',
+  app: 'ai.error.app',
   other: 'ai.error.other',
   refusal: 'ai.error.refusal',
   tooLong: 'ai.error.tooLong',
@@ -184,7 +187,9 @@ function Chat({ apiKey, model, day, recipe }: { apiKey: string; model: AiModel; 
   // Products looked up in this chat stay usable for later proposals in it.
   const [seenProducts] = useState(() => new Map<string, Product>());
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<MessageKey>();
+  /** The error shown above the composer, with the exact cause where there is one. */
+  const [error, setError] = useState<{ key: MessageKey; detail?: string }>();
+  const showError = (key: MessageKey) => setError({ key });
   const fileRef = useRef<HTMLInputElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const [create] = useState(() => makeCreate(apiKey));
@@ -202,7 +207,7 @@ function Chat({ apiKey, model, day, recipe }: { apiKey: string; model: AiModel; 
       setText((old) => appendText(old, added, continued));
       setDictated(true);
     },
-    onError: setError,
+    onError: showError,
   });
   const { recording, transcribing } = dictation;
   /** Index of the photo shown large, for looking at photos while talking about them. */
@@ -216,7 +221,7 @@ function Chat({ apiKey, model, day, recipe }: { apiKey: string; model: AiModel; 
     if (!files) return;
     setError(undefined);
     const picked = [...files].slice(0, Math.max(0, MAX_PHOTOS - images.length));
-    if (picked.length < files.length) setError('ai.error.tooManyPhotos');
+    if (picked.length < files.length) showError('ai.error.tooManyPhotos');
     try {
       // Capture time and barcodes come from the original file, on the phone (scaling drops EXIF);
       // the assistant gets them as text.
@@ -225,11 +230,13 @@ function Chat({ apiKey, model, day, recipe }: { apiKey: string; model: AiModel; 
       );
       let room = MAX_PHOTO_BYTES - photoBytes - images.reduce((n, i) => n + i.data.length, 0);
       const prepared = all.filter((img) => (room -= img.data.length) >= 0);
-      if (prepared.length < all.length) setError('ai.error.chatFull');
+      if (prepared.length < all.length) showError('ai.error.chatFull');
       // Oldest first, photos without a time last: the order the meals happened in.
       setImages((imgs) => [...imgs, ...prepared].sort((a, b) => (a.time.time ?? Infinity) - (b.time.time ?? Infinity)));
-    } catch {
-      setError('ai.error.photo');
+    } catch (e) {
+      const detail = errorText(e);
+      logAiError('photo', model, { kind: 'photo', detail }, e);
+      setError({ key: 'ai.error.photo', detail });
     }
   }
 
@@ -339,9 +346,10 @@ function Chat({ apiKey, model, day, recipe }: { apiKey: string; model: AiModel; 
         setDictated(dictated_);
       }
       if (!reply) setImages(images);
-      const kind = await classifyError(e);
-      recorder.event({ type: 'error', reason: kind, detail: e instanceof Error ? e.message : String(e) });
-      setError(ERROR_TEXT[kind]);
+      const failure = await describeAiError(e);
+      recorder.event({ type: 'error', reason: failure.kind, detail: failure.detail });
+      logAiError(recipe ? 'recipe' : 'assistant', model, failure, e);
+      setError({ key: ERROR_TEXT[failure.kind]!, detail: failure.detail });
     } finally {
       setBusy(false);
     }
@@ -350,7 +358,8 @@ function Chat({ apiKey, model, day, recipe }: { apiKey: string; model: AiModel; 
   function show(outcome: TurnOutcome) {
     if (outcome.kind === 'error') {
       recorder.event({ type: 'error', reason: outcome.reason });
-      setError(ERROR_TEXT[outcome.reason]);
+      logAiError(recipe ? 'recipe' : 'assistant', model, { kind: outcome.reason });
+      setError({ key: ERROR_TEXT[outcome.reason]! });
       return;
     }
     const added: Bubble[] = outcome.text ? [{ role: 'assistant', text: outcome.text }] : [];
@@ -515,11 +524,16 @@ function Chat({ apiKey, model, day, recipe }: { apiKey: string; model: AiModel; 
         {busy && <div className="bubble bubble-assistant muted">{t('ai.thinking')}</div>}
         {error && (
           <div className="card notice-card" role="alert">
-            <Icon name="alert" size={18} /> {t(error)}
+            <Icon name="alert" size={18} />
+            <div>
+              <p>{t(error.key)}</p>
+              {error.detail && <p className="small error-detail">{t('ai.error.detail', { detail: error.detail })}</p>}
+            </div>
           </div>
         )}
         <UsageLine chat={chatTokens} turn={turnTokens} model={model} />
-        {recorder.enabled && bubbles.length > 0 && !busy && <ChatExport recorder={recorder} />}
+        {/* Also after a first message that failed: the saved chat holds the error to share. */}
+        {recorder.enabled && (bubbles.length > 0 || !!error) && !busy && <ChatExport recorder={recorder} />}
         <div ref={endRef} />
       </div>
 

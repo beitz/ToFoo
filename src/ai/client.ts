@@ -1,5 +1,7 @@
 /** Browser glue for the assistant: the API client, its settings on the device, and error texts. */
 import { repo } from '../storage/repo';
+import { diag } from '../app/diagnostics';
+import { errorText } from '../lib/shareFile';
 import { dayKey } from '../lib/dates';
 import { AI_MODELS, DEFAULT_AI_MODEL, type AiModel, type CreateMessage } from './assistant';
 import { recordUsage, type ModelTokens, type UsageDay } from './pricing';
@@ -48,21 +50,69 @@ export function makeCreate(apiKey: string): CreateMessage {
   return async (params) => (await client).beta.messages.stream(params).finalMessage();
 }
 
-export type AiErrorKind = 'auth' | 'rateLimit' | 'overloaded' | 'network' | 'webSearchOff' | 'other';
+export type AiErrorKind = 'auth' | 'rateLimit' | 'overloaded' | 'network' | 'webSearchOff' | 'rejected' | 'app' | 'other';
 
-/** The SDK is already loaded when a request has failed, so importing it here costs nothing. */
-export async function classifyError(e: unknown): Promise<AiErrorKind> {
+/** What went wrong, for the user (kind picks the message) and in full (detail: status, type, the service's own words). */
+export interface AiFailure {
+  kind: AiErrorKind;
+  detail: string;
+}
+
+/** Mid-answer errors arrive in the stream without an HTTP status; their type says what happened. */
+const STREAM_ERROR_KIND: Record<string, AiErrorKind> = {
+  overloaded_error: 'overloaded',
+  api_error: 'overloaded',
+  rate_limit_error: 'rateLimit',
+  authentication_error: 'auth',
+  permission_error: 'auth',
+};
+
+/** The message the API itself gave (`{type: 'error', error: {type, message}}`), if any. */
+function apiMessage(body: unknown): string | undefined {
+  const inner = (body as { error?: { message?: unknown } } | undefined)?.error;
+  const msg = inner?.message ?? (body as { message?: unknown } | undefined)?.message;
+  return typeof msg === 'string' && msg.trim() ? msg.trim() : undefined;
+}
+
+/**
+ * Sort a failed request into what the user can do about it, and spell out the cause in full.
+ * The SDK is already loaded when a request has failed, so importing it here costs nothing.
+ */
+export async function describeAiError(e: unknown): Promise<AiFailure> {
   let Anthropic;
   try {
     ({ default: Anthropic } = await import('@anthropic-ai/sdk'));
   } catch {
-    return 'network'; // offline before the SDK was ever loaded
+    // Offline before the SDK was ever loaded.
+    return { kind: 'network', detail: errorText(e) };
   }
-  if (e instanceof Anthropic.AuthenticationError || e instanceof Anthropic.PermissionDeniedError) return 'auth';
-  if (e instanceof Anthropic.RateLimitError) return 'rateLimit';
-  // An organization admin can turn web search off in the Anthropic console; requests offering it then fail.
-  if (e instanceof Anthropic.BadRequestError && /web search/i.test(e.message)) return 'webSearchOff';
-  if (e instanceof Anthropic.APIConnectionError) return 'network';
-  if (e instanceof Anthropic.APIError && (e.status ?? 0) >= 500) return 'overloaded';
-  return 'other';
+  if (e instanceof Anthropic.APIConnectionError) {
+    const cause = e.cause instanceof Error && e.cause.message !== e.message ? ` (${e.cause.message})` : '';
+    return { kind: 'network', detail: `${e.message}${cause}` };
+  }
+  if (e instanceof Anthropic.APIError) {
+    const type = e.type ?? (e.error as { error?: { type?: string } } | undefined)?.error?.type ?? undefined;
+    const said = apiMessage(e.error) ?? e.message;
+    const detail = [e.status ? `HTTP ${e.status}` : 'Error during the answer', type, said].filter(Boolean).join(' · ') + (e.requestID ? ` (request ${e.requestID})` : '');
+    if (e instanceof Anthropic.AuthenticationError || e instanceof Anthropic.PermissionDeniedError) return { kind: 'auth', detail };
+    if (e instanceof Anthropic.RateLimitError) return { kind: 'rateLimit', detail };
+    // An organization admin can turn web search off in the Anthropic console; requests offering it then fail.
+    if (e instanceof Anthropic.BadRequestError && /web search/i.test(said)) return { kind: 'webSearchOff', detail };
+    if (e.status === undefined) return { kind: (type && STREAM_ERROR_KIND[type]) || 'other', detail };
+    if (e.status >= 500) return { kind: 'overloaded', detail };
+    // Any other 4xx: the service turned this request down, and its message says why.
+    return { kind: 'rejected', detail };
+  }
+  // The SDK's own complaints (e.g. a stream that ended early) versus a fault in the app's own code.
+  if (e instanceof Anthropic.AnthropicError) return { kind: 'other', detail: errorText(e) };
+  return { kind: 'app', detail: errorText(e) };
+}
+
+/**
+ * Keep a failure in the diagnostics log (Settings → About → Diagnostics), so it can be traced
+ * later even when the chat was closed. For a fault in the app, the first stack lines say where.
+ */
+export function logAiError(where: string, model: string, failure: { kind: string; detail?: string }, e?: unknown): void {
+  const stack = failure.kind === 'app' && e instanceof Error && e.stack ? e.stack.split('\n').slice(0, 4).join(' | ') : undefined;
+  diag('ai.error', { where, model, kind: failure.kind, ...(failure.detail ? { detail: failure.detail } : {}), ...(stack ? { stack } : {}) });
 }
