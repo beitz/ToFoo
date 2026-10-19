@@ -4,7 +4,7 @@ import { useData } from '../../app/data';
 import { href } from '../../app/router';
 import { t, type MessageKey } from '../../i18n';
 import type { AiModel } from '../../ai/assistant';
-import { classifyError, getAiSettings, makeCreate, saveUsage } from '../../ai/client';
+import { describeAiError, getAiSettings, logAiError, makeCreate, saveUsage } from '../../ai/client';
 import { ChatRecorder } from '../../ai/chatStore';
 import { INSIGHT_SYSTEM, INSIGHT_TOOLS } from '../../ai/insightsPrompt';
 import { askInsights, fmtChance, fmtMeasure, insightNote, type Check, type InsightConversation } from '../../ai/insights';
@@ -49,6 +49,8 @@ const ERROR_TEXT: Record<string, MessageKey> = {
   overloaded: 'ai.error.overloaded',
   network: 'ai.error.network',
   webSearchOff: 'ai.error.other',
+  rejected: 'ai.error.rejected',
+  app: 'ai.error.app',
   other: 'ai.error.other',
   refusal: 'insights.error.refusal',
   tooLong: 'insights.error.tooLong',
@@ -182,6 +184,7 @@ function Chat({ apiKey, model }: { apiKey: string; model: AiModel }) {
       if (r.outcome.kind === 'error') {
         const reason = r.outcome.reason;
         recorder.event({ type: 'error', reason });
+        logAiError('insights', model, { kind: reason });
         setState((s) => ({ ...s, conversation: r.conversation, bubbles: s.bubbles.slice(0, -1) }));
         setText(question);
         setError({ key: ERROR_TEXT[reason]! });
@@ -194,10 +197,10 @@ function Chat({ apiKey, model }: { apiKey: string; model: AiModel }) {
       // Nothing was added to the conversation: put the question back so Ask retries it.
       setState((s) => ({ ...s, bubbles: s.bubbles.slice(0, -1) }));
       setText(question);
-      const kind = await classifyError(e);
-      const detail = e instanceof Error ? e.message : String(e);
-      recorder.event({ type: 'error', reason: kind, detail });
-      setError({ key: ERROR_TEXT[kind]!, detail });
+      const failure = await describeAiError(e);
+      recorder.event({ type: 'error', reason: failure.kind, detail: failure.detail });
+      logAiError('insights', model, failure, e);
+      setError({ key: ERROR_TEXT[failure.kind]!, detail: failure.detail });
     } finally {
       setBusy(false);
     }
