@@ -3,7 +3,7 @@ import { useData } from '../../app/data';
 import { href, navigate } from '../../app/router';
 import { t, type MessageKey } from '../../i18n';
 import { addDays, daysBetween } from '../../lib/dates';
-import { formatRange, presetOf, presetRange, type PeriodPreset } from '../../lib/periods';
+import { formatRange, presetOf, presetRange, weekStart, type PeriodPreset } from '../../lib/periods';
 import { NUTRIENTS } from '../../model/nutrients';
 import { periodBreakdown } from '../../model/period';
 import type { NutrientResult } from '../../model/simulate';
@@ -108,6 +108,9 @@ export function ReviewPage({ from: fromParam, to: toParam }: { from?: string; to
               <Icon name="diary" size={16} /> {t('review.openDiary')}
             </a>
           )}
+          <a className="btn btn-small btn-ghost" href={href('week', weekStart(to))}>
+            <Icon name="bars" size={16} /> {t('review.weekByWeek')}
+          </a>
           <a className="btn btn-small btn-ghost" href={href('calendar', to.slice(0, 7))}>
             <Icon name="calendar" size={16} /> {t('review.calendar')}
           </a>

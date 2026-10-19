@@ -1694,10 +1694,13 @@ body:has(.composer) .toast-area {
 
 /* ── Calendar and period review ─────────────────────────────── */
 .diary-links {
+  flex-wrap: wrap;
   margin-bottom: 12px;
 }
+/* Buttons share the row and wrap to a second one (rather than squeezing) once Patterns is on too. */
 .diary-links .btn {
-  flex: 1;
+  flex: 1 1 0;
+  min-width: max-content;
   min-height: 44px;
 }
 .calendar {
@@ -2847,4 +2850,231 @@ body:has(.fab-stack) .toast-area {
 }
 .auto-backup p {
   margin: 2px 0 8px;
+}
+
+/* Weekly look-back (features/review/WeekPage.tsx) */
+.week-days > li,
+.week-days > li + li,
+.week-chart > li,
+.week-chart > li + li,
+.week-rows > li,
+.week-rows > li + li {
+  padding: 0;
+  border: 0;
+}
+.week-days {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+  margin: 4px 0 8px;
+}
+.week-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-height: 60px;
+  padding: 4px 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  text-decoration: none;
+}
+.week-day-future {
+  opacity: 0.45;
+}
+.week-day.day-logged svg,
+.week-day.day-fasted svg {
+  color: var(--ok);
+}
+.week-day.day-partial svg,
+.week-day.day-unknown svg {
+  color: var(--warn);
+}
+.week-recap h2,
+.week-recap + .card h2,
+.card > h2:first-child {
+  margin-top: 0;
+}
+.week-recap-list {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+.week-recap-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.week-recap-line svg {
+  flex: none;
+  margin-top: 2px;
+}
+.week-st-fine > svg {
+  color: var(--ok);
+}
+.week-st-gettingLow > svg {
+  color: var(--warn);
+}
+.week-st-low > svg {
+  color: var(--low);
+}
+.week-st-tooHigh > svg {
+  color: var(--high);
+}
+.week-st-unknown > svg,
+.week-st-info > svg {
+  color: var(--text-muted);
+}
+.week-suggestion {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  color: var(--text);
+  text-decoration: none;
+}
+a.week-suggestion {
+  min-height: 44px;
+}
+.week-suggestion svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--accent);
+}
+.week-suggestion > span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.week-chart {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 4px;
+}
+.week-chart-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: 100%;
+  min-height: 44px;
+  padding: 2px 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+.week-chart-col.is-current {
+  border-color: var(--accent);
+}
+.week-chart-num {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.week-chart-track {
+  position: relative;
+  display: block;
+  width: 60%;
+  height: 64px;
+  border-radius: 3px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+.week-chart-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--text-muted);
+}
+.week-chart-col.is-current .week-chart-bar {
+  background: var(--accent);
+}
+.week-chart-label {
+  font-size: 0.7rem;
+  line-height: 1.2;
+  text-align: center;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.week-section {
+  margin-bottom: 2px;
+}
+.week-rows {
+  margin: 6px 0 4px;
+}
+.week-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  padding: 4px 2px;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.9rem;
+  text-align: left;
+}
+button.week-row {
+  cursor: pointer;
+}
+button.week-row:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 1px;
+}
+.week-row > svg {
+  flex: none;
+}
+.week-row-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+.week-row-tracker .week-row-name {
+  white-space: normal;
+}
+.week-row-prev {
+  display: block;
+  font-weight: 400;
+}
+.week-row-value {
+  flex: none;
+  min-width: 3.4em;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.minibars {
+  flex: none;
+}
+.minibar {
+  fill: var(--text-muted);
+  opacity: 0.55;
+}
+.minibar-current {
+  fill: var(--accent);
+  opacity: 1;
+}
+.minibar-none {
+  fill: var(--border);
+}
+.minibar-target {
+  stroke: var(--text);
+  stroke-width: 1;
+  stroke-dasharray: 3 2;
+  opacity: 0.6;
+}
+.week-review {
+  margin-top: 16px;
 }

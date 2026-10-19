@@ -61,3 +61,8 @@ export function monthGrid(month: string): Array<Array<string | null>> {
   for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
   return weeks;
 }
+
+/** Monday of the week a day falls in (weeks run Monday to Sunday, as in the calendar). */
+export function weekStart(day: string): string {
+  return addDays(day, -((parseDay(day).getDay() + 6) % 7));
+}

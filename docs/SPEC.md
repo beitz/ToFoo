@@ -471,7 +471,13 @@ The home screen answers "how am I doing, and what do I eat next?" at a glance, w
 **Reviewing the past** (decided 2026-10-16, needed; the owner named this as what makes ToFoo feel lacking next to other apps):
 
 - **Day and range breakdown** (built 2026-10-16): the full nutrient breakdown for one day, a week, a month or a chosen date range ("how was September?"), using the same gauges and percentages. It shows what was logged, nothing filled in: the average per day over the days that count in the model (logged and fasted days, and days without entries unless "Fill in unlogged days" is on; partly logged, filled-in and left-out days are not counted and are shown separately). Percentages are the absorbed amount against the absorbed need, as on Home, and intake against the limit for limits; nutrients with stores show the daily average here, not a fill level. The diary links to the day view and the calendar to the month. The stores view stays the main one on Home.
-- **Trends and weekly look-back**: weekly averages and charts across nutrients, not only one nutrient's history. This is the "weekly recap card" (see Motivation), shipped on its own, without the rest of gamification.
+- **Trends and weekly look-back** (built 2026-10-19; owner's pick): weekly averages and charts across nutrients, not only one nutrient's history. This is the "weekly recap card" (see Motivation), shipped on its own, without the rest of gamification. One screen per calendar week (Monday to Sunday, as the calendar), opened from the diary ("Week") and from the Review screen ("Week by week"); it opens on the current week, or on last week on a Monday, when the current one has no finished day. Today counts once it is over, so a half-eaten day never reads as a gap. From top to bottom:
+  - **The seven days** with their day status (icon and label), each opening the diary.
+  - **Since the week before**: nutrients that are enough again (low or getting low the week before), that are now low, and that are over their limit (the first four names and "and N more"); the biggest rise and fall in share of the need, as "82 % → 96 %", ranked on values capped at 100 % of the need (above the need, more closes no gap); and **one suggestion for the next batch**: the recipe from the book whose portion covers most of the week's gaps (low counts double, as in "Foods that fill your gaps", pushed down when it adds over 20 % of the day of something already too high), with what one portion gives; without a recipe that helps, three foods from "Foods that fill your gaps" for the week. Without a logged day the week before, it says so instead of comparing.
+  - **Nutrients at enough** per week over the last 8 weeks: one bar per week with the count written on it; tap a week to open it.
+  - **Every visible nutrient** sorted by urgency: status icon, name, 8 small bars (one per week, the shown week highlighted, a dashed line at the need) and the week's value, as on the Review screen (absorbed against the need; "of max" for limits; amounts for nutrients without a reference value). Tap for the nutrient page.
+  - **Sleep, activity and more**, for trackers that are on and have data in these weeks: sleep per night, fell asleep, woke up, activity, moderate or hard, outside, plain water per day, water from drinks and food per day, first and last meal, alcohol per day, journal entries; each with the week before and 8 small bars (none for clock times). Activity and journal entries are totals for the week, the rest are averages over the days with a value; a week without any value shows "–", never zero.
+  - "All numbers for this week" opens the Review screen for the same week.
 - **Calendar of day statuses** (built 2026-10-16): a month view, Monday first, with logged / partly / fasted / not logged (and filled in / left out, when used) per day (icon and label, not colour alone) and the count per status; tap a day to open it in the diary, which links back to the calendar. Unlogged days matter for the model, so finding and fixing them fast is worth more here than in other apps.
 - **Fasting timer** (nice to have): "fasted 31 h" on Home, from the last meal's time. Information only, no rewards for longer fasts. Planned as part of the ketosis estimate (see "Ketosis estimate during fasts"), which adds the likely phase to the same line.
 
@@ -511,7 +517,7 @@ A light layer of rewards makes regular use feel good, rewarding logging, cooking
 - **Levels**: experience points from consistent logging, new recipes and gaps closed; a level number and a cosmetic title, nothing more.
 - **Nutrient codex**: each nutrient's wiki entry starts greyed out and "unlocks" the first time it reaches the green zone. Collecting doubles as learning.
 - **Satisfying feedback**: gauges animate as they fill after a log, a short burst when a gauge turns green, haptic tap on Android. Respects the system's reduced-motion setting.
-- **Weekly recap card**: which gaps closed, which tank improved most, one suggestion for the next batch.
+- **Weekly recap card**: which gaps closed, which tank improved most, one suggestion for the next batch. Built on its own as the weekly look-back (see "Reviewing the past").
 
 Guardrails: no rewards for fewer calories, longer fasts, weight change or overshooting a nutrient; no countdowns, loss threats or nagging notifications; every element can be switched off.
 
@@ -617,7 +623,7 @@ v1 is the smallest app that is useful every day; each later version adds to the 
 - [x] Repeat a past meal; favourite foods; home-screen shortcuts (built 2026-10-16)
 - [x] Day and range nutrient breakdown; calendar of day statuses (built 2026-10-16)
 - [x] Edit a logged entry, including replacing its food by search or barcode (built 2026-10-17)
-- [ ] Trends and weekly look-back
+- [x] Trends and weekly look-back: a screen per week with the recap, 8-week bars per nutrient and tracker, and a next-batch suggestion (built 2026-10-19)
 - [x] Water: plain water with one tap or through the assistant, water in foods from the BLS, against the DGE guide value (built 2026-10-17)
 - [ ] Nice to have: fasting timer; "eat soon" flag for fridge portions (needs a shelf-life source)
 
