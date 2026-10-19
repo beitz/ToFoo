@@ -12,6 +12,7 @@ import { FastShortcut } from '../features/home/FastShortcut';
 import { SleepShortcut } from '../features/sleep/SleepShortcut';
 import { CalendarPage } from '../features/review/CalendarPage';
 import { ReviewPage } from '../features/review/ReviewPage';
+import { WeekPage } from '../features/review/WeekPage';
 import { LogPage } from '../features/log/LogPage';
 import { AssistantPage } from '../features/assistant/AssistantPage';
 import { AssistantSettingsPage } from '../features/settings/AssistantSettingsPage';
@@ -91,6 +92,8 @@ function Page({ route }: { route: string[] }) {
       return <CalendarPage month={b} />;
     case 'review':
       return <ReviewPage from={b} to={c} />;
+    case 'week':
+      return <WeekPage week={b} />;
     case 'fast':
       return <FastShortcut />;
     case 'sleep':
@@ -109,7 +112,7 @@ const NAV = [
 
 export function App() {
   const route = useRoute();
-  const section = route[0] === 'about' ? 'settings' : route[0] === 'insights' ? 'diary' : (route[0] ?? 'home');
+  const section = route[0] === 'about' ? 'settings' : route[0] === 'insights' || route[0] === 'week' ? 'diary' : (route[0] ?? 'home');
   const active = NAV.some((n) => n.key === section) ? section : 'home';
   const path = route.join('/');
   // Braces matter: an effect's return value is its cleanup, and newer Chrome returns a Promise

@@ -4,6 +4,7 @@ import { useToast } from '../../app/toast';
 import { href, navigate } from '../../app/router';
 import { t, type MessageKey } from '../../i18n';
 import { addDays, formatDay, formatTime, parseDay } from '../../lib/dates';
+import { weekStart } from '../../lib/periods';
 import { fmtAmount } from '../../lib/format';
 import { groupMeals } from '../../model/simulate';
 import { repo } from '../../storage/repo';
@@ -113,6 +114,9 @@ export function DiaryPage({ day: dayParam }: { day?: string }) {
       <div className="row diary-links">
         <a className="btn btn-small btn-secondary" href={href('calendar', day.slice(0, 7))}>
           <Icon name="calendar" size={18} /> {t('diary.calendar')}
+        </a>
+        <a className="btn btn-small btn-secondary" href={href('week', weekStart(day))}>
+          <Icon name="bars" size={18} /> {t('diary.week')}
         </a>
         <a className="btn btn-small btn-secondary" href={href('review', day, day)}>
           <Icon name="bars" size={18} /> {t('diary.dayNutrients')}
