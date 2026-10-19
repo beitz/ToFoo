@@ -160,6 +160,17 @@ export function toolsFor(sources: PromptSources = {}): BetaToolUnion[] {
   return toolSets.get(k)!;
 }
 
+/**
+ * Strict tools get their input enforced by a grammar the API compiles from all strict schemas of
+ * a request together, and that grammar has a size limit: with propose_recipe, check_recipe,
+ * propose_portion and propose_batch strict as well, the full tool set was rejected ("The compiled
+ * grammar is too large", HTTP 400, 2026-10-19). Each tool holding a list of foods costs the most,
+ * so only the one used most (propose_meal, or propose_ingredients in the recipe editor) is
+ * strict; the others are validated by the app (src/ai/tools.ts), which sends errors back to the
+ * model to fix. tools.test.ts keeps it that way.
+ */
+export const STRICT_NESTED = 1;
+
 const SEARCH_USDA: BetaTool = {
   name: 'search_usda',
   description:
@@ -311,7 +322,7 @@ function proposePortion(changes: object): BetaTool {
     name: 'propose_portion',
     description:
       'Show the user a serving eaten from one of their batches in stock, as a card with the amount, any changes for this serving and the time, for the user to check and log; nothing is logged until they do. The app computes the nutrients from the pot. After a correction, call it again with replaces set to the card id.',
-    strict: true,
+    // Not strict: see STRICT_NESTED. The app validates the input itself and sends errors back.
     input_schema: {
       type: 'object',
       properties: {
@@ -334,7 +345,7 @@ function proposeBatch(changes: object): BetaTool {
     name: 'propose_batch',
     description:
       'Show the user a batch they cooked of a recipe in their book, as a card with the day, storage plan, pot weight, changes for this pot and what they ate of it right away, for the user to check and save; nothing is saved until they do. After a correction, call it again with replaces set to the card id.',
-    strict: true,
+    // Not strict: see STRICT_NESTED. The app validates the input itself and sends errors back.
     input_schema: {
       type: 'object',
       properties: {
@@ -371,7 +382,7 @@ function checkRecipe(items: object): BetaTool {
     name: 'check_recipe',
     description:
       'Compute what one portion of a recipe gives: energy, protein, and the share of the daily recommended intake for each nutrient that is low, getting low or too high now, plus other nutrients it is rich in (after cooking losses). For a recipe in the book as it is, pass its recipe_id and no items.',
-    strict: true,
+    // Not strict: see STRICT_NESTED. The app validates the input itself and sends errors back.
     input_schema: {
       type: 'object',
       properties: {
@@ -390,7 +401,7 @@ function proposeRecipe(items: object, ideas: boolean): BetaTool {
     name: 'propose_recipe',
     description:
       'Show the user a recipe for their recipe book, as a card with its ingredients and grams for the whole pot, portions and steps, for the user to check and save; nothing is saved until they do. New (recipe_id empty) or a change to a recipe in the book (recipe_id set, complete new ingredient list). After a correction, call it again with replaces set to the card id.',
-    strict: true,
+    // Not strict: see STRICT_NESTED. The app validates the input itself and sends errors back.
     input_schema: {
       type: 'object',
       properties: {
