@@ -250,8 +250,9 @@ describe('tea, coffee and iron status', () => {
     const reference = res.meals.reduce((a, m) => a + (m.absorbed.FE ?? 0), 0) / d.length;
     const fe = res.nutrients.get('FE')!;
     // The store fills with adapted absorption; the daily balance stays at reference stores.
-    expect(fe.netPerDay! + male30.byNutrient.get('FE')!.physiological).toBeGreaterThan(reference * 2);
-    expect(fe.averageAbsorbed).toBeCloseTo(reference, 6);
+    const need = male30.byNutrient.get('FE')!.physiological;
+    expect(fe.netPerDay! + need).toBeGreaterThan(reference * 2);
+    expect(fe.balance!.central * need).toBeCloseTo(reference, 6);
   });
 });
 
@@ -326,7 +327,7 @@ describe('simulation', () => {
     const spread = d.flatMap((day, i) => [7, 11, 15, 19].map((h) => manual(`s${i}-${h}`, day, h, { VITB12: 2 })));
     const a = simulate(baseInput(d, omad, { startingLevel: 'empty' })).nutrients.get('VITB12')!;
     const b = simulate(baseInput(d, spread, { startingLevel: 'empty' })).nutrients.get('VITB12')!;
-    expect(a.kind).toBe('balance');
+    expect(a.kind).toBe('tank');
     expect(a.level!.central).toBeLessThan(b.level!.central);
   });
 
@@ -343,17 +344,24 @@ describe('simulation', () => {
     expect(unlogged.store!.low).toBeLessThan(unlogged.store!.central); // but the range widens
   });
 
-  it('slow stores are headlined by their daily balance; vitamin D stays a tank', () => {
+  it('slow stores show their fill level like any store, with the daily balance alongside', () => {
     const d = days('2026-10-15', 3);
     // With vitamin C, 16 mg non-heme iron is absorbed at the Monsen maximum (8 %): above a man's need.
     const entries = d.map((day, i) => manual(`f${i}`, day, 12, { FE: 16, VITC: 200, VITD: 1 }));
     const res = simulate(baseInput(d, entries, { startingLevel: 'empty' })).nutrients;
     const fe = res.get('FE')!;
-    expect(fe.kind).toBe('balance');
-    expect(fe.value.central).toBeCloseTo(fe.averageAbsorbed / male30.byNutrient.get('FE')!.physiological, 6);
-    expect(fe.status).toBe('fine'); // the diet covers the need, though the store started empty
-    expect(fe.store!.central).toBeLessThan(0.01);
-    expect(res.get('VITD')!.kind).toBe('tank');
+    expect(fe.kind).toBe('tank');
+    expect(fe.slow).toBe(true);
+    // The shown number is the fill level, so an empty start reads empty and low.
+    expect(fe.value.central).toBe(fe.store!.central);
+    expect(fe.value.central).toBeLessThan(0.01);
+    expect(fe.status).toBe('low');
+    // The balance still says the diet covers the need (absorbed at reference stores ÷ need).
+    expect(fe.balance!.central).toBeGreaterThan(1);
+    const vitD = res.get('VITD')!;
+    expect(vitD.kind).toBe('tank');
+    expect(vitD.slow).toBeUndefined();
+    expect(vitD.balance).toBeUndefined();
   });
 
   it('counts how long a slow store\'s balance has been low, only while something is logged', () => {
@@ -366,7 +374,7 @@ describe('simulation', () => {
     expect(nothing.lowForDays).toBe(0);
   });
 
-  it('a blood test sets the store on its day and turns a slow store back into a tank', () => {
+  it('a blood test sets a slow store on its day; from then on it follows the log', () => {
     const d = days('2026-10-01', 10);
     const entries = d.map((day, i) => manual(`f${i}`, day, 12, { FE: 16, VITC: 200 }));
     const res = simulate(baseInput(d, entries, { startingLevel: 'empty', measuredStores: { FE: { day: d[5]!, amount: 200 } } })).nutrients.get('FE')!;
@@ -376,7 +384,7 @@ describe('simulation', () => {
     expect(res.level!.central).toBeGreaterThan(200 - 5 * 0.95); // from the test on: measured level ± a few days of flow
     // A test from before the model start sets the first day; one in the future changes nothing.
     expect(simulate(baseInput(d, entries, { measuredStores: { FE: { day: '2026-01-01', amount: 200 } } })).nutrients.get('FE')!.history[0]!.central).toBeGreaterThan(0.15);
-    expect(simulate(baseInput(d, entries, { measuredStores: { FE: { day: '2027-01-01', amount: 200 } } })).nutrients.get('FE')!.kind).toBe('balance');
+    expect(simulate(baseInput(d, entries, { measuredStores: { FE: { day: '2027-01-01', amount: 200 } } })).nutrients.get('FE')!.measuredOn).toBeUndefined();
   });
 
   it('an empty iron store on a good diet is filling, with the time to the fine zone', () => {

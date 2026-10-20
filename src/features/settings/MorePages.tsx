@@ -28,7 +28,6 @@ import { SubPage } from './ProfilePage';
 export function StartPage() {
   const d = useData();
   const p = d.profile;
-  // Slow stores show their daily balance; their starting level only matters before a blood test.
   const tanks = NUTRIENTS.filter((n) => (storage[n.id]?.kind === 'tank' || storage[n.id]?.kind === 'tankDays') && d.model.nutrients.get(n.id)?.kind === 'tank');
   return (
     <SubPage title={t('settings.start')}>

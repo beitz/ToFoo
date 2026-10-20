@@ -29,15 +29,14 @@ export interface SimulationInput {
   startingLevel: StartingLevelChoice;
   /** Custom start fractions (0–1) per tank nutrient. */
   customStartLevels?: Readonly<Record<string, number>>;
-  /** Store levels measured by a blood test (absorbed units), set on that day. A measured slow store shows as a tank. */
+  /** Store levels measured by a blood test (absorbed units), set on that day; the store follows the log from there. */
   measuredStores?: Readonly<Record<string, { day: string; amount: number }>>;
   weightKg: number;
   sex?: Sex;
 }
 
 export type GaugeStatus = 'fine' | 'gettingLow' | 'low' | 'tooHigh' | 'unknown' | 'info';
-/** 'balance': a slow store (months to years of need), headlined by its daily balance; its fill level is secondary. */
-export type GaugeKind = 'tank' | 'balance' | 'rolling' | 'limit' | 'info';
+export type GaugeKind = 'tank' | 'rolling' | 'limit' | 'info';
 
 export interface HistoryPoint {
   day: string;
@@ -57,19 +56,26 @@ export interface NutrientResult {
   id: string;
   kind: GaugeKind;
   status: GaugeStatus;
-  /** Tank: fill level 0–1. Rolling / balance: average absorbed ÷ requirement. Limit: intake ÷ limit. Info: average intake. */
+  /** Tank: fill level 0–1. Rolling: average absorbed ÷ requirement. Limit: intake ÷ limit. Info: average intake. */
   value: Range;
-  /** Tank and balance: store capacity and level in absolute (absorbed) units, and the fill level 0–1. */
+  /** Tank: store capacity and level in absolute (absorbed) units, and the fill level 0–1. */
   capacity?: number;
   level?: Range;
   store?: Range;
-  /** Tank and balance: how many days a full store covers the need with no intake (sourced capacity range ÷ need). */
+  /** Tank: how many days a full store covers the need with no intake (sourced capacity range ÷ need). */
   storeDays?: Range;
   /** Tank: day of the blood test the store was set from, if any. */
   measuredOn?: string;
-  /** Balance: days in a row (up to today) the balance has been in the "low" zone, with something logged in each window. */
+  /**
+   * Slow store (months to years of need: iron, B12, vitamin A, folate, iodine): its fill level barely moves within
+   * weeks and mostly reflects the starting level until a blood test is entered.
+   */
+  slow?: boolean;
+  /** Slow store: absorbed (at reference iron stores) ÷ need over the window, i.e. whether the diet covers the need. */
+  balance?: Range;
+  /** Slow store: days in a row (up to today) the balance has been in the "low" zone, with something logged in each window. */
   lowForDays?: number;
-  /** Tank and balance: average net change per day over the window (absorbed + sun − need, central), before clamping. */
+  /** Tank: average net change per day over the window (absorbed + sun − need, central), before clamping. */
   netPerDay?: number;
   /** Average per day over the window: absorbed (central) and raw intake (central). */
   averageAbsorbed: number;
@@ -333,8 +339,8 @@ export function simulate(input: SimulationInput): SimulationResult {
     const measured = isTank ? input.measuredStores?.[id] : undefined;
     // Index of the day the measurement sets the store (the first model day if it was taken before); -1 if none / in the future.
     const measuredIdx = measured ? days.findIndex((d) => d >= measured.day) : -1;
-    const slow = storeDays >= slowStore.minDays.value && measuredIdx < 0;
-    const kind: GaugeKind = isInfo ? 'info' : r!.limitOnly ? 'limit' : isTank ? (slow ? 'balance' : 'tank') : 'rolling';
+    const slow = isTank && storeDays >= slowStore.minDays.value;
+    const kind: GaugeKind = isInfo ? 'info' : r!.limitOnly ? 'limit' : isTank ? 'tank' : 'rolling';
     const windowDays =
       model?.kind === 'rolling' && model.window === 'short' ? settings.shortWindowDays : settings.longWindowDays;
 
@@ -426,11 +432,54 @@ export function simulate(input: SimulationInput): SimulationResult {
       contributors,
     };
 
-    // Balance: absorbed (plus sun) at reference iron stores, so it says what the diet covers whatever the store guess.
     const sunAt = (s: Scenario, i: number) => (id === 'VITD' && settings.sun ? (input.sunByDay?.[days[i]!]?.[s] ?? 0) : 0);
-    const referenceInflow = Object.fromEntries(SCENARIOS.map((s) => [s, inflow[s].map((v, i) => v + sunAt(s, i))])) as Record<Scenario, number[]>;
-    let storePart: Pick<NutrientResult, 'capacity' | 'level' | 'store' | 'netPerDay' | 'storeDays'> = {};
-    if (kind === 'tank' || kind === 'balance') {
+    // Prefix sums make every window average O(1).
+    const knownMask = days.map((d) => (known(d) ? 1 : 0));
+    const includedMask = included.map((x) => (x ? 1 : 0));
+    const prefix = (arr: number[]) => {
+      const p = new Float64Array(arr.length + 1);
+      for (let i = 0; i < arr.length; i++) p[i + 1] = p[i]! + arr[i]!;
+      return p;
+    };
+    const knownPrefix = prefix(knownMask);
+    const includedPrefix = prefix(includedMask);
+    /**
+     * Window averages ÷ denom ending on any day. With a source (absorbed per day): all days count (unknown days
+     * are imputed) except left-out ones. Without: raw intake on known days only (limit / info).
+     */
+    const windowAverages = (source: Record<Scenario, number[]> | null, denom: number) => {
+      const sums = {} as Record<Scenario, Float64Array>;
+      for (const s of SCENARIOS) {
+        sums[s] = source ? prefix(source[s].map((v, i) => v * includedMask[i]!)) : prefix(days.map((_, i) => (knownMask[i] ? (totals[s][i]!.intake[id] ?? 0) : 0)));
+      }
+      return (s: Scenario, endIdx: number) => {
+        const start = Math.max(0, endIdx - windowDays + 1);
+        const total = sums[s][endIdx + 1]! - sums[s][start]!;
+        const n = source ? includedPrefix[endIdx + 1]! - includedPrefix[start]! : knownPrefix[endIdx + 1]! - knownPrefix[start]!;
+        return n > 0 ? total / n / denom : 0;
+      };
+    };
+    const rangeAt = (valueAt: (s: Scenario, i: number) => number, endIdx: number): Range => {
+      if (endIdx < 0) return { low: 0, central: 0, high: 0 };
+      const v = { low: valueAt('low', endIdx), central: valueAt('central', endIdx), high: valueAt('high', endIdx) };
+      return { low: Math.min(v.low, v.central, v.high), central: v.central, high: Math.max(v.low, v.central, v.high) };
+    };
+
+    if (kind === 'tank') {
+      // Slow store: its balance is absorbed (plus sun) at reference iron stores, so it says what the diet covers
+      // whatever the store level. Computed before the store run below adapts iron absorption to the level.
+      let slowPart: Pick<NutrientResult, 'slow' | 'balance' | 'lowForDays'> = {};
+      if (slow) {
+        const referenceInflow = Object.fromEntries(SCENARIOS.map((s) => [s, inflow[s].map((v, i) => v + sunAt(s, i))])) as Record<Scenario, number[]>;
+        const balanceAt = windowAverages(referenceInflow, physiological || 1);
+        let lowForDays = 0;
+        for (let i = end; i >= Math.max(0, end - HISTORY_DAYS + 1); i--) {
+          const windowKnown = knownPrefix[i + 1]! - knownPrefix[Math.max(0, i - windowDays + 1)]!;
+          if (windowKnown === 0 || balanceAt('central', i) >= statusThresholds.rolling.value.low) break;
+          lowForDays++;
+        }
+        slowPart = { slow: true, balance: rangeAt(balanceAt, end), lowForDays };
+      }
       const capacity = tankCapacity(id, input.weightKg, input.sex, physiological) ?? 1;
       const capRange = tankCapacityRange(id, input.weightKg, input.sex, physiological);
       const coverDays = capRange && physiological > 0 ? { low: capRange.low / physiological, central: capRange.central / physiological, high: capRange.high / physiological } : undefined;
@@ -468,75 +517,38 @@ export function simulate(input: SimulationInput): SimulationResult {
       // Net change per day (central) over the window, for "filling / going down" and time to the fine zone.
       const netPerDay = win.length ? win.reduce((a, i) => a + inflow.central[i]! + sunAt('central', i) - physiological, 0) / win.length : undefined;
       const value = { low: level.low / capacity, central: level.central / capacity, high: level.high / capacity };
-      const lo = Math.min(value.low, value.central, value.high);
-      const hi = Math.max(value.low, value.central, value.high);
-      const store = { low: lo, central: value.central, high: hi };
-      if (kind === 'tank') {
-        results.set(id, {
-          ...base,
-          averageAbsorbed: mean(inflow.central, win),
-          status: classify('tank', value.central, ulRatio, true),
-          value: store,
-          capacity,
-          level,
-          store,
-          netPerDay,
-          storeDays: coverDays,
-          history,
-          measuredOn: measuredIdx >= 0 ? measured!.day : undefined,
-        });
-        continue;
-      }
-      storePart = { capacity, level, store, netPerDay, storeDays: coverDays };
+      const store = { low: Math.min(value.low, value.central, value.high), central: value.central, high: Math.max(value.low, value.central, value.high) };
+      results.set(id, {
+        ...base,
+        averageAbsorbed: mean(inflow.central, win),
+        status: classify('tank', value.central, ulRatio, true),
+        value: store,
+        capacity,
+        level,
+        store,
+        netPerDay,
+        storeDays: coverDays,
+        history,
+        measuredOn: measuredIdx >= 0 ? measured!.day : undefined,
+        ...slowPart,
+      });
+      continue;
     }
 
     // Rolling, limit and info.
     const denom = kind === 'limit' ? (r?.recommended ?? 1) : kind === 'info' ? 1 : physiological || 1;
-    const source = kind === 'limit' || kind === 'info' ? null : kind === 'balance' ? referenceInflow : inflow;
-    // Prefix sums make every window average O(1).
-    const knownMask = days.map((d) => (known(d) ? 1 : 0));
-    const includedMask = included.map((x) => (x ? 1 : 0));
-    const prefix = (arr: number[]) => {
-      const p = new Float64Array(arr.length + 1);
-      for (let i = 0; i < arr.length; i++) p[i + 1] = p[i]! + arr[i]!;
-      return p;
-    };
-    const knownPrefix = prefix(knownMask);
-    const includedPrefix = prefix(includedMask);
-    const sums = {} as Record<Scenario, Float64Array>;
-    for (const s of SCENARIOS) {
-      sums[s] = source ? prefix(source[s].map((v, i) => v * includedMask[i]!)) : prefix(days.map((_, i) => (knownMask[i] ? (totals[s][i]!.intake[id] ?? 0) : 0)));
-    }
-    const valueAt = (s: Scenario, endIdx: number) => {
-      const start = Math.max(0, endIdx - windowDays + 1);
-      const total = sums[s][endIdx + 1]! - sums[s][start]!;
-      // Rolling: all days count (unknown days are imputed) except left-out ones. Limit / info: raw intake on known days only.
-      const n = source ? includedPrefix[endIdx + 1]! - includedPrefix[start]! : knownPrefix[endIdx + 1]! - knownPrefix[start]!;
-      return n > 0 ? total / n / denom : 0;
-    };
+    const valueAt = windowAverages(kind === 'limit' || kind === 'info' ? null : inflow, denom);
     const history: HistoryPoint[] = [];
     for (let i = Math.max(0, end - HISTORY_DAYS + 1); i <= end; i++) {
       const vals = SCENARIOS.map((s) => valueAt(s, i));
       history.push({ day: days[i]!, low: Math.min(...vals), central: vals[1]!, high: Math.max(...vals) });
     }
-    let lowForDays: number | undefined;
-    if (kind === 'balance') {
-      lowForDays = 0;
-      for (let i = end; i >= Math.max(0, end - HISTORY_DAYS + 1); i--) {
-        const windowKnown = knownPrefix[i + 1]! - knownPrefix[Math.max(0, i - windowDays + 1)]!;
-        if (windowKnown === 0 || valueAt('central', i) >= statusThresholds.rolling.value.low) break;
-        lowForDays++;
-      }
-    }
-    const v = end >= 0 ? { low: valueAt('low', end), central: valueAt('central', end), high: valueAt('high', end) } : { low: 0, central: 0, high: 0 };
-    const value = { low: Math.min(v.low, v.central, v.high), central: v.central, high: Math.max(v.low, v.central, v.high) };
+    const value = rangeAt(valueAt, end);
     results.set(id, {
       ...base,
-      status: classify(kind === 'balance' ? 'rolling' : kind, value.central, ulRatio, knownInWindow > 0),
+      status: classify(kind, value.central, ulRatio, knownInWindow > 0),
       value,
       history,
-      lowForDays,
-      ...storePart,
     });
   }
 
@@ -557,7 +569,7 @@ export type TankTrend = { direction: 'filling'; daysToFine?: number } | { direct
  * "getting low" zone, when it is below that and filling.
  */
 export function tankTrend(r: Pick<NutrientResult, 'kind' | 'capacity' | 'level' | 'netPerDay'>): TankTrend | null {
-  if ((r.kind !== 'tank' && r.kind !== 'balance') || !r.capacity || !r.level || r.netPerDay === undefined) return null;
+  if (r.kind !== 'tank' || !r.capacity || !r.level || r.netPerDay === undefined) return null;
   if (r.netPerDay < 0) return { direction: 'draining' };
   if (r.netPerDay === 0) return { direction: 'steady' };
   const gap = statusThresholds.tank.value.gettingLow * r.capacity - r.level.central;

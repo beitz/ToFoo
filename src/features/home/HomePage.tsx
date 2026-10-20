@@ -155,7 +155,7 @@ export function HomePage() {
         const grid = (
           <div className="nrow-list" id={`group-${g.key}`}>
             {g.items.map((r) => {
-              const defaultBased = weightDefault && (r.kind === 'tank' || r.kind === 'balance' || PER_KG.has(r.id));
+              const defaultBased = weightDefault && (r.kind === 'tank' || PER_KG.has(r.id));
               const open = () => navigate('nutrient', r.id);
               return <GaugeRow key={r.id} result={r} showRange={showRange} defaultBased={defaultBased} onClick={open} />;
             })}
