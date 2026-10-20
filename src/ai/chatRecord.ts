@@ -9,10 +9,12 @@
  */
 import type { Food } from '../foods/foodDb';
 import type { Product } from '../storage/types';
+import type { Conversation } from './assistant';
 import { fmtLocalDateTime } from './photoTime';
 import type { ModelTokens } from './pricing';
 
-export const CHAT_SCHEMA_VERSION = 1;
+/** 2: `resume` added, so a chat can be reopened exactly where it was left (older chats are rebuilt from their events). */
+export const CHAT_SCHEMA_VERSION = 2;
 export const CHAT_EXPORT_FORMAT = 'tofoo-chat';
 export const CHAT_EXPORT_VERSION = 1;
 
@@ -53,6 +55,14 @@ export interface ChatRecord {
   photos: number;
   /** Billed tokens per model, as in the usage line. */
   tokens: ModelTokens;
+  /** What reopening the chat needs besides the messages and events (meal chats, from version 2). */
+  resume?: ChatResume;
+}
+
+/** The rest of the conversation state after the latest turn, and the products looked up in the chat. */
+export interface ChatResume {
+  conversation: Omit<Conversation, 'messages'>;
+  products: Product[];
 }
 
 export interface ChatPhoto {
@@ -79,16 +89,30 @@ function mapBlocks(messages: readonly unknown[], fn: (b: Block) => Block): unkno
   return messages.map((m) => (isBlock(m) && Array.isArray(m.content) ? { ...m, content: mapList(m.content) } : m));
 }
 
+/** The number in the label the app puts before each photo ("Photo 3: taken …"). */
+export function photoNumber(label: string): number | undefined {
+  const m = /^Photo (\d+):/.exec(label);
+  return m ? Number(m[1]) : undefined;
+}
+
 /**
- * Replace the photos in API messages by their number; returns the photos too. Already numbered
- * photos are kept as they are, so the conversation can be split again after every turn.
+ * Replace the photos in API messages by their number; returns the photos too. A photo gets the
+ * number of its label, so numbers stay right when earlier photos were taken out of the chat
+ * (retirePhotos); one without a label gets the next free number. Already numbered photos are kept
+ * as they are, so the conversation can be split again after every turn.
  */
 export function splitPhotos(messages: readonly unknown[], chatId: string): { messages: unknown[]; photos: ChatPhoto[] } {
   const photos: ChatPhoto[] = [];
-  let n = 0;
+  let last = 0;
+  let label: number | undefined;
   const out = mapBlocks(messages, (b) => {
-    if (b.type !== 'image') return b;
-    n++;
+    if (b.type !== 'image') {
+      label = b.type === 'text' && typeof b.text === 'string' ? photoNumber(b.text) : undefined;
+      return b;
+    }
+    const n = typeof b.photo === 'number' ? b.photo : (label ?? last + 1);
+    label = undefined;
+    last = Math.max(last, n);
     const src = b.source;
     if (isBlock(src) && src.type === 'base64' && typeof src.data === 'string') {
       photos.push({ id: `${chatId}:${n}`, chatId, n, mediaType: String(src.media_type), data: src.data });
@@ -99,12 +123,17 @@ export function splitPhotos(messages: readonly unknown[], chatId: string): { mes
   return { messages: out, photos };
 }
 
-/** Put the photos back into stored messages; a photo that is missing stays a number. */
-export function joinPhotos(messages: readonly unknown[], photos: readonly ChatPhoto[]): unknown[] {
+/**
+ * Put the photos back into stored messages. A photo that is missing stays a number, or becomes
+ * the text `missing` (a request to the API cannot carry a numbered photo).
+ */
+export function joinPhotos(messages: readonly unknown[], photos: readonly ChatPhoto[], missing?: string): unknown[] {
   const byN = new Map(photos.map((p) => [p.n, p]));
   return mapBlocks(messages, (b) => {
-    const p = b.type === 'image' && typeof b.photo === 'number' ? byN.get(b.photo) : undefined;
-    return p ? { type: 'image', source: { type: 'base64', media_type: p.mediaType, data: p.data } } : b;
+    if (b.type !== 'image' || typeof b.photo !== 'number') return b;
+    const p = byN.get(b.photo);
+    if (p) return { type: 'image', source: { type: 'base64', media_type: p.mediaType, data: p.data } };
+    return missing === undefined ? b : { type: 'text', text: missing };
   });
 }
 

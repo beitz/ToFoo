@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
 import { useData } from '../../app/data';
 import { useToast } from '../../app/toast';
 import { href, navigate } from '../../app/router';
@@ -19,7 +20,7 @@ import {
 } from '../../ai/assistant';
 import { describeAiError, getAiSettings, logAiError, makeCreate, saveUsage } from '../../ai/client';
 import { errorText } from '../../lib/shareFile';
-import { cardSummary, itemSummary, localTimes } from '../../ai/chatRecord';
+import { cardSummary, itemSummary, localTimes, type ChatPhoto, type ChatRecord } from '../../ai/chatRecord';
 import { ChatRecorder } from '../../ai/chatStore';
 import { ChatExport } from './ChatExport';
 import { mergeModelTokens, type ModelTokens } from '../../ai/pricing';
@@ -48,7 +49,7 @@ import { waterText } from '../water/format';
 import { waterProblem } from '../water/WaterSheet';
 import { IngredientSheet } from '../recipes/IngredientSheet';
 import { ActivityForm, activityName, DEFAULT_ACTIVITY_SKIN, recordOf, type ActivityDraft } from '../activity/ActivityForm';
-import { cardId, cardOf, cardTitle, useRegister, type Card, type CardProps, type RecipeChat, type Saver, type Undo } from './cards';
+import { cardId, cardOf, cardTitle, useRegister, type Bubble, type Card, type CardProps, type RecipeChat, type Saver, type Undo } from './cards';
 import { RecipeCard } from './RecipeCard';
 import { ShoppingCard } from './ShoppingCard';
 import { BatchCard, PortionCard } from './BatchCards';
@@ -57,15 +58,10 @@ import { refKey } from '../../lib/refs';
 import { itemIngredient } from '../../logic/ingredients';
 import { checkPortion, describeCheck, describeStatus, gapFoods, oftenEaten, portionIntake, recipeInfos } from '../../logic/recipeIdeas';
 import type { AppData } from '../../app/data';
+import { openCardIds, reopenChat, type Reopened } from './reopen';
 
 export type { RecipeChat } from './cards';
 
-/** A chat bubble; an answer with several cards is one 'pages' bubble, its cards shown as pages. */
-type Bubble =
-  | { role: 'user'; text: string; previews: string[] }
-  | { role: 'assistant'; text: string }
-  | { role: 'card'; id: string }
-  | { role: 'pages'; key: number; text: string; ids: string[] };
 type ComposerPhoto = PreparedImage & { barcodes: string[]; time: PhotoTime };
 /** Photos per message: enough for a couple of days of meals; each one adds to the cost of every request in the chat. */
 const MAX_PHOTOS = 50;
@@ -118,14 +114,14 @@ export function RecipeAssistant({ recipe, onClose }: { recipe: RecipeChat; onClo
 
 /**
  * The assistant: meals, journal, sleep, activity, water and recipes in one chat, photos, text and
- * voice in, cards to check out. Route: #/assistant (from Home) or #/assistant/day (from the log
- * screen of that day).
+ * voice in, cards to check out. Route: #/assistant (from Home), #/assistant/day (from the log
+ * screen of that day) or #/assistant/chat/id (a saved chat, reopened).
  */
-export function AssistantPage({ day: dayParam }: { day?: string }) {
+export function AssistantPage({ day: dayParam, chatId }: { day?: string; chatId?: string }) {
   const d = useData();
   const day = dayParam && /^\d{4}-\d{2}-\d{2}$/.test(dayParam) ? dayParam : d.today;
   const back = dayParam ? href('log', day) : href();
-  const body = <ChatOrNotice chat={(ai) => <Chat apiKey={ai.apiKey} model={ai.model} day={day} />} />;
+  const body = <ChatOrNotice chat={(ai) => (chatId ? <ReopenedChat id={chatId} ai={ai} /> : <Chat apiKey={ai.apiKey} model={ai.model} day={day} />)} />;
 
   return (
     <section className="assistant-page">
@@ -138,6 +134,34 @@ export function AssistantPage({ day: dayParam }: { day?: string }) {
       {body}
     </section>
   );
+}
+
+/** A saved chat to carry on with, as it was saved and as the chat screen starts from it. */
+type ReopenedState = { record: ChatRecord; state: Reopened };
+
+/** A saved meal chat, loaded and rebuilt, then the chat as it was left. */
+function ReopenedChat({ id, ai }: { id: string; ai: { apiKey: string; model: AiModel } }) {
+  const d = useData();
+  const [loaded, setLoaded] = useState<ReopenedState | null>();
+  useEffect(() => {
+    let live = true;
+    void (async () => {
+      const record = await repo.db.chats.get(id);
+      // Only meal chats come back here: a recipe chat's cards belong to its recipe editor.
+      if (!record || record.kind !== 'log') return live && setLoaded(null);
+      const photos: ChatPhoto[] = await repo.chatPhotos(id);
+      const state = reopenChat(record, photos, { db: d.foods, saved: d.productsById });
+      if (live) setLoaded({ record, state });
+    })();
+    return () => {
+      live = false;
+    };
+    // Built once from the chat as saved; later changes to products do not rebuild it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+  if (loaded === undefined) return <p className="muted">{t('common.loading')}</p>;
+  if (loaded === null) return <p className="muted">{t('chats.missing')}</p>;
+  return <Chat apiKey={ai.apiKey} model={ai.model} day={loaded.record.day ?? d.today} reopened={loaded} />;
 }
 
 const ERROR_TEXT: Record<string, MessageKey> = {
@@ -154,12 +178,13 @@ const ERROR_TEXT: Record<string, MessageKey> = {
   tooManySteps: 'ai.error.tooManySteps',
 };
 
-function Chat({ apiKey, model, day, recipe }: { apiKey: string; model: AiModel; day: string; recipe?: RecipeChat }) {
+function Chat({ apiKey, model, day, recipe, reopened }: { apiKey: string; model: AiModel; day: string; recipe?: RecipeChat; reopened?: ReopenedState }) {
   const d = useData();
   const toast = useToast();
-  const [conversation, setConversation] = useState<Conversation>(emptyConversation);
-  const [bubbles, setBubbles] = useState<Bubble[]>([]);
-  const [cards, setCards] = useState<ReadonlyMap<string, Card>>(new Map());
+  const was = reopened?.state;
+  const [conversation, setConversation] = useState<Conversation>(() => was?.conversation ?? emptyConversation());
+  const [bubbles, setBubbles] = useState<Bubble[]>(() => was?.bubbles ?? []);
+  const [cards, setCards] = useState<ReadonlyMap<string, Card>>(() => was?.cards ?? new Map());
   // Cards can be logged while the assistant is thinking, so its answer is matched against the latest state.
   const cardsRef = useRef(cards);
   cardsRef.current = cards;
@@ -172,21 +197,21 @@ function Chat({ apiKey, model, day, recipe }: { apiKey: string; model: AiModel; 
   const [savingAll, setSavingAll] = useState(false);
   /** The answer shown as pages right now (its bubble key), if any. */
   const [pagesOpen, setPagesOpen] = useState<number>();
-  const pagesKey = useRef(0);
+  const pagesKey = useRef(was?.pages ?? 0);
   /** While pages are open, the microphone fills the comment box of the page shown. */
   const dictationTarget: DictationTarget = useRef(null);
   const [text, setText] = useState('');
   const [images, setImages] = useState<ComposerPhoto[]>([]);
   /** Photos sent so far, so numbers stay unique across the chat, and their size (base64 characters). */
-  const [photoCount, setPhotoCount] = useState(0);
-  const [photoBytes, setPhotoBytes] = useState(0);
+  const [photoCount, setPhotoCount] = useState(was?.photoCount ?? 0);
+  const [photoBytes, setPhotoBytes] = useState(was?.photoBytes ?? 0);
   /** Some of the text in the box was dictated: the assistant is told to expect misheard words. */
   const [dictated, setDictated] = useState(false);
   const offOn = isOn(d.settings.features, 'openFoodFacts');
   const usdaOn = isOn(d.settings.features, 'usda');
   const webSearchOn = isOn(d.settings.features, 'productWebSearch');
   // Products looked up in this chat stay usable for later proposals in it.
-  const [seenProducts] = useState(() => new Map<string, Product>());
+  const [seenProducts] = useState(() => new Map<string, Product>(was?.seen.map((p) => [p.id, p])));
   const [busy, setBusy] = useState(false);
   /** The error shown above the composer, with the exact cause where there is one. */
   const [error, setError] = useState<{ key: MessageKey; detail?: string }>();
@@ -196,10 +221,10 @@ function Chat({ apiKey, model, day, recipe }: { apiKey: string; model: AiModel; 
   const [create] = useState(() => makeCreate(apiKey));
   /** Saves the chat on the phone as it goes, for exporting it later (Settings → AI assistant → Saved chats). */
   const [recorder] = useState(
-    () => new ChatRecorder({ kind: recipe ? 'recipe' : 'log', model, ...(recipe ? {} : { day }), features: d.settings.features }, isOn(d.settings.features, 'saveChats')),
+    () => new ChatRecorder({ kind: recipe ? 'recipe' : 'log', model, ...(recipe ? {} : { day }), features: d.settings.features }, isOn(d.settings.features, 'saveChats'), repo, reopened?.record),
   );
   /** Billed tokens: the whole chat, and the user's latest message (all requests it caused). */
-  const [chatTokens, setChatTokens] = useState<ModelTokens>({});
+  const [chatTokens, setChatTokens] = useState<ModelTokens>(() => reopened?.record.tokens ?? {});
   const [turnTokens, setTurnTokens] = useState<ModelTokens>({});
   // Voice input (opt-in, OpenAI key): record, then the transcript lands in the text box.
   const dictation = useDictation({
@@ -335,7 +360,10 @@ function Chat({ apiKey, model, day, recipe }: { apiKey: string; model: AiModel; 
       const lighter = retirePhotos(conversation, (id) => !cardsRef.current.get(id) || !!cardsRef.current.get(id)?.logged);
       const r = await sendMessage(create, model, lighter, msg, ctx, onUsage);
       setConversation(r.conversation);
-      recorder.conversation(r.conversation.messages, chatSetup(ctx));
+      const { messages, ...state } = r.conversation;
+      // Meal chats keep what reopening them needs (the recipe editor's chat belongs to its recipe).
+      if (!recipe) recorder.resume({ conversation: state, products: [...seenProducts.values()] });
+      recorder.conversation(messages, chatSetup(ctx));
       setPhotoCount((n) => n + msg.images.length);
       setPhotoBytes((n) => n + msg.images.reduce((sum, i) => sum + i.data.length, 0));
       show(r.outcome);
@@ -401,8 +429,12 @@ function Chat({ apiKey, model, day, recipe }: { apiKey: string; model: AiModel; 
     }
   }
 
+  /** A card was saved here (not only before the chat was reopened). */
+  const loggedHere = useRef(false);
+
   /** A card was saved (with what was saved, for the saved chat) or its save undone. */
   function setLogged(id: string, logged: boolean, saved?: Record<string, unknown>) {
+    if (logged) loggedHere.current = true;
     recorder.event(logged ? { type: 'saved', card: id, saved: saved ?? {} } : { type: 'undone', card: id });
     setCards((all) => {
       const card = all.get(id);
@@ -413,7 +445,7 @@ function Chat({ apiKey, model, day, recipe }: { apiKey: string; model: AiModel; 
   // Everything proposed in this chat is logged: back to the log (or the recipe).
   const recipeDone = recipe?.done;
   useEffect(() => {
-    if (cards.size > 0 && [...cards.values()].every((c) => c.logged)) {
+    if (loggedHere.current && cards.size > 0 && [...cards.values()].every((c) => c.logged)) {
       if (recipeDone) recipeDone();
       else navigate();
     }
@@ -421,6 +453,27 @@ function Chat({ apiKey, model, day, recipe }: { apiKey: string; model: AiModel; 
 
   const timedOut = images.filter((i) => i.time.source !== 'photo').length;
   const openCards = [...cards.values()].filter((c) => !c.logged).map(cardId);
+
+  // Leaving with cards still open (the back gesture, a link): the chat is saved, so the toast's
+  // undo brings it back as it was. A reply still on its way is saved too, but reopening before
+  // it arrives would miss it, so no toast while busy.
+  const leaving = useRef({ open: 0, busy: false });
+  leaving.current = { open: openCards.length, busy };
+  const mounted = useRef(false);
+  useEffect(() => {
+    if (recipe || !recorder.enabled) return;
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      const { open, busy: thinking } = leaving.current;
+      // React's development double mount runs this without leaving; only a real unmount stays unmounted.
+      setTimeout(() => {
+        const id = recorder.id;
+        if (mounted.current || open === 0 || thinking || !id) return;
+        toast(t('ai.chatClosed', { n: open }), () => navigate('assistant', 'chat', id));
+      }, 0);
+    };
+  }, [recipe, recorder, toast]);
 
   /** Save these open cards (all by default) as shown, in the order shown, with one undo for all of them. */
   async function logAll(ids: readonly string[] = openCards) {
@@ -495,6 +548,14 @@ function Chat({ apiKey, model, day, recipe }: { apiKey: string; model: AiModel; 
               .join(', ')}
             .{isOn(d.settings.features, 'recipeIdeas') && ` ${t('ai.introIdeas')}`}
           </div>
+        )}
+        {reopened ? (
+          <p className="chat-reopened muted small">
+            <Icon name="history" size={16} /> {t('ai.reopened', { when: `${formatDay(dayKey(new Date(reopened.record.startedAt)), d.today)}, ${formatTime(reopened.record.startedAt)}` })}
+            {reopened.state.lost.length > 0 && ` ${t('ai.reopenedLost', { ids: reopened.state.lost.join(', ') })}`}
+          </p>
+        ) : (
+          !recipe && recorder.enabled && bubbles.length === 0 && !busy && <LastChat today={d.today} />
         )}
         {bubbles.map((b, i) =>
           b.role === 'card' ? (
@@ -640,6 +701,24 @@ function ideasOverview(d: AppData, hidden: ReadonlySet<string>): string {
     `Excluded by the user (never use these in ideas): ${excluded.length ? excluded.join('; ') : 'none.'}`,
     `Cooking preferences, in the user's words: ${prefs ? `\n${prefs}` : 'none written.'}`,
   ].join('\n\n');
+}
+
+/** In a new chat: the latest saved meal chat, to carry on with (e.g. after leaving it by mistake). */
+function LastChat({ today }: { today: string }) {
+  const last = useLiveQuery(() => repo.db.chats.orderBy('updatedAt').reverse().filter((c) => c.kind === 'log' && c.events.length > 0).first(), []);
+  if (!last) return null;
+  const open = openCardIds(last.events).length;
+  const when = `${formatDay(dayKey(new Date(last.updatedAt)), today)}, ${formatTime(last.updatedAt)}`;
+  return (
+    <a className="last-chat" href={href('assistant', 'chat', last.id)}>
+      <Icon name="history" size={20} />
+      <span>
+        <strong>{t('ai.lastChat')}</strong>
+        <span className="small last-chat-what">{last.title || t('chats.kind.log')}</span>
+        <span className="muted small">{[when, ...(open ? [t('ai.lastChatOpen', { n: open })] : [])].join(' · ')}</span>
+      </span>
+    </a>
+  );
 }
 
 /** An answer in pages, as it sits in the chat: the start of its text, its cards with their state, and a way back into the pages. */

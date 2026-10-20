@@ -16,7 +16,7 @@ import { SubPage } from './ProfilePage';
 
 const KIND_LABEL: Record<ChatKind, MessageKey> = { log: 'chats.kind.log', recipe: 'chats.kind.recipe', insights: 'chats.kind.insights' };
 
-/** Saved assistant chats: share one as a file, or delete (with undo). Route: #/settings/chats. */
+/** Saved assistant chats: open a meal chat to carry on, share one as a file, or delete (with undo). Route: #/settings/chats. */
 export function SavedChatsPage() {
   const d = useData();
   const toast = useToast();
@@ -90,9 +90,17 @@ function ChatRow({ chat, today, size, onShare, onDelete }: { chat: ChatRecord; t
         {chat.title && <p className="chat-row-title">{chat.title}</p>}
         <p className="muted small">{parts.join(' · ')}</p>
         <div className="row-between">
-          <button className="btn btn-small btn-secondary" onClick={onShare}>
-            <Icon name="share" size={18} /> {t('chats.share')}
-          </button>
+          <div className="row chat-row-actions">
+            {/* Only meal chats: a recipe chat's cards belong to its recipe editor, Insights has none. */}
+            {chat.kind === 'log' && (
+              <a className="btn btn-small btn-primary" href={href('assistant', 'chat', chat.id)} aria-label={t('chats.openHint')}>
+                <Icon name="history" size={18} /> {t('chats.open')}
+              </a>
+            )}
+            <button className="btn btn-small btn-secondary" onClick={onShare}>
+              <Icon name="share" size={18} /> {t('chats.share')}
+            </button>
+          </div>
           <button className="icon-btn" aria-label={t('chats.delete')} onClick={onDelete}>
             <Icon name="trash" size={18} />
           </button>

@@ -43,6 +43,7 @@ function Page({ route }: { route: string[] }) {
     case 'log':
       return <LogPage key={`${b}-${c}`} day={b} foodCode={c} />;
     case 'assistant':
+      if (b === 'chat') return <AssistantPage key={`chat-${c}`} chatId={c} />;
       return <AssistantPage key={b} day={b} />;
     case 'diary':
       return <DiaryPage day={b} />;

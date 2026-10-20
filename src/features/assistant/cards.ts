@@ -80,6 +80,13 @@ export function cardTitle(c: Card): string {
   }
 }
 
+/** A chat bubble; an answer with several cards is one 'pages' bubble, its cards shown as pages. */
+export type Bubble =
+  | { role: 'user'; text: string; previews: string[] }
+  | { role: 'assistant'; text: string }
+  | { role: 'card'; id: string }
+  | { role: 'pages'; key: number; text: string; ids: string[] };
+
 /** Undoes one saved card. */
 export type Undo = () => Promise<void>;
 /** Saves a card as it is shown (with the user's edits); undefined if it cannot be saved as it is. */

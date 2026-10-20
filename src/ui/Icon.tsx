@@ -35,6 +35,7 @@ const paths: Record<string, string> = {
   chat: 'M4 5h16v11H9l-5 4zM8 9h8M8 12h5',
   barcode: 'M4 6v12M7 6v12M10.5 6v12M13 6v12M16.5 6v12M20 6v12',
   star: 'M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z',
+  history: 'M4.5 12a7.5 7.5 0 1 0 2.2-5.3L4.5 9M4.5 4.5V9H9M12 8v4.5l3 2',
   repeat: 'M4 12a7 7 0 0 1 12-4.9L18 9M18 4v5h-5M20 12a7 7 0 0 1-12 4.9L6 15M6 20v-5h5',
   bars: 'M5 20v-8M10 20V5M15 20v-6M20 20V9',
   calendar: 'M4.5 6.5h15v13h-15zM4.5 10.5h15M8.5 4v4M15.5 4v4',

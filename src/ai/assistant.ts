@@ -392,7 +392,7 @@ export async function sendMessage(
       const fromPhotos = order.filter((id) => !shownRecipes.some((r) => r.id === id && r.kind === 'idea'));
       const last = photoTurns[photoTurns.length - 1];
       if (last) photoTurns = [...photoTurns.slice(0, -1), { ...last, cards: [...last.cards, ...fromPhotos] }];
-      const shownResult = (id: string, card: string, verb: string): Beta.BetaToolResultBlockParam => ({ type: 'tool_result', tool_use_id: id, content: `Shown to the user as card ${card}. Not ${verb} yet; their reply follows.` });
+      const shownResult = (id: string, card: string, verb: string): Beta.BetaToolResultBlockParam => ({ type: 'tool_result', tool_use_id: id, content: shownText(card, verb) });
       const shownResults = [
         ...proposals.map(({ id }, i) => shownResult(id, shown[i]!.id, 'logged')),
         ...notesProposed.map(({ id }, i) => shownResult(id, shownNotes[i]!.id, 'saved')),
@@ -457,6 +457,24 @@ export async function sendMessage(
     messages.push({ role: 'user', content: results });
   }
   return done({ kind: 'error', reason: 'tooManySteps' });
+}
+
+/** The tool result for a proposal shown as a card, until the user answers. */
+export const shownText = (card: string, verb: string) => `Shown to the user as card ${card}. Not ${verb} yet; their reply follows.`;
+
+/** What saving a card is called in shownText, by its id's letter. */
+export function cardVerb(card: string, recipe: boolean): string {
+  switch (card[0]) {
+    case 'M':
+    case 'P':
+      return 'logged';
+    case 'L':
+      return 'added to the list';
+    case 'R':
+      return recipe ? 'added to the recipe' : 'saved';
+    default:
+      return 'saved';
+  }
 }
 
 /** The system prompt and tools a request with this context carries (kept with saved chats). */
