@@ -4,10 +4,10 @@ import { href } from '../../app/router';
 import { t, type MessageKey } from '../../i18n';
 import { fmtAmount, fmtFill, fmtNumber, fmtPercent } from '../../lib/format';
 import { NUTRIENT_BY_ID } from '../../model/nutrients';
-import { tankTrend, type NutrientResult } from '../../model/simulate';
+import { tankTrend, type HistoryPoint, type NutrientResult, type StoreResult } from '../../model/simulate';
 import type { Range } from '../../model/paramTypes';
 import { nutrientParams, statusThresholds, storage, trendDisplay } from '../../../model/parameters';
-import { trendOf } from '../../model/trend';
+import { storeTrendOf, trendOf } from '../../model/trend';
 import { referenceValues } from '../../../model/reference-values';
 import { portionGrams } from '../../model/ranking';
 import { isOn } from '../../settings/features';
@@ -15,7 +15,7 @@ import { NON_SINGLE_FOOD_GROUPS } from '../../foods/foodDb';
 import { diverseTop } from '../../foods/variety';
 import { infoId, NUTRIENT_INFO_SOURCES } from '../../i18n/nutrientInfo.en';
 import { LineChart } from '../../ui/LineChart';
-import { hasNoData, trendArrows, trendLabel } from '../../ui/Gauge';
+import { hasNoData, storeTrendLabel, trendArrows, trendLabel } from '../../ui/Gauge';
 import { StatusBadge } from '../../ui/status';
 import { Icon } from '../../ui/Icon';
 import { energyBasisText } from '../settings/EnergyTarget';
@@ -57,20 +57,10 @@ export function NutrientPage({ id }: { id: string }) {
   if (!def || !r) return <p>{t('nutrient.unknown')}</p>;
 
   const model = storage[id];
-  const isTank = r.kind === 'tank';
   const noData = hasNoData(r);
   const trend = r.status === 'unknown' ? null : trendOf(r);
-  const scale = (v: number) => v * 100;
-  const history = r.history.slice(-120).map((p) => ({ ...p, low: scale(p.low), central: scale(p.central), high: scale(p.high) }));
-  const guides =
-    r.kind === 'tank'
-      ? [
-          { value: 100, label: '100%' },
-          { value: statusThresholds.tank.value.gettingLow * 100, label: fmtPercent(statusThresholds.tank.value.gettingLow) },
-        ]
-      : r.kind === 'info'
-        ? []
-        : [{ value: 100, label: '100%' }];
+  const history = r.history.slice(-120).map(toPercent);
+  const guides = r.kind === 'info' ? [] : [{ value: 100, label: '100%' }];
 
   return (
     <section>
@@ -85,8 +75,6 @@ export function NutrientPage({ id }: { id: string }) {
         <p className="big-number">
           {noData
             ? '–'
-            : r.kind === 'tank'
-            ? t('gauge.full', { pct: fmtFill(r.value.central) })
             : r.kind === 'info'
               ? `${fmtAmount(id, r.averageIntake)}/${t('nutrient.day')}`
               : fmtPercent(r.value.central)}
@@ -101,21 +89,20 @@ export function NutrientPage({ id }: { id: string }) {
           </p>
         )}
         <p className="small">
-          {r.kind === 'tank' && r.storeDays && `${storeLastsText(r.storeDays)} `}
-          {r.kind === 'tank'
-            ? `${t('nutrient.tankExplain')}${r.slow && !r.measuredOn ? ` ${t('nutrient.slowExplain')}` : ''}`
-            : r.kind === 'limit'
-              ? t('nutrient.limitExplain', { days: r.windowDays })
-              : r.kind === 'info'
-                ? t('nutrient.infoExplain', { days: r.windowDays })
+          {r.kind === 'limit'
+            ? t('nutrient.limitExplain', { days: r.windowDays })
+            : r.kind === 'info'
+              ? t('nutrient.infoExplain', { days: r.windowDays })
+              : r.store
+                ? t('nutrient.storeAverageExplain', { days: r.windowDays })
                 : t('nutrient.rollingExplain', { days: r.windowDays })}
         </p>
         {r.kind !== 'info' && req && (
           <p className="small muted">
             {t('nutrient.averageIntake', { amount: fmtAmount(id, r.averageIntake), ref: fmtAmount(id, req.recommended) })}
-            {r.kind !== 'tank' && r.leftOutDays > 0
+            {r.leftOutDays > 0
               ? ` ${t('nutrient.knownDaysLeftOut', { known: r.knownDays, days: r.windowDays - r.leftOutDays, left: r.leftOutDays })}`
-              : r.knownDays < r.windowDays && r.kind !== 'tank'
+              : r.knownDays < r.windowDays
                 ? ` ${t('nutrient.knownDays', { known: r.knownDays, days: r.windowDays })}`
                 : ''}
           </p>
@@ -128,10 +115,6 @@ export function NutrientPage({ id }: { id: string }) {
             </p>
           </>
         )}
-        {isTank && req && <TankTrendNote r={r} need={req.physiological} startedEmpty={d.profile.startingLevel === 'empty' && !r.measuredOn} />}
-        {isTank && req && <IronReferenceNote r={r} need={req.physiological} />}
-        {r.slow && !r.measuredOn && !markersFor(id).length && <p className="small muted">{t('nutrient.noLabYet')}</p>}
-        {r.measuredOn && <p className="small">{t('nutrient.measuredOn', { day: formatDay(r.measuredOn, d.today) })}</p>}
         <TestHint r={r} name={def.name} />
         {r.missingDataDays > 0 && <p className="small notice">{t('nutrient.missingData', { n: r.missingDataDays })}</p>}
         {r.ulRatio !== undefined && req?.upperLimit && (
@@ -146,7 +129,10 @@ export function NutrientPage({ id }: { id: string }) {
         )}
       </div>
 
-      {r.kind === 'tank' && <BloodTests id={id} />}
+      {r.store && req && (
+        <StoreCard r={r} store={r.store} need={req.physiological} showRange={showRange} startedEmpty={d.profile.startingLevel === 'empty'} today={d.today} />
+      )}
+      {r.store && <BloodTests id={id} />}
 
       <NutrientInfo id={id} />
 
@@ -155,7 +141,7 @@ export function NutrientPage({ id }: { id: string }) {
           <h2 className="section-title">{t('nutrient.history')}</h2>
           <div className="card">
             <LineChart points={history} guides={guides} showRange={showRange} format={(v) => `${Math.round(v)}%`} />
-            <p className="muted small">{isTank ? t('nutrient.historyTank') : t('nutrient.historyRolling', { days: r.windowDays })}</p>
+            <p className="muted small">{t('nutrient.historyRolling', { days: r.windowDays })}</p>
           </div>
         </>
       )}
@@ -230,9 +216,9 @@ export function NutrientPage({ id }: { id: string }) {
                 {req.physiologicalDerived ? ` (${t('nutrient.derived')})` : ''}
               </li>
             )}
-            {r.capacity !== undefined && advanced && (
+            {r.store && advanced && (
               <li>
-                {t('nutrient.capacity')}: {fmtAmount(id, r.capacity)}
+                {t('nutrient.capacity')}: {fmtAmount(id, r.store.capacity)}
               </li>
             )}
           </ul>
@@ -290,22 +276,87 @@ function storeLastsText(days: Range): string {
   return low === high ? t('nutrient.storeLasts', { central }) : t('nutrient.storeLastsRange', { central, low, high });
 }
 
+const toPercent = (p: HistoryPoint): HistoryPoint => ({ ...p, low: p.low * 100, central: p.central * 100, high: p.high * 100 });
+
+/**
+ * The body store behind a nutrient: how full it is, whether it is filling, how long a full one lasts, the
+ * notes that keep an empty start or iron's adapted absorption from misleading, and the fill history.
+ */
+function StoreCard({ r, store, need, showRange, startedEmpty, today }: { r: NutrientResult; store: StoreResult; need: number; showRange: boolean; startedEmpty: boolean; today: string }) {
+  const tr = storeTrendOf(store);
+  const history = store.history.slice(-120).map(toPercent);
+  const gettingLow = statusThresholds.tank.value.gettingLow;
+  return (
+    <>
+      <div className="section-title row-between">
+        <h2>{t('nutrient.storeTitle')}</h2>
+        <a className="small" href={href('stores')}>
+          {t('stores.all')}
+        </a>
+      </div>
+      <div className="card">
+        <StatusBadge status={store.status} />
+        <p className="big-number">
+          {t('gauge.full', { pct: fmtFill(store.fill.central) })}
+          {showRange && store.fill.high - store.fill.low > 0.02 && (
+            <span className="muted range">
+              {' '}
+              ({fmtFill(store.fill.low)}–{fmtFill(store.fill.high)})
+            </span>
+          )}
+        </p>
+        {tr && (
+          <p className="small trend-line">
+            <span className={`trend trend-${tr.better === true ? 'better' : tr.better === false ? 'worse' : 'neutral'}`} aria-hidden>
+              {trendArrows(tr)}
+            </span>{' '}
+            {storeTrendLabel(tr)}
+          </p>
+        )}
+        <p className="small">
+          {store.storeDays && `${storeLastsText(store.storeDays)} `}
+          {t('nutrient.tankExplain')}
+          {store.slow && !store.measuredOn ? ` ${t('nutrient.slowExplain')}` : ''}
+        </p>
+        <TankTrendNote r={r} store={store} need={need} startedEmpty={startedEmpty && !store.measuredOn} />
+        <IronReferenceNote r={r} store={store} need={need} />
+        {store.slow && !store.measuredOn && !markersFor(r.id).length && <p className="small muted">{t('nutrient.noLabYet')}</p>}
+        {store.measuredOn && <p className="small">{t('nutrient.measuredOn', { day: formatDay(store.measuredOn, today) })}</p>}
+        {history.length > 1 && (
+          <>
+            <LineChart
+              points={history}
+              guides={[
+                { value: 100, label: '100%' },
+                { value: gettingLow * 100, label: fmtPercent(gettingLow) },
+              ]}
+              showRange={showRange}
+              format={(v) => `${Math.round(v)}%`}
+            />
+            <p className="muted small">{t('nutrient.historyTank')}</p>
+          </>
+        )}
+      </div>
+    </>
+  );
+}
+
 /**
  * Whether a store is filling or going down at the recent rate, so a low tank on a good diet
  * doesn't read as "you eat too little" (e.g. after starting empty).
  */
-function TankTrendNote({ r, need, startedEmpty }: { r: NutrientResult; need: number; startedEmpty: boolean }) {
-  const trend = tankTrend(r);
-  const fill = r.store?.central ?? r.value.central;
-  if (!trend || r.netPerDay === undefined || fill >= 1) return null;
+function TankTrendNote({ r, store, need, startedEmpty }: { r: NutrientResult; store: StoreResult; need: number; startedEmpty: boolean }) {
+  const trend = tankTrend(store);
+  const fill = store.fill.central;
+  if (!trend || store.netPerDay === undefined || fill >= 1) return null;
   const low = fill < statusThresholds.tank.value.gettingLow;
   // "Not because you eat too little" only holds when the diet covers the need (at normal iron stores for iron).
-  const dietCovers = !r.balance || r.balance.central >= 1;
+  const dietCovers = r.value.central >= 1;
   // Absorbed = need + net change, so the two numbers always explain the direction (vitamin D includes sun).
-  const vars = { absorbed: fmtAmount(r.id, Math.max(0, need + r.netPerDay)), need: fmtAmount(r.id, need) };
+  const vars = { absorbed: fmtAmount(r.id, Math.max(0, need + store.netPerDay)), need: fmtAmount(r.id, need) };
   const text =
     trend.direction === 'draining'
-      ? t(r.level!.central > 0 ? 'nutrient.trendDraining' : 'nutrient.trendEmpty', vars)
+      ? t(store.level.central > 0 ? 'nutrient.trendDraining' : 'nutrient.trendEmpty', vars)
       : trend.direction === 'steady'
         ? t('nutrient.trendSteady', vars)
         : trend.daysToFine !== undefined
@@ -316,9 +367,7 @@ function TankTrendNote({ r, need, startedEmpty }: { r: NutrientResult; need: num
       <p className="small">{text}</p>
       {low && startedEmpty && dietCovers && trend.direction === 'filling' && (
         <p className="small">
-          {t('nutrient.startedEmpty')}
-          {' '}
-          <a href={href('settings', 'start')}>{t('nutrient.changeStart')}</a>
+          {t('nutrient.startedEmpty')} <a href={href('settings', 'start')}>{t('nutrient.changeStart')}</a>
         </p>
       )}
     </>
@@ -329,10 +378,10 @@ function TankTrendNote({ r, need, startedEmpty }: { r: NutrientResult; need: num
  * Iron is absorbed better while stores are low, so the store can fill on a diet that would not cover the need
  * at normal stores. Say so in amounts, so the filling store doesn't read as "my diet is enough".
  */
-function IronReferenceNote({ r, need }: { r: NutrientResult; need: number }) {
-  if (!r.balance || r.netPerDay === undefined) return null;
-  const adapted = Math.max(0, need + r.netPerDay);
-  const reference = r.balance.central * need;
+function IronReferenceNote({ r, store, need }: { r: NutrientResult; store: StoreResult; need: number }) {
+  if (store.netPerDay === undefined || hasNoData(r)) return null;
+  const adapted = Math.max(0, need + store.netPerDay);
+  const reference = r.value.central * need;
   if (adapted - reference <= 0.05 * need) return null;
   return <p className="small">{t('nutrient.ironReference', { absorbed: fmtAmount(r.id, reference), need: fmtAmount(r.id, need) })}</p>;
 }

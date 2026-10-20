@@ -28,7 +28,7 @@ import { SubPage } from './ProfilePage';
 export function StartPage() {
   const d = useData();
   const p = d.profile;
-  const tanks = NUTRIENTS.filter((n) => (storage[n.id]?.kind === 'tank' || storage[n.id]?.kind === 'tankDays') && d.model.nutrients.get(n.id)?.kind === 'tank');
+  const tanks = NUTRIENTS.filter((n) => (storage[n.id]?.kind === 'tank' || storage[n.id]?.kind === 'tankDays') && !!d.model.nutrients.get(n.id)?.store);
   return (
     <SubPage title={t('settings.start')}>
       <p className="muted small">{t('start.intro')}</p>

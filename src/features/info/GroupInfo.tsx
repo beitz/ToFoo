@@ -360,7 +360,7 @@ function MicroInfo({ group, onNavigate }: { group: 'vitamins' | 'minerals'; onNa
           <tbody>
             {ids.map((id) => {
               const r = d.model.nutrients.get(id);
-              const days = r && r.kind === 'tank' ? r.storeDays?.central : undefined;
+              const days = r?.store?.storeDays?.central;
               return (
                 <tr key={id}>
                   <th scope="row">

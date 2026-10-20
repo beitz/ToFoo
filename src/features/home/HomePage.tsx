@@ -21,6 +21,7 @@ import { WaterCard } from '../water/WaterCard';
 import { QuickActions } from './QuickActions';
 import { StockChips } from './StockChips';
 import { GroupInfoButton, hasGroupInfo } from '../info/GroupInfo';
+import { storeNeedsAttention, withStores } from '../../logic/stores';
 import { attentionCounts, COLLAPSED_BY_DEFAULT, groupNutrients, type HomeGrouping } from './grouping';
 
 /** Shown first, in one row: energy and the macronutrients. */
@@ -67,6 +68,7 @@ export function HomePage() {
     return diverseTop(ranked, 12, (g) => d.foods.byCode.get(g.key) ?? { code: g.key, nameEn: g.key });
   }, [d.foods, d.profile.exclusions, model, d.requirements]);
 
+  const storeWarnings = withStores(model.nutrients.values()).filter((r) => !hidden.has(r.id) && storeNeedsAttention(r.store)).length;
   const weightDefault = d.requirements.defaultsUsed.includes('weight');
   const sexDefault = d.requirements.defaultsUsed.includes('sex');
 
@@ -120,6 +122,14 @@ export function HomePage() {
         >
           <Icon name="info" />
         </button>
+        <a className="btn btn-secondary btn-small home-stores-link" href={href('stores')}>
+          {t('home.stores')}
+          {storeWarnings > 0 && (
+            <span className="nrow-warn" role="img" aria-label={t('store.warnSpoken')}>
+              <Icon name="warning" size={16} />
+            </span>
+          )}
+        </a>
       </div>
       {legendOpen && (
         <p className="muted small home-legend" id="home-legend">
@@ -155,7 +165,7 @@ export function HomePage() {
         const grid = (
           <div className="nrow-list" id={`group-${g.key}`}>
             {g.items.map((r) => {
-              const defaultBased = weightDefault && (r.kind === 'tank' || PER_KG.has(r.id));
+              const defaultBased = weightDefault && (!!r.store || PER_KG.has(r.id));
               const open = () => navigate('nutrient', r.id);
               return <GaugeRow key={r.id} result={r} showRange={showRange} defaultBased={defaultBased} onClick={open} />;
             })}
