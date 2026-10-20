@@ -20,6 +20,7 @@ Guiding principles:
 3. **Approximation over nothing, but labelled as such.**
 4. **Features are modular and switchable.** Forecasts, notifications and other extras can be turned on and off.
 5. **Foundation first, then iterate.** v1 is small, but the data model already supports later versions.
+6. **Transparent on request.** Anyone who wants to can see how each number is calculated, where its data comes from and what the research says, one tap away and never in the way (see "How it works: transparency and sources").
 
 Out of scope: pregnancy, medical conditions, medication interactions, and any form of medical advice.
 
@@ -524,6 +525,32 @@ Content is drafted once from reputable sources, cited, and reviewed by the user;
 
 **Group pages** (decided 2026-10-18): each nutrient group (protein and amino acids, fats, carbohydrates, vitamins, minerals) has a one-page explanation in a pop-up, opened from a small ⓘ next to the group's heading on Home ("By type"), on the food page (the nutrient table is split into the same groups) and from "About …" on each nutrient's "What it does" card. It says what the group is, which ones the body can make, where they come from (animal, plant or both) and what changes absorption, with sources listed at the end. Comparisons are computed, not written: the amino acid make-up of grain, legume, nut and animal protein (median per g protein over BLS foods, as % of the WHO 2007 adult requirement pattern, ↓ below 100 %), the fatty acid shares of common fats (BLS), store durations and cooking losses (from `model/`). Each essential amino acid also has a one-line role, shown on the group page and its nutrient page. Texts: `src/i18n/groupInfo.en.ts`.
 
+## How it works: transparency and sources
+
+Owner's request (2026-10-20, not built yet): trust comes from being able to look underneath. A user who wants to dig deeper can see how every number is calculated, where its data comes from and what the research says, including how exact it can be. Nothing of this is shown by default: the everyday screens stay as they are, and the detail opens only when the user asks for it, from where they would expect it.
+
+**Where it opens** (a small ⓘ or "How is this calculated?" link next to the number, never a block of text):
+
+- Home: a line, a store card, the energy gauge.
+- The nutrient page (next to "How ToFoo models it"), the food page's nutrient table, a meal or day in the diary, the weekly look-back.
+- Assistant cards: where each food's values came from (BLS, Open Food Facts, USDA, built from ingredients, or an estimate).
+- Settings → About: the full reference, readable front to back.
+
+**What it shows**, in layers, plain words first and details folded:
+
+1. **One-paragraph answer**: what the number means and how it is worked out, e.g. "the share of your daily need you absorbed on average over the last 7 finished days".
+2. **The calculation for this number**: each entry that contributed, from amount eaten → after cooking and storage losses → absorbed, the sum, the need it is compared with, and the result, with the low and high run next to the central one. Missing values are listed as missing, not hidden.
+3. **Where the data comes from**: per food, the database, version and code (e.g. BLS 4.0 C131000) and the BLS provenance of the value (analysed, calculated, taken from another table, estimated).
+4. **What the research says**: every parameter used (absorption, retention, store size, requirement, upper limit, sun) with its source, link, low/central/high range and confidence (high, medium, low, assumption), and the open question when it is an assumption.
+5. **How exact this can be**: per nutrient, how far a food log can be trusted (good, rough, or a blind spot the log cannot see, such as iodine from bakery salt, vitamin D from sun, selenium missing from the BLS, iron and B12 status), what drives the error, and which blood test helps where one exists. Based on the accuracy review of 2026-10-20; its proposals are still with the owner, so this layer explains and does not change any status.
+
+**Rules for the content**:
+
+- Generated from the same data the model uses (`model/*.ts`, the BLS provenance codes, the log), so the explanation can never disagree with the number. Only the prose is written by hand, with sources, like the nutrient wiki.
+- Honest about limits: say what is an assumption, what is unknown and what the app cannot see.
+- Works offline; all text through `t()`; links to sources open outside the app only when tapped.
+- Builds on what exists: "How ToFoo models it" on the nutrient page, "How exact is this?" on entries, the group info pop-ups, About and data sources, and the planned nutrient wiki (which explains what a nutrient does; this explains how the app calculates it). They should end up as one consistent place per nutrient rather than more scattered pop-ups.
+
 ## Motivation and gamification
 
 A light layer of rewards makes regular use feel good, rewarding logging, cooking, variety and nutrients in range, never eating less.
@@ -668,6 +695,7 @@ v1 is the smallest app that is useful every day; each later version adds to the 
 - [ ] Phone health data (Health Connect), low priority; the route to automatic sleep times and steps
 - [ ] Energy in and out (calorie balance; the personal energy target exists since 2026-10-17, activity energy not yet): would be nice in one app since it overlaps with nutrient tracking, but the focus stays on nutrients, not weight loss or gain. Only if it can be added cleanly, as an optional feature that keeps the gamification guardrails (no rewards for eating less).
 - [ ] **Research: how long the body copes without each nutrient** (owner's question 2026-10-20, parked; research first, no app change decided). Per nutrient, from studies: how long body stores or pools last with no intake (e.g. vitamin C depletion studies, thiamine), what shows first and how gradually (no hard cutoff), and how often a check makes sense (e.g. ferritin for iron). Could later feed the nutrient pages, the "lasts" figures beyond the six stores, and when Home should warn; every number needs a source in `model/` before it is used.
+- [ ] **How it works: transparency and sources** (owner's request 2026-10-20): "How is this calculated?" from every number, with the calculation, data origin, sources and how exact it can be, hidden until asked for; see "How it works: transparency and sources".
 - [ ] Keep in mind, not needed now: user-set target per nutrient (e.g. from a doctor), clearly marked as user-set. The DGE-derived targets stay as they are.
 
 **Not planned**: social features, community recipes, coaching, ads (one user, privacy, calm by default).
