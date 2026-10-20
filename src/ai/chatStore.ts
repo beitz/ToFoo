@@ -6,14 +6,15 @@ import { diag, diagEntries } from '../app/diagnostics';
 import { newId } from '../lib/id';
 import { shareOrDownload } from '../lib/shareFile';
 import { repo } from '../storage/repo';
-import { buildChatExport, CHAT_SCHEMA_VERSION, chatFileName, chatTitle, splitPhotos, type ChatEvent, type ChatKind, type ChatPhoto, type ChatRecord, type NewChatEvent } from './chatRecord';
+import { buildChatExport, CHAT_SCHEMA_VERSION, chatFileName, chatTitle, splitPhotos, type ChatEvent, type ChatKind, type ChatPhoto, type ChatRecord, type ChatResume, type NewChatEvent } from './chatRecord';
 import { mergeModelTokens, type ModelTokens } from './pricing';
 
 type Store = { saveChat: (chat: ChatRecord, photos?: ChatPhoto[]) => Promise<void> };
 
 /**
  * Writes one chat to the phone as it goes: the first event starts the record, every later event
- * and turn rewrites it (photos only once). Does nothing when saving chats is off.
+ * and turn rewrites it (photos only once). Does nothing when saving chats is off. A reopened chat
+ * carries on with its saved record.
  */
 export class ChatRecorder {
   private rec: ChatRecord | undefined;
@@ -24,7 +25,13 @@ export class ChatRecorder {
     private readonly start: { kind: ChatKind; model: string; day?: string; features: Record<string, boolean> },
     readonly enabled: boolean,
     private readonly store: Store = repo,
-  ) {}
+    reopened?: ChatRecord,
+  ) {
+    if (reopened) {
+      this.rec = { ...reopened, events: [...reopened.events], schemaVersion: CHAT_SCHEMA_VERSION };
+      this.photosSaved = reopened.photos;
+    }
+  }
 
   /** The saved chat's id, once something was recorded. */
   get id(): string | undefined {
@@ -66,6 +73,12 @@ export class ChatRecorder {
     if (setup) rec.setup = setup;
     rec.updatedAt = now;
     this.flush(fresh);
+  }
+
+  /** What reopening the chat needs besides messages and events; saved with the next turn. */
+  resume(state: ChatResume, now = Date.now()): void {
+    if (!this.enabled) return;
+    this.ensure(now).resume = state;
   }
 
   /** Resolves once everything recorded so far is written. */

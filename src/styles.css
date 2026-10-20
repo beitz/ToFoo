@@ -2592,6 +2592,48 @@ body:has(.fab-stack) .toast-area {
   margin: 0;
   padding: 0;
 }
+.chat-row-actions {
+  flex-wrap: wrap;
+}
+
+/* ── Assistant: carry on with a saved chat ───────────────────── */
+.last-chat {
+  align-self: flex-start;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 88%;
+  min-height: 44px;
+  padding: 8px 14px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  text-decoration: none;
+}
+.last-chat svg {
+  flex: none;
+  color: var(--accent);
+}
+.last-chat > span {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.last-chat-what {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.chat-reopened {
+  margin: 0;
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+}
+.chat-reopened svg {
+  flex: none;
+  margin-top: 2px;
+}
 
 /* ── Assistant: an answer in pages ───────────────────────────── */
 .pages {
