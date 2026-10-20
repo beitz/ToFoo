@@ -117,17 +117,15 @@ export function topGaps(c: PortionCheck, n = 3): PortionShare[] {
 const STATUS_WORD: Record<string, string> = { low: 'Low', gettingLow: 'Getting low', tooHigh: 'Too high', fine: 'Enough', unknown: 'Not enough data' };
 
 /** How each status value reads: what the percentage means for that kind of gauge. */
-function valueText(r: Pick<NutrientResult, 'kind' | 'value' | 'windowDays' | 'balance'>): string {
+function valueText(r: Pick<NutrientResult, 'kind' | 'value' | 'windowDays' | 'store'>): string {
   const v = pct(r.value.central);
-  // A slow store's level barely moves; its balance says whether the diet covers the need.
-  if (r.kind === 'tank' && r.balance) return `store about ${v} full; absorbed about ${pct(r.balance.central)} of the need over ${r.windowDays} days`;
-  if (r.kind === 'tank') return `store about ${v} full`;
   if (r.kind === 'limit') return `about ${v} of the daily limit`;
-  return `about ${v} of the need on average over ${r.windowDays} days`;
+  const average = `about ${v} of the need on average over ${r.windowDays} days`;
+  return r.store ? `${average}; body store about ${pct(r.store.fill.central)} full` : average;
 }
 
 /** The current nutrient status, grouped, for nutrient_gaps. */
-export function describeStatus(nutrients: ReadonlyMap<string, Pick<NutrientResult, 'kind' | 'status' | 'value' | 'windowDays' | 'balance'>>, hidden: ReadonlySet<string> = new Set()): string {
+export function describeStatus(nutrients: ReadonlyMap<string, Pick<NutrientResult, 'kind' | 'status' | 'value' | 'windowDays' | 'store'>>, hidden: ReadonlySet<string> = new Set()): string {
   const groups = new Map<string, string[]>();
   for (const n of NUTRIENTS) {
     const r = nutrients.get(n.id);

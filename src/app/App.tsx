@@ -20,6 +20,7 @@ import { UsdaSettingsPage } from '../features/settings/UsdaSettingsPage';
 import { DiaryPage } from '../features/diary/DiaryPage';
 import { JournalPage } from '../features/journal/JournalPage';
 import { ShoppingPage } from '../features/shopping/ShoppingPage';
+import { StoresPage } from '../features/stores/StoresPage';
 import { RecipesPage } from '../features/recipes/RecipesPage';
 import { RecipeEditor } from '../features/recipes/RecipeEditor';
 import { RecipeView } from '../features/recipes/RecipeView';
@@ -52,6 +53,8 @@ function Page({ route }: { route: string[] }) {
       return <InsightsPage />;
     case 'shopping':
       return <ShoppingPage />;
+    case 'stores':
+      return <StoresPage />;
     case 'recipes':
       if (b === 'new') return <RecipeEditor key="new" />;
       if (b && c === 'edit') return <RecipeEditor key={b} id={b} />;

@@ -3210,3 +3210,22 @@ button.week-row:focus-visible {
 .shop-awake {
   margin-top: 1.5rem;
 }
+
+/* ⚠ after a nutrient's name: its body store is low and not filling. Same colour in every status row. */
+.nrow .nrow-warn {
+  display: inline-flex;
+  vertical-align: -2px;
+  margin-left: 4px;
+}
+.nrow .nrow-warn > svg {
+  color: var(--warn);
+}
+.home-stores-link {
+  margin-left: auto;
+  min-height: 44px;
+  gap: 6px;
+}
+.home-stores-link .nrow-warn {
+  display: inline-flex;
+  color: var(--warn);
+}
