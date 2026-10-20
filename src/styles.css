@@ -3229,3 +3229,12 @@ button.week-row:focus-visible {
   display: inline-flex;
   color: var(--warn);
 }
+/* Stores screen: a small second line under a store ("Lasts … now · … when full"). */
+.nrow-sub {
+  grid-column: 2 / -1;
+  margin-top: -6px;
+  padding-bottom: 6px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}

@@ -32,6 +32,7 @@ export function StoresPage() {
           <StoreRow key={r.id} result={r} showRange={showRange} onClick={() => navigate('nutrient', r.id)} />
         ))}
       </div>
+      <p className="muted small">{t('stores.lastsNote')}</p>
       <p className="muted small">{t('stores.slowNote')}</p>
       {sorted.some((r) => storeNeedsAttention(r.store)) && <p className="muted small">{t('stores.warnNote')}</p>}
     </section>
