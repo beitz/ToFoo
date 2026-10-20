@@ -288,12 +288,7 @@ function StoreCard({ r, store, need, showRange, startedEmpty, today }: { r: Nutr
   const gettingLow = statusThresholds.tank.value.gettingLow;
   return (
     <>
-      <div className="section-title row-between">
-        <h2>{t('nutrient.storeTitle')}</h2>
-        <a className="small" href={href('stores')}>
-          {t('stores.all')}
-        </a>
-      </div>
+      <h2 className="section-title">{t('nutrient.storeTitle')}</h2>
       <div className="card">
         <StatusBadge status={store.status} />
         <p className="big-number">

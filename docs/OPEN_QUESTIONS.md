@@ -67,7 +67,7 @@ Still open:
 - [ ] **Iron adaptation:** measured for total dietary iron, applied to non-heme only; heme absorption is not adapted. The low scenario (half the effect) is an assumption.
 - [ ] **Uncertainty widths:** amounts ±5 % (A), ±25 % (B), ±50 % (C); BLS values ±0–30 % by provenance.
 - [ ] **"Average" starting level** = tanks 60 % full.
-- [ ] **Slow-store cut-off:** stores holding ≥ 100 days of the absorbed need (iron, B12, vitamin A, folate, iodine; not vitamin D) count as slow: their level mostly reflects the starting level until a blood test, and after 42 days in a row of a low 14-day average the app suggests a blood test. (Since 2026-10-20 Home shows averages for every nutrient and fill levels are on the Stores screen.)
+- [ ] **Slow-store cut-off:** stores holding ≥ 100 days of the absorbed need (iron, B12, vitamin A, folate, iodine; not vitamin D) count as slow: their level mostly reflects the starting level until a blood test, and after 42 days in a row of a low 14-day average the app suggests a blood test. (Since 2026-10-20 the six stores are tank cards on Home and every other nutrient is a line with its average.)
 - [ ] **Blood tests for other stores:** only ferritin → iron store (8 mg/µg/L) has a source. Needed: a sourced conversion from a lab value to a store amount for B12 (serum B12 or holotranscobalamin), folate (red-cell folate) and vitamin D (25(OH)D). Vitamin A (serum retinol) and iodine (urinary iodine) barely reflect stores, so they likely stay balance-only.
 - [ ] **Vitamin C** absorption at 3000 mg (extrapolated beyond Levine 1996).
 - [ ] **Vitamin K typical absorption** (0.5): EFSA says an average cannot be estimated; only affects the absorbed amount shown.
