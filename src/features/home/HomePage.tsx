@@ -6,7 +6,7 @@ import { t, type MessageKey } from '../../i18n';
 import { addDays, formatDay } from '../../lib/dates';
 import { isOn } from '../../settings/features';
 import { repo } from '../../storage/repo';
-import { CompactGauge, GaugeRow } from '../../ui/Gauge';
+import { CompactGauge, GaugeRow, TankCard } from '../../ui/Gauge';
 import { Icon } from '../../ui/Icon';
 import { statusLabel } from '../../ui/status';
 import { NUTRIENT_BY_ID, NUTRIENTS } from '../../model/nutrients';
@@ -21,7 +21,7 @@ import { WaterCard } from '../water/WaterCard';
 import { QuickActions } from './QuickActions';
 import { StockChips } from './StockChips';
 import { GroupInfoButton, hasGroupInfo } from '../info/GroupInfo';
-import { storeNeedsAttention, withStores } from '../../logic/stores';
+import { withStores } from '../../logic/stores';
 import { attentionCounts, COLLAPSED_BY_DEFAULT, groupNutrients, type HomeGrouping } from './grouping';
 
 /** Shown first, in one row: energy and the macronutrients. */
@@ -37,6 +37,7 @@ export function HomePage() {
   const [fastSheet, setFastSheet] = useState(false);
   const [fastStart, setFastStart] = useState(today);
   const [legendOpen, setLegendOpen] = useState(false);
+  const [storesLegendOpen, setStoresLegendOpen] = useState(false);
   const showRange = isOn(settings.features, 'uncertaintyRanges');
   const hidden = new Set(settings.hiddenNutrients);
   const todayStatus = model.dayStatus[today];
@@ -49,7 +50,7 @@ export function HomePage() {
       groupNutrients(
         NUTRIENTS.filter((n) => !hidden.has(n.id) && !MACRO_ROW.includes(n.id))
           .map((n) => model.nutrients.get(n.id)!)
-          .filter(Boolean),
+          .filter((r) => r && !r.store),
         grouping,
       ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -68,7 +69,8 @@ export function HomePage() {
     return diverseTop(ranked, 12, (g) => d.foods.byCode.get(g.key) ?? { code: g.key, nameEn: g.key });
   }, [d.foods, d.profile.exclusions, model, d.requirements]);
 
-  const storeWarnings = withStores(model.nutrients.values()).filter((r) => !hidden.has(r.id) && storeNeedsAttention(r.store)).length;
+  // Store nutrients show as tank cards, everything else as lines.
+  const stores = withStores(NUTRIENTS.filter((n) => !hidden.has(n.id)).map((n) => model.nutrients.get(n.id)!).filter(Boolean));
   const weightDefault = d.requirements.defaultsUsed.includes('weight');
   const sexDefault = d.requirements.defaultsUsed.includes('sex');
 
@@ -122,14 +124,6 @@ export function HomePage() {
         >
           <Icon name="info" />
         </button>
-        <a className="btn btn-secondary btn-small home-stores-link" href={href('stores')}>
-          {t('home.stores')}
-          {storeWarnings > 0 && (
-            <span className="nrow-warn" role="img" aria-label={t('store.warnSpoken')}>
-              <Icon name="warning" size={16} />
-            </span>
-          )}
-        </a>
       </div>
       {legendOpen && (
         <p className="muted small home-legend" id="home-legend">
@@ -150,6 +144,32 @@ export function HomePage() {
           ))}
         </div>
       )}
+      {stores.length > 0 && (
+        <>
+          <div className="home-stores-head">
+            <h3>{t('home.stores')}</h3>
+            <button
+              className="icon-btn"
+              aria-label={t('home.storesHint')}
+              aria-expanded={storesLegendOpen}
+              aria-controls="home-stores-legend"
+              onClick={() => setStoresLegendOpen((o) => !o)}
+            >
+              <Icon name="info" />
+            </button>
+          </div>
+          {storesLegendOpen && (
+            <p className="muted small home-legend" id="home-stores-legend">
+              {t('home.storesLegend', { start: t(`start.${d.profile.startingLevel}` as MessageKey) })}
+            </p>
+          )}
+          <div className="tank-grid" role="group" aria-label={t('home.storesHint')}>
+            {stores.map((r) => (
+              <TankCard key={r.id} result={r} showRange={showRange} onClick={() => navigate('nutrient', r.id)} />
+            ))}
+          </div>
+        </>
+      )}
       <Segmented
         label={t('home.grouping')}
         className="home-grouping"
@@ -165,7 +185,7 @@ export function HomePage() {
         const grid = (
           <div className="nrow-list" id={`group-${g.key}`}>
             {g.items.map((r) => {
-              const defaultBased = weightDefault && (!!r.store || PER_KG.has(r.id));
+              const defaultBased = weightDefault && PER_KG.has(r.id);
               const open = () => navigate('nutrient', r.id);
               return <GaugeRow key={r.id} result={r} showRange={showRange} defaultBased={defaultBased} onClick={open} />;
             })}

@@ -693,14 +693,14 @@ export const labMarkers: Record<string, Valued<{ nutrient: string; unit: string;
   },
 };
 
-/** Stores this slow mostly show their starting level until a blood test (Stores screen and nutrient page). */
+/** Stores this slow mostly show their starting level until a blood test (tank cards on Home and the nutrient page). */
 export const slowStore = {
   minDays: {
     value: 100,
     source: 'Modelling choice',
     confidence: 'assumption',
     note:
-      'Store size ÷ absorbed need per day. A store holding months to years of need (iron, B12, vitamin A, folate, iodine) barely moves within weeks, so its fill level mostly reflects the starting guess; what the log can tell is whether intake covers the need (the average shown on Home, also used for the blood-test hint). Vitamin D (~2 months) is not slow.',
+      'Store size ÷ absorbed need per day. A store holding months to years of need (iron, B12, vitamin A, folate, iodine) barely moves within weeks, so its fill level mostly reflects the starting guess; what the log can tell is whether intake covers the need (the average on the nutrient page, also behind the filling / draining arrows and the blood-test hint). Vitamin D (~2 months) is not slow.',
   } satisfies Valued<number>,
   /** A slow store's balance this many days in a row in the "low" zone suggests checking the real level with a blood test. */
   testHintDays: {

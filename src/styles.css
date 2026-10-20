@@ -3211,30 +3211,137 @@ button.week-row:focus-visible {
   margin-top: 1.5rem;
 }
 
-/* ⚠ after a nutrient's name: its body store is low and not filling. Same colour in every status row. */
-.nrow .nrow-warn {
-  display: inline-flex;
-  vertical-align: -2px;
-  margin-left: 4px;
+/* Home: body stores as small cards with a tank that fills from the bottom. */
+.home-stores-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 4px 0 2px;
 }
-.nrow .nrow-warn > svg {
-  color: var(--warn);
+.home-stores-head h3 {
+  margin: 0;
+  font-size: 1rem;
 }
-.home-stores-link {
-  margin-left: auto;
-  min-height: 44px;
+.tank-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 6px;
+  margin-bottom: 12px;
 }
-.home-stores-link .nrow-warn {
+@media (min-width: 560px) {
+  .tank-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}
+.tank-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  min-height: 44px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.tank-card:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 1px;
+}
+.tank-card-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  font-size: 0.85rem;
+}
+.tank-card-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+.tank-card-warn {
   display: inline-flex;
+  margin-left: auto;
   color: var(--warn);
 }
-/* Stores screen: a small second line under a store ("Lasts … now · … when full"). */
-.nrow-sub {
-  grid-column: 2 / -1;
-  margin-top: -6px;
-  padding-bottom: 6px;
-  font-size: 0.75rem;
-  color: var(--text-muted);
+.tank-card-body {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+.tank {
+  position: relative;
+  flex: none;
+  width: 20px;
+  height: 52px;
+  border: 1.5px solid var(--text-muted);
+  border-radius: 4px 4px 6px 6px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+.tank-fill,
+.tank-band {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: currentColor;
+}
+.tank-band {
+  opacity: 0.35;
+}
+.tank-level {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  margin-bottom: -1px;
+  background: currentColor;
+}
+.tank-card-text {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-width: 0;
+}
+.tank-card-value {
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.tank-card-value small {
+  font-weight: 400;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+.tank-card-lasts {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.tank-card.gauge-fine .tank-card-head svg,
+.tank-card.gauge-fine .tank {
+  color: var(--ok);
+}
+.tank-card.gauge-gettingLow .tank-card-head svg,
+.tank-card.gauge-gettingLow .tank {
+  color: var(--warn);
+}
+.tank-card.gauge-low .tank-card-head svg,
+.tank-card.gauge-low .tank {
+  color: var(--low);
+}
+.tank-card.gauge-tooHigh .tank-card-head svg,
+.tank-card.gauge-tooHigh .tank {
+  color: var(--high);
+}
+.tank-card .tank-card-head .tank-card-warn svg {
+  color: var(--warn);
 }

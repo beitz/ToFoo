@@ -2,7 +2,7 @@ import type { NutrientResult, StoreResult } from '../model/simulate';
 import { storeTrendOf, trendOf, type Trend } from '../model/trend';
 import { NUTRIENT_BY_ID } from '../model/nutrients';
 import { storeNeedsAttention } from '../logic/stores';
-import { fmtAmount, fmtFill, fmtPercent } from '../lib/format';
+import { fmtAmount, fmtFill, fmtNumber, fmtPercent } from '../lib/format';
 import { STATUS_ICON, statusLabel } from './status';
 import { Icon } from './Icon';
 import { fmtDuration } from './duration';
@@ -132,7 +132,7 @@ function Bar({ value, showRange, target }: { value: { low: number; central: numb
 
 /**
  * One line per nutrient: status, name, a bar with the uncertainty band and the 100 % mark, the value
- * and the trend arrows. A ⚠ after the name when the nutrient's body store is low and not filling.
+ * and the trend arrows.
  */
 export function GaugeRow({ result: r, showRange, onClick, defaultBased }: Pick<Props, 'result' | 'showRange' | 'onClick' | 'defaultBased'>) {
   const def = NUTRIENT_BY_ID.get(r.id);
@@ -144,22 +144,16 @@ export function GaugeRow({ result: r, showRange, onClick, defaultBased }: Pick<P
   const pct = isInfo ? fmtAmount(r.id, r.averageIntake) : fmtPercent(r.value.central);
   const suffix = isInfo ? t('gauge.perDay') : r.kind === 'limit' ? t('gauge.ofMaxShort') : '';
   const range = hasBand ? `, ${t('gauge.rangeSpoken', { low: fmtPercent(r.value.low), high: fmtPercent(r.value.high) })}` : '';
-  const warn = r.store && storeNeedsAttention(r.store);
   return (
     <button
       className={`nrow gauge-${r.kind} gauge-${r.status}`}
       onClick={onClick}
-      aria-label={`${def?.name ?? r.id}: ${noData ? t('gauge.noData') : gaugeLabel(r)}${range}, ${statusLabel(r.status)}${warn ? `, ${t('store.warnSpoken')}` : ''}`}
+      aria-label={`${def?.name ?? r.id}: ${noData ? t('gauge.noData') : gaugeLabel(r)}${range}, ${statusLabel(r.status)}`}
     >
       <Icon name={STATUS_ICON[r.status]} size={14} />
       <span className="nrow-name">
         {name}
         {defaultBased && <span className="gauge-default">*</span>}
-        {warn && (
-          <span className="nrow-warn" title={t('store.warnSpoken')}>
-            <Icon name="warning" size={14} />
-          </span>
-        )}
       </span>
       {isInfo ? <span className="nrow-bar" aria-hidden /> : <Bar value={scaled} showRange={showRange} target={1 / 1.5} />}
       <span className="nrow-value" aria-hidden>
@@ -176,51 +170,86 @@ export function StoreTrendMark({ store }: { store: StoreResult }) {
   return <Arrows tr={storeTrendOf(store)} label={storeTrendLabel} />;
 }
 
-/** One line per body store on the Stores screen: status by fill level, name, fill bar, "% full", filling arrows. */
-export function StoreRow({ result: r, showRange, onClick }: { result: NutrientResult & { store: StoreResult }; showRange: boolean; onClick?: () => void }) {
+/** Short duration for a narrow card: "9 d", "3 wk", "5 mo", "3.4 yr". */
+export function fmtDurationShort(days: number): string {
+  if (days < 14) return t('durationShort.days', { n: Math.max(1, Math.round(days)) });
+  if (days < 60) return t('durationShort.weeks', { n: Math.round(days / 7) });
+  if (days < 730) return t('durationShort.months', { n: Math.round(days / 30.44) });
+  return t('durationShort.years', { n: fmtNumber(days / 365.25, 1) });
+}
+
+/**
+ * How long the store would cover the need with nothing eaten at its current level (middle of the sourced
+ * capacity range; sun left out for vitamin D). Null when the store size isn't known.
+ */
+export function storeLastsDays(st: StoreResult): number | null {
+  const full = st.storeDays?.central;
+  return full ? clamp01(st.fill.central) * full : null;
+}
+
+/**
+ * A body store on Home: a small card with a tank that fills from the bottom (uncertainty as a shaded band),
+ * "% full", filling / draining arrows, how long it lasts, and a ⚠ when it is low and not filling. Its status
+ * and colour follow the fill level only.
+ */
+export function TankCard({ result: r, showRange, onClick }: { result: NutrientResult & { store: StoreResult }; showRange: boolean; onClick?: () => void }) {
   const def = NUTRIENT_BY_ID.get(r.id);
   const st = r.store;
   const warn = storeNeedsAttention(st);
   const fill = { low: clamp01(st.fill.low), central: clamp01(st.fill.central), high: clamp01(st.fill.high) };
-  const range = showRange && fill.high - fill.low > 0.01 ? `, ${t('gauge.rangeSpoken', { low: fmtFill(fill.low), high: fmtFill(fill.high) })}` : '';
-  const lasts = storeLastsLine(st);
+  const band = showRange && fill.high - fill.low > 0.01;
+  const tr = storeTrendOf(st);
+  const lastsDays = storeLastsDays(st);
+  // "empty" only when nothing is left, so it never sits next to "2% full".
+  const lastsText = (fmt: (days: number) => string, under: string) =>
+    lastsDays === null ? '' : lastsDays <= 0 ? t('tank.empty') : lastsDays < 1 ? t('tank.lasts', { time: under }) : t('tank.lasts', { time: fmt(lastsDays) });
+  const lasts = lastsText(fmtDurationShort, t('durationShort.underDay'));
+  const spokenLasts = lastsText(fmtDuration, t('duration.underDay'));
+  const range = band ? `, ${t('gauge.rangeSpoken', { low: fmtFill(fill.low), high: fmtFill(fill.high) })}` : '';
   return (
     <button
-      className={`nrow gauge-store gauge-${st.status}`}
+      className={`tank-card gauge-${st.status}`}
       onClick={onClick}
-      aria-label={`${def?.name ?? r.id}: ${t('gauge.full', { pct: fmtFill(st.fill.central) })}${range}, ${statusLabel(st.status)}${warn ? `, ${t('store.warnSpoken')}` : ''}${lasts ? `. ${lasts}` : ''}`}
+      aria-label={[
+        `${def?.name ?? r.id}: ${t('gauge.full', { pct: fmtFill(st.fill.central) })}${range}`,
+        statusLabel(st.status),
+        tr ? storeTrendLabel(tr) : '',
+        spokenLasts,
+        warn ? t('store.warnSpoken') : '',
+      ]
+        .filter(Boolean)
+        .join(', ')}
     >
-      <Icon name={STATUS_ICON[st.status]} size={14} />
-      <span className="nrow-name">
-        {def?.short ?? r.id}
+      <span className="tank-card-head" aria-hidden>
+        <Icon name={STATUS_ICON[st.status]} size={14} />
+        <span className="tank-card-name">{def?.short ?? r.id}</span>
         {warn && (
-          <span className="nrow-warn" title={t('store.warnSpoken')}>
+          <span className="tank-card-warn">
             <Icon name="warning" size={14} />
           </span>
         )}
       </span>
-      <Bar value={fill} showRange={showRange} />
-      <span className="nrow-value" aria-hidden>
-        {fmtFill(st.fill.central)}
-        <small> {t('gauge.fullShort')}</small>
-      </span>
-      <StoreTrendMark store={st} />
-      {lasts && (
-        <span className="nrow-sub" aria-hidden>
-          {lasts}
+      <span className="tank-card-body" aria-hidden>
+        <span className="tank">
+          {band ? (
+            <>
+              <span className="tank-fill" style={{ height: `${fill.low * 100}%` }} />
+              <span className="tank-band" style={{ bottom: `${fill.low * 100}%`, height: `${(fill.high - fill.low) * 100}%` }} />
+              <span className="tank-level" style={{ bottom: `${fill.central * 100}%` }} />
+            </>
+          ) : (
+            <span className="tank-fill" style={{ height: `${fill.central * 100}%` }} />
+          )}
         </span>
-      )}
+        <span className="tank-card-text">
+          <span className="tank-card-value">
+            {fmtFill(st.fill.central)}
+            <small> {t('gauge.fullShort')}</small>
+          </span>
+          <StoreTrendMark store={st} />
+          {lasts && <span className="tank-card-lasts">{lasts}</span>}
+        </span>
+      </span>
     </button>
   );
-}
-
-/**
- * How long the store would cover the need with nothing eaten: now, and when full (sourced capacity ÷ need,
- * central). Sun for vitamin D is left out, like the "lasts" line on the nutrient page.
- */
-export function storeLastsLine(st: StoreResult): string | null {
-  const full = st.storeDays?.central;
-  if (!full) return null;
-  const now = clamp01(st.fill.central) * full;
-  return t('stores.lasts', { now: now < 1 ? t('stores.lastsEmpty') : fmtDuration(now), full: fmtDuration(full) });
 }

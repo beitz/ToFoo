@@ -1,4 +1,4 @@
-/** Pure: which body stores need a look, for the ⚠ on Home and the order on the Stores screen. */
+/** Pure: which body stores need a look, for the ⚠ on the tank cards on Home. */
 import type { NutrientResult, StoreResult } from '../model/simulate';
 import { storeTrendOf } from '../model/trend';
 

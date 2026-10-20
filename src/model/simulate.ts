@@ -55,7 +55,7 @@ export interface Contributor {
 
 /**
  * A body store (iron, B12, vitamin A, folate, iodine, vitamin D): a level in absorbed units, filled by what is
- * absorbed (and sun), drained by the need. Shown on the Stores screen and the nutrient page, not on Home.
+ * absorbed (and sun), drained by the need. Shown as a tank card on Home and on the nutrient page.
  */
 export interface StoreResult {
   /** Fill level 0–1. */
