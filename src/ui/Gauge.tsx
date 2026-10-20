@@ -5,6 +5,7 @@ import { storeNeedsAttention } from '../logic/stores';
 import { fmtAmount, fmtFill, fmtPercent } from '../lib/format';
 import { STATUS_ICON, statusLabel } from './status';
 import { Icon } from './Icon';
+import { fmtDuration } from './duration';
 import { t } from '../i18n';
 
 interface Props {
@@ -182,11 +183,12 @@ export function StoreRow({ result: r, showRange, onClick }: { result: NutrientRe
   const warn = storeNeedsAttention(st);
   const fill = { low: clamp01(st.fill.low), central: clamp01(st.fill.central), high: clamp01(st.fill.high) };
   const range = showRange && fill.high - fill.low > 0.01 ? `, ${t('gauge.rangeSpoken', { low: fmtFill(fill.low), high: fmtFill(fill.high) })}` : '';
+  const lasts = storeLastsLine(st);
   return (
     <button
       className={`nrow gauge-store gauge-${st.status}`}
       onClick={onClick}
-      aria-label={`${def?.name ?? r.id}: ${t('gauge.full', { pct: fmtFill(st.fill.central) })}${range}, ${statusLabel(st.status)}${warn ? `, ${t('store.warnSpoken')}` : ''}`}
+      aria-label={`${def?.name ?? r.id}: ${t('gauge.full', { pct: fmtFill(st.fill.central) })}${range}, ${statusLabel(st.status)}${warn ? `, ${t('store.warnSpoken')}` : ''}${lasts ? `. ${lasts}` : ''}`}
     >
       <Icon name={STATUS_ICON[st.status]} size={14} />
       <span className="nrow-name">
@@ -203,6 +205,22 @@ export function StoreRow({ result: r, showRange, onClick }: { result: NutrientRe
         <small> {t('gauge.fullShort')}</small>
       </span>
       <StoreTrendMark store={st} />
+      {lasts && (
+        <span className="nrow-sub" aria-hidden>
+          {lasts}
+        </span>
+      )}
     </button>
   );
+}
+
+/**
+ * How long the store would cover the need with nothing eaten: now, and when full (sourced capacity ÷ need,
+ * central). Sun for vitamin D is left out, like the "lasts" line on the nutrient page.
+ */
+export function storeLastsLine(st: StoreResult): string | null {
+  const full = st.storeDays?.central;
+  if (!full) return null;
+  const now = clamp01(st.fill.central) * full;
+  return t('stores.lasts', { now: now < 1 ? t('stores.lastsEmpty') : fmtDuration(now), full: fmtDuration(full) });
 }
