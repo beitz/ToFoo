@@ -46,12 +46,12 @@ describe('recipe ideas: what one portion gives', () => {
   it('describes the status by group, with what each percentage means', () => {
     const text = describeStatus(
       new Map([
-        ['FE', { kind: 'balance' as const, status: 'low' as const, value: { low: 0.5, central: 0.62, high: 0.7 }, windowDays: 14 }],
+        ['FE', { kind: 'tank' as const, status: 'low' as const, value: { low: 0, central: 0.05, high: 0.1 }, windowDays: 14, balance: { low: 0.5, central: 0.62, high: 0.7 } }],
         ['VITD', { kind: 'tank' as const, status: 'gettingLow' as const, value: { low: 0.3, central: 0.4, high: 0.5 }, windowDays: 30 }],
         ['VITC', { kind: 'rolling' as const, status: 'fine' as const, value: { low: 1, central: 1.2, high: 1.3 }, windowDays: 7 }],
       ]),
     );
-    expect(text).toContain('Low: Iron (absorbed about 62 % of the need over 14 days).');
+    expect(text).toContain('Low: Iron (store about 5 % full; absorbed about 62 % of the need over 14 days).');
     expect(text).toContain('Getting low: Vitamin D (store about 40 % full).');
     expect(text).toContain('Enough: Vitamin C.');
   });

@@ -101,11 +101,9 @@ export function NutrientPage({ id }: { id: string }) {
           </p>
         )}
         <p className="small">
-          {(r.kind === 'tank' || r.kind === 'balance') && r.storeDays && `${storeLastsText(r.storeDays)} `}
+          {r.kind === 'tank' && r.storeDays && `${storeLastsText(r.storeDays)} `}
           {r.kind === 'tank'
-            ? t('nutrient.tankExplain')
-            : r.kind === 'balance'
-              ? t('nutrient.balanceExplain', { days: r.windowDays })
+            ? `${t('nutrient.tankExplain')}${r.slow && !r.measuredOn ? ` ${t('nutrient.slowExplain')}` : ''}`
             : r.kind === 'limit'
               ? t('nutrient.limitExplain', { days: r.windowDays })
               : r.kind === 'info'
@@ -131,6 +129,8 @@ export function NutrientPage({ id }: { id: string }) {
           </>
         )}
         {isTank && req && <TankTrendNote r={r} need={req.physiological} startedEmpty={d.profile.startingLevel === 'empty' && !r.measuredOn} />}
+        {isTank && req && <IronReferenceNote r={r} need={req.physiological} />}
+        {r.slow && !r.measuredOn && !markersFor(id).length && <p className="small muted">{t('nutrient.noLabYet')}</p>}
         {r.measuredOn && <p className="small">{t('nutrient.measuredOn', { day: formatDay(r.measuredOn, d.today) })}</p>}
         <TestHint r={r} name={def.name} />
         {r.missingDataDays > 0 && <p className="small notice">{t('nutrient.missingData', { n: r.missingDataDays })}</p>}
@@ -146,22 +146,7 @@ export function NutrientPage({ id }: { id: string }) {
         )}
       </div>
 
-      {r.kind === 'balance' && req && (
-        <>
-          <h2 className="section-title">{t('nutrient.storeTitle')}</h2>
-          <div className="card">
-            <p className="small">{t('nutrient.storeUnknown')}</p>
-            <p className="small">
-              {t(r.averageAbsorbed >= req.physiological ? 'nutrient.storeGaining' : 'nutrient.storeLosing', {
-                absorbed: fmtAmount(id, r.averageAbsorbed),
-                need: fmtAmount(id, req.physiological),
-              })}
-            </p>
-            {!markersFor(id).length && <p className="small muted">{t('nutrient.noLabYet')}</p>}
-          </div>
-        </>
-      )}
-      {(r.kind === 'balance' || r.kind === 'tank') && <BloodTests id={id} />}
+      {r.kind === 'tank' && <BloodTests id={id} />}
 
       <NutrientInfo id={id} />
 
@@ -314,8 +299,8 @@ function TankTrendNote({ r, need, startedEmpty }: { r: NutrientResult; need: num
   const fill = r.store?.central ?? r.value.central;
   if (!trend || r.netPerDay === undefined || fill >= 1) return null;
   const low = fill < statusThresholds.tank.value.gettingLow;
-  // "Not because you eat too little" only holds when the diet covers the need (a tank's status is its fill level).
-  const dietCovers = r.kind === 'tank' || r.value.central >= 1;
+  // "Not because you eat too little" only holds when the diet covers the need (at normal iron stores for iron).
+  const dietCovers = !r.balance || r.balance.central >= 1;
   // Absorbed = need + net change, so the two numbers always explain the direction (vitamin D includes sun).
   const vars = { absorbed: fmtAmount(r.id, Math.max(0, need + r.netPerDay)), need: fmtAmount(r.id, need) };
   const text =
@@ -332,16 +317,24 @@ function TankTrendNote({ r, need, startedEmpty }: { r: NutrientResult; need: num
       {low && startedEmpty && dietCovers && trend.direction === 'filling' && (
         <p className="small">
           {t('nutrient.startedEmpty')}
-          {r.kind === 'tank' && (
-            <>
-              {' '}
-              <a href={href('settings', 'start')}>{t('nutrient.changeStart')}</a>
-            </>
-          )}
+          {' '}
+          <a href={href('settings', 'start')}>{t('nutrient.changeStart')}</a>
         </p>
       )}
     </>
   );
+}
+
+/**
+ * Iron is absorbed better while stores are low, so the store can fill on a diet that would not cover the need
+ * at normal stores. Say so in amounts, so the filling store doesn't read as "my diet is enough".
+ */
+function IronReferenceNote({ r, need }: { r: NutrientResult; need: number }) {
+  if (!r.balance || r.netPerDay === undefined) return null;
+  const adapted = Math.max(0, need + r.netPerDay);
+  const reference = r.balance.central * need;
+  if (adapted - reference <= 0.05 * need) return null;
+  return <p className="small">{t('nutrient.ironReference', { absorbed: fmtAmount(r.id, reference), need: fmtAmount(r.id, need) })}</p>;
 }
 
 function TestHint({ r, name }: { r: NutrientResult; name: string }) {
