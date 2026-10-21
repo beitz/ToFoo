@@ -3,7 +3,7 @@ import { useData } from '../../app/data';
 import { useToast } from '../../app/toast';
 import { href, navigate } from '../../app/router';
 import { t, type MessageKey } from '../../i18n';
-import { addDays, formatDay } from '../../lib/dates';
+import { addDays } from '../../lib/dates';
 import { isOn } from '../../settings/features';
 import { repo } from '../../storage/repo';
 import { CompactGauge, GaugeRow, TankCard } from '../../ui/Gauge';
@@ -19,6 +19,7 @@ import { Prompts } from './Prompts';
 import { SleepQuestion } from '../sleep/SleepQuestion';
 import { WaterCard } from '../water/WaterCard';
 import { QuickActions } from './QuickActions';
+import { FastingLine } from './FastingLine';
 import { StockChips } from './StockChips';
 import { GroupInfoButton, hasGroupInfo } from '../info/GroupInfo';
 import { withStores } from '../../logic/stores';
@@ -102,11 +103,7 @@ export function HomePage() {
           {!d.activeFast && ` · ${statusText}`}
         </span>
       </header>
-      {d.activeFast && (
-        <p className="home-fasting">
-          <Icon name="moon" size={16} /> {t('home.fastingSince', { day: formatDay(d.activeFast.startDay, today) })}
-        </p>
-      )}
+      <FastingLine />
       <StockChips />
 
       {isOn(d.settings.features, 'sleep') && <SleepQuestion />}

@@ -824,3 +824,140 @@ export const sunGuidance: Cited = {
     'RKI / BfR / DGE FAQ Vitamin D: from March to October, exposing face, hands and arms (about a quarter of the body) to the sun 2–3 times a week for half the time needed for sunburn (~12–25 min) is enough for sufficient vitamin D production',
   confidence: 'high',
 };
+
+// ── Ketosis during fasts ────────────────────────────────────────────────────────
+
+/**
+ * Blood β-hydroxybutyrate (BHB, mmol/L) during a fast, by hours since the last meal (docs/SPEC.md,
+ * "Ketosis estimate during fasts"). The curve is a group mean; the factors move it earlier or later
+ * (hours) or scale its rise above the fed baseline. For each factor `low`..`high` is the span of
+ * plausible effect sizes, not a pessimistic/optimistic pair: the band takes the lowest and highest
+ * result of all of them together.
+ */
+export const ketosis = {
+  /** [hours since the last meal, mean BHB mmol/L] for adults of normal weight, interpolated linearly. */
+  curve: {
+    value: [
+      [0, 0.1],
+      [12, 0.25],
+      [21, 0.5],
+      [30, 0.9],
+      [38, 1.6],
+      [62, 2.2],
+      [86, 2.9],
+      [110, 3.1],
+      [134, 3.6],
+      [158, 4.2],
+      [240, 4.3],
+      [408, 5.1],
+      [576, 5.8],
+      [912, 5.9],
+    ] as ReadonlyArray<readonly [number, number]>,
+    source:
+      'Puchalska & Crawford 2017 (Cell Metab 25:262, review: 0.1–0.25 fed and overnight); Deru et al. 2021 (Med Sci Sports Exerc 53:1987, 20 adults: 0.5 mmol/L reached at 21.1 h without exercise); Haymond et al. 1982 (Metabolism 31:33: men 0.9 at 30 h); Cahill et al. 1966 (J Clin Invest 45:1751, Table III, 6 men: 1.6 / 2.2 / 2.9 / 3.1 / 3.6 / 4.2 at ~38–158 h); Owen et al. 1969 (J Clin Invest 48:574, Table II, 11 people with obesity: 4.3 / 5.1 / 5.8–5.9 on days 10 / 17 / 24–38)',
+    url: 'https://doi.org/10.1249/MSS.0000000000002655',
+    confidence: 'medium',
+    note:
+      'Small studies, partly old, different assays. Cahill measured 0.4 at about 14 h, more than Deru found at 21 h; the curve follows Deru for the first day because it is larger, recent and used a finger-prick meter like the ones people use at home. Puchalska gives "about 1" at 24 h, above Haymond\'s men at 30 h; the curve follows the measured study. After a week only Owen\'s people with obesity were measured, so the curve there is likely low for normal weight.',
+  } satisfies Valued<ReadonlyArray<readonly [number, number]>>,
+  /** Spread between people: standard deviation of the time to reach 0.5 mmol/L, in hours. */
+  personSpreadHours: {
+    value: 2.95,
+    source: 'Deru et al. 2021: time to 0.5 mmol/L 21.07 ± 2.95 h (mean ± SD, 20 adults, no exercise)',
+    url: 'https://doi.org/10.1249/MSS.0000000000002655',
+    confidence: 'medium',
+    note: 'Applied as a shift in time over the whole fast. Measured only over the first 36 h.',
+  } satisfies Valued<number>,
+  /** How many standard deviations of `personSpreadHours` the band spans to each side. */
+  personSpreadSd: {
+    value: 1,
+    source: 'Modelling choice',
+    confidence: 'assumption',
+    note: 'One SD in time, together with one SD in level (`personLevelCv`), so the band is honest early in a fast, when people differ mostly in timing, and later, when they differ in level.',
+  } satisfies Valued<number>,
+  /** Spread between people in how high BHB rises at a given time: coefficient of variation, applied to the rise above the fed baseline. */
+  personLevelCv: {
+    value: 0.56,
+    source: 'Gipson et al. 2025, Table 2: 0.50 ± 0.28 mmol/L (mean ± SD) at 24 h of fasting after a low-carbohydrate start (24 adults); after a high-carbohydrate start 0.31 ± 0.21',
+    url: 'https://doi.org/10.1186/s12986-025-00920-5',
+    confidence: 'low',
+    note: 'Measured at one time point in older overweight adults; assumed to hold at every hour. No spread between people was checked for long fasts.',
+  } satisfies Valued<number>,
+  /** Hours earlier after a very-low-carbohydrate last meal, compared with a carbohydrate-rich one. */
+  lowCarbShiftHours: {
+    value: r(0, 7, 10),
+    source:
+      'Gipson et al. 2025 (Nutr Metab 22:32, 24 adults over 50, overweight): a shake with 4 % of energy from carbohydrate gave 0.54 / 0.50 mmol/L at 12 / 24 h, an equal-energy one with 57 % gave 0.32 / 0.31; on the reference curve those levels lie about 7 h apart',
+    url: 'https://doi.org/10.1186/s12986-025-00920-5',
+    confidence: 'low',
+    note:
+      'Central 7 h is read off the curve, not reported by the study. Low end: no effect; high end: 1.5 × central (modelling choice). The low-carbohydrate shake also contained MCT oil, which makes ketones directly, so part of the effect may be the oil.',
+  } satisfies Valued<Range>,
+  /** Share of the last meal's energy from carbohydrate: full low-carb shift at or below `full`, none at or above `none`, linear between. */
+  carbShareSpan: {
+    value: { full: 0.05, none: 0.55 },
+    source: 'Gipson et al. 2025: the two shakes had 4.4 % and 56.8 % of energy from carbohydrate',
+    url: 'https://doi.org/10.1186/s12986-025-00920-5',
+    confidence: 'assumption',
+    note: 'Only the two end points were measured; the straight line between them is an assumption. Mixed meals usually get 40–55 % of energy from carbohydrate, so a usual meal shifts the curve little.',
+  } satisfies Valued<{ full: number; none: number }>,
+  /** To turn the last meal's carbohydrate grams into a share of its energy. */
+  carbKcalPerGram: {
+    value: 4,
+    source: 'Regulation (EU) No 1169/2011, Annex XIV (energy conversion factors): carbohydrate 4 kcal/g',
+    url: 'https://eur-lex.europa.eu/eli/reg/2011/1169/oj',
+    confidence: 'high',
+  } satisfies Valued<number>,
+  /** Hours earlier after exercise early in the fast (negative = later). */
+  exerciseShiftHours: {
+    value: r(-2.11, 3.57, 10.87),
+    source: 'Deru et al. 2021: an intense treadmill session at the start of a 36-h fast brought 0.5 mmol/L 3.57 h earlier (95 % interval 2.11 h later to 10.87 h earlier); BHB over the fast was 43 % higher',
+    url: 'https://doi.org/10.1249/MSS.0000000000002655',
+    confidence: 'low',
+  } satisfies Valued<Range>,
+  /** Moderate or hard activity since the last meal that counts as "exercise early in the fast". */
+  exerciseMinMinutes: {
+    value: 30,
+    source: 'Modelling choice',
+    confidence: 'assumption',
+    note: 'Deru et al. 2021 used one intense treadmill session; its length was not checked. Shorter or easy activity is not counted.',
+  } satisfies Valued<number>,
+  /** Women: the rise above the fed baseline × this factor. */
+  femaleRiseFactor: {
+    value: r(1, 2, 2),
+    source: 'Haymond et al. 1982 (10 men, 10 women): 1.7 vs 0.9 mmol/L at 30 h; Merimee et al. 1978 (J Clin Endocrinol Metab 46:414): faster rise in women over 72-h fasts',
+    url: 'https://doi.org/10.1016/0026-0495(82)90024-5',
+    confidence: 'low',
+    note: 'Central and high end are the one measured ratio of the rise above the fed baseline, (1.7 − 0.1) / (0.9 − 0.1); low end: no difference. Sex not set: the band covers both.',
+  } satisfies Valued<Range>,
+  /** BMI ≥ `obeseBmi`: the rise above the fed baseline × this factor (from `leanBmi` it falls linearly to it). */
+  obeseRiseFactor: {
+    value: r(0.52, 0.52, 1),
+    source:
+      'Owen et al. 1969 (people with obesity: 1.2 mmol/L on day 3) vs Cahill et al. 1966 (men of normal weight: about 2.2 at a similar time): (1.2 − 0.1) / (2.2 − 0.1); direction also in Göschke & Lauffenburger 1975 (Res Exp Med 165:233) and Prabhakar et al. 2015 (Nutr J 14:41)',
+    url: 'https://doi.org/10.1172/JCI106016',
+    confidence: 'low',
+    note: 'Two different small studies compared, not one trial. High end: no difference. Not applied after a week, where the curve itself comes from people with obesity (faded out between 158 and 240 h).',
+  } satisfies Valued<Range>,
+  /** Hours over which the body-fat factor fades out: the curve follows Cahill's normal-weight men up to `from` and Owen's people with obesity from `to`. */
+  obeseFadeHours: {
+    value: { from: 158, to: 240 },
+    source: 'The last Cahill et al. 1966 and the first Owen et al. 1969 point of the curve',
+    confidence: 'assumption',
+    note: 'A straight fade between the two studies, so the estimate does not jump.',
+  } satisfies Valued<{ from: number; to: number }>,
+  bmi: {
+    value: { lean: 25, obese: 30 },
+    source: 'WHO BMI categories (overweight from 25, obesity from 30)',
+    url: 'https://www.who.int/news-room/fact-sheets/detail/obesity-and-overweight',
+    confidence: 'high',
+    note: 'The linear step between 25 and 30 is an assumption.',
+  } satisfies Valued<{ lean: number; obese: number }>,
+  /** Phase lines in mmol/L, named in words on Home and the fast page. */
+  phases: {
+    value: { light: 0.5, moderate: 1.5, deep: 3 },
+    source: '0.5 mmol/L is the "nutritional ketosis" line used by Deru et al. 2021 and Gipson et al. 2025; 1.5 and 3 are display choices',
+    confidence: 'assumption',
+    note: 'Not a diagnosis. Diabetic ketoacidosis needs diabetes, BHB ≥ 3.0 and acidosis together (Umpierrez et al. 2024).',
+  } satisfies Valued<{ light: number; moderate: number; deep: number }>,
+};
