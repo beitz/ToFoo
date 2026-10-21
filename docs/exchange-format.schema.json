@@ -96,6 +96,32 @@
                       "type": "number",
                       "exclusiveMinimum": 0
                     },
+                    "nutrientTargets": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {
+                        "type": "object",
+                        "properties": {
+                          "amount": {
+                            "type": "number",
+                            "exclusiveMinimum": 0
+                          },
+                          "per": {
+                            "type": "string",
+                            "enum": [
+                              "kg",
+                              "day"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "amount",
+                          "per"
+                        ]
+                      }
+                    },
                     "phytate": {
                       "type": "string",
                       "enum": [

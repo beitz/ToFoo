@@ -367,6 +367,42 @@ export const energyNeed: {
   roundToKcal: 10,
 };
 
+// ── Own protein target (docs/SPEC.md, "Own nutrient targets") ─────────────────────
+
+/**
+ * What research says about protein for people who train, shown next to the own protein target as
+ * guidance. Not a reference value: the model uses DGE until the user sets an own number.
+ */
+export const proteinForTraining: {
+  muscleGain: Valued<Range>;
+  exercising: Valued<{ low: number; high: number }>;
+  energyDeficit: Valued<{ low: number; high: number }>;
+} = {
+  /** g/kg/day beyond which extra protein added no further muscle gain with resistance training. */
+  muscleGain: {
+    value: r(1.03, 1.62, 2.2),
+    source:
+      'Morton RW et al. (2018): A systematic review, meta-analysis and meta-regression of the effect of protein supplementation on resistance training-induced gains in muscle mass and strength in healthy adults. Br J Sports Med 52(6):376–384',
+    url: 'https://doi.org/10.1136/bjsports-2017-097608',
+    confidence: 'medium',
+    note: 'Break point of a two-phase regression (42 study arms, 723 people): "Protein supplementation beyond total protein intakes of 1.62 g/kg/day resulted in no further RET-induced gains in FFM", 95 % CI 1.03 to 2.20. The authors suggest 2.2 g/kg as a safe upper end for people who want to make sure. Checked against the abstract and full text (Europe PMC) on 2026-10-21.',
+  },
+  exercising: {
+    value: { low: 1.4, high: 2.0 },
+    source: 'Jäger R et al. (2017): International Society of Sports Nutrition Position Stand: protein and exercise. J Int Soc Sports Nutr 14:20',
+    url: 'https://doi.org/10.1186/s12970-017-0177-8',
+    confidence: 'medium',
+    note: '"An overall daily protein intake in the range of 1.4-2.0 g protein/kg body weight/day (g/kg/d) is sufficient for most exercising individuals." A society position stand, not a systematic review. Checked against the abstract on 2026-10-21.',
+  },
+  energyDeficit: {
+    value: { low: 2.3, high: 3.1 },
+    source: 'Jäger R et al. (2017): International Society of Sports Nutrition Position Stand: protein and exercise. J Int Soc Sports Nutr 14:20',
+    url: 'https://doi.org/10.1186/s12970-017-0177-8',
+    confidence: 'low',
+    note: '"Higher protein intakes (2.3-3.1 g/kg/d) may be needed to maximize the retention of lean body mass in resistance-trained subjects during hypocaloric periods." "May": based on few, small studies. Checked against the abstract on 2026-10-21.',
+  },
+};
+
 // ── Iron (rule type "iron") ─────────────────────────────────────────────────────
 
 export const iron = {

@@ -72,6 +72,8 @@ export function HomePage() {
   // Store nutrients show as tank cards, everything else as lines.
   const stores = withStores(NUTRIENTS.filter((n) => !hidden.has(n.id)).map((n) => model.nutrients.get(n.id)!).filter(Boolean));
   const weightDefault = d.requirements.defaultsUsed.includes('weight');
+  // An own target per day doesn't use body weight.
+  const perKgOnDefault = (id: string) => weightDefault && PER_KG.has(id) && d.requirements.byNutrient.get(id)?.own?.target.per !== 'day';
   const sexDefault = d.requirements.defaultsUsed.includes('sex');
 
   async function toggleFast() {
@@ -140,7 +142,7 @@ export function HomePage() {
       {macros.length > 0 && (
         <div className="macro-row" role="group" aria-label={t('home.macros')}>
           {macros.map((r) => (
-            <CompactGauge key={r.id} variant="cell" result={r} defaultBased={weightDefault && PER_KG.has(r.id)} onClick={() => navigate('nutrient', r.id)} />
+            <CompactGauge key={r.id} variant="cell" result={r} defaultBased={perKgOnDefault(r.id)} onClick={() => navigate('nutrient', r.id)} />
           ))}
         </div>
       )}
@@ -185,7 +187,7 @@ export function HomePage() {
         const grid = (
           <div className="nrow-list" id={`group-${g.key}`}>
             {g.items.map((r) => {
-              const defaultBased = weightDefault && PER_KG.has(r.id);
+              const defaultBased = perKgOnDefault(r.id);
               const open = () => navigate('nutrient', r.id);
               return <GaugeRow key={r.id} result={r} showRange={showRange} defaultBased={defaultBased} onClick={open} />;
             })}

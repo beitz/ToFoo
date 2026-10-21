@@ -14,7 +14,18 @@ export interface ModelProfile {
   menstruation?: Menstruation;
   /** The user's own energy target (kcal/day); replaces the estimate when set. */
   energyTargetKcal?: number;
+  /** Own daily targets per nutrient id; each replaces the reference value of a nutrient in OWN_TARGET_NUTRIENTS. */
+  nutrientTargets?: Record<string, OwnTarget>;
 }
+
+/** A user-set daily amount for one nutrient, in its BLS unit: per kg body weight or per day. */
+export interface OwnTarget {
+  amount: number;
+  per: 'kg' | 'day';
+}
+
+/** Nutrients the user can give an own target. Needs only, not limits: an own number changes what "enough" means. */
+export const OWN_TARGET_NUTRIENTS: readonly string[] = ['PROT625'];
 
 /** Where the energy reference comes from: the user's own number, the personal estimate, or the DGE table. */
 export type EnergyBasis = 'own' | 'estimate' | 'guide';
@@ -55,6 +66,15 @@ export interface Requirement {
   upperLimit?: Pick<UpperLimit, 'value' | 'basis' | 'scope' | 'safeLevel'>;
   confidence: Confidence;
   source: string;
+  /** Set when the user's own target replaces the reference value (energy and OWN_TARGET_NUTRIENTS). */
+  own?: OwnRequirement;
+}
+
+export interface OwnRequirement {
+  /** What `recommended` would be without the own target (DGE value or energy estimate). */
+  referenceRecommended: number;
+  /** Energy has no per-kg form; its own target is always per day. */
+  target: OwnTarget;
 }
 
 export interface ResolvedRequirements {
@@ -115,6 +135,13 @@ export function estimateEnergyNeed(sex: Sex | undefined, ageYears: number, weigh
   return { kcal: Math.round((reeKcal * pal) / step) * step, reeKcal: Math.round(reeKcal / step) * step, pal };
 }
 
+/** The own target for a nutrient, if the user set a usable one and the nutrient allows it. */
+function ownTargetFor(profile: ModelProfile, nutrient: string, limitOnly: boolean): OwnTarget | undefined {
+  if (limitOnly || !OWN_TARGET_NUTRIENTS.includes(nutrient)) return undefined;
+  const t = profile.nutrientTargets?.[nutrient];
+  return t && t.amount > 0 ? t : undefined;
+}
+
 export function resolveRequirements(profile: ModelProfile, currentYear: number): ResolvedRequirements {
   const defaultsUsed: ResolvedRequirements['defaultsUsed'] = [];
   let ageGroup = PROFILE_DEFAULTS.ageGroup;
@@ -147,11 +174,17 @@ export function resolveRequirements(profile: ModelProfile, currentYear: number):
 
   const byNutrient = new Map<string, Requirement>();
   for (const ref of referenceValues) {
-    const recommended = ref.nutrient === 'ENERCC' ? energy.kcal : amountFor(ref.amount, profile.sex, ageGroup, ctx);
+    const reference = ref.nutrient === 'ENERCC' ? energy.kcal : amountFor(ref.amount, profile.sex, ageGroup, ctx);
+    const target = ownTargetFor(profile, ref.nutrient, ref.limitOnly ?? false);
+    let own: OwnRequirement | undefined;
+    if (ref.nutrient === 'ENERCC' && energy.basis === 'own') own = { referenceRecommended: energy.estimate?.kcal ?? energy.guideKcal, target: { amount: energy.kcal, per: 'day' } };
+    else if (target) own = { referenceRecommended: reference, target };
+    const recommended = target ? (target.per === 'kg' ? target.amount * weightKg : target.amount) : reference;
     let physiological: number;
     let derived = false;
     if (ref.physiological) {
-      physiological = amountFor(ref.physiological, profile.sex, ageGroup, ctx);
+      // An own target moves the absorbed need by the same factor as the intake.
+      physiological = amountFor(ref.physiological, profile.sex, ageGroup, ctx) * (reference > 0 ? recommended / reference : 1);
     } else {
       const f = nutrientParams[ref.nutrient]?.typicalAbsorption.value ?? 1;
       physiological = recommended * f;
@@ -169,6 +202,7 @@ export function resolveRequirements(profile: ModelProfile, currentYear: number):
         : undefined,
       confidence: ref.nutrient === 'ENERCC' && energy.basis === 'estimate' ? energyNeed.ree.confidence : ref.confidence,
       source: ref.nutrient === 'ENERCC' && energy.basis === 'estimate' ? energyNeed.ree.source : ref.source,
+      own,
     });
   }
   return { byNutrient, infoOnly: new Set(infoOnly.map((i) => i.nutrient)), ageGroup, defaultsUsed, underAge, energy };

@@ -108,6 +108,8 @@ export interface NutrientResult {
   /** The main number per day. */
   history: HistoryPoint[];
   contributors: Contributor[];
+  /** The value compares with the user's own target, not the reference value. */
+  ownTarget?: boolean;
 }
 
 export interface SimulationResult {
@@ -446,6 +448,7 @@ export function simulate(input: SimulationInput): SimulationResult {
       leftOutDays: end >= 0 ? windowIdx(end).length - win.length : 0,
       missingDataDays,
       contributors,
+      ownTarget: !!r?.own,
     };
 
     const sunAt = (s: Scenario, i: number) => (id === 'VITD' && settings.sun ? (input.sunByDay?.[days[i]!]?.[s] ?? 0) : 0);
