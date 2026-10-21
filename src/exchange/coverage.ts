@@ -4,7 +4,7 @@
  * silently lost on backup and restore. `npm run typecheck` fails here instead. Types only.
  */
 import type { z } from 'zod';
-import type { ActivityRecord, Batch, CustomFood, DayStatusRecord, Fast, FavouriteMealItem, FoodPortionSizes, Ingredient, JournalEntry, LabResult, LogEntry, OutdoorSession, Product, Profile, Recipe, Settings, ShoppingItem, SleepRecord, SunEntry, WaterRecord } from '../storage/types';
+import type { ActivityRecord, Batch, CustomFood, DayStatusRecord, Fast, FavouriteMealItem, FoodPortionSizes, Ingredient, JournalEntry, LabResult, LogEntry, OutdoorSession, PantryItem, Product, Profile, Recipe, Settings, ShoppingItem, SleepRecord, SunEntry, WaterRecord } from '../storage/types';
 import type { Snapshot } from '../storage/repo';
 import type * as S from './schema';
 
@@ -37,5 +37,6 @@ export type BackupCoversStoredFields = [
   Covered<Missing<ActivityRecord, z.infer<typeof S.activitySchema>>>,
   Covered<Missing<WaterRecord, z.infer<typeof S.waterSchema>>>,
   Covered<Missing<ShoppingItem, z.infer<typeof S.shoppingItemSchema>>>,
+  Covered<Missing<PantryItem, z.infer<typeof S.pantryItemSchema>>>,
   Covered<Missing<FoodPortionSizes, z.infer<typeof S.portionSizesSchema>>>,
 ];

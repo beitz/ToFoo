@@ -3,7 +3,7 @@ import type * as Beta from '@anthropic-ai/sdk/resources/beta/messages/messages';
 import type { Food } from '../foods/foodDb';
 import { buildIndex } from '../foods/search';
 import { appNote, emptyConversation, requestParams, retirePhotos, sendMessage, textOf, type CreateMessage } from './assistant';
-import { describeFood, validateBatchProposal, validatePortionProposal, MAX_INGREDIENT_GRAMS, MAX_ITEM_GRAMS, runCheckRecipe, runListRecipes, validateRecipeProposal, validateIngredientsProposal, runLookupBarcode, runSearchFoods, runSearchUsda, validateJournalProposal, validateProposal, validateSleepProposal, validateActivityProposal, validateWaterProposal, validateShoppingProposal, type ProductTools, type ToolContext } from './tools';
+import { describeFood, validateBatchProposal, validatePortionProposal, MAX_INGREDIENT_GRAMS, MAX_ITEM_GRAMS, runCheckRecipe, runListRecipes, validateRecipeProposal, validateIngredientsProposal, runLookupBarcode, runSearchFoods, runSearchUsda, validateJournalProposal, validateProposal, validateSleepProposal, validateActivityProposal, validateWaterProposal, validateShoppingProposal, validateHomeProposal, type ProductTools, type ToolContext } from './tools';
 import type { Product } from '../storage/types';
 import type { FindResult } from '../foods/findProduct';
 
@@ -617,6 +617,47 @@ describe('shopping list', () => {
       ok: true,
       proposal: { items: [{ name: 'Rice' }], recipes: [{ recipeId: 'r1', name: 'Lentil curry', portions: 4 }, { recipeId: 'r1', name: 'Lentil curry', portions: 6 }], replaces: 'L1' },
     });
+  });
+});
+
+describe('at home', () => {
+  it('offers propose_home only with At home on, not strict', () => {
+    const tool = (sources: Parameters<typeof requestParams>[2]) => (requestParams('claude-opus-5-5', [], sources).tools ?? []).find((t) => 'name' in t && t.name === 'propose_home') as { strict?: boolean } | undefined;
+    expect(tool({})).toBeUndefined();
+    expect(tool({ pantry: true, recipe: true })).toBeUndefined();
+    expect(tool({ pantry: true })!.strict).toBeUndefined();
+  });
+
+  it('shows an At home card', async () => {
+    const api = scripted(reply([toolUse('h', 'propose_home', { items: [{ name: 'Nougat', code: 'S450000', amount: '2', status: 'bought' }, { name: 'Cumin', status: 'low' }] })], 'tool_use'));
+    const { conversation, outcome } = await sendMessage(api.create, 'claude-opus-5-5', emptyConversation(), { text: 'bought two nougat bars, cumin is running low', images: [] }, { ...ctx, pantry: new Set() });
+    expect(outcome.kind === 'proposal' && outcome.homes).toEqual([
+      {
+        id: 'H1',
+        items: [
+          { name: 'Nougat', ref: { source: 'BLS', version: '4.0', code: 'S450000' }, pieces: 2, status: 'bought' },
+          { name: 'Cumin', status: 'low' },
+        ],
+      },
+    ]);
+    expect(conversation.homes).toBe(1);
+  });
+
+  it('checks codes, places and statuses', () => {
+    expect(validateHomeProposal({ items: [] }, db)).toMatchObject({ ok: false });
+    expect(validateHomeProposal({ items: [{ name: 'X', code: 'NOPE' }] }, db)).toMatchObject({ ok: false, error: expect.stringContaining('unknown code') });
+    expect(validateHomeProposal({ items: [{ name: 'X', place: 'garage' }] }, db)).toMatchObject({ ok: false, error: expect.stringContaining('place') });
+    expect(validateHomeProposal({ items: [{ name: 'X', status: 'gone' }] }, db)).toMatchObject({ ok: false, error: expect.stringContaining('status') });
+    expect(validateHomeProposal({ items: [{ name: ' Oats ', amount: '500 g', place: 'cupboard', status: 'used_up' }], replaces: 'H1' }, db)).toEqual({
+      ok: true,
+      proposal: { items: [{ name: 'Oats', grams: 500, place: 'cupboard', status: 'out' }], replaces: 'H1' },
+    });
+  });
+
+  it('marks foods at home in search results', () => {
+    const r = runSearchFoods({ queries: ['Nougat'] }, { ...ctx, pantry: new Set(['BLS:S450000']) });
+    expect(r.text).toContain('[at home]');
+    expect(runSearchFoods({ queries: ['Nougat'] }, ctx).text).not.toContain('[at home]');
   });
 });
 

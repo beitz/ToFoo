@@ -229,6 +229,22 @@ export const shoppingItemSchema = z
   })
   .describe('One line on the shopping list: what, how much (grams and/or a typed amount), the shop section, the recipes it is for; ticked off (checkedAt) or cleared after shopping (clearedAt, kept as suggestions), epoch ms');
 
+export const pantryItemSchema = z
+  .object({
+    id: z.string(),
+    ...versioned,
+    name: z.string().min(1),
+    ref: foodRef.optional(),
+    place: z.enum(['fridge', 'freezer', 'cupboard', 'spices']),
+    pieces: z.number().nonnegative().optional(),
+    grams: z.number().nonnegative().optional(),
+    amount: z.string().optional(),
+    since: z.number(),
+    status: z.enum(['low', 'out']).optional(),
+    addedAt: z.number(),
+  })
+  .describe('Something at home: what, the food it is, where it is kept, how much there was at `since` (pieces, grams, or another amount as typed; what is left is worked out from the log and cooked batches from then on), and whether the user marked it running low or used up; epoch ms');
+
 export const portionSizesSchema = z
   .object({ food: z.string().min(1), sizes: z.array(z.object({ label: z.string(), grams: z.number().positive() })) })
   .describe('Portion sizes the user saved for one food ("My bowl", 60 g), by the food code they were saved under');
@@ -259,6 +275,7 @@ export const backupSchema = z.object({
     activities: z.array(activitySchema).default([]),
     water: z.array(waterSchema).default([]),
     shopping: z.array(shoppingItemSchema).default([]),
+    pantry: z.array(pantryItemSchema).default([]),
     // Optional, not defaulted: restoring a backup from before portion sizes were in backups keeps the
     // sizes on the phone instead of clearing them.
     portionSizes: z.array(portionSizesSchema).optional(),

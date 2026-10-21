@@ -5,6 +5,7 @@ import { t } from '../../i18n';
 import type { Food } from '../../foods/foodDb';
 import { productFood, productLabel, productRef } from '../../foods/products';
 import { fmtNumber } from '../../lib/format';
+import { parseAmount } from '../../logic/shopping';
 import { dayKey } from '../../lib/dates';
 import type { Preparation } from '../../model/paramTypes';
 import type { EntryConfidence } from '../../model/types';
@@ -44,7 +45,10 @@ export function AmountSheet({ day, time: initialTime, onClose, onAdded, ...targe
   const [helperName, setHelperName] = useState('');
   const kcal = typeof food.per100.ENERCC === 'number' && grams ? (food.per100.ENERCC * grams) / 100 : undefined;
   const serving = draft?.serving ? [{ label: draft.serving.label, grams: draft.serving.grams }] : [];
-  const chips: PortionHelper[] = [...helpers, ...serving, ...(last ? [{ label: t('log.lastTime'), grams: last }] : []), { label: '50 g', grams: 50 }, { label: '100 g', grams: 100 }, { label: '200 g', grams: 200 }];
+  // The pack size as printed ("400 g"), for a ready meal or a bar eaten whole.
+  const packGrams = draft?.quantity && !draft.perMl ? parseAmount(draft.quantity).grams : undefined;
+  const pack = packGrams && packGrams !== draft?.serving?.grams ? [{ label: t('log.wholePack'), grams: packGrams }] : [];
+  const chips: PortionHelper[] = [...helpers, ...serving, ...pack, ...(last ? [{ label: t('log.lastTime'), grams: last }] : []), { label: '50 g', grams: 50 }, { label: '100 g', grams: 100 }, { label: '200 g', grams: 200 }];
   // A product with no label values and no matched food would log nothing but a name.
   const hasValues = !draft || Object.keys(draft.per100).length > 0 || !!match;
 

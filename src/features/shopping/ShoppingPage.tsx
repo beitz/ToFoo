@@ -15,6 +15,10 @@ import { ItemSheet, sectionName } from './ItemSheet';
 import { RecipeToListSheet } from './RecipeToListSheet';
 import { useShopFoods, useShopping } from './useShopping';
 import { useWakeLock } from './useWakeLock';
+import { isOn } from '../../settings/features';
+import { needsBuying, onShoppingList } from '../../logic/pantry';
+import { PutAwaySheet } from '../pantry/PutAwaySheet';
+import { usePantry, usePantryFoods, usePantryLeft } from '../pantry/usePantry';
 
 /** Foods from the database offered while typing, after things bought before. */
 const FOOD_SUGGESTIONS = 3;
@@ -31,6 +35,13 @@ export function ShoppingPage() {
   const [text, setText] = useState('');
   const [fromRecipe, setFromRecipe] = useState(false);
   const [editing, setEditing] = useState<ShoppingItem | null>(null);
+  const [puttingAway, setPuttingAway] = useState(false);
+  const atHome = isOn(d.settings.features, 'atHome');
+  const pantry = usePantry();
+  const left = usePantryLeft();
+  const { asShopping } = usePantryFoods();
+  // Running low or used up at home and not on the list yet (marking it puts it on; eating it up does not).
+  const needed = atHome ? (pantry ?? []).filter((p) => needsBuying(left(p)) && !onShoppingList(p, all ?? [])).sort((a, b) => a.name.localeCompare(b.name)) : [];
   const { typed } = useShopFoods();
   const items = useMemo(() => (all ?? []).filter(onList), [all]);
   const toBuy = items.filter(isOpen);
@@ -51,6 +62,12 @@ export function ShoppingPage() {
     const withAmount = { ...item, ...(entry.grams ? { grams: entry.grams } : {}), ...(entry.amount ? { amount: entry.amount } : {}) };
     await repo.changeShopping((current) => planAdd(current, [withAmount], Date.now(), newId, CURRENT_SCHEMA_VERSION));
     setText('');
+  }
+
+  async function addNeeded(names: readonly string[]) {
+    const things = needed.filter((p) => names.includes(p.id));
+    const undo = await repo.changeShopping((current) => planAdd(current, things.map((p) => asShopping(p, current)), Date.now(), newId, CURRENT_SCHEMA_VERSION));
+    toast(t('shopping.added', { n: things.length }), () => repo.undoShopping(undo));
   }
 
   async function toggle(item: ShoppingItem) {
@@ -132,6 +149,36 @@ export function ShoppingPage() {
         <Icon name="recipes" size={18} /> {t('shopping.fromRecipe')}
       </button>
 
+      {needed.length > 0 && (
+        <div className="card shop-needed">
+          <div className="row-between">
+            <h2 className="shop-needed-title">
+              <Icon name="pantry" size={18} /> {t('pantry.needed')}
+            </h2>
+            {needed.length > 1 && (
+              <button className="btn btn-small btn-ghost" onClick={() => void addNeeded(needed.map((p) => p.id))}>
+                {t('pantry.addAllToList')}
+              </button>
+            )}
+          </div>
+          <ul className="plain-list">
+            {needed.map((p) => (
+              <li key={p.id}>
+                <button className="shop-row" onClick={() => void addNeeded([p.id])} aria-label={t('pantry.addToList', { name: p.name })}>
+                  <span className="shop-check" aria-hidden>
+                    <Icon name="plus" size={16} />
+                  </span>
+                  <span className="shop-text">
+                    <span className="shop-name">{p.name}</span>
+                  </span>
+                  <span className="muted small shop-amount">{left(p).out ? t('pantry.out') : t('pantry.low')}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {all && items.length === 0 && <p className="muted empty">{t('shopping.empty')}</p>}
       {bySection(toBuy).map((g) => (
         <div key={g.section}>
@@ -151,9 +198,16 @@ export function ShoppingPage() {
         <>
           <div className="section-title row-between">
             <h2>{t('shopping.basket', { n: basket.length })}</h2>
-            <button className="btn btn-small btn-ghost" onClick={() => void clear()}>
-              {t('shopping.clear')}
-            </button>
+            <span className="row">
+              {atHome && (
+                <button className="btn btn-small btn-secondary" onClick={() => setPuttingAway(true)}>
+                  <Icon name="pantry" size={16} /> {t('shopping.putAway')}
+                </button>
+              )}
+              <button className="btn btn-small btn-ghost" onClick={() => void clear()}>
+                {t('shopping.clear')}
+              </button>
+            </span>
           </div>
           <ul className="plain-list shop-list">
             {basket.map((i) => (
@@ -168,6 +222,7 @@ export function ShoppingPage() {
 
       {fromRecipe && <RecipeToListSheet onClose={() => setFromRecipe(false)} />}
       {editing && <ItemSheet key={editing.id} item={editing} onClose={() => setEditing(null)} />}
+      {puttingAway && <PutAwaySheet onClose={() => setPuttingAway(false)} />}
     </section>
   );
 }

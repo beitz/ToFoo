@@ -121,19 +121,25 @@ function forms(w: string): string[] {
  * dishes do not, and the section most of the top ones share wins.
  */
 export function sectionFromFoods(name: string, hits: readonly SearchItem[]): ShopSection {
-  const tokens = normalize(name).split(' ').filter(Boolean);
-  if (!tokens.length) return 'other';
   const votes = new Map<ShopSection, number>();
   let rank = 0;
-  for (const h of hits) {
-    if (h.key.startsWith('X') || h.key.startsWith('Y')) continue;
-    const words = `${normalize(h.nameEn)} ${normalize(h.nameDe)}`.split(' ');
-    if (!tokens.every((tk) => forms(tk).some((f) => words.some((w) => w.startsWith(f))))) continue;
+  for (const h of namedFoods(name, hits)) {
     const section = sectionOfCode(h.key);
     // Better hits weigh more.
     votes.set(section, (votes.get(section) ?? 0) + 1 / (++rank + 1));
   }
   return [...votes].sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'other';
+}
+
+/** Of the database's hits for a typed name, the single foods whose name has every typed word (no typo matches, no composite dishes). */
+export function namedFoods<T extends SearchItem>(name: string, hits: readonly T[]): T[] {
+  const tokens = normalize(name).split(' ').filter(Boolean);
+  if (!tokens.length) return [];
+  return hits.filter((h) => {
+    if (h.key.startsWith('X') || h.key.startsWith('Y')) return false;
+    const words = `${normalize(h.nameEn)} ${normalize(h.nameDe)}`.split(' ');
+    return tokens.every((tk) => forms(tk).some((f) => words.some((w) => w.startsWith(f))));
+  });
 }
 
 const UNIT = '(kg|g|ml|l|x|pcs?|packs?|cans?|bottles?|jars?|bags?|bunch(?:es)?)';

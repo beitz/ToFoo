@@ -115,6 +115,8 @@ describe('reopening a saved chat', () => {
     expect(sleep).toEqual({ kind: 'sleep', sleep: { id: 'S1', start: new Date(2026, 9, 19, 23, 30).getTime(), end: new Date(2026, 9, 20, 7, 0).getTime() }, logged: false });
     const list = restoreCard({ id: 'L1', items: [{ name: 'Milk', amount: '2 l' }], recipes: [] }, true, { db, products });
     expect(list).toMatchObject({ kind: 'shopping', logged: true, shopping: { items: [{ name: 'Milk', amount: '2 l' }] } });
+    const home = restoreCard({ id: 'H1', items: [{ name: 'Oat drink', ref: { source: 'OFF', code: '400' }, pieces: 2, status: 'bought' }] }, false, { db, products });
+    expect(home).toMatchObject({ kind: 'home', logged: false, home: { items: [{ name: 'Oat drink', pieces: 2 }] } });
 
     const withProduct = restoreCard({ id: 'M1', summary: 'Oats', items: [{ code: 'OFF:400', name: 'Oat drink', grams: 200, preparation: 'asListed', product: { id: 'OFF:400', name: 'Oat drink', microsFrom: 'M111000' } }] }, false, { db, products });
     const item = withProduct?.kind === 'meal' ? withProduct.proposal.items[0] : undefined;

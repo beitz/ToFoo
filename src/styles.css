@@ -3253,6 +3253,82 @@ button.week-row:focus-visible {
   margin-top: 1.5rem;
 }
 
+/* ── At home ──────────────────────────────────────────────────── */
+.home-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 52px;
+  padding: 6px 0;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.home-row > svg:last-child {
+  flex: none;
+  color: var(--text-muted);
+}
+.home-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--warn);
+}
+/* Used up: dimmed and said in words (never colour alone). */
+.home-row.out .shop-name {
+  color: var(--text-muted);
+}
+.home-row.out .home-status {
+  color: var(--text-muted);
+}
+.pantry-hint {
+  margin-top: 1.5rem;
+}
+.pantry-food {
+  gap: 8px;
+  min-height: 44px;
+}
+.put-away-row {
+  border-bottom: 1px solid var(--border);
+}
+.put-away-place {
+  margin: 0 0 8px 38px;
+  width: auto;
+  min-height: 40px;
+}
+.shop-needed {
+  margin: 12px 0 4px;
+}
+.shop-needed-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.95rem;
+  margin: 0;
+}
+.shop-needed .shop-row {
+  width: 100%;
+}
+.shop-needed .btn {
+  white-space: nowrap;
+}
+.shop-needed .shop-check {
+  border-style: dashed;
+  color: var(--text-muted);
+}
+.log-home-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+
 /* Home: body stores as small cards with a tank that fills from the bottom. */
 .home-stores-head {
   display: flex;

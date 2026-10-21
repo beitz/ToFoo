@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { ToFooDB } from './db';
 import { createRepo } from './repo';
 import { planAdd, planClear } from '../logic/shopping';
+import { leftOf, planStock, usageOf } from '../logic/pantry';
 import type { FavouriteMeal, Recipe } from './types';
 
 let n = 0;
@@ -202,5 +203,23 @@ describe('repository', () => {
     expect((await repo.db.shopping.get('s1'))!.clearedAt).toBeUndefined();
     await repo.undoShopping(added);
     expect(await repo.db.shopping.count()).toBe(0);
+  });
+
+  it('puts things away at home with the shopping list in one go, undoes both, and backs it up', async () => {
+    const repo = await fresh();
+    let k = 0;
+    const ids = () => `h${++k}`;
+    await repo.changeShopping((items) => planAdd(items, [{ name: 'Cumin', section: 'pantry' }], 1, () => 's1', 1));
+    const left = (i: Parameters<typeof leftOf>[0]) => leftOf(i, usageOf([], []));
+    const undo = await repo.changeHome((pantry, shopping) => ({
+      pantry: planStock(pantry, [{ name: 'Cumin', place: 'spices' }, { name: 'Lasagne', place: 'freezer', pieces: 2 }], 2, ids, 1, left),
+      shopping: planClear(shopping.map((s) => ({ ...s, checkedAt: 2 })), 2),
+    }));
+    expect(undo.pantry.created).toEqual(['h1', 'h2']);
+    expect(await repo.db.shopping.get('s1')).toMatchObject({ clearedAt: 2 });
+    expect((await repo.snapshot()).pantry.map((i) => i.name)).toEqual(['Cumin', 'Lasagne']);
+    await repo.undoHome(undo);
+    expect(await repo.db.pantry.count()).toBe(0);
+    expect((await repo.db.shopping.get('s1'))!.clearedAt).toBeUndefined();
   });
 });
