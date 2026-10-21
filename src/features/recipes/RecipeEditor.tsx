@@ -1,7 +1,8 @@
 import { useMemo, useRef, useState } from 'react';
 import { useData } from '../../app/data';
 import { useBackCloses } from '../../app/history';
-import { href, navigate } from '../../app/router';
+import { goBack, replaceRoute } from '../../app/router';
+import { BackButton } from '../../ui/BackButton';
 import { t } from '../../i18n';
 import { productFood, productLabel } from '../../foods/products';
 import { fmtGrams } from '../../lib/format';
@@ -239,7 +240,9 @@ export function RecipeEditor({ id }: { id?: string }) {
       defaultPlan: plan,
       saltOverride: hasSalt ? saltOverride : undefined,
     });
-    navigate('recipes', rec.id);
+    // Back to the recipe the editor was opened from; a new recipe's page takes the editor's place.
+    if (existing) goBack('recipes', rec.id);
+    else replaceRoute('recipes', rec.id);
   }
 
   const assistant = assistantStarted && (
@@ -254,9 +257,7 @@ export function RecipeEditor({ id }: { id?: string }) {
       {/* Hidden, not unmounted, while the assistant is open: the search and any open sheet stay as they were. */}
       <section hidden={assistantOpen}>
         <header className="page-head row">
-          <a className="icon-btn" href={existing ? href('recipes', existing.id) : href('recipes')} aria-label={t('common.back')}>
-            <Icon name="back" />
-          </a>
+          <BackButton to={existing ? ['recipes', existing.id] : ['recipes']} />
           <h1>{existing ? t('recipes.edit') : t('recipes.new')}</h1>
         </header>
 

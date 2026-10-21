@@ -24,6 +24,7 @@ import { PantryPage } from '../features/pantry/PantryPage';
 import { RecipesPage } from '../features/recipes/RecipesPage';
 import { RecipeEditor } from '../features/recipes/RecipeEditor';
 import { RecipeView } from '../features/recipes/RecipeView';
+import { splitContext } from '../features/nutrient/NutrientSplit';
 import { NutrientPage } from '../features/nutrient/NutrientPage';
 import { NutrientFoodsPage } from '../features/nutrient/NutrientFoodsPage';
 import { FoodPage } from '../features/food/FoodPage';
@@ -40,7 +41,7 @@ import { FastPage } from '../features/fast/FastPage';
 
 function Page({ route }: { route: string[] }) {
   const d = useData();
-  const [a, b, c] = route;
+  const [a, b, c, e] = route;
   if (!d.profile.onboarded) return <Onboarding />;
   switch (a) {
     case 'log':
@@ -65,7 +66,7 @@ function Page({ route }: { route: string[] }) {
       return <RecipesPage />;
     case 'nutrient':
       if (c === 'foods') return <NutrientFoodsPage key={b} id={b ?? ''} />;
-      return <NutrientPage id={b ?? ''} />;
+      return <NutrientPage key={route.join('/')} id={b ?? ''} context={splitContext(c, e)} />;
     case 'food':
       return <FoodPage code={b ?? ''} />;
     case 'meal':

@@ -3,14 +3,22 @@ import { useData } from '../../app/data';
 import { t } from '../../i18n';
 import { fmtAmount, fmtPercent } from '../../lib/format';
 import { portionIntake } from '../../logic/recipeIdeas';
-import { NUTRIENTS } from '../../model/nutrients';
+import { NUTRIENTS, NUTRIENT_BY_ID } from '../../model/nutrients';
+import { href } from '../../app/router';
+import { Sheet } from '../../ui/controls';
+import { recipePieces, SplitList } from '../nutrient/NutrientSplit';
 import type { Storage } from '../../model/paramTypes';
 import type { Recipe } from '../../storage/types';
 
-/** Nutrients in one portion (after cooking losses), as % of the daily reference intake. */
-export function PortionNutrients({ recipe, storage = 'fresh' }: { recipe: Recipe; storage?: Storage }) {
+/**
+ * Nutrients in one portion (after cooking losses), as % of the daily reference intake. Each nutrient
+ * opens which ingredient gives how much of it: a saved recipe's on the nutrient page, a recipe being
+ * edited (not saved yet, so not leaving the editor) in a sheet.
+ */
+export function PortionNutrients({ recipe, storage = 'fresh', saved = false }: { recipe: Recipe; storage?: Storage; saved?: boolean }) {
   const d = useData();
   const [all, setAll] = useState(false);
+  const [split, setSplit] = useState<string | null>(null);
   const rows = useMemo(() => {
     const ctx = { foods: d.foods, products: d.productsById, batches: new Map(), customFoods: new Map(), salt: recipe.saltOverride ?? d.profile.salt };
     const res = portionIntake(recipe, ctx, storage);
@@ -31,7 +39,17 @@ export function PortionNutrients({ recipe, storage = 'fresh' }: { recipe: Recipe
         <tbody>
           {shown.map((r) => (
             <tr key={r.id}>
-              <td>{r.name}</td>
+              <td>
+                {saved ? (
+                  <a className="row-link" href={href('nutrient', r.id, 'recipe', recipe.id)}>
+                    {r.name}
+                  </a>
+                ) : (
+                  <button className="row-link" onClick={() => setSplit(r.id)}>
+                    {r.name}
+                  </button>
+                )}
+              </td>
               <td className="num">{fmtAmount(r.id, r.amount)}</td>
               <td className="num muted">{r.pct !== undefined ? fmtPercent(r.pct) : ''}</td>
               <td>{r.missing ? <span className="muted small" title={t('food.someMissing')}>*</span> : null}</td>
@@ -43,6 +61,13 @@ export function PortionNutrients({ recipe, storage = 'fresh' }: { recipe: Recipe
       <button className="btn btn-small btn-ghost" onClick={() => setAll(!all)}>
         {all ? t('recipes.showTop') : t('recipes.showAll')}
       </button>
+      {split && (
+        <Sheet title={t('split.inRecipe', { name: recipe.name || t('recipes.new') })} onClose={() => setSplit(null)}>
+          <h3 className="section-title">{NUTRIENT_BY_ID.get(split)?.name ?? split}</h3>
+          <SplitList nutrient={split} pieces={recipePieces(d, recipe, false)} />
+          <p className="muted small">{t('split.sheetHint')}</p>
+        </Sheet>
+      )}
     </div>
   );
 }

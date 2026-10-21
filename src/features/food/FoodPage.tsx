@@ -7,6 +7,7 @@ import { NUTRIENTS } from '../../model/nutrients';
 import { Icon } from '../../ui/Icon';
 import { nutrientType } from '../home/grouping';
 import { GroupInfoButton, groupTitle, hasGroupInfo } from '../info/GroupInfo';
+import { BackButton } from '../../ui/BackButton';
 
 /** A food's nutrient profile per 100 g. */
 export function FoodPage({ code }: { code: string }) {
@@ -17,9 +18,7 @@ export function FoodPage({ code }: { code: string }) {
   return (
     <section>
       <header className="page-head row">
-        <button className="icon-btn" onClick={() => history.back()} aria-label={t('common.back')}>
-          <Icon name="back" />
-        </button>
+        <BackButton />
         <h1 className="grow">{food.nameEn}</h1>
       </header>
       <p className="muted">

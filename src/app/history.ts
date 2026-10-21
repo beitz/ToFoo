@@ -38,7 +38,8 @@ function sync(): void {
   if (pushed > 0 && depthOf(window.history.state) !== pushed) pushed = 0;
   while (pushed < layers.length) {
     pushed++;
-    window.history.pushState({ tofooLayer: pushed }, '');
+        // Carries the page's depth (router.ts), so going back onto it from a page linked in a sheet still knows it.
+    window.history.pushState({ tofooLayer: pushed, tofooPage: (window.history.state as { tofooPage?: unknown } | null)?.tofooPage }, '');
   }
   if (pushed > layers.length) {
     const n = pushed - layers.length;

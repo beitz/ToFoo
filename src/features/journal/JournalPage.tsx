@@ -11,6 +11,7 @@ import { Icon } from '../../ui/Icon';
 import { JournalEditor } from './JournalEditor';
 import { JournalSheet } from './JournalSheet';
 import { useJournal } from './useJournal';
+import { BackButton } from '../../ui/BackButton';
 
 /** Days shown at first; older ones one tap away, so the page stays quick with a long journal. */
 const DAYS_SHOWN = 30;
@@ -49,9 +50,7 @@ export function JournalPage() {
   return (
     <section>
       <header className="page-head row">
-        <a className="icon-btn" href={href()} aria-label={t('common.back')}>
-          <Icon name="back" />
-        </a>
+        <BackButton />
         <h1>{t('journal.title')}</h1>
       </header>
 

@@ -8,6 +8,7 @@ import { ketosis } from '../../../model/parameters';
 import { Icon } from '../../ui/Icon';
 import { KetosisChart } from './KetosisChart';
 import { fmtBhbRange, fmtFastDuration, PHASE_KEY, useFast } from './useFast';
+import { BackButton } from '../../ui/BackButton';
 
 /** Every number the estimate uses, with its source and confidence, generated from model/parameters.ts. */
 const SOURCE_ROWS: ReadonlyArray<readonly [keyof typeof ketosis, MessageKey]> = [
@@ -57,9 +58,7 @@ export function FastPage() {
   return (
     <section>
       <header className="page-head row">
-        <a className="icon-btn" href={href()} aria-label={t('common.back')}>
-          <Icon name="back" />
-        </a>
+        <BackButton />
         <h1>{t('fast.title')}</h1>
       </header>
 

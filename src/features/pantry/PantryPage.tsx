@@ -19,6 +19,7 @@ import { useShopping } from '../shopping/useShopping';
 import { PutAwaySheet } from './PutAwaySheet';
 import { PantryItemSheet } from './PantryItemSheet';
 import { leftLabel, placeName, usePantry, usePantryFoods, usePantryLeft } from './usePantry';
+import { BackButton } from '../../ui/BackButton';
 
 /** Foods and products from the database offered while typing, after things already at home. */
 const FOOD_SUGGESTIONS = 3;
@@ -89,9 +90,7 @@ export function PantryPage() {
   return (
     <section className="pantry-page">
       <header className="page-head row-between">
-        <a className="icon-btn" href={href()} aria-label={t('common.back')}>
-          <Icon name="back" />
-        </a>
+        <BackButton />
         <h1 className="grow">{t('pantry.title')}</h1>
         {shoppingOn && (
           <a className="icon-btn" href={href('shopping')} aria-label={t('shopping.title')} title={t('shopping.title')}>

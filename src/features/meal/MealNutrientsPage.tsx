@@ -31,6 +31,7 @@ import { nutrientType } from '../home/grouping';
 import { GroupInfoButton, groupTitle, hasGroupInfo } from '../info/GroupInfo';
 import { EditEntrySheet } from '../diary/EditEntrySheet';
 import { entryAmount } from '../log/describe';
+import { BackButton } from '../../ui/BackButton';
 
 const MACROS = ['PROT625', 'FAT', 'CHO', 'FIBT'];
 
@@ -38,7 +39,7 @@ const MACROS = ['PROT625', 'FAT', 'CHO', 'FIBT'];
 const BLS_URL = 'https://doi.org/10.25826/Data20251217-134202-0';
 
 /** The diary's meal (same grouping) that holds this entry. */
-function mealOf(d: AppData, entry: LogEntry): LogEntry[] {
+export function mealOf(d: AppData, entry: LogEntry): LogEntry[] {
   const meals = groupMeals(
     d.log.filter((e) => e.day === entry.day),
     d.settings.mealWindowMinutes,
@@ -88,9 +89,7 @@ function useBreakdown(pieces: readonly Piece[]) {
 function Header({ title }: { title: string }) {
   return (
     <header className="page-head row">
-      <button className="icon-btn" onClick={() => history.back()} aria-label={t('common.back')}>
-        <Icon name="back" />
-      </button>
+      <BackButton to={['diary']} />
       <h1 className="grow">{title}</h1>
     </header>
   );
@@ -146,7 +145,11 @@ export function MealNutrientsPage({ entryId }: { entryId: string }) {
           })}
         </ul>
       </div>
-      <NutrientBreakdown b={b} weight={mealWeight(d, meal, entries)} />
+      <NutrientBreakdown
+        b={b}
+        weight={mealWeight(d, meal, entries)}
+        nutrientHref={(id) => (meal.length > 1 ? href('nutrient', id, 'meal', entry.id) : (entries.get(entry.id)?.parts.length ?? 0) > 1 ? href('nutrient', id, 'entry', entry.id) : href('nutrient', id))}
+      />
     </section>
   );
 }
@@ -220,7 +223,7 @@ export function EntryNutrientsPage({ entryId, part: partParam }: { entryId: stri
           </div>
         </>
       )}
-      {entry.kind !== 'drink' && <NutrientBreakdown b={b} weight={weight} />}
+      {entry.kind !== 'drink' && <NutrientBreakdown b={b} weight={weight} nutrientHref={(id) => (parts.length > 0 ? href('nutrient', id, 'entry', entry.id) : href('nutrient', id))} />}
       {editing && <EditEntrySheet entry={entry} nutrientsLink={false} onClose={() => setEditing(false)} />}
     </section>
   );
@@ -235,7 +238,7 @@ export type Weight = { grams: number; raw: boolean } | undefined;
  * What was eaten (default), the same per 100 g (when its weight is known) or its share of the day; the
  * energy and make-up at a glance; then every nutrient with data, grouped by type or by biggest share.
  */
-function NutrientBreakdown({ b, weight }: { b: Breakdown; weight: Weight }) {
+function NutrientBreakdown({ b, weight, nutrientHref }: { b: Breakdown; weight: Weight; nutrientHref: (id: string) => string }) {
   const d = useData();
   const [chosen, setBasis] = useState<Basis>('serving');
   const [order, setOrder] = useState<Order>('type');
@@ -332,7 +335,7 @@ function NutrientBreakdown({ b, weight }: { b: Breakdown; weight: Weight }) {
                   <GroupInfoButton group={group} />
                 </div>
               )}
-              <ShareLine row={r} basis={basis} sources={b.sources[r.id]} />
+              <ShareLine row={r} basis={basis} sources={b.sources[r.id]} to={nutrientHref(r.id)} />
             </Fragment>
           );
         })}
@@ -406,7 +409,7 @@ function SourceMarks({ sources }: { sources?: ReadonlySet<SourceLetter> }) {
 }
 
 /** Name with its source letters, amount, a bar for the share (full = a whole day's need or limit) and the share. */
-function ShareLine({ row: r, basis, sources }: { row: ShareRow; basis: Basis; sources?: ReadonlySet<SourceLetter> }) {
+function ShareLine({ row: r, basis, sources, to }: { row: ShareRow; basis: Basis; sources?: ReadonlySet<SourceLetter>; to: string }) {
   const def = NUTRIENT_BY_ID.get(r.id);
   const name = def?.short ?? r.id;
   const share = r.share;
@@ -422,7 +425,7 @@ function ShareLine({ row: r, basis, sources }: { row: ShareRow; basis: Basis; so
     : '';
   const spoken = [def?.name ?? r.id, amountText(r) === '–' ? t('gauge.noData') : amountText(r), pct && ofWhat, from].filter(Boolean).join(', ');
   return (
-    <a className={`mrow mrow-${r.kind}`} href={href('nutrient', r.id)} aria-label={spoken}>
+    <a className={`mrow mrow-${r.kind}`} href={to} aria-label={spoken}>
       <span className="mrow-name">
         <span className="mrow-label">{name}</span>
         <SourceMarks sources={sources} />

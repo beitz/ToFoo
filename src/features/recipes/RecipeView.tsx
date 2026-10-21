@@ -21,6 +21,7 @@ import { SourceTag } from './SourceTag';
 import { refKey } from '../../lib/refs';
 import { isOn } from '../../settings/features';
 import { RecipeToListSheet } from '../shopping/RecipeToListSheet';
+import { BackButton } from '../../ui/BackButton';
 
 export function RecipeView({ id }: { id: string }) {
   const d = useData();
@@ -48,9 +49,7 @@ export function RecipeView({ id }: { id: string }) {
   return (
     <section>
       <header className="page-head row-between">
-        <a className="icon-btn" href={href('recipes')} aria-label={t('common.back')}>
-          <Icon name="back" />
-        </a>
+        <BackButton to={['recipes']} />
         <h1 className="grow">{recipe.name}</h1>
         <a className="icon-btn" href={href('recipes', recipe.id, 'edit')} aria-label={t('recipes.edit')}>
           <Icon name="edit" />
@@ -68,8 +67,8 @@ export function RecipeView({ id }: { id: string }) {
       <ul className="plain-list">
         {recipe.ingredients.map((ing, i) => {
           const food = ing.ref.source === 'BLS' ? d.foods.byCode.get(ing.ref.code) : undefined;
-          return (
-            <li key={i} className="row-between ingredient-line">
+          const body = (
+            <>
               <span>
                 {ing.isSalt ? t('recipes.salt') : (food?.nameEn ?? ing.name)}
                 {!ing.isSalt && (
@@ -80,7 +79,22 @@ export function RecipeView({ id }: { id: string }) {
                 )}
                 {ing.preparation !== 'asListed' && <span className="muted small"> · {prepLabel(ing.preparation)}</span>}
               </span>
-              <span className="muted">{fmtGrams(ing.grams)}</span>
+              <span className="muted">
+                {fmtGrams(ing.grams)}
+                {food && !ing.isSalt && <Icon name="chevron" size={16} />}
+              </span>
+            </>
+          );
+          return (
+            <li key={i}>
+              {/* A BLS food opens its page; salt follows the profile's choice, so it has no one food to show. */}
+              {food && !ing.isSalt ? (
+                <a className="row-between ingredient-line ingredient-link" href={href('food', food.code)}>
+                  {body}
+                </a>
+              ) : (
+                <div className="row-between ingredient-line">{body}</div>
+              )}
             </li>
           );
         })}
@@ -104,7 +118,7 @@ export function RecipeView({ id }: { id: string }) {
       {recipe.notes && <p className="notes">{recipe.notes}</p>}
 
       <h2 className="section-title">{t('recipes.perPortion')}</h2>
-      <PortionNutrients recipe={recipe} />
+      <PortionNutrients recipe={recipe} saved />
 
       {batches.length > 0 && (
         <>
