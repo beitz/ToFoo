@@ -13,6 +13,7 @@ import { Icon } from '../../ui/Icon';
 import { Segmented } from '../../ui/controls';
 import { entryAmount } from '../log/describe';
 import { EditEntrySheet } from './EditEntrySheet';
+import { useMealBreakdown } from '../meal/MealNutrientsPage';
 import { SunEntrySheet } from './SunEntrySheet';
 import { sunSessionsFor } from '../../logic/resolve';
 import { logMealAgain } from '../log/logAgain';
@@ -310,10 +311,11 @@ function sleepDefault(day: string): { start: number; end: number } {
   return { start: end - 8 * 3_600_000, end };
 }
 
-/** One meal: its items, each tappable to edit, and "Log again". */
+/** One meal: its items, each tappable to edit, "Log again", and its energy with a link to all its nutrients. */
 function MealCard({ meal, day, onEdit }: { meal: LogEntry[]; day: string; onEdit: (e: LogEntry) => void }) {
   const d = useData();
   const toast = useToast();
+  const kcal = useMealBreakdown(meal.map((e) => ({ entryId: e.id }))).intake.ENERCC;
   return (
     <div className="card meal">
       <div className="meal-head">
@@ -347,6 +349,12 @@ function MealCard({ meal, day, onEdit }: { meal: LogEntry[]; day: string; onEdit
           </li>
         ))}
       </ul>
+      <a className="meal-foot" href={href('meal', meal[0]!.id)} aria-label={t('diary.mealNutrientsLabel', { time: formatTime(meal[0]!.time) })}>
+        <Icon name="bars" size={16} />
+        <span className="grow">{t('diary.mealNutrients')}</span>
+        {kcal !== undefined && <span className="muted small">{fmtAmount('ENERCC', kcal)}</span>}
+        <Icon name="chevron" size={16} />
+      </a>
     </div>
   );
 }

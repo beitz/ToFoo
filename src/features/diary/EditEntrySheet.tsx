@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useData } from '../../app/data';
 import { useToast } from '../../app/toast';
+import { navigate } from '../../app/router';
 import { t } from '../../i18n';
 import { dayKey } from '../../lib/dates';
 import { refKey } from '../../lib/refs';
@@ -27,8 +28,11 @@ function withPortion<E extends PortionDraft>(e: E, patch: Partial<PortionDraft>)
   return next;
 }
 
-/** Change a logged entry: amount, time, confidence, and for foods the food itself (search or barcode). */
-export function EditEntrySheet({ entry, onClose }: { entry: LogEntry; onClose: () => void }) {
+/**
+ * Change a logged entry: amount, time, confidence, and for foods the food itself (search or barcode).
+ * "What's in it" opens the entry's nutrients (off where the sheet is opened from that page).
+ */
+export function EditEntrySheet({ entry, onClose, nutrientsLink = true }: { entry: LogEntry; onClose: () => void; nutrientsLink?: boolean }) {
   const d = useData();
   const toast = useToast();
   const [draft, setDraft] = useState<EntryDraft>(entry);
@@ -114,6 +118,11 @@ export function EditEntrySheet({ entry, onClose }: { entry: LogEntry; onClose: (
             <p className="muted small">
               {food.nameDe} · <a href={`#/food/${food.code}`}>{t('log.details')}</a>
             </p>
+          )}
+          {nutrientsLink && (
+            <button className="btn btn-small btn-ghost" onClick={() => navigate('entry', entry.id)}>
+              <Icon name="bars" size={16} /> {t('edit.nutrients')}
+            </button>
           )}
           {canReplaceFood(draft) && (
             <button className="btn btn-secondary btn-block" onClick={() => setMode('pick')}>

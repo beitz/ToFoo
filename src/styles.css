@@ -1000,6 +1000,16 @@ textarea:focus-visible,
   margin-left: auto;
   min-height: 44px;
 }
+.meal-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  border-top: 1px solid var(--border);
+  color: var(--accent);
+  font-weight: 600;
+  text-decoration: none;
+}
 .fav-btn {
   min-height: 44px;
   padding-left: 0;
@@ -3386,4 +3396,72 @@ button.week-row:focus-visible {
 }
 .tank-card .tank-card-head .tank-card-warn svg {
   color: var(--warn);
+}
+
+/* ── Nutrients of one meal or entry ─────────────────────────── */
+a.entry-row {
+  text-decoration: none;
+}
+.meal-summary p {
+  margin: 4px 0;
+}
+.meal-energy strong {
+  font-size: 1.4rem;
+}
+.mrow-list {
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+.mrow-group {
+  padding: 10px 2px 0;
+  border-bottom: 1px solid var(--border);
+}
+/* Name, amount, bar (full = the whole day), share. */
+.mrow {
+  display: grid;
+  grid-template-columns: minmax(64px, 7rem) 4.6rem minmax(40px, 1fr) 3.6rem;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 2px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  font-size: 0.9rem;
+  text-decoration: none;
+}
+.mrow:last-child {
+  border-bottom: none;
+}
+.mrow:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 1px;
+}
+.mrow-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+.mrow-amount,
+.mrow-value {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+/* "of max" under the share, so the column stays narrow enough for the bar. */
+.mrow-value small {
+  display: block;
+  line-height: 1.1;
+  color: var(--text-muted);
+}
+.mrow-amount {
+  color: var(--text-muted);
+}
+.mrow .nrow-fill {
+  color: var(--accent);
+}
+/* A limit is not something to fill: grey, and "of max" in the text. */
+.mrow-limit .nrow-fill {
+  color: var(--unknown);
 }

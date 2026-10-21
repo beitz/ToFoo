@@ -26,6 +26,7 @@ import { RecipeView } from '../features/recipes/RecipeView';
 import { NutrientPage } from '../features/nutrient/NutrientPage';
 import { NutrientFoodsPage } from '../features/nutrient/NutrientFoodsPage';
 import { FoodPage } from '../features/food/FoodPage';
+import { EntryNutrientsPage, MealNutrientsPage } from '../features/meal/MealNutrientsPage';
 import { SettingsPage } from '../features/settings/SettingsPage';
 import { ProfilePage } from '../features/settings/ProfilePage';
 import { SunPage } from '../features/settings/SunPage';
@@ -63,6 +64,10 @@ function Page({ route }: { route: string[] }) {
       return <NutrientPage id={b ?? ''} />;
     case 'food':
       return <FoodPage code={b ?? ''} />;
+    case 'meal':
+      return <MealNutrientsPage key={b} entryId={b ?? ''} />;
+    case 'entry':
+      return <EntryNutrientsPage key={`${b}-${c}`} entryId={b ?? ''} part={c} />;
     case 'settings':
       switch (b) {
         case 'profile':
@@ -116,7 +121,7 @@ const NAV = [
 
 export function App() {
   const route = useRoute();
-  const section = route[0] === 'about' ? 'settings' : route[0] === 'insights' || route[0] === 'week' ? 'diary' : (route[0] ?? 'home');
+  const section = route[0] === 'about' ? 'settings' : route[0] === 'insights' || route[0] === 'week' || route[0] === 'meal' || route[0] === 'entry' ? 'diary' : (route[0] ?? 'home');
   const active = NAV.some((n) => n.key === section) ? section : 'home';
   const path = route.join('/');
   // Braces matter: an effect's return value is its cleanup, and newer Chrome returns a Promise
