@@ -2174,6 +2174,17 @@ body:has(.composer) .toast-area {
   stroke: var(--surface);
   stroke-width: 2;
 }
+.ketosis-chart-measured {
+  fill: var(--text);
+  stroke: var(--surface);
+  stroke-width: 1.5;
+}
+.fast-measured {
+  font-weight: 600;
+}
+.fast-readings {
+  margin: 0 0 8px;
+}
 .ketosis-chart-axis,
 .ketosis-chart-label {
   font-size: 10px;

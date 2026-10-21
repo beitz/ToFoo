@@ -19,7 +19,7 @@ export function buildBackup(snapshot: Snapshot, appVersion: string, now: Date): 
 }
 
 /** Keys of the record lists in a backup, in the order the app shows their counts. */
-export const COUNTED = ['log', 'recipes', 'batches', 'journal', 'sleep', 'activities', 'water', 'shopping', 'pantry', 'customFoods', 'products', 'fasts', 'dayStatus', 'sunEntries', 'portionSizes'] as const;
+export const COUNTED = ['log', 'recipes', 'batches', 'journal', 'sleep', 'activities', 'water', 'shopping', 'pantry', 'ketones', 'customFoods', 'products', 'fasts', 'dayStatus', 'sunEntries', 'portionSizes'] as const;
 export type CountedKey = (typeof COUNTED)[number];
 
 /** Number of records per list, e.g. { log: 320, recipes: 12, … }. */

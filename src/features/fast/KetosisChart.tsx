@@ -15,13 +15,13 @@ export function chartHours(now: number): number {
  * The estimated band and central line over hours since the last meal, with the phase lines and a
  * "now" mark. Same inputs as the estimate now, so the curve shows where this fast is heading.
  */
-export function KetosisChart({ input }: { input: KetosisInput }) {
+export function KetosisChart({ input, dots = [] }: { input: KetosisInput; dots?: ReadonlyArray<{ hours: number; mmol: number }> }) {
   const maxH = chartHours(input.hours);
   const step = maxH > 96 ? 2 : 1;
   const pts: Array<{ h: number; low: number; central: number; high: number }> = [];
   for (let h = 0; h <= maxH; h += step) pts.push({ h, ...estimateKetosis({ ...input, hours: h }).bhb });
   const { light, moderate, deep } = ketosis.phases.value;
-  const top = Math.max(light * 2, ...pts.map((p) => p.high)) * 1.08;
+  const top = Math.max(light * 2, ...pts.map((p) => p.high), ...dots.map((p) => p.mmol)) * 1.08;
   const x = (h: number) => PAD.left + (h / maxH) * (W - PAD.left - PAD.right);
   const y = (v: number) => PAD.top + (1 - Math.min(v, top) / top) * (H - PAD.top - PAD.bottom);
   const band = `M${pts.map((p) => `${x(p.h)},${y(p.high)}`).join('L')}L${[...pts]
@@ -65,6 +65,10 @@ export function KetosisChart({ input }: { input: KetosisInput }) {
       ))}
       <line x1={x(input.hours)} x2={x(input.hours)} y1={PAD.top} y2={y(0)} className="ketosis-chart-now" />
       <circle cx={x(input.hours)} cy={y(now)} r={4} className="ketosis-chart-dot" />
+      {/* Measurements as squares, so they read apart from the round estimate mark without colour. */}
+      {dots.map((p, i) => (
+        <rect key={i} x={x(p.hours) - 3.5} y={y(p.mmol) - 3.5} width={7} height={7} className="ketosis-chart-measured" />
+      ))}
       <text x={Math.min(x(input.hours) + 5, W - PAD.right - 24)} y={PAD.top + 10} className="ketosis-chart-label">
         {t('fast.chart.now')}
       </text>

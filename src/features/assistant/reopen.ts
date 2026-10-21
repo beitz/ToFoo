@@ -136,6 +136,8 @@ export function restoreCard(summary: Summary, logged: boolean, ctx: RestoreConte
       return { kind: 'activity', activity: c, logged };
     case 'W':
       return { kind: 'water', water: c, logged };
+    case 'K':
+      return { kind: 'ketone', ketone: c, logged };
     case 'L':
       return { kind: 'shopping', shopping: c, logged };
     case 'H':
@@ -178,6 +180,7 @@ export function rebuildConversation(messages: Beta.BetaMessageParam[], events: r
     sleeps: highest('S'),
     activities: highest('A'),
     waters: highest('W'),
+    ketones: highest('K'),
     lists: highest('L'),
     homes: highest('H'),
     recipes: highest('R'),

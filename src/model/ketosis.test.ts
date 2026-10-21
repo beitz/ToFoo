@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ketosis } from '../../model/parameters';
-import { curveAt, estimateKetosis, phaseOf, type KetosisInput } from './ketosis';
+import { curveAt, estimateKetosis, personalShift, phaseOf, shiftForReading, type KetosisInput } from './ketosis';
 
 const man: KetosisInput = { hours: 0, carbShare: 0.6, exerciseMinutes: 0, sex: 'male', bmi: 23 };
 
@@ -91,5 +91,29 @@ describe('estimateKetosis', () => {
     expect(estimateKetosis({ ...man, hours: 8 }).phase).toBe('none');
     expect(estimateKetosis({ ...man, hours: 18 }).phase).toBe('starting');
     expect(estimateKetosis({ ...man, hours: 31 }).phase).toBe('light');
+  });
+});
+
+describe('personal timing from blood readings', () => {
+  it('finds the shift that puts the estimate on a reading', () => {
+    // 0.9 mmol/L at 24 h: the curve reaches 0.9 at 30 h, so 6 h earlier.
+    expect(shiftForReading({ ...man, hours: 24 }, 0.9)).toBeCloseTo(6, 1);
+    expect(shiftForReading({ ...man, hours: 30 }, 0.5)).toBeCloseTo(-9, 1);
+    // Out of reach within a day either way.
+    expect(shiftForReading({ ...man, hours: 2 }, 3)).toBeNull();
+  });
+
+  it('takes the median of at least three readings, leaving out readings above the meter range', () => {
+    const r = (hours: number, mmol: number) => ({ input: { ...man, hours }, mmol });
+    expect(personalShift([r(24, 0.9), r(30, 1.6)])).toBeNull();
+    const p = personalShift([r(24, 0.9), r(30, 1.6), r(21, 0.5), r(40, 4)]);
+    expect(p?.readings).toBe(3);
+    expect(p?.hours).toBeCloseTo(6, 1);
+  });
+
+  it('moves the whole band and says so', () => {
+    const e = estimateKetosis({ ...man, hours: 24, personal: { hours: 6, readings: 4 } });
+    expect(e.bhb.central).toBeCloseTo(curveAt(30));
+    expect(e.factors).toContainEqual({ kind: 'personal', hours: 6, readings: 4 });
   });
 });

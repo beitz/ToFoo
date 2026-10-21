@@ -33,12 +33,12 @@ import { VoiceFailed } from './VoiceFailed';
 import type { ProposedItem, ProductTools, RecipeTools } from '../../ai/tools';
 import { findProduct, findUsda } from '../../foods/findProduct';
 import { productLabel, productPageUrl, productRef } from '../../foods/products';
-import type { Batch, FoodRef, Ingredient, LogEntry, Product } from '../../storage/types';
+import { KETONE_TYPES, type Batch, type FoodRef, type Ingredient, type KetoneType, type LogEntry, type Product } from '../../storage/types';
 import { barcodesInPhoto } from '../log/barcode';
 import type { EntryConfidence } from '../../model/types';
 import { isOn } from '../../settings/features';
 import { repo } from '../../storage/repo';
-import { Field, NumberInput } from '../../ui/controls';
+import { Field, NumberInput, Segmented } from '../../ui/controls';
 import { Icon } from '../../ui/Icon';
 import { ConfidenceField } from '../log/ConfidenceField';
 import { TimeField } from '../log/TimeField';
@@ -47,6 +47,7 @@ import { sleepProblem } from '../sleep/SleepSheet';
 import { durationText, spanText } from '../sleep/format';
 import { waterText } from '../water/format';
 import { waterProblem } from '../water/WaterSheet';
+import { KETONE_TYPE_KEY, KETONE_UNIT, ketoneProblem, ketoneValueText } from '../fast/ketoneFormat';
 import { IngredientSheet } from '../recipes/IngredientSheet';
 import { ActivityForm, activityName, DEFAULT_ACTIVITY_SKIN, recordOf, type ActivityDraft } from '../activity/ActivityForm';
 import { cardId, cardOf, cardTitle, useRegister, type Bubble, type Card, type CardProps, type RecipeChat, type Saver, type Undo } from './cards';
@@ -356,6 +357,7 @@ function Chat({ apiKey, model, day, recipe, reopened }: { apiKey: string; model:
               sleep: isOn(d.settings.features, 'sleep'),
               activity: isOn(d.settings.features, 'activity'),
               water: isOn(d.settings.features, 'water'),
+              ketones: isOn(d.settings.features, 'ketosis'),
               shopping: isOn(d.settings.features, 'shoppingList'),
               ...(atHome ? { pantry: atHome } : {}),
               recipes: recipeTools(),
@@ -406,6 +408,7 @@ function Chat({ apiKey, model, day, recipe, reopened }: { apiKey: string; model:
         ...outcome.sleeps.map((s): Card => ({ kind: 'sleep', sleep: s, logged: false })),
         ...outcome.activities.map((a): Card => ({ kind: 'activity', activity: a, logged: false })),
         ...outcome.waters.map((w): Card => ({ kind: 'water', water: w, logged: false })),
+        ...outcome.ketones.map((k): Card => ({ kind: 'ketone', ketone: k, logged: false })),
         ...outcome.shopping.map((l): Card => ({ kind: 'shopping', shopping: l, logged: false })),
         ...outcome.homes.map((h): Card => ({ kind: 'home', home: h, logged: false })),
         ...outcome.ingredients.map((r): Card => ({ kind: 'ingredients', ingredients: r, logged: false })),
@@ -547,6 +550,7 @@ function Chat({ apiKey, model, day, recipe, reopened }: { apiKey: string; model:
               isOn(d.settings.features, 'sleep') && t('ai.introSleep'),
               isOn(d.settings.features, 'activity') && t('ai.introActivity'),
               isOn(d.settings.features, 'water') && t('ai.introWater'),
+              isOn(d.settings.features, 'ketosis') && t('ai.introKetones'),
               isOn(d.settings.features, 'shoppingList') && t('ai.introShopping'),
               isOn(d.settings.features, 'atHome') && t('ai.introPantry'),
               t('ai.introRecipes'),
@@ -839,6 +843,7 @@ function CardView({ card, ...rest }: CardProps<Card>) {
   if (card.kind === 'sleep') return <SleepCard card={card} {...rest} />;
   if (card.kind === 'activity') return <ActivityCard card={card} {...rest} />;
   if (card.kind === 'water') return <WaterProposalCard card={card} {...rest} />;
+  if (card.kind === 'ketone') return <KetoneProposalCard card={card} {...rest} />;
   if (card.kind === 'shopping') return <ShoppingCard card={card} {...rest} />;
   if (card.kind === 'home') return <HomeCard card={card} {...rest} />;
   if (card.kind === 'ingredients') return <IngredientsCard card={card} {...rest} />;
@@ -973,6 +978,81 @@ function WaterProposalCard({ card, day, toast, onLogged, register }: CardProps<E
         )}
         <button className="btn btn-primary" disabled={!!problem || saving} onClick={() => void saveOne()}>
           {t('ai.saveWater')}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** A ketone measurement the user told the assistant: check the method, value and time, then save. */
+function KetoneProposalCard({ card, day, toast, onLogged, register }: CardProps<Extract<Card, { kind: 'ketone' }>>) {
+  const { ketone } = card;
+  const d = useData();
+  const [type, setType] = useState<KetoneType>(ketone.type);
+  const [value, setValue] = useState<number | undefined>(ketone.value);
+  const [time, setTime] = useState(() => ketone.time ?? defaultTimeFor(day, d.today));
+  const [saving, setSaving] = useState(false);
+  const problem = ketoneProblem(value, time, Date.now());
+
+  async function save(): Promise<Undo | undefined> {
+    if (problem || value === undefined || saving) return;
+    setSaving(true);
+    try {
+      const added = await repo.addKetone({ type, value, time, day: dayKey(new Date(time)) });
+      onLogged(true, localTimes({ type, value, time }));
+      return async () => {
+        await repo.deleteKetone(added.id);
+        onLogged(false);
+      };
+    } finally {
+      setSaving(false);
+    }
+  }
+  useRegister(ketone.id, card.logged ? undefined : save, register);
+
+  async function saveOne() {
+    const undo = await save();
+    if (undo && value !== undefined) toast(t('ketone.added', { value: ketoneValueText({ type, value }) }), undo);
+  }
+
+  if (card.logged) {
+    return (
+      <div className="card proposal-done row">
+        <Icon name="check" size={18} />
+        <span>
+          {t('ai.ketoneSaved', { value: ketoneValueText({ type, value: value ?? 0 }), when: `${formatDay(dayKey(new Date(time)))}, ${formatTime(time)}` })}
+          {d.activeFast && (
+            <>
+              {' '}
+              <a href={href('fasting')}>{t('ai.ketoneOpenFast')}</a>
+            </>
+          )}
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="card proposal">
+      <div className="row-between">
+        <strong className="journal-label">
+          <Icon name="moon" size={18} /> {t('ketone.cardTitle')}
+        </strong>
+        <span className="muted small" title={t('ai.cardId')}>
+          {ketone.id}
+        </span>
+      </div>
+      <Segmented label={t('ketone.type')} value={type} onChange={setType} options={KETONE_TYPES.map((k) => ({ value: k, label: t(KETONE_TYPE_KEY[k]) }))} />
+      <Field label={t('ketone.value')}>{(id) => <NumberInput id={id} value={value} onChange={setValue} suffix={KETONE_UNIT[type]} min={0} />}</Field>
+      <TimeField value={time} onChange={setTime} label={t('ketone.time')} />
+      <div className="sheet-actions">
+        {problem && (
+          <span className="notice small" role="alert">
+            {problem}
+          </span>
+        )}
+        <button className="btn btn-primary" disabled={!!problem || saving} onClick={() => void saveOne()}>
+          {t('ai.saveKetone')}
         </button>
       </div>
     </div>

@@ -323,6 +323,25 @@ export interface WaterRecord extends Versioned {
   ml: number;
 }
 
+export const KETONE_TYPES = ['blood', 'breath', 'urine'] as const;
+export type KetoneType = (typeof KETONE_TYPES)[number];
+
+/**
+ * A ketone measurement the user took (docs/SPEC.md, "Ketosis estimate during fasts"). `value` is in
+ * the method's own unit: blood β-hydroxybutyrate in mmol/L (finger-prick meter), breath acetone in
+ * ppm (device-specific), urine acetoacetate in mmol/L as the strip's colour reads. Never converted
+ * between methods.
+ */
+export interface KetoneReading extends Versioned {
+  id: string;
+  /** Epoch ms it was measured. */
+  time: number;
+  /** Local calendar day of `time` (YYYY-MM-DD). */
+  day: string;
+  type: KetoneType;
+  value: number;
+}
+
 export interface ActivityRecord extends Versioned {
   id: string;
   kind: ActivityKind;

@@ -15,6 +15,13 @@ export interface KetosisInput {
   exerciseMinutes: number;
   sex: Sex | undefined;
   bmi: number | undefined;
+  /** The user's own timing learnt from blood readings (hours earlier than the estimate without it). */
+  personal?: PersonalShift;
+}
+
+export interface PersonalShift {
+  hours: number;
+  readings: number;
 }
 
 export type KetosisPhase = 'none' | 'starting' | 'light' | 'moderate' | 'deep';
@@ -27,7 +34,8 @@ export type KetosisFactor =
   | { kind: 'female' }
   | { kind: 'sexUnknown' }
   | { kind: 'bmi'; bmi: number }
-  | { kind: 'bmiUnknown' };
+  | { kind: 'bmiUnknown' }
+  | { kind: 'personal'; hours: number; readings: number };
 
 export interface KetosisEstimate {
   hours: number;
@@ -119,6 +127,13 @@ export function estimateKetosis(input: KetosisInput): KetosisEstimate {
     factors.push({ kind: 'exercise', minutes: input.exerciseMinutes });
   }
 
+  if (input.personal) {
+    shift.low += input.personal.hours;
+    shift.central += input.personal.hours;
+    shift.high += input.personal.hours;
+    factors.push({ kind: 'personal', ...input.personal });
+  }
+
   // Rise factors: sex, body fat and the person-to-person spread in level scale the rise above the fed baseline.
   const female = k.femaleRiseFactor.value;
   let sexFactor: Range = { low: 1, central: 1, high: 1 };
@@ -144,4 +159,36 @@ export function estimateKetosis(input: KetosisInput): KetosisEstimate {
   const at = (h: number, f: number) => BASE() + (curveAt(Math.max(0, hours + h)) - BASE()) * f;
   const bhb: Range = { low: at(shift.low, rise.low), central: at(shift.central, rise.central), high: at(shift.high, rise.high) };
   return { hours, bhb, phase: phaseOf(bhb), factors };
+}
+
+/** Hours earlier (negative: later) that put the central estimate on one blood reading; null when that needs more than the allowed shift. */
+export function shiftForReading(input: KetosisInput, mmol: number): number | null {
+  const max = k.personal.value.maxShiftHours;
+  const at = (s: number) => estimateKetosis({ ...input, personal: { hours: s, readings: 0 } }).bhb.central;
+  if (mmol < at(-max) || mmol > at(max)) return null;
+  let lo = -max;
+  let hi = max;
+  // The estimate rises with the shift, so halve the interval until it is well under an hour.
+  for (let i = 0; i < 30; i++) {
+    const mid = (lo + hi) / 2;
+    if (at(mid) < mmol) lo = mid;
+    else hi = mid;
+  }
+  return (lo + hi) / 2;
+}
+
+/**
+ * The user's own timing from blood readings taken during fasts: the median of the per-reading
+ * shifts, once there are enough of them. Readings above the meters' reliable range are left out.
+ */
+export function personalShift(readings: ReadonlyArray<{ input: KetosisInput; mmol: number }>): PersonalShift | null {
+  const shifts = readings
+    .filter((r) => r.mmol <= k.meterMaxMmol.value)
+    .map((r) => shiftForReading({ ...r.input, personal: undefined }, r.mmol))
+    .filter((s): s is number => s !== null)
+    .sort((a, b) => a - b);
+  if (shifts.length < k.personal.value.minReadings) return null;
+  const mid = Math.floor(shifts.length / 2);
+  const median = shifts.length % 2 ? shifts[mid]! : (shifts[mid - 1]! + shifts[mid]!) / 2;
+  return { hours: median, readings: shifts.length };
 }

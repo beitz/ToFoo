@@ -3,7 +3,7 @@ import type * as Beta from '@anthropic-ai/sdk/resources/beta/messages/messages';
 import type { Food } from '../foods/foodDb';
 import { buildIndex } from '../foods/search';
 import { appNote, emptyConversation, requestParams, retirePhotos, sendMessage, textOf, type CreateMessage } from './assistant';
-import { describeFood, validateBatchProposal, validatePortionProposal, MAX_INGREDIENT_GRAMS, MAX_ITEM_GRAMS, runCheckRecipe, runListRecipes, validateRecipeProposal, validateIngredientsProposal, runLookupBarcode, runSearchFoods, runSearchUsda, validateJournalProposal, validateProposal, validateSleepProposal, validateActivityProposal, validateWaterProposal, validateShoppingProposal, validateHomeProposal, type ProductTools, type ToolContext } from './tools';
+import { describeFood, validateBatchProposal, validatePortionProposal, MAX_INGREDIENT_GRAMS, MAX_ITEM_GRAMS, runCheckRecipe, runListRecipes, validateRecipeProposal, validateIngredientsProposal, runLookupBarcode, runSearchFoods, runSearchUsda, validateJournalProposal, validateProposal, validateSleepProposal, validateActivityProposal, validateWaterProposal, validateKetoneProposal, validateShoppingProposal, validateHomeProposal, type ProductTools, type ToolContext } from './tools';
 import type { Product } from '../storage/types';
 import type { FindResult } from '../foods/findProduct';
 
@@ -587,6 +587,36 @@ describe('water', () => {
     expect(validateWaterProposal({ ml: 4000, time: '', replaces: '' }, now)).toMatchObject({ ok: false });
     expect(validateWaterProposal({ ml: 250, time: '2026-10-18 09:00', replaces: '' }, now)).toMatchObject({ ok: false });
     expect(validateWaterProposal({ ml: 249.6, time: '', replaces: 'W1' }, now)).toEqual({ ok: true, proposal: { ml: 250, replaces: 'W1' } });
+  });
+});
+
+describe('ketones', () => {
+  const now = new Date(2026, 9, 21, 20, 0).getTime();
+
+  it('offers propose_ketone only with the ketosis estimate on, not strict, never in the recipe editor', () => {
+    const tool = (sources: Parameters<typeof requestParams>[2]) => (requestParams('claude-opus-5-5', [], sources).tools ?? []).find((t) => 'name' in t && t.name === 'propose_ketone') as { strict?: boolean } | undefined;
+    expect(tool({})).toBeUndefined();
+    expect(tool({ ketones: true, recipe: true })).toBeUndefined();
+    expect(tool({ ketones: true })!.strict).toBeUndefined();
+    expect(String(requestParams('claude-opus-5-5', [], { ketones: true }).system)).toContain('never estimate or convert');
+  });
+
+  it('shows ketone cards next to the others', async () => {
+    const api = scripted(reply([toolUse('k', 'propose_ketone', { type: 'blood', value: 1.2, time: '2026-10-21 08:00', replaces: '' }), toolUse('b', 'propose_ketone', { type: 'breath', value: 14, time: '', replaces: '' })], 'tool_use'));
+    const { conversation, outcome } = await sendMessage(api.create, 'claude-opus-5-5', emptyConversation(), { text: 'ketones 1.2 this morning, breath 14 now', images: [] }, { ...ctx, now, ketones: true });
+    expect(outcome.kind === 'proposal' && outcome.ketones).toEqual([
+      { id: 'K1', type: 'blood', value: 1.2, time: new Date(2026, 9, 21, 8, 0).getTime() },
+      { id: 'K2', type: 'breath', value: 14 },
+    ]);
+    expect(conversation.ketones).toBe(2);
+  });
+
+  it('checks a measurement: a value in the method\'s unit, at a plausible time', () => {
+    expect(validateKetoneProposal({ type: 'blood', value: -1, time: '', replaces: '' }, now)).toMatchObject({ ok: false });
+    // 20 mmol/L blood is a unit mix-up (mg/dL), sent back to check.
+    expect(validateKetoneProposal({ type: 'blood', value: 20, time: '', replaces: '' }, now)).toMatchObject({ ok: false });
+    expect(validateKetoneProposal({ type: 'urine', value: 4, time: '2026-10-22 09:00', replaces: '' }, now)).toMatchObject({ ok: false });
+    expect(validateKetoneProposal({ type: 'breath', value: 30, time: '', replaces: 'K1' }, now)).toEqual({ ok: true, proposal: { type: 'breath', value: 30, replaces: 'K1' } });
   });
 });
 

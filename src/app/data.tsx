@@ -7,7 +7,7 @@ import { refKey } from '../lib/refs';
 import { isOn } from '../settings/features';
 import { repo } from '../storage/repo';
 import { startAutoBackups } from './autoBackup';
-import type { ActivityRecord, Batch, CustomFood, DayStatusRecord, Fast, LogEntry, Product, Profile, Recipe, Settings, SunEntry } from '../storage/types';
+import type { ActivityRecord, Batch, CustomFood, KetoneReading, DayStatusRecord, Fast, LogEntry, Product, Profile, Recipe, Settings, SunEntry } from '../storage/types';
 import { resolveRequirements, type ResolvedRequirements } from '../model/requirements';
 import { simulate, type SimulationResult } from '../model/simulate';
 import type { ModelEntry } from '../model/types';
@@ -46,6 +46,8 @@ export interface AppData {
   activeFast: Fast | undefined;
   /** Logged activities (also when the Activity module is off; then there are none new). */
   activities: ActivityRecord[];
+  /** Measured ketones, oldest first. */
+  ketones: KetoneReading[];
   /** Food code → recency boost (0–1), for search. */
   recentFoods: Map<string, number>;
   weightKg: number;
@@ -103,6 +105,7 @@ export function DataProvider({ children, fallback }: { children: ReactNode; fall
   const productList = useLiveQuery(() => repo.db.products.toArray(), []);
   // Only outside activities matter to the model (time in the sun); the rest stays out of it.
   const activities = useLiveQuery(() => repo.db.activities.toArray(), []);
+  const ketones = useLiveQuery(() => repo.db.ketones.orderBy('time').toArray(), []);
 
   const searchIndex = useMemo(() => (foods ? buildIndex(foods.foods.map((f) => ({ key: f.code, nameEn: f.nameEn, nameDe: f.nameDe }))) : null), [foods]);
 
@@ -113,7 +116,7 @@ export function DataProvider({ children, fallback }: { children: ReactNode; fall
   }, [theme]);
 
   const value = useMemo<AppData | null>(() => {
-    if (!foods || !searchIndex || !profile || !settings || !recipes || !batches || !log || !customFoods || !dayStatus || !fasts || !sunEntries || !productList || !activities) return null;
+    if (!foods || !searchIndex || !profile || !settings || !recipes || !batches || !log || !customFoods || !dayStatus || !fasts || !sunEntries || !productList || !activities || !ketones) return null;
     const batchesById = new Map(batches.map((b) => [b.id, b]));
     const customFoodsById = new Map(customFoods.map((c) => [c.id, c]));
     const weight = currentWeight(profile);
@@ -184,10 +187,11 @@ export function DataProvider({ children, fallback }: { children: ReactNode; fall
       modelDays: days,
       activeFast: activeFast(fasts, log, customFoodsById, today),
       activities,
+      ketones,
       recentFoods,
       weightKg: weight ?? 70,
     };
-  }, [foods, searchIndex, profile, settings, recipes, batches, log, customFoods, dayStatus, fasts, sunEntries, productList, activities, today]);
+  }, [foods, searchIndex, profile, settings, recipes, batches, log, customFoods, dayStatus, fasts, sunEntries, productList, activities, ketones, today]);
 
   if (error) return <>{fallback({ error })}</>;
   if (!value) return <>{fallback({})}</>;

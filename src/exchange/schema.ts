@@ -245,6 +245,10 @@ export const pantryItemSchema = z
   })
   .describe('Something at home: what, the food it is, where it is kept, how much there was at `since` (pieces, grams, or another amount as typed; what is left is worked out from the log and cooked batches from then on), and whether the user marked it running low or used up; epoch ms');
 
+export const ketoneSchema = z
+  .object({ id: z.string(), ...versioned, time: z.number(), day, type: z.enum(['blood', 'breath', 'urine']), value: z.number().nonnegative() })
+  .describe('A ketone measurement: when (epoch ms), how (blood: β-hydroxybutyrate in mmol/L from a finger-prick meter; breath: acetone in ppm, device-specific; urine: acetoacetate in mmol/L as the strip reads) and the value in that unit');
+
 export const portionSizesSchema = z
   .object({ food: z.string().min(1), sizes: z.array(z.object({ label: z.string(), grams: z.number().positive() })) })
   .describe('Portion sizes the user saved for one food ("My bowl", 60 g), by the food code they were saved under');
@@ -276,6 +280,7 @@ export const backupSchema = z.object({
     water: z.array(waterSchema).default([]),
     shopping: z.array(shoppingItemSchema).default([]),
     pantry: z.array(pantryItemSchema).default([]),
+    ketones: z.array(ketoneSchema).default([]),
     // Optional, not defaulted: restoring a backup from before portion sizes were in backups keeps the
     // sizes on the phone instead of clearing them.
     portionSizes: z.array(portionSizesSchema).optional(),

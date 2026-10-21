@@ -31,6 +31,9 @@ const SLEEP = (journal: boolean) => `- Sleep: when the user says when they slept
 const ACTIVITY = `- Activity: when the user says they moved (a walk, a run, cycling to work, the gym, football, gardening), propose it with propose_activity: kind (walk, run, cycling, strength, or other with their word as name), start as local "YYYY-MM-DD HH:MM", minutes, intensity only if they said or it is obvious (easy, moderate, hard), and whether it was outside. One call per activity. Estimate a missing start or length from what they said ("walked to work" fits their usual commute time) and say so in your text; ask in your numbered questions only when it matters. Outside time counts toward the vitamin D sun estimate; set skin only when they said what they wore ("in shorts and T-shirt": armsLegs). The app computes no calories. To change an open activity card, call propose_activity again with replaces set to its id (A1, A2, …).`;
 
 // Water (docs/SPEC.md, "Water"): only plain water; every other drink is a food with its own water.
+// Ketones (docs/SPEC.md, "Ketosis estimate during fasts"): only what the user measured.
+const KETONES = `- Ketones: when the user says they measured ketones ("ketones 1.2 this morning", "breath meter says 15", a photo of a meter), propose it with propose_ketone: blood (finger-prick meter, mmol/L) unless they say breath (ppm) or urine strip; the time they measured, else now. Only measured values; never estimate or convert one, and do not comment on what the value means for their health beyond what they ask. To change an open ketone card, call propose_ketone again with replaces set to its id (K1, K2, …).`;
+
 const WATER = `- Water: plain water (tap, mineral, sparkling, nothing added) goes in propose_water with ml and time, not in a meal: it is kept apart so it never ends a fast. Every other drink (coffee, tea, juice, milk, soda, beer, smoothies) goes in a meal as a food, since the app counts the water in foods from the database. Glasses ≈ 250 ml, a small bottle 500 ml, a large bottle 1,500 ml (or what the user says). For "about two litres over the day", propose two or three cards spread over the day rather than one. To change an open water card, call propose_water again with replaces set to its id (W1, W2, …).`;
 
 export interface PromptSources {
@@ -48,6 +51,8 @@ export interface PromptSources {
   activity?: boolean;
   /** Water is on: the assistant may propose plain water. */
   water?: boolean;
+  /** The ketosis estimate is on: the assistant may propose ketone measurements. */
+  ketones?: boolean;
   /** The shopping list is on: the assistant may put things on it. */
   shopping?: boolean;
   /** At home is on: the assistant may save what was bought or runs low. */
@@ -119,7 +124,7 @@ Style: brief, friendly, plain text (no headings or tables). Answer in the langua
 
 function systemPrompt(sources: PromptSources): string {
   if (sources.recipe) return recipeSystemPrompt(sources);
-  const { off = false, usda = false, webSearch = false, journal = false, sleep = false, activity = false, water = false, shopping = false, pantry = false, recipes = false, ideas = false } = sources;
+  const { off = false, usda = false, webSearch = false, journal = false, sleep = false, activity = false, water = false, ketones = false, shopping = false, pantry = false, recipes = false, ideas = false } = sources;
   const extra = [
     off && ' Packaged products can also be looked up by barcode in Open Food Facts.',
     usda && ' Foods the BLS lacks can be searched in USDA FoodData Central.',
@@ -127,6 +132,7 @@ function systemPrompt(sources: PromptSources): string {
     sleep && ' The user can also tell you when they slept.',
     activity && ' The user can also tell you what exercise or activity they did.',
     water && ' The user can also tell you how much water they drank.',
+    ketones && ' The user can also tell you ketone values they measured.',
     shopping && ' The user can also have you put things on their shopping list.',
     pantry && ' The user can also tell you what they bought or what runs low at home.',
     recipes && ' The user can also save recipes they cooked and change recipes in their recipe book.',
@@ -141,7 +147,7 @@ Your job: work out which foods the user ate and how many grams of each, then cal
 How to work:
 - Find foods with search_foods. Search short, generic terms, in English and German (e.g. ["milk roll", "Milchbrötchen"]); send several queries in one call. Only use codes that search_foods returned.
 ${off ? BRANDED_WITH_PRODUCTS('propose_meal') : BRANDED_BLS_ONLY}
-${off && webSearch ? `${WEB_SEARCH}\n` : ''}${usda ? `${USDA('propose_meal')}\n` : ''}${journal ? `${JOURNAL(activity)}\n` : ''}${sleep ? `${SLEEP(journal)}\n` : ''}${activity ? `${ACTIVITY}\n` : ''}${water ? `${WATER}\n` : ''}${shopping ? `${SHOPPING(recipes)}\n` : ''}${pantry ? `${PANTRY(off)}\n` : ''}${recipes ? `${RECIPES(ideas)}\n${PAGES}\n` : ''}- Mixed dishes (restaurant meals, a hotpot, a bowl): use a matching BLS dish if there is one, otherwise split it into ingredients with estimated grams. Include what changes the result most: cooking oil, sauces, broth that was actually eaten.
+${off && webSearch ? `${WEB_SEARCH}\n` : ''}${usda ? `${USDA('propose_meal')}\n` : ''}${journal ? `${JOURNAL(activity)}\n` : ''}${sleep ? `${SLEEP(journal)}\n` : ''}${activity ? `${ACTIVITY}\n` : ''}${water ? `${WATER}\n` : ''}${ketones ? `${KETONES}\n` : ''}${shopping ? `${SHOPPING(recipes)}\n` : ''}${pantry ? `${PANTRY(off)}\n` : ''}${recipes ? `${RECIPES(ideas)}\n${PAGES}\n` : ''}- Mixed dishes (restaurant meals, a hotpot, a bowl): use a matching BLS dish if there is one, otherwise split it into ingredients with estimated grams. Include what changes the result most: cooking oil, sauces, broth that was actually eaten.
 - Amounts: use what the user said, label weights, counts of standard items, and visual cues (plate size, cutlery, hands, packaging). Think about the portion one person ate, not the whole shared dish.
 - Ask when the answer would noticeably change the result (an unknown main food, a portion that could easily be double or half, whether shared food was all eaten). Ask one short question at a time and offer a default the user can just accept, e.g. "About one bowl, roughly 400 ml?". Do not ask about details that barely matter. Do not ask for more photos (barcode, label, packaging) when you can work with what you have: the user often cannot take them. If one would clearly change the result, mention it once alongside your proposal, not instead of it. If the user cannot know, estimate and record the assumption.
 - Everything at once: the user often logs a day or two in one go, in one long message (often spoken for many minutes, with filler words and corrections) and many photos (meals, packaging, barcodes, labels, screenshots). Go through all of it and propose every meal${journal ? ', journal entry' : ''}${sleep ? ', sleep' : ''}${activity ? ', activity' : ''}${water ? ', water' : ''}${recipes ? ', recipe' : ''} it contains: leave nothing out and propose nothing twice. Later words override earlier ones ("no, it was two eggs"). The app puts a line before each photo with its number and capture time. Group the photos into meals by time and content: photos minutes apart of the same table are one meal; the same food at different times (yogurt in the morning and in the evening) is two; a photo of a package or barcode belongs to the meal that food was eaten in. Also include meals the user only describes in words. Before proposing, ask everything that matters in one message, as a short numbered list with a default for each, and say how you grouped the photos (e.g. "Photos 2–5: Korean BBQ, Thu 19:40"); keep it to what really changes the result. Then propose everything in one response, one call per meal${journal ? ', journal entry' : ''}${sleep ? ', sleep' : ''}${activity ? ', activity' : ''}${water ? ', water' : ''}${recipes ? ', recipe' : ''}.
@@ -155,10 +161,10 @@ ${recipes ? '- Questions: when the user just asks something (about their food, t
 Style: brief, friendly, plain text (no headings or tables). Answer in the language the user writes in.`;
 }
 
-const key = ({ off = false, usda = false, webSearch = false, journal = false, sleep = false, activity = false, water = false, shopping = false, pantry = false, recipe = false, recipes = false, ideas = false }: PromptSources) =>
+const key = ({ off = false, usda = false, webSearch = false, journal = false, sleep = false, activity = false, water = false, ketones = false, shopping = false, pantry = false, recipe = false, recipes = false, ideas = false }: PromptSources) =>
   recipe
     ? `r${off ? 1 : 0}${usda ? 1 : 0}${off && webSearch ? 1 : 0}`
-    : `${off ? 1 : 0}${usda ? 1 : 0}${off && webSearch ? 1 : 0}${journal ? 1 : 0}${sleep ? 1 : 0}${activity ? 1 : 0}${water ? 1 : 0}${shopping ? 1 : 0}${pantry ? 1 : 0}${recipes ? 1 : 0}${recipes && ideas ? 1 : 0}`;
+    : `${off ? 1 : 0}${usda ? 1 : 0}${off && webSearch ? 1 : 0}${journal ? 1 : 0}${sleep ? 1 : 0}${activity ? 1 : 0}${water ? 1 : 0}${ketones ? 1 : 0}${shopping ? 1 : 0}${pantry ? 1 : 0}${recipes ? 1 : 0}${recipes && ideas ? 1 : 0}`;
 const prompts = new Map<string, string>();
 const toolSets = new Map<string, BetaToolUnion[]>();
 
@@ -232,7 +238,7 @@ export const WEB_SEARCH_TOOL: BetaWebSearchTool20250305 = {
   user_location: { type: 'approximate', country: 'DE' },
 };
 
-function tools({ off = false, usda = false, webSearch = false, journal = false, sleep = false, activity = false, water = false, shopping = false, pantry = false, recipe = false, recipes = false, ideas = false }: PromptSources): BetaToolUnion[] {
+function tools({ off = false, usda = false, webSearch = false, journal = false, sleep = false, activity = false, water = false, ketones = false, shopping = false, pantry = false, recipe = false, recipes = false, ideas = false }: PromptSources): BetaToolUnion[] {
   const withProducts = off || usda;
   const codeHelp = off && usda ? 'BLS code from search_foods, or an OFF: or USDA: code from lookup_barcode, search_usda or search_foods.' : off ? 'BLS code from search_foods, or OFF: product code from lookup_barcode or search_foods.' : usda ? 'BLS code from search_foods, or USDA: code from search_usda or search_foods.' : 'BLS code from search_foods.';
   const items = {
@@ -315,6 +321,7 @@ function tools({ off = false, usda = false, webSearch = false, journal = false, 
     ...(sleep ? [PROPOSE_SLEEP] : []),
     ...(activity ? [PROPOSE_ACTIVITY] : []),
     ...(water ? [PROPOSE_WATER] : []),
+    ...(ketones ? [PROPOSE_KETONE] : []),
     ...(shopping ? [proposeShopping(recipes)] : []),
     ...(pantry ? [proposeHome(codeHelp)] : []),
     ...(recipes ? [LIST_RECIPES, proposeRecipe(items, ideas), proposePortion(changeItems), proposeBatch(changeItems)] : []),
@@ -508,6 +515,24 @@ const PROPOSE_WATER: BetaTool = {
       replaces: { type: 'string', description: 'Id of the open water card this corrects (e.g. "W1"); empty for new water.' },
     },
     required: ['ml', 'time', 'replaces'],
+    additionalProperties: false,
+  },
+};
+
+const PROPOSE_KETONE: BetaTool = {
+  name: 'propose_ketone',
+  description:
+    'Show the user a ketone measurement they took, as a card with the method, value and time for the user to check and confirm; nothing is saved until they do. Only values the user measured; never estimate one. After a correction, call it again with replaces set to the card id.',
+  // Not strict: see STRICT_NESTED. The app validates the input itself and sends errors back.
+  input_schema: {
+    type: 'object',
+    properties: {
+      type: { type: 'string', enum: ['blood', 'breath', 'urine'], description: 'blood: finger-prick meter (β-hydroxybutyrate, mmol/L); breath: acetone device (ppm); urine: strip (mmol/L as its colour chart reads).' },
+      value: { type: 'number', description: 'The value in that method\'s unit, as the user read it, e.g. 1.2.' },
+      time: { type: 'string', description: 'When it was measured, local "YYYY-MM-DD HH:MM"; empty for now.' },
+      replaces: { type: 'string', description: 'Id of the open ketone card this corrects (e.g. "K1"); empty for a new measurement.' },
+    },
+    required: ['type', 'value', 'time', 'replaces'],
     additionalProperties: false,
   },
 };
