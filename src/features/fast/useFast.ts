@@ -2,11 +2,11 @@ import { useMemo } from 'react';
 import { useData } from '../../app/data';
 import { useNow } from '../../app/useNow';
 import { t, type MessageKey } from '../../i18n';
-import { fastClock, ketosisInput, type FastClock } from '../../logic/fasting';
+import { fastClock, ketosisInput, personalTiming, type FastClock } from '../../logic/fasting';
 import { currentWeight } from '../../logic/resolve';
 import { estimateKetosis, type KetosisEstimate, type KetosisInput, type KetosisPhase } from '../../model/ketosis';
 import { isOn } from '../../settings/features';
-import type { Fast } from '../../storage/types';
+import type { Fast, KetoneReading } from '../../storage/types';
 
 export const PHASE_KEY: Record<KetosisPhase, MessageKey> = {
   none: 'fast.phase.none',
@@ -35,6 +35,8 @@ export interface FastView {
   input: KetosisInput;
   /** Null when the Ketosis estimate module is off. */
   estimate: KetosisEstimate | null;
+  /** Measurements taken during this fast, oldest first. */
+  readings: KetoneReading[];
 }
 
 /** The running fast with its clock and, with the module on, the ketosis estimate; undefined when not fasting. */
@@ -44,7 +46,14 @@ export function useFast(): FastView | undefined {
   const entries = useMemo(() => new Map(d.modelEntries.map((e) => [e.id, e])), [d.modelEntries]);
   const fast = d.activeFast;
   if (!fast) return undefined;
+  const weightKg = currentWeight(d.profile);
   const clock = fastClock(fast, d.log, d.customFoodsById, d.settings.mealWindowMinutes);
-  const input = ketosisInput({ clock, now, entries, activities: d.activities, profile: d.profile, weightKg: currentWeight(d.profile) });
-  return { fast, clock, now, input, estimate: isOn(d.settings.features, 'ketosis') ? estimateKetosis(input) : null };
+  const on = isOn(d.settings.features, 'ketosis');
+  const personal = on
+    ? personalTiming(d.ketones, { fasts: d.fasts, log: d.log, customFoods: d.customFoodsById, mealWindowMinutes: d.settings.mealWindowMinutes, entries, activities: d.activities, profile: d.profile, weightKg })
+    : null;
+  const input = { ...ketosisInput({ clock, now, entries, activities: d.activities, profile: d.profile, weightKg }), ...(personal ? { personal } : {}) };
+  // The fast still runs, so nothing has been eaten since the clock started.
+  const readings = d.ketones.filter((r) => r.time >= clock.since);
+  return { fast, clock, now, input, estimate: on ? estimateKetosis(input) : null, readings };
 }

@@ -18,6 +18,7 @@ import {
   validateSleepProposal,
   validateActivityProposal,
   validateWaterProposal,
+  validateKetoneProposal,
   validateShoppingProposal,
   validateHomeProposal,
   validateIngredientsProposal,
@@ -36,6 +37,7 @@ import {
   type SleepProposal,
   type ActivityProposal,
   type WaterProposal,
+  type KetoneProposal,
   type ShoppingProposal,
   type HomeProposal,
   type ToolContext,
@@ -71,6 +73,8 @@ export interface Conversation {
   activities?: number;
   /** Water cards shown so far; the next one gets id W(waters + 1). */
   waters?: number;
+  /** Ketone cards shown so far; the next one gets id K(ketones + 1). */
+  ketones?: number;
   /** Shopping list cards shown so far; the next one gets id L(lists + 1). */
   lists?: number;
   /** At home cards shown so far; the next one gets id H(homes + 1). */
@@ -91,7 +95,7 @@ export interface PhotoTurn {
   cards: string[];
 }
 
-export const emptyConversation = (): Conversation => ({ messages: [], pendingResults: [], cards: 0, notes: 0, sleeps: 0, activities: 0, waters: 0, lists: 0, homes: 0, recipes: 0, portions: 0, batches: 0, photoTurns: [] });
+export const emptyConversation = (): Conversation => ({ messages: [], pendingResults: [], cards: 0, notes: 0, sleeps: 0, activities: 0, waters: 0, ketones: 0, lists: 0, homes: 0, recipes: 0, portions: 0, batches: 0, photoTurns: [] });
 
 const RETIRED_PHOTO = '[photo removed]';
 const RETIRED_NOTE =
@@ -134,6 +138,8 @@ export type ShownSleep = SleepProposal & { id: string };
 export type ShownActivity = ActivityProposal & { id: string };
 /** Plain water as shown: with its card id (W1, W2, …). */
 export type ShownWater = WaterProposal & { id: string };
+/** A ketone measurement as shown: with its card id (K1, K2, …). */
+export type ShownKetone = KetoneProposal & { id: string };
 /** Things for the shopping list as shown: with their card id (L1, L2, …). */
 export type ShownShopping = ShoppingProposal & { id: string };
 /** Things for At home as shown: with their card id (H1, H2, …). */
@@ -157,6 +163,7 @@ export type TurnOutcome =
       sleeps: ShownSleep[];
       activities: ShownActivity[];
       waters: ShownWater[];
+      ketones: ShownKetone[];
       shopping: ShownShopping[];
       homes: ShownHome[];
       ingredients: ShownIngredients[];
@@ -245,12 +252,13 @@ export async function sendMessage(
   let sleeps = conversation.sleeps ?? 0;
   let activities = conversation.activities ?? 0;
   let waters = conversation.waters ?? 0;
+  let ketones = conversation.ketones ?? 0;
   let lists = conversation.lists ?? 0;
   let homes = conversation.homes ?? 0;
   let recipes = conversation.recipes ?? 0;
   let portions = conversation.portions ?? 0;
   let batches = conversation.batches ?? 0;
-  const done = (outcome: TurnOutcome, pendingResults: Beta.BetaToolResultBlockParam[] = []) => ({ conversation: { messages, pendingResults, cards, notes, sleeps, activities, waters, lists, homes, recipes, portions, batches, photoTurns }, outcome });
+  const done = (outcome: TurnOutcome, pendingResults: Beta.BetaToolResultBlockParam[] = []) => ({ conversation: { messages, pendingResults, cards, notes, sleeps, activities, waters, ketones, lists, homes, recipes, portions, batches, photoTurns }, outcome });
 
   for (let step = 0; step < MAX_STEPS; step++) {
     const res = await create(requestParams(model, messages, sources));
@@ -271,6 +279,7 @@ export async function sendMessage(
     const sleepsProposed: Array<{ id: string; proposal: SleepProposal }> = [];
     const activitiesProposed: Array<{ id: string; proposal: ActivityProposal }> = [];
     const watersProposed: Array<{ id: string; proposal: WaterProposal }> = [];
+    const ketonesProposed: Array<{ id: string; proposal: KetoneProposal }> = [];
     const listsProposed: Array<{ id: string; proposal: ShoppingProposal }> = [];
     const homesProposed: Array<{ id: string; proposal: HomeProposal }> = [];
     const ingredientsProposed: Array<{ id: string; proposal: IngredientsProposal }> = [];
@@ -360,6 +369,13 @@ export async function sendMessage(
           rejected = true;
           results.push({ type: 'tool_result', tool_use_id: use.id, content: r.error, is_error: true });
         }
+      } else if (use.name === 'propose_ketone' && sources.ketones) {
+        const r = validateKetoneProposal(use.input, ctx.now);
+        if (r.ok) ketonesProposed.push({ id: use.id, proposal: r.proposal });
+        else {
+          rejected = true;
+          results.push({ type: 'tool_result', tool_use_id: use.id, content: r.error, is_error: true });
+        }
       } else if (use.name === 'propose_home' && sources.pantry) {
         const r = validateHomeProposal(use.input, ctx.db, ctx.products);
         if (r.ok) homesProposed.push({ id: use.id, proposal: r.proposal });
@@ -380,13 +396,14 @@ export async function sendMessage(
     }
 
     // Cards are shown all together or not at all, so the user never sees half a batch.
-    const anyProposed = proposals.length + notesProposed.length + sleepsProposed.length + activitiesProposed.length + watersProposed.length + listsProposed.length + homesProposed.length + ingredientsProposed.length + recipesProposed.length + portionsProposed.length + batchesProposed.length > 0;
+    const anyProposed = proposals.length + notesProposed.length + sleepsProposed.length + activitiesProposed.length + watersProposed.length + ketonesProposed.length + listsProposed.length + homesProposed.length + ingredientsProposed.length + recipesProposed.length + portionsProposed.length + batchesProposed.length > 0;
     if (anyProposed && !rejected) {
       const shown = proposals.map(({ proposal }): ShownProposal => ({ ...proposal, id: `M${++cards}` }));
       const shownNotes = notesProposed.map(({ proposal }): ShownNote => ({ ...proposal, id: `J${++notes}` }));
       const shownSleeps = sleepsProposed.map(({ proposal }): ShownSleep => ({ ...proposal, id: `S${++sleeps}` }));
       const shownActivities = activitiesProposed.map(({ proposal }): ShownActivity => ({ ...proposal, id: `A${++activities}` }));
       const shownWaters = watersProposed.map(({ proposal }): ShownWater => ({ ...proposal, id: `W${++waters}` }));
+      const shownKetones = ketonesProposed.map(({ proposal }): ShownKetone => ({ ...proposal, id: `K${++ketones}` }));
       const shownLists = listsProposed.map(({ proposal }): ShownShopping => ({ ...proposal, id: `L${++lists}` }));
       const shownHomes = homesProposed.map(({ proposal }): ShownHome => ({ ...proposal, id: `H${++homes}` }));
       const shownIngredients = ingredientsProposed.map(({ proposal }): ShownIngredients => ({ ...proposal, id: `R${++recipes}` }));
@@ -399,6 +416,7 @@ export async function sendMessage(
         ...sleepsProposed.map(({ id }, i) => [id, shownSleeps[i]!.id] as const),
         ...activitiesProposed.map(({ id }, i) => [id, shownActivities[i]!.id] as const),
         ...watersProposed.map(({ id }, i) => [id, shownWaters[i]!.id] as const),
+        ...ketonesProposed.map(({ id }, i) => [id, shownKetones[i]!.id] as const),
         ...listsProposed.map(({ id }, i) => [id, shownLists[i]!.id] as const),
         ...homesProposed.map(({ id }, i) => [id, shownHomes[i]!.id] as const),
         ...ingredientsProposed.map(({ id }, i) => [id, shownIngredients[i]!.id] as const),
@@ -417,6 +435,7 @@ export async function sendMessage(
         ...sleepsProposed.map(({ id }, i) => shownResult(id, shownSleeps[i]!.id, 'saved')),
         ...activitiesProposed.map(({ id }, i) => shownResult(id, shownActivities[i]!.id, 'saved')),
         ...watersProposed.map(({ id }, i) => shownResult(id, shownWaters[i]!.id, 'saved')),
+        ...ketonesProposed.map(({ id }, i) => shownResult(id, shownKetones[i]!.id, 'saved')),
         ...listsProposed.map(({ id }, i) => shownResult(id, shownLists[i]!.id, 'added to the list')),
         ...homesProposed.map(({ id }, i) => shownResult(id, shownHomes[i]!.id, 'saved')),
         ...ingredientsProposed.map(({ id }, i) => shownResult(id, shownIngredients[i]!.id, 'added to the recipe')),
@@ -433,6 +452,7 @@ export async function sendMessage(
           sleeps: shownSleeps,
           activities: shownActivities,
           waters: shownWaters,
+          ketones: shownKetones,
           shopping: shownLists,
           homes: shownHomes,
           ingredients: shownIngredients,
@@ -455,6 +475,9 @@ export async function sendMessage(
     }
     for (const { id } of watersProposed) {
       results.push({ type: 'tool_result', tool_use_id: id, content: 'Not shown: another proposal in this response had errors. Call propose_water again for this water too.', is_error: true });
+    }
+    for (const { id } of ketonesProposed) {
+      results.push({ type: 'tool_result', tool_use_id: id, content: 'Not shown: another proposal in this response had errors. Call propose_ketone again for this measurement too.', is_error: true });
     }
     for (const { id } of homesProposed) {
       results.push({ type: 'tool_result', tool_use_id: id, content: 'Not shown: another proposal in this response had errors. Call propose_home again for these items too.', is_error: true });

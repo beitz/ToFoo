@@ -989,6 +989,30 @@ export const ketosis = {
     confidence: 'high',
     note: 'The linear step between 25 and 30 is an assumption.',
   } satisfies Valued<{ lean: number; obese: number }>,
+  /** Learning the user's own timing from their blood readings. */
+  personal: {
+    value: { minReadings: 3, maxShiftHours: 24 },
+    source: 'Modelling choice',
+    confidence: 'assumption',
+    note:
+      'Each blood reading taken during a fast gives the shift in hours that puts the estimate on it; the median of at least `minReadings` such shifts moves later estimates. A reading that would need more than `maxShiftHours` either way is left out (it says more about the meter or the log than about timing). The band keeps its width: there is no source for how much a few readings narrow it.',
+  } satisfies Valued<{ minReadings: number; maxShiftHours: number }>,
+  /** Blood meters read reliably up to this value; above it the app shows "> 3". */
+  meterMaxMmol: {
+    value: 3,
+    source: 'Janssen et al. 2010 (Clin Chem Lab Med 48:1781): the Precision Xtra meter agreed with LC-MS/MS from 0 to 3 mmol/L (slope 1.20); above 3 its readings scattered',
+    url: 'https://doi.org/10.1515/CCLM.2010.351',
+    confidence: 'medium',
+    note: 'Readings above this are not used to learn the personal timing.',
+  } satisfies Valued<number>,
+  /** A measured blood value above this gets a plain note (more than healthy people reach in long water-only fasts). */
+  highNoteMmol: {
+    value: 6,
+    source: 'Owen et al. 1969: about 5.8–5.9 mmol/L after 3–5 weeks of water-only fasting (11 people with obesity)',
+    url: 'https://doi.org/10.1172/JCI106016',
+    confidence: 'assumption',
+    note: 'The exact line is open (docs/OPEN_QUESTIONS.md). The note suggests measuring again and getting medical help with nausea, vomiting, belly pain or fast breathing; it is not a diagnosis.',
+  } satisfies Valued<number>,
   /** Phase lines in mmol/L, named in words on Home and the fast page. */
   phases: {
     value: { light: 0.5, moderate: 1.5, deep: 3 },

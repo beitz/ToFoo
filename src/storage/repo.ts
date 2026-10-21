@@ -25,6 +25,7 @@ import {
   type WaterRecord,
   type ShoppingItem,
   type PantryItem,
+  type KetoneReading,
   type LogEntry,
   type NewLogEntry as NewLog,
   type Product,
@@ -55,6 +56,7 @@ export interface Snapshot {
   water: WaterRecord[];
   shopping: ShoppingItem[];
   pantry: PantryItem[];
+  ketones: KetoneReading[];
   /** Missing in backups from before portion sizes were included; restoring one keeps the sizes on the phone. */
   portionSizes?: FoodPortionSizes[];
 }
@@ -430,6 +432,24 @@ export function createRepo(db: ToFooDB) {
       await db.water.put(w);
     },
 
+    // ── Ketone measurements ──
+    async addKetone(k: Omit<KetoneReading, 'id' | 'schemaVersion'>): Promise<KetoneReading> {
+      const rec: KetoneReading = { ...k, id: newId(), schemaVersion: v };
+      await db.ketones.put(rec);
+      return rec;
+    },
+    /** Delete a measurement; returns it so the UI can offer undo via restoreKetone. */
+    async deleteKetone(id: string): Promise<KetoneReading | undefined> {
+      return db.transaction('rw', db.ketones, async () => {
+        const old = await db.ketones.get(id);
+        await db.ketones.delete(id);
+        return old;
+      });
+    },
+    async restoreKetone(k: KetoneReading): Promise<void> {
+      await db.ketones.put(k);
+    },
+
     // ── Shopping list ──
     /**
      * Change the shopping list: `plan` gets every line (cleared ones too) inside the transaction and
@@ -512,7 +532,7 @@ export function createRepo(db: ToFooDB) {
      * `backupFirst`, an automatic backup of the data it replaces is saved in the same transaction.
      */
     async restore(s: Snapshot, { backupFirst = false } = {}): Promise<void> {
-      const tables = [db.profile, db.settings, db.recipes, db.batches, db.log, db.customFoods, db.dayStatus, db.fasts, db.sunEntries, db.products, db.journal, db.sleep, db.activities, db.water, db.shopping, db.pantry];
+      const tables = [db.profile, db.settings, db.recipes, db.batches, db.log, db.customFoods, db.dayStatus, db.fasts, db.sunEntries, db.products, db.journal, db.sleep, db.activities, db.water, db.shopping, db.pantry, db.ketones];
       await db.transaction('rw', [...SNAPSHOT_TABLES, 'autoBackups'], async () => {
         if (backupFirst) await writeAutoBackup((name) => db.table(name), 'restore', new Date());
         await Promise.all(tables.map((t) => t.clear()));
@@ -532,6 +552,7 @@ export function createRepo(db: ToFooDB) {
         await db.water.bulkPut(s.water);
         await db.shopping.bulkPut(s.shopping);
         await db.pantry.bulkPut(s.pantry);
+        await db.ketones.bulkPut(s.ketones);
         if (s.portionSizes) {
           await db.meta.where('key').startsWith(PORTIONS_PREFIX).delete();
           await db.meta.bulkPut(s.portionSizes.map((p) => ({ key: PORTIONS_PREFIX + p.food, value: p.sizes })));

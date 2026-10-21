@@ -24,7 +24,7 @@ import type { RawValue } from '../model/types';
 import type { SkinExposure } from '../model/sun';
 import { excludedFoods, type RecipeInfo } from '../logic/recipeIdeas';
 import { stockAmount } from '../logic/pantry';
-import { ACTIVITY_KINDS, HOME_PLACES, INTENSITIES, type ActivityKind, type FoodRef, type HomePlace, type Ingredient, type Intensity, type Product, type Profile } from '../storage/types';
+import { ACTIVITY_KINDS, HOME_PLACES, INTENSITIES, type ActivityKind, type FoodRef, type HomePlace, type Ingredient, type Intensity, type KetoneType, type Product, type Profile } from '../storage/types';
 
 export const PREPARATIONS = ['asListed', 'raw', 'boiled', 'steamed', 'baked', 'fried'] as const satisfies readonly Preparation[];
 const SKIN_EXPOSURES = ['faceHands', 'faceHandsForearms', 'faceHandsArms', 'armsLegs', 'mostOfBody'] as const satisfies readonly SkinExposure[];
@@ -197,6 +197,23 @@ export interface WaterProposal {
   replaces?: string;
 }
 
+export const ketoneProposalInput = z.object({
+  type: z.enum(['blood', 'breath', 'urine']),
+  value: z.number(),
+  /** Local "YYYY-MM-DD HH:MM" it was measured; empty for now. */
+  time: z.string().optional(),
+  /** Id of the open ketone card this replaces (e.g. "K1"); empty for a new one. */
+  replaces: z.string().optional(),
+});
+
+/** A ketone measurement the assistant proposes, for the user to check. */
+export interface KetoneProposal {
+  type: KetoneType;
+  value: number;
+  time?: number;
+  replaces?: string;
+}
+
 export const shoppingProposalInput = z.object({
   /** Things to buy, in the user's words, with an amount only when they said one. */
   items: z.array(z.object({ name: z.string(), amount: z.string().optional() })).default([]),
@@ -348,6 +365,8 @@ export interface ToolContext {
   activity?: boolean;
   /** Water is on: the assistant may propose plain water. */
   water?: boolean;
+  /** The ketosis estimate is on: the assistant may propose ketone measurements. */
+  ketones?: boolean;
   /** The shopping list is on: the assistant may propose things to put on it. */
   shopping?: boolean;
   /** At home is on: the assistant may propose things bought or running low, and search_foods marks what is at home (by refKey). */
@@ -381,7 +400,7 @@ export interface IdeaTools {
 }
 
 /** Which online sources the assistant is offered (decides the prompt and tool variant). */
-export function sourcesOf(ctx: Pick<ToolContext, 'products' | 'journal' | 'sleep' | 'activity' | 'water' | 'shopping' | 'pantry' | 'recipe' | 'recipes'>): {
+export function sourcesOf(ctx: Pick<ToolContext, 'products' | 'journal' | 'sleep' | 'activity' | 'water' | 'ketones' | 'shopping' | 'pantry' | 'recipe' | 'recipes'>): {
   off: boolean;
   usda: boolean;
   webSearch: boolean;
@@ -389,6 +408,7 @@ export function sourcesOf(ctx: Pick<ToolContext, 'products' | 'journal' | 'sleep
   sleep: boolean;
   activity: boolean;
   water: boolean;
+  ketones: boolean;
   shopping: boolean;
   pantry: boolean;
   recipe: boolean;
@@ -397,13 +417,14 @@ export function sourcesOf(ctx: Pick<ToolContext, 'products' | 'journal' | 'sleep
 } {
   const { products } = ctx;
   const online = { off: !!products?.find, usda: !!products?.searchUsda, webSearch: !!products?.find && !!products.webSearch };
-  if (ctx.recipe) return { ...online, journal: false, sleep: false, activity: false, water: false, shopping: false, pantry: false, recipe: true, recipes: false, ideas: false };
+  if (ctx.recipe) return { ...online, journal: false, sleep: false, activity: false, water: false, ketones: false, shopping: false, pantry: false, recipe: true, recipes: false, ideas: false };
   return {
     ...online,
     journal: !!ctx.journal,
     sleep: !!ctx.sleep,
     activity: !!ctx.activity,
     water: !!ctx.water,
+    ketones: !!ctx.ketones,
     shopping: !!ctx.shopping,
     pantry: !!ctx.pantry,
     recipe: false,
@@ -603,6 +624,24 @@ export function validateWaterProposal(input: unknown, now?: number): { ok: true;
   if (problems.length) return { ok: false, error: `${problems.join('\n')}\nFix these and call propose_water again.` };
   const replaces = parsed.data.replaces?.trim();
   return { ok: true, proposal: { ml: Math.round(ml), ...(time !== undefined ? { time } : {}), ...(replaces ? { replaces } : {}) } };
+}
+
+/** Input check against unit mix-ups (e.g. mg/dL for mmol/L), not physiology: values above these are sent back to the assistant to check. */
+const MAX_KETONE: Record<KetoneType, number> = { blood: 10, breath: 500, urine: 16 };
+
+/** Check a `propose_ketone` call: a value in the method's own unit, at a plausible time. */
+export function validateKetoneProposal(input: unknown, now?: number): { ok: true; proposal: KetoneProposal } | { ok: false; error: string } {
+  const parsed = ketoneProposalInput.safeParse(input);
+  if (!parsed.success) return { ok: false, error: `Invalid input: ${parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}` };
+  const problems: string[] = [];
+  const { type, value } = parsed.data;
+  if (!(value >= 0)) problems.push('value must be 0 or more.');
+  else if (value > MAX_KETONE[type]) problems.push(`value ${value} is not a plausible ${type} reading (more than ${MAX_KETONE[type]}); check the unit: blood in mmol/L, breath in ppm, urine in mmol/L as the strip reads.`);
+  const { time, problem } = checkTime(parsed.data.time, now);
+  if (problem) problems.push(problem);
+  if (problems.length) return { ok: false, error: `${problems.join('\n')}\nFix these and call propose_ketone again.` };
+  const replaces = parsed.data.replaces?.trim();
+  return { ok: true, proposal: { type, value, ...(time !== undefined ? { time } : {}), ...(replaces ? { replaces } : {}) } };
 }
 
 /** Check a `propose_shopping` call: something to buy, and recipes that are in the book. */

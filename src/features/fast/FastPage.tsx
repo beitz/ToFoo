@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useData } from '../../app/data';
 import { href } from '../../app/router';
 import { t, type MessageKey } from '../../i18n';
@@ -7,6 +8,9 @@ import type { Cited, Confidence } from '../../model/paramTypes';
 import { ketosis } from '../../../model/parameters';
 import { Icon } from '../../ui/Icon';
 import { KetosisChart } from './KetosisChart';
+import { KetoneSheet } from './KetoneSheet';
+import { agoText, KETONE_TYPE_KEY, ketoneValueText } from './ketoneFormat';
+import type { KetoneReading } from '../../storage/types';
 import { fmtBhbRange, fmtFastDuration, PHASE_KEY, useFast } from './useFast';
 import { BackButton } from '../../ui/BackButton';
 
@@ -22,6 +26,9 @@ const SOURCE_ROWS: ReadonlyArray<readonly [keyof typeof ketosis, MessageKey]> = 
   ['femaleRiseFactor', 'fast.src.femaleRiseFactor'],
   ['obeseRiseFactor', 'fast.src.obeseRiseFactor'],
   ['phases', 'fast.src.phases'],
+  ['personal', 'fast.src.personal'],
+  ['meterMaxMmol', 'fast.src.meterMaxMmol'],
+  ['highNoteMmol', 'fast.src.highNoteMmol'],
 ];
 
 const CONFIDENCE_KEY: Record<Confidence, MessageKey> = {
@@ -47,6 +54,8 @@ function factorText(f: KetosisFactor): string {
       return t('fast.factor.bmi', { bmi: f.bmi.toFixed(1) });
     case 'bmiUnknown':
       return t('fast.factor.bmiUnknown');
+    case 'personal':
+      return t(f.hours >= 0 ? 'fast.factor.personalEarlier' : 'fast.factor.personalLater', { h: Math.abs(Math.round(f.hours)), n: f.readings });
   }
 }
 
@@ -54,6 +63,10 @@ function factorText(f: KetosisFactor): string {
 export function FastPage() {
   const d = useData();
   const f = useFast();
+  const [sheet, setSheet] = useState<{ reading?: KetoneReading } | null>(null);
+  const latest = f?.readings[f.readings.length - 1];
+  const high = f?.readings.some((r) => r.type === 'blood' && r.value > ketosis.highNoteMmol.value);
+  const dots = f ? f.readings.filter((r) => r.type === 'blood').map((r) => ({ hours: (r.time - f.clock.since) / 3_600_000, mmol: Math.min(r.value, ketosis.meterMaxMmol.value * 2) })) : [];
 
   return (
     <section>
@@ -81,8 +94,38 @@ export function FastPage() {
               <p>
                 {t('fast.bhbNow', { range: fmtBhbRange(f.estimate.bhb.low, f.estimate.bhb.high) })}
               </p>
-              <KetosisChart input={f.input} />
+              {latest && (
+                <p className="fast-measured">
+                  {t('fast.measured', { value: ketoneValueText(latest), type: t(KETONE_TYPE_KEY[latest.type]), ago: agoText(latest.time, f.now) })}
+                </p>
+              )}
+              {high && (
+                <p className="notice small" role="alert">
+                  {t('fast.highNote', { v: ketosis.highNoteMmol.value })}
+                </p>
+              )}
+              <KetosisChart input={f.input} dots={dots} />
               <p className="muted small">{t('fast.chart.caption')}</p>
+
+              <h3 className="fast-sub">{t('fast.measureTitle')}</h3>
+              {f.readings.length > 0 && (
+                <ul className="plain-list fast-readings">
+                  {[...f.readings].reverse().map((r) => (
+                    <li key={r.id}>
+                      <button className="entry-row" onClick={() => setSheet({ reading: r })}>
+                        <span>
+                          {formatDay(r.day, d.today)}, {formatTime(r.time)} · {t(KETONE_TYPE_KEY[r.type])}
+                        </span>
+                        <strong>{ketoneValueText(r)}</strong>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <button className="btn" onClick={() => setSheet({})}>
+                <Icon name="plus" size={18} /> {t('fast.addMeasurement')}
+              </button>
+              {!f.input.personal && <p className="muted small">{t('fast.personalHint', { n: ketosis.personal.value.minReadings })}</p>}
 
               <h3 className="fast-sub">{t('fast.movedTitle')}</h3>
               <ul className="fast-factors">
@@ -126,6 +169,7 @@ export function FastPage() {
           )}
         </>
       )}
+      {sheet && <KetoneSheet reading={sheet.reading} onClose={() => setSheet(null)} />}
     </section>
   );
 }

@@ -100,6 +100,10 @@ const snapshot: Snapshot = {
     { id: 'h3', schemaVersion: 1, name: 'Milk', place: 'fridge', amount: '1 l', since: 16, addedAt: 16 },
     { id: 'h4', schemaVersion: 1, name: 'Cumin', place: 'spices', status: 'low', since: 16, addedAt: 16 },
   ],
+  ketones: [
+    { id: 'k1', schemaVersion: 1, time: 17, day: '2026-10-21', type: 'blood', value: 1.4 },
+    { id: 'k2', schemaVersion: 1, time: 18, day: '2026-10-21', type: 'breath', value: 12 },
+  ],
   portionSizes: [{ food: 'C133000', sizes: [{ label: 'My bowl', grams: 60 }] }],
 };
 
@@ -114,8 +118,8 @@ describe('exchange format', () => {
     }
   });
 
-  it('reads backups made before products, the journal, sleep, activities, water, the shopping list and the At home list existed', () => {
-    const { products: _products, journal: _journal, sleep: _sleep, activities: _activities, water: _water, shopping: _shopping, pantry: _pantry, portionSizes: _sizes, ...older } = snapshot;
+  it('reads backups made before products, the journal, sleep, activities, water, the shopping list, the At home list and ketone measurements existed', () => {
+    const { products: _products, journal: _journal, sleep: _sleep, activities: _activities, water: _water, shopping: _shopping, pantry: _pantry, ketones: _ketones, portionSizes: _sizes, ...older } = snapshot;
     const parsed = parseExchange(JSON.stringify(buildBackup({ ...older, log: snapshot.log.slice(0, 2) } as Snapshot, '0.1.0', new Date())));
     expect(parsed.ok && parsed.value.type === 'backup' && parsed.value.data.products).toEqual([]);
     expect(parsed.ok && parsed.value.type === 'backup' && parsed.value.data.journal).toEqual([]);
@@ -124,6 +128,7 @@ describe('exchange format', () => {
     expect(parsed.ok && parsed.value.type === 'backup' && parsed.value.data.water).toEqual([]);
     expect(parsed.ok && parsed.value.type === 'backup' && parsed.value.data.shopping).toEqual([]);
     expect(parsed.ok && parsed.value.type === 'backup' && parsed.value.data.pantry).toEqual([]);
+    expect(parsed.ok && parsed.value.type === 'backup' && parsed.value.data.ketones).toEqual([]);
     // Left missing, so restoring an older backup keeps the portion sizes on the phone.
     expect(parsed.ok && parsed.value.type === 'backup' && parsed.value.data.portionSizes).toBeUndefined();
   });

@@ -5,10 +5,10 @@
  */
 import { ketosis } from '../../model/parameters';
 import { entryIntake } from '../model/intake';
-import type { KetosisInput } from '../model/ketosis';
+import { personalShift, type KetosisInput, type PersonalShift } from '../model/ketosis';
 import type { ModelEntry } from '../model/types';
 import { addDays, parseDay } from '../lib/dates';
-import type { ActivityRecord, CustomFood, Fast, LogEntry, Profile } from '../storage/types';
+import type { ActivityRecord, CustomFood, Fast, KetoneReading, LogEntry, Profile } from '../storage/types';
 import { breaksFast } from './resolve';
 
 export interface FastClock {
@@ -82,4 +82,53 @@ export function ketosisInput(args: {
     sex: args.profile.sex,
     bmi: bodyMassIndex(args.weightKg, args.profile.heightCm),
   };
+}
+
+/**
+ * When a fast's clock stops: the first food logged after its last meal, else the end of its last
+ * day when it was ended by hand; undefined while it runs.
+ */
+export function fastEnd(fast: Fast, clock: FastClock, log: readonly LogEntry[], customFoods: ReadonlyMap<string, CustomFood>): number | undefined {
+  const next = log.filter((e) => e.time > clock.since && breaksFast(e, customFoods)).reduce<number | undefined>((m, e) => (m === undefined || e.time < m ? e.time : m), undefined);
+  if (next !== undefined) return next;
+  if (!fast.endDay) return undefined;
+  const end = parseDay(addDays(fast.endDay, 1));
+  end.setHours(0, 0, 0, 0);
+  return end.getTime();
+}
+
+interface ReadingContext {
+  fasts: readonly Fast[];
+  log: readonly LogEntry[];
+  customFoods: ReadonlyMap<string, CustomFood>;
+  mealWindowMinutes: number;
+  entries: ReadonlyMap<string, ModelEntry>;
+  activities: readonly ActivityRecord[];
+  profile: Pick<Profile, 'sex' | 'heightCm'>;
+  weightKg: number | undefined;
+}
+
+/**
+ * Blood readings taken during fasts (from the meal before the fast until the next food), each with
+ * the estimate's input at the time it was taken. Only fasts that count from a logged meal: without
+ * one, the hours are not known.
+ */
+export function bloodReadingsInFasts(readings: readonly KetoneReading[], c: ReadingContext): Array<{ reading: KetoneReading; input: KetosisInput }> {
+  const out: Array<{ reading: KetoneReading; input: KetosisInput }> = [];
+  const blood = readings.filter((r) => r.type === 'blood');
+  for (const fast of c.fasts) {
+    const clock = fastClock(fast, c.log, c.customFoods, c.mealWindowMinutes);
+    if (!clock.fromMeal) continue;
+    const end = fastEnd(fast, clock, c.log, c.customFoods) ?? Infinity;
+    for (const r of blood) {
+      if (r.time < clock.since || r.time >= end) continue;
+      out.push({ reading: r, input: ketosisInput({ clock, now: r.time, entries: c.entries, activities: c.activities, profile: c.profile, weightKg: c.weightKg }) });
+    }
+  }
+  return out.sort((a, b) => a.reading.time - b.reading.time);
+}
+
+/** The user's own timing from all their blood readings during fasts (null until there are enough). */
+export function personalTiming(readings: readonly KetoneReading[], c: ReadingContext): PersonalShift | null {
+  return personalShift(bloodReadingsInFasts(readings, c).map(({ reading, input }) => ({ input, mmol: reading.value })));
 }
