@@ -11,6 +11,8 @@ export type RawValue = number | null | 't';
 /** One food inside an entry: a single food, or one ingredient of a recipe portion. */
 export interface FoodPart {
   label: string;
+  /** The food's code (BLS code, or a product id like `OFF:<barcode>`), to show where its values come from. */
+  code?: string;
   /** Grams eaten (for a recipe portion: this ingredient's grams ÷ portions). */
   grams: number;
   /** Values per 100 g by nutrient id (incl. derived ids and RETOL/FOLAC). */

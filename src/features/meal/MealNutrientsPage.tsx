@@ -1,10 +1,12 @@
-import { Fragment, useMemo, useState } from 'react';
+import { Fragment, useMemo, useState, type ReactNode } from 'react';
 import { useData, type AppData } from '../../app/data';
 import { href } from '../../app/router';
-import { t } from '../../i18n';
-import { formatDay, formatTime } from '../../lib/dates';
+import { t, type MessageKey } from '../../i18n';
+import { dayKey, formatDay, formatTime } from '../../lib/dates';
 import { fmtAmount, fmtGrams, fmtPercent } from '../../lib/format';
-import { biggestShares, breakdown, shareRows, type Piece, type ShareRow } from '../../logic/mealNutrients';
+import { biggestShares, breakdown, composition, entryWeight, shareRows, type Basis, type Breakdown, type Composition, type Piece, type ShareRow } from '../../logic/mealNutrients';
+import { hasOwnMicros, isProductCode, productPageUrl } from '../../foods/products';
+import { refKey } from '../../lib/refs';
 import { NUTRIENTS, NUTRIENT_BY_ID } from '../../model/nutrients';
 import { groupMeals } from '../../model/simulate';
 import type { ModelEntry } from '../../model/types';
@@ -19,6 +21,9 @@ import { entryAmount } from '../log/describe';
 
 const MACROS = ['PROT625', 'FAT', 'CHO', 'FIBT'];
 
+/** The BLS 4.0 dataset (Max Rubner-Institut), as cited in data/README.md. */
+const BLS_URL = 'https://doi.org/10.25826/Data20251217-134202-0';
+
 /** The diary's meal (same grouping) that holds this entry. */
 function mealOf(d: AppData, entry: LogEntry): LogEntry[] {
   const meals = groupMeals(
@@ -26,6 +31,30 @@ function mealOf(d: AppData, entry: LogEntry): LogEntry[] {
     d.settings.mealWindowMinutes,
   );
   return meals.find((m) => m.some((e) => e.id === entry.id)) ?? [entry];
+}
+
+/** What an entry weighed (see entryWeight); a drink mark weighs nothing and gives nothing. */
+function weightOf(d: AppData, e: LogEntry, model: ModelEntry | undefined): Weight | 'none' {
+  if (e.kind === 'drink') return 'none';
+  return entryWeight(e, {
+    batch: e.kind === 'portion' ? d.batchesById.get(e.batchId) : undefined,
+    custom: e.kind === 'custom' ? d.customFoodsById.get(e.customFoodId) : undefined,
+    parts: model?.parts,
+  });
+}
+
+/** A meal's weight: the sum of its items', unknown when one of them is. */
+function mealWeight(d: AppData, meal: readonly LogEntry[], entries: ReadonlyMap<string, ModelEntry>): Weight {
+  let grams = 0;
+  let raw = false;
+  for (const e of meal) {
+    const w = weightOf(d, e, entries.get(e.id));
+    if (w === 'none') continue;
+    if (!w) return undefined;
+    grams += w.grams;
+    raw ||= w.raw;
+  }
+  return grams > 0 ? { grams, raw } : undefined;
 }
 
 /** Amounts and absorbed amounts of some pieces of the log (see logic/mealNutrients.ts). */
@@ -104,7 +133,7 @@ export function MealNutrientsPage({ entryId }: { entryId: string }) {
           })}
         </ul>
       </div>
-      <NutrientBreakdown b={b} />
+      <NutrientBreakdown b={b} weight={mealWeight(d, meal, entries)} />
     </section>
   );
 }
@@ -122,7 +151,10 @@ export function EntryNutrientsPage({ entryId, part: partParam }: { entryId: stri
   if (part !== undefined && !ingredient) return <NotFound />;
   const meal = mealOf(d, entry);
   const parts = part === undefined && model && model.parts.length > 1 ? model.parts : [];
-  const foodCode = ingredient ? undefined : entry.kind === 'food' && entry.ref.source === 'BLS' ? entry.ref.code : undefined;
+  // The food behind the item: the ingredient's, or the logged food's (BLS code or product id).
+  const code = ingredient ? ingredient.code : entry.kind === 'food' ? (entry.ref.source === 'BLS' ? entry.ref.code : refKey(entry.ref)) : undefined;
+  const w = ingredient ? { grams: ingredient.grams, raw: false } : weightOf(d, entry, model);
+  const weight = w === 'none' ? undefined : w;
   return (
     <section>
       <Header title={ingredient ? ingredient.label : entry.label} />
@@ -141,17 +173,13 @@ export function EntryNutrientsPage({ entryId, part: partParam }: { entryId: stri
             </a>
           )
         )}
-        {foodCode && (
-          <a className="btn btn-small btn-ghost" href={href('food', foodCode)}>
-            <Icon name="search" size={16} /> {t('mealNutrients.per100')}
-          </a>
-        )}
         {!ingredient && (
           <button className="btn btn-small btn-ghost" onClick={() => setEditing(true)}>
             <Icon name="edit" size={16} /> {t('mealNutrients.edit')}
           </button>
         )}
       </div>
+      <ItemSource code={code} entry={entry} />
       {entry.kind === 'drink' && <p className="small notice">{t('mealNutrients.drink')}</p>}
       {parts.length > 0 && (
         <>
@@ -179,7 +207,7 @@ export function EntryNutrientsPage({ entryId, part: partParam }: { entryId: stri
           </div>
         </>
       )}
-      {entry.kind !== 'drink' && <NutrientBreakdown b={b} />}
+      {entry.kind !== 'drink' && <NutrientBreakdown b={b} weight={weight} />}
       {editing && <EditEntrySheet entry={entry} nutrientsLink={false} onClose={() => setEditing(false)} />}
     </section>
   );
@@ -187,39 +215,79 @@ export function EntryNutrientsPage({ entryId, part: partParam }: { entryId: stri
 
 type Order = 'type' | 'share';
 
-/** Energy and macros at a glance, the nutrients it covers most of, then every nutrient with its share of the day. */
-function NutrientBreakdown({ b }: { b: ReturnType<typeof breakdown> }) {
+/** What the page weighs the pieces at, for "per 100 g". */
+export type Weight = { grams: number; raw: boolean } | undefined;
+
+/**
+ * The item's make-up per 100 g (default, when its weight is known) or its share of the day; the
+ * energy and macros at a glance; then every nutrient with data, grouped by type or by biggest share.
+ */
+function NutrientBreakdown({ b, weight }: { b: Breakdown; weight: Weight }) {
   const d = useData();
+  const [chosen, setBasis] = useState<Basis>('per100');
   const [order, setOrder] = useState<Order>('type');
+  const [showEmpty, setShowEmpty] = useState(false);
+  const basis: Basis = weight ? chosen : 'day';
+  const per100 = basis === 'per100';
   const hidden = new Set(d.settings.hiddenNutrients);
   const ids = NUTRIENTS.map((n) => n.id).filter((id) => !hidden.has(id));
-  const rows = shareRows(b, ids, d.requirements);
+  const rows = shareRows(b, ids, d.requirements, basis, weight?.grams);
   const byId = new Map(rows.map((r) => [r.id, r]));
   const energy = byId.get('ENERCC');
+  const eatenKcal = b.intake.ENERCC;
   const top = biggestShares(rows);
   const sorted = order === 'type' ? rows : [...rows].sort(byShare);
+  // Nothing known at all (e.g. amino acids for a product whose label gives only protein): hidden unless asked for.
+  const empty = rows.filter((r) => r.noData).length;
+  const shown = showEmpty ? sorted : sorted.filter((r) => !r.noData);
+  const make = per100 && weight ? composition(b, weight.grams) : undefined;
 
   return (
     <>
+      {weight && (
+        <Segmented<Basis>
+          label={t('mealNutrients.basis')}
+          value={basis}
+          onChange={setBasis}
+          options={[
+            { value: 'per100', label: t('mealNutrients.per100Basis') },
+            { value: 'day', label: t('mealNutrients.dayBasis') },
+          ]}
+        />
+      )}
       <div className="card meal-summary">
         {energy && (
           <p className="meal-energy">
             <strong>{amountText(energy)}</strong>
-            {energy.share !== undefined && <span className="muted small"> · {t('mealNutrients.ofEnergy', { pct: fmtPercent(energy.share) })}</span>}
+            {per100 ? (
+              <span className="muted small">
+                {' '}
+                {t('mealNutrients.per100Short')}
+                {eatenKcal !== undefined && weight ? ` · ${t('mealNutrients.youHad', { grams: fmtGrams(weight.grams), kcal: fmtAmount('ENERCC', eatenKcal) })}` : ''}
+              </span>
+            ) : (
+              energy.share !== undefined && <span className="muted small"> · {t('mealNutrients.ofEnergy', { pct: fmtPercent(energy.share) })}</span>
+            )}
           </p>
         )}
-        <p className="small">
-          {MACROS.map((id) => byId.get(id))
-            .filter((r): r is ShareRow => !!r)
-            .map((r) => `${NUTRIENT_BY_ID.get(r.id)?.short ?? r.id} ${amountText(r)}`)
-            .join(' · ')}
-        </p>
+        {make ? (
+          <MakeUp c={make} />
+        ) : (
+          <p className="small">
+            {MACROS.map((id) => byId.get(id))
+              .filter((r): r is ShareRow => !!r)
+              .map((r) => `${NUTRIENT_BY_ID.get(r.id)?.short ?? r.id} ${amountText(r)}`)
+              .join(' · ')}
+          </p>
+        )}
         {top.length > 0 && (
           <p className="small">
-            {t('mealNutrients.most')}: {top.map((r) => `${NUTRIENT_BY_ID.get(r.id)?.short ?? r.id} ${fmtPercent(r.share!)}`).join(', ')}
+            {t(per100 ? 'mealNutrients.richest' : 'mealNutrients.most')}: {top.map((r) => `${NUTRIENT_BY_ID.get(r.id)?.short ?? r.id} ${fmtPercent(r.share!)}`).join(', ')}
           </p>
         )}
-        {!b.absorbedKnown && <p className="small muted">{t('mealNutrients.tooOld')}</p>}
+        {per100 && weight?.raw && <p className="small muted">{t('mealNutrients.rawWeight')}</p>}
+        {!per100 && !b.absorbedKnown && <p className="small muted">{t('mealNutrients.tooOld')}</p>}
+        {!weight && <p className="small muted">{t('mealNutrients.noWeight')}</p>}
         {b.unresolved > 0 && <p className="small notice">{t('mealNutrients.unresolved', { n: b.unresolved })}</p>}
       </div>
 
@@ -233,9 +301,9 @@ function NutrientBreakdown({ b }: { b: ReturnType<typeof breakdown> }) {
         ]}
       />
       <div className="card mrow-list">
-        {sorted.map((r, i) => {
+        {shown.map((r, i) => {
           const group = nutrientType(r.id);
-          const startsGroup = order === 'type' && hasGroupInfo(group) && (i === 0 || nutrientType(sorted[i - 1]!.id) !== group);
+          const startsGroup = order === 'type' && hasGroupInfo(group) && (i === 0 || nutrientType(shown[i - 1]!.id) !== group);
           return (
             <Fragment key={r.id}>
               {startsGroup && (
@@ -244,17 +312,51 @@ function NutrientBreakdown({ b }: { b: ReturnType<typeof breakdown> }) {
                   <GroupInfoButton group={group} />
                 </div>
               )}
-              <ShareLine row={r} />
+              <ShareLine row={r} basis={basis} />
             </Fragment>
           );
         })}
+        {empty > 0 && (
+          <button className="btn btn-small btn-ghost" onClick={() => setShowEmpty(!showEmpty)}>
+            {showEmpty ? t('mealNutrients.hideEmpty') : t('mealNutrients.showEmpty', { n: empty })}
+          </button>
+        )}
       </div>
-      <p className="muted small">{t('mealNutrients.legend')}</p>
+      <p className="muted small">{t(per100 ? 'mealNutrients.legendPer100' : 'mealNutrients.legend')}</p>
     </>
   );
 }
 
-/** Biggest share of the need first, then limits, then amounts only, then nothing known. */
+const MAKE_UP_LABEL: Record<Composition['parts'][number]['id'], MessageKey> = {
+  CHO: 'mealNutrients.carbs',
+  PROT625: 'mealNutrients.protein',
+  FAT: 'mealNutrients.fat',
+  FIBT: 'mealNutrients.fibre',
+};
+
+/** One bar of what 100 g is made of (carbs, protein, fat, fibre, the rest), with the same in words. */
+function MakeUp({ c }: { c: Composition }) {
+  const pct = (v: number) => (v > 0 && v < 0.005 ? '<1%' : fmtPercent(v));
+  const words = c.parts.map((p) => {
+    const name = t(MAKE_UP_LABEL[p.id]);
+    if (p.noData) return t('mealNutrients.partNoData', { name });
+    const sugar = p.id === 'CHO' && c.sugar !== undefined && c.sugar > 0 ? ` (${t('mealNutrients.ofWhichSugar', { pct: pct(c.sugar) })})` : '';
+    return `${p.partial ? '≥ ' : ''}${pct(p.share)} ${name}${sugar}`;
+  });
+  if (c.rest !== undefined) words.push(`${pct(c.rest)} ${t('mealNutrients.rest')}`);
+  return (
+    <>
+      <span className="makeup-bar" aria-hidden>
+        {c.parts.map((p) => (
+          <span key={p.id} className={`makeup-${p.id}`} style={{ width: `${p.share * 100}%` }} />
+        ))}
+      </span>
+      <p className="small">{words.join(' · ')}</p>
+    </>
+  );
+}
+
+/** Biggest share first, then limits, then amounts only, then nothing known. */
 function byShare(a: ShareRow, b: ShareRow): number {
   const rank = (r: ShareRow) => (r.noData ? 3 : r.kind === 'need' ? 0 : r.kind === 'limit' ? 1 : 2);
   return rank(a) - rank(b) || (b.share ?? b.amount) - (a.share ?? a.amount);
@@ -266,15 +368,14 @@ function amountText(r: ShareRow): string {
   return `${r.partial ? '≥ ' : ''}${fmtAmount(r.id, r.amount)}`;
 }
 
-/** Name, amount, a bar for the share of the day (full = the whole day's need or limit) and the share. */
-function ShareLine({ row: r }: { row: ShareRow }) {
+/** Name, amount, a bar for the share (full = a whole day's need or limit) and the share. */
+function ShareLine({ row: r, basis }: { row: ShareRow; basis: Basis }) {
   const def = NUTRIENT_BY_ID.get(r.id);
   const name = def?.short ?? r.id;
   const share = r.share;
   const pct = share === undefined ? '' : `${r.partial ? '≥ ' : ''}${fmtPercent(share)}`;
-  const spoken = [def?.name ?? r.id, amountText(r) === '–' ? t('gauge.noData') : amountText(r), pct && (r.kind === 'limit' ? t('gauge.ofMax', { pct }) : t('mealNutrients.ofDay', { pct }))]
-    .filter(Boolean)
-    .join(', ');
+  const ofWhat = r.kind === 'limit' ? t('gauge.ofMax', { pct }) : t(basis === 'per100' ? 'mealNutrients.ofReference' : 'mealNutrients.ofDay', { pct });
+  const spoken = [def?.name ?? r.id, amountText(r) === '–' ? t('gauge.noData') : amountText(r), pct && ofWhat].filter(Boolean).join(', ');
   return (
     <a className={`mrow mrow-${r.kind}`} href={href('nutrient', r.id)} aria-label={spoken}>
       <span className="mrow-name">{name}</span>
@@ -293,5 +394,83 @@ function ShareLine({ row: r }: { row: ShareRow }) {
         {pct && r.kind === 'limit' && <small> {t('gauge.ofMaxShort')}</small>}
       </span>
     </a>
+  );
+}
+
+/** Where an item's numbers come from, one line until opened: the database or label, with links. */
+function ItemSource({ code, entry }: { code?: string; entry: LogEntry }) {
+  const d = useData();
+  const product = code && isProductCode(code) ? d.productsById.get(code) : undefined;
+  const food = code && !product ? d.foods.byCode.get(code) : undefined;
+  const batch = !code && entry.kind === 'portion' ? d.batchesById.get(entry.batchId) : undefined;
+  const custom = !code && entry.kind === 'custom' ? d.customFoodsById.get(entry.customFoodId) : undefined;
+
+  let summary: string;
+  let body: ReactNode;
+  if (product) {
+    const match = product.match ? d.foods.byCode.get(product.match.code) : undefined;
+    const own = Object.keys(product.per100)
+      .map((id) => NUTRIENT_BY_ID.get(id)?.short)
+      .filter((n): n is string => !!n);
+    const off = product.source === 'OFF';
+    const generic = hasOwnMicros(product);
+    summary = t(off ? 'source.offSummary' : generic ? 'source.usdaGenericSummary' : 'source.usdaSummary') + (match ? ` + BLS` : '');
+    body = (
+      <>
+        <p>
+          <a href={productPageUrl(product)} target="_blank" rel="noreferrer">
+            {t(off ? 'source.offPage' : 'source.usdaPage', { code: product.code })}
+          </a>{' '}
+          <span className="muted">· {t('source.fetched', { day: formatDay(dayKey(new Date(product.fetchedAt)), d.today) })}</span>
+        </p>
+        <p>{generic ? t('source.usdaOwn', { n: own.length }) : t('source.labelValues', { list: own.join(', ') || '–' })}</p>
+        <p>
+          {match ? (
+            <>
+              {t(generic ? 'source.gapsFrom' : 'source.restFrom')} <a href={href('food', match.code)}>{match.nameEn}</a> <span className="muted">(BLS {match.code})</span>
+            </>
+          ) : (
+            t(generic ? 'source.noMatchGeneric' : 'source.noMatch')
+          )}
+        </p>
+      </>
+    );
+  } else if (food) {
+    summary = t('source.blsSummary');
+    body = (
+      <>
+        <p>
+          {t('source.blsDetail', { code: food.code })} · {food.nameDe}
+        </p>
+        <p>
+          <a href={href('food', food.code)}>{t('source.blsFood')}</a> ·{' '}
+          <a href={BLS_URL} target="_blank" rel="noreferrer">
+            {t('source.blsAbout')}
+          </a>
+        </p>
+      </>
+    );
+  } else if (batch) {
+    summary = t('source.recipeSummary');
+    body = (
+      <p>
+        {t('source.recipe')} <a href={href('recipes', batch.recipeId)}>{batch.recipe.name}</a>
+      </p>
+    );
+  } else if (custom) {
+    summary = t('source.customSummary');
+    body = <p>{t('source.customDetail', { name: custom.name })}</p>;
+  } else if (entry.kind === 'manual') {
+    summary = t('source.manualSummary');
+    body = <p>{t('source.manual')}</p>;
+  } else return null;
+
+  return (
+    <details className="card small item-source">
+      <summary>
+        <span className="muted">{t('source.title')}:</span> {summary}
+      </summary>
+      {body}
+    </details>
   );
 }

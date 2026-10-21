@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { MealSummary } from '../model/simulate';
 import type { FoodPart, ModelEntry } from '../model/types';
-import { biggestShares, breakdown, shareRows } from './mealNutrients';
+import type { LogEntry } from '../storage/types';
+import { biggestShares, breakdown, composition, entryWeight, shareRows } from './mealNutrients';
 
 const part = (label: string, grams: number, per100: FoodPart['per100']): FoodPart => ({ label, grams, per100, preparation: 'raw', storage: 'fresh' });
 const entry = (id: string, parts: FoodPart[], extra: Partial<ModelEntry> = {}): ModelEntry => ({
@@ -100,5 +101,37 @@ describe('nutrients of one meal', () => {
   it('names the biggest shares of the need, leaving out energy and limits', () => {
     const rows = shareRows(breakdown([{ entryId: 'nuts' }, { entryId: 'orange' }], entries, meals, opts), ['ENERCC', 'FE', 'VITC', 'NA'], requirements);
     expect(biggestShares(rows).map((r) => r.id)).toEqual(['VITC', 'FE']);
+  });
+
+  it('per 100 g: the item’s own make-up, against the reference intake (as on the food page)', () => {
+    const b = breakdown([{ entryId: 'nuts' }], entries, meals, opts);
+    const rows = shareRows(b, ['FE', 'NA', 'VITC'], requirements, 'per100', 50);
+    const by = new Map(rows.map((r) => [r.id, r]));
+    expect(by.get('FE')!.amount).toBeCloseTo(3); // 1.5 mg in 50 g
+    expect(by.get('FE')!.share).toBeCloseTo(0.3); // 3 mg of a 10 mg reference intake, not absorbed
+    expect(by.get('NA')!.share).toBeCloseTo(10 / 1500);
+    expect(by.get('VITC')!.noData).toBe(true);
+  });
+
+  it('what 100 g is made of, and nothing for the rest when a part is unknown', () => {
+    const b = { intake: { CHO: 17, SUGAR: 10, PROT625: 1.5, FAT: 0.1, FIBT: 0 }, absorbed: {}, missing: new Set<string>(), unresolved: 0, absorbedKnown: true };
+    const c = composition(b, 22)!;
+    expect(c.parts.find((p) => p.id === 'CHO')!.share).toBeCloseTo(17 / 22);
+    expect(c.sugar).toBeCloseTo(10 / 22);
+    expect(c.rest).toBeCloseTo(1 - 18.6 / 22);
+    const noFibre = composition({ ...b, intake: { ...b.intake, FIBT: undefined as never }, missing: new Set(['FIBT']) }, 22)!;
+    expect(noFibre.parts.find((p) => p.id === 'FIBT')!.noData).toBe(true);
+    expect(noFibre.rest).toBeUndefined();
+    expect(composition(b, 0)).toBeUndefined();
+  });
+
+  it('weighs an entry: grams, a share of the weighed pot, else the raw ingredients', () => {
+    const base = { id: 'x', time: 0, day: '2026-10-21', confidence: 'A', label: 'x', schemaVersion: 1 } as const;
+    expect(entryWeight({ ...base, kind: 'food', ref: { source: 'BLS', version: '4.0', code: 'X' }, grams: 22, preparation: 'raw' }, {})).toEqual({ grams: 22, raw: false });
+    const portion = { ...base, kind: 'portion', batchId: 'b', storage: 'fresh', portions: 1 } as LogEntry;
+    const recipe = { name: 'Curry', portions: 4, ingredients: [] };
+    expect(entryWeight(portion, { batch: { cookedGrams: 2000, recipe } })).toEqual({ grams: 500, raw: false });
+    expect(entryWeight(portion, { batch: { recipe }, parts: [{ grams: 75 }, { grams: 100 }] })).toEqual({ grams: 175, raw: true });
+    expect(entryWeight({ ...base, kind: 'manual', isSupplement: false, nutrients: {} } as LogEntry, {})).toBeUndefined();
   });
 });

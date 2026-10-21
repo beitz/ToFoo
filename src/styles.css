@@ -3541,3 +3541,40 @@ a.entry-row {
 .mrow-limit .nrow-fill {
   color: var(--unknown);
 }
+/* What 100 g is made of: one bar, the same in words below it (the colours only group, the words say it). */
+.makeup-bar {
+  display: flex;
+  height: 10px;
+  margin: 6px 0 2px;
+  border-radius: 5px;
+  overflow: hidden;
+  background: var(--surface-2);
+}
+.makeup-bar > span + span {
+  border-left: 2px solid var(--surface);
+}
+.makeup-CHO {
+  background: var(--accent);
+}
+.makeup-PROT625 {
+  background: var(--high);
+}
+.makeup-FAT {
+  background: var(--warn);
+}
+.makeup-FIBT {
+  background: var(--unknown);
+}
+.item-source summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+.item-source p {
+  margin: 4px 0;
+}
+.mrow-list > .btn {
+  margin-top: 4px;
+}
