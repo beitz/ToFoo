@@ -15,6 +15,7 @@ import type { MealSummary } from '../model/simulate';
 import type { FoodPart, ModelEntry } from '../model/types';
 import type { Batch, CustomFood, LogEntry } from '../storage/types';
 import { potShare } from './batch';
+import { BORROWED_PROVENANCE } from '../foods/products';
 
 /** One entry, or one ingredient (`part`, an index into the entry's parts) of a recipe portion. */
 export interface Piece {
@@ -33,6 +34,26 @@ export interface Breakdown {
   unresolved: number;
   /** Every piece belongs to a meal the model ran, so `absorbed` is complete. */
   absorbedKnown: boolean;
+  /** Where each nutrient's value comes from, per nutrient (several for a meal of foods from different databases). */
+  sources: Record<string, Set<SourceLetter>>;
+}
+
+/**
+ * Where a value comes from, as one letter: B the BLS, O Open Food Facts, U USDA FoodData Central,
+ * E entered by the user (a saved item or an entry by hand). A product's values borrowed from its
+ * similar BLS food count as B; a recipe portion's as its ingredients'.
+ */
+export type SourceLetter = 'B' | 'O' | 'U' | 'E';
+export const SOURCE_LETTERS: readonly SourceLetter[] = ['B', 'O', 'U', 'E'];
+
+/** The source of one food's value for one nutrient (none when it has no value). */
+export function partSource(part: Pick<FoodPart, 'code' | 'per100' | 'provenance'>, id: string): SourceLetter | undefined {
+  const v = part.per100[id];
+  if (v === null || v === undefined) return undefined;
+  const code = part.code ?? '';
+  const product = code.startsWith('OFF:') ? 'O' : code.startsWith('USDA:') ? 'U' : undefined;
+  if (!product) return 'B';
+  return part.provenance?.[id] === BORROWED_PROVENANCE ? 'B' : product;
 }
 
 const add = (rec: Record<string, number>, id: string, v: number) => {
@@ -43,7 +64,8 @@ const add = (rec: Record<string, number>, id: string, v: number) => {
 export function breakdown(pieces: readonly Piece[], entries: ReadonlyMap<string, ModelEntry>, meals: readonly MealSummary[], opts: { retention: boolean }): Breakdown {
   const mealOf = new Map<string, MealSummary>();
   for (const m of meals) for (const id of m.entryIds) mealOf.set(id, m);
-  const out: Breakdown = { intake: {}, absorbed: {}, missing: new Set(), unresolved: 0, absorbedKnown: true };
+  const out: Breakdown = { intake: {}, absorbed: {}, missing: new Set(), unresolved: 0, absorbedKnown: true, sources: {} };
+  const source = (id: string, letter: SourceLetter) => (out.sources[id] ??= new Set()).add(letter);
   for (const p of pieces) {
     const entry = entries.get(p.entryId);
     if (!entry) {
@@ -60,6 +82,14 @@ export function breakdown(pieces: readonly Piece[], entries: ReadonlyMap<string,
     const ei = entryIntake(piece, 'central', opts);
     for (const [id, v] of Object.entries(ei.intake)) add(out.intake, id, v);
     for (const id of ei.missing) out.missing.add(id);
+    for (const fp of piece.parts) {
+      if (!(fp.grams > 0)) continue;
+      for (const id of Object.keys(fp.per100)) {
+        const letter = partSource(fp, id);
+        if (letter) source(id, letter);
+      }
+    }
+    for (const id of Object.keys(piece.direct ?? {})) source(id, 'E');
     const meal = mealOf.get(entry.id);
     if (!meal) {
       out.absorbedKnown = false;
@@ -76,20 +106,20 @@ export function breakdown(pieces: readonly Piece[], entries: ReadonlyMap<string,
 export type ShareKind = 'need' | 'limit' | 'info';
 
 /**
- * What the rows compare against. 'per100': the item's own make-up per 100 g eaten, with its share of
- * the daily reference intake per 100 g, as on the food page. 'day': what was eaten, with its share
- * of the day's absorbed need, as on Home.
+ * What the rows compare against. 'serving': what was eaten (the 23 g logged), with its share of the
+ * daily reference intake, as on a label or the recipe page. 'per100': the same per 100 g of it, as on
+ * the food page. 'day': what was eaten, with its share of the day's absorbed need, as on Home.
  */
-export type Basis = 'per100' | 'day';
+export type Basis = 'serving' | 'per100' | 'day';
 
 export interface ShareRow {
   id: string;
   kind: ShareKind;
-  /** Intake after losses: what was eaten ('day') or per 100 g of it ('per100'). */
+  /** Intake after losses: what was eaten ('serving', 'day') or per 100 g of it ('per100'). */
   amount: number;
   /**
-   * 'day': absorbed ÷ absorbed need ('need'), intake ÷ limit ('limit'). 'per100': per-100 g amount ÷
-   * reference intake or limit. None for 'info' or when unknown.
+   * 'day': absorbed ÷ absorbed need ('need'), intake ÷ limit ('limit'). 'serving', 'per100': the
+   * amount ÷ reference intake or limit. None for 'info' or when unknown.
    */
   share?: number;
   /** Some piece has no data for it: the real amount may be higher ("≥"). */
@@ -109,7 +139,7 @@ export function shareRows(b: Breakdown, ids: readonly string[], req: Pick<Resolv
     const noData = missing && amount === 0;
     let share: number | undefined;
     if (!noData && r) {
-      if ((kind === 'limit' || basis === 'per100') && kind !== 'info' && r.recommended > 0) share = amount / r.recommended;
+      if (kind !== 'info' && (kind === 'limit' || basis !== 'day') && r.recommended > 0) share = amount / r.recommended;
       else if (kind === 'need' && r.physiological > 0 && b.absorbedKnown) share = (b.absorbed[id] ?? 0) / r.physiological;
     }
     return { id, kind, amount, share, partial: missing && !noData, noData };

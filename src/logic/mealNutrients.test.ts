@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { MealSummary } from '../model/simulate';
 import type { FoodPart, ModelEntry } from '../model/types';
 import type { LogEntry } from '../storage/types';
-import { biggestShares, breakdown, composition, entryWeight, shareRows } from './mealNutrients';
+import { biggestShares, breakdown, composition, entryWeight, partSource, shareRows } from './mealNutrients';
 
 const part = (label: string, grams: number, per100: FoodPart['per100']): FoodPart => ({ label, grams, per100, preparation: 'raw', storage: 'fresh' });
 const entry = (id: string, parts: FoodPart[], extra: Partial<ModelEntry> = {}): ModelEntry => ({
@@ -114,7 +114,7 @@ describe('nutrients of one meal', () => {
   });
 
   it('what 100 g is made of, and nothing for the rest when a part is unknown', () => {
-    const b = { intake: { CHO: 17, SUGAR: 10, PROT625: 1.5, FAT: 0.1, FIBT: 0 }, absorbed: {}, missing: new Set<string>(), unresolved: 0, absorbedKnown: true };
+    const b = { intake: { CHO: 17, SUGAR: 10, PROT625: 1.5, FAT: 0.1, FIBT: 0 }, absorbed: {}, missing: new Set<string>(), unresolved: 0, absorbedKnown: true, sources: {} };
     const c = composition(b, 22)!;
     expect(c.parts.find((p) => p.id === 'CHO')!.share).toBeCloseTo(17 / 22);
     expect(c.sugar).toBeCloseTo(10 / 22);
@@ -133,5 +133,27 @@ describe('nutrients of one meal', () => {
     expect(entryWeight(portion, { batch: { cookedGrams: 2000, recipe } })).toEqual({ grams: 500, raw: false });
     expect(entryWeight(portion, { batch: { recipe }, parts: [{ grams: 75 }, { grams: 100 }] })).toEqual({ grams: 175, raw: true });
     expect(entryWeight({ ...base, kind: 'manual', isSupplement: false, nutrients: {} } as LogEntry, {})).toBeUndefined();
+  });
+
+  it('the serving: what was eaten, against the reference intake', () => {
+    const rows = shareRows(breakdown([{ entryId: 'nuts' }], entries, meals, opts), ['FE', 'NA'], requirements, 'serving');
+    expect(rows[0]!.amount).toBeCloseTo(1.5);
+    expect(rows[0]!.share).toBeCloseTo(0.15); // 1.5 mg of a 10 mg reference intake
+    expect(rows[1]!.share).toBeCloseTo(5 / 1500);
+  });
+
+  it('says where each value comes from: BLS, a product label, its similar BLS food, or the user', () => {
+    const gummy = { code: 'OFF:4001686301265', per100: { CHO: 77, FE: 0.1, VITC: null }, provenance: { CHO: 'B', FE: 'U' } };
+    expect(partSource(gummy, 'CHO')).toBe('O');
+    expect(partSource(gummy, 'FE')).toBe('B');
+    expect(partSource(gummy, 'VITC')).toBeUndefined();
+    expect(partSource({ code: 'USDA:123', per100: { FE: 1 }, provenance: { FE: 'D' } }, 'FE')).toBe('U');
+    expect(partSource({ code: 'H130100', per100: { FE: 3 } }, 'FE')).toBe('B');
+    const label = entry('label', [], { direct: { NA: 200 } });
+    const withGummy = new Map([...entries, ['gummy', entry('gummy', [{ ...part('Goldbären', 22, gummy.per100), ...gummy }])], ['label', label]]);
+    const b = breakdown([{ entryId: 'nuts' }, { entryId: 'gummy' }, { entryId: 'label' }], withGummy, meals, opts);
+    expect([...b.sources.FE!].sort()).toEqual(['B']);
+    expect([...(b.sources.CHO ?? [])]).toEqual(['O']);
+    expect([...b.sources.NA!].sort()).toEqual(['B', 'E']);
   });
 });

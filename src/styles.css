@@ -3513,11 +3513,36 @@ a.entry-row {
   outline-offset: 1px;
 }
 .mrow-name {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  font-weight: 600;
+}
+.mrow-label {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+/* Source letters: small and quiet, readable while scrolling. */
+.src-marks {
+  display: inline-flex;
+  flex-shrink: 0;
+  gap: 2px;
+}
+.src-mark {
+  display: inline-grid;
+  place-items: center;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 2px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--text-muted);
+  font-size: 0.62rem;
   font-weight: 600;
+  line-height: 1;
 }
 .mrow-amount,
 .mrow-value {
