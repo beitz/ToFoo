@@ -93,7 +93,8 @@ export type FeatureKey =
   | 'insights'
   | 'recipeIdeas'
   | 'saveChats'
-  | 'shoppingList';
+  | 'shoppingList'
+  | 'atHome';
 
 export interface Settings extends Versioned {
   id: 'settings';
@@ -381,6 +382,36 @@ export interface ShoppingItem extends Versioned {
   checkedAt?: number;
   /** Epoch ms "Clear" took it off the list; missing while it is on the list. */
   clearedAt?: number;
+}
+
+/** Where something is kept at home, for grouping the At home list (src/logic/pantry.ts). */
+export const HOME_PLACES = ['fridge', 'freezer', 'cupboard', 'spices'] as const;
+export type HomePlace = (typeof HOME_PLACES)[number];
+
+/**
+ * Something bought that is at home (docs/SPEC.md, "At home"). Only what the user said is stored:
+ * how much there was when it was bought or counted (`since`). What is left now is worked out from
+ * the log and the cooked batches from then on, so logging, editing or deleting a meal moves it.
+ */
+export interface PantryItem extends Versioned {
+  id: string;
+  /** As shown. */
+  name: string;
+  /** The food it is, so it can be logged with one tap and its amount goes down when it is eaten. */
+  ref?: FoodRef;
+  place: HomePlace;
+  /** Pieces (packs, jars, ready meals) there were at `since`; one fewer each time it is logged or cooked with. */
+  pieces?: number;
+  /** Grams there were at `since`; what is logged or cooked with is taken off. */
+  grams?: number;
+  /** Any other amount, as typed ("1 l"); shown, not counted down. */
+  amount?: string;
+  /** Epoch ms the amount was set (bought, or counted again); meals and pots from then on count. */
+  since: number;
+  /** Set by the user: running low, or used up. Missing: they have it (or as much as is left). */
+  status?: 'low' | 'out';
+  /** Epoch ms it was first added. */
+  addedAt: number;
 }
 
 export const DEFAULT_AUTO_BACKUP_KEEP = 5;

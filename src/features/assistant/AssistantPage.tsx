@@ -33,7 +33,7 @@ import { VoiceFailed } from './VoiceFailed';
 import type { ProposedItem, ProductTools, RecipeTools } from '../../ai/tools';
 import { findProduct, findUsda } from '../../foods/findProduct';
 import { productLabel, productPageUrl, productRef } from '../../foods/products';
-import type { FoodRef, Ingredient, Product } from '../../storage/types';
+import type { Batch, FoodRef, Ingredient, LogEntry, Product } from '../../storage/types';
 import { barcodesInPhoto } from '../log/barcode';
 import type { EntryConfidence } from '../../model/types';
 import { isOn } from '../../settings/features';
@@ -52,6 +52,8 @@ import { ActivityForm, activityName, DEFAULT_ACTIVITY_SKIN, recordOf, type Activ
 import { cardId, cardOf, cardTitle, useRegister, type Bubble, type Card, type CardProps, type RecipeChat, type Saver, type Undo } from './cards';
 import { RecipeCard } from './RecipeCard';
 import { ShoppingCard } from './ShoppingCard';
+import { HomeCard } from './HomeCard';
+import { leftOf, usageOf } from '../../logic/pantry';
 import { BatchCard, PortionCard } from './BatchCards';
 import { Pages, type DictationTarget } from './Pages';
 import { refKey } from '../../lib/refs';
@@ -338,6 +340,8 @@ function Chat({ apiKey, model, day, recipe, reopened }: { apiKey: string; model:
               ...(usdaOn ? { searchUsda: (q: string, kind: 'generic' | 'branded') => findUsda(q, kind, 8) } : {}),
             }
           : undefined;
+      // What is at home (not used up), so search_foods can mark it.
+      const atHome = !recipe && isOn(d.settings.features, 'atHome') ? await homeFoodKeys(d.log, d.batches) : undefined;
       const ctx = {
         db: d.foods,
         index: d.searchIndex,
@@ -353,6 +357,7 @@ function Chat({ apiKey, model, day, recipe, reopened }: { apiKey: string; model:
               activity: isOn(d.settings.features, 'activity'),
               water: isOn(d.settings.features, 'water'),
               shopping: isOn(d.settings.features, 'shoppingList'),
+              ...(atHome ? { pantry: atHome } : {}),
               recipes: recipeTools(),
             }),
       };
@@ -402,6 +407,7 @@ function Chat({ apiKey, model, day, recipe, reopened }: { apiKey: string; model:
         ...outcome.activities.map((a): Card => ({ kind: 'activity', activity: a, logged: false })),
         ...outcome.waters.map((w): Card => ({ kind: 'water', water: w, logged: false })),
         ...outcome.shopping.map((l): Card => ({ kind: 'shopping', shopping: l, logged: false })),
+        ...outcome.homes.map((h): Card => ({ kind: 'home', home: h, logged: false })),
         ...outcome.ingredients.map((r): Card => ({ kind: 'ingredients', ingredients: r, logged: false })),
         ...outcome.recipes.map((r): Card => ({ kind: 'recipe', recipe: r, logged: false })),
         ...outcome.portions.map((p): Card => ({ kind: 'portion', portion: p, logged: false })),
@@ -542,6 +548,7 @@ function Chat({ apiKey, model, day, recipe, reopened }: { apiKey: string; model:
               isOn(d.settings.features, 'activity') && t('ai.introActivity'),
               isOn(d.settings.features, 'water') && t('ai.introWater'),
               isOn(d.settings.features, 'shoppingList') && t('ai.introShopping'),
+              isOn(d.settings.features, 'atHome') && t('ai.introPantry'),
               t('ai.introRecipes'),
             ]
               .filter(Boolean)
@@ -833,6 +840,7 @@ function CardView({ card, ...rest }: CardProps<Card>) {
   if (card.kind === 'activity') return <ActivityCard card={card} {...rest} />;
   if (card.kind === 'water') return <WaterProposalCard card={card} {...rest} />;
   if (card.kind === 'shopping') return <ShoppingCard card={card} {...rest} />;
+  if (card.kind === 'home') return <HomeCard card={card} {...rest} />;
   if (card.kind === 'ingredients') return <IngredientsCard card={card} {...rest} />;
   if (card.kind === 'recipe') return <RecipeCard card={card} {...rest} />;
   if (card.kind === 'portion') return <PortionCard card={card} {...rest} />;
@@ -1382,4 +1390,11 @@ function IngredientsCard({ card, toast, onLogged, register, recipe }: CardProps<
       </div>
     </div>
   );
+}
+
+/** Foods at home and not used up, by food key (refKey). */
+async function homeFoodKeys(log: readonly LogEntry[], batches: readonly Batch[]): Promise<ReadonlySet<string>> {
+  const usage = usageOf(log, batches);
+  const items = await repo.db.pantry.toArray();
+  return new Set(items.flatMap((i) => (i.ref && !leftOf(i, usage).out ? [refKey(i.ref)] : [])));
 }

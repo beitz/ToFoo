@@ -32,13 +32,13 @@ Everything personal, as stored on the device. Written by Settings → Backup →
     "profile": { "id": "profile", "schemaVersion": 1, "…": "…" },
     "settings": { "id": "settings", "schemaVersion": 1, "…": "…" },
     "recipes": [], "batches": [], "log": [], "customFoods": [],
-    "dayStatus": [], "fasts": [], "sunEntries": [], "products": [], "journal": [], "sleep": [], "activities": [], "water": [], "shopping": [],
+    "dayStatus": [], "fasts": [], "sunEntries": [], "products": [], "journal": [], "sleep": [], "activities": [], "water": [], "shopping": [], "pantry": [],
     "portionSizes": [{ "food": "C133000", "sizes": [{ "label": "My bowl", "grams": 60 }] }]
   }
 }
 ```
 
-Each record has a `schemaVersion`; older records are migrated on import. `products` may be missing in backups from before the Open Food Facts lookup, `journal` in backups from before the journal, `sleep` in backups from before sleep, `activities` in backups from before activities, `water` in backups from before water, and `shopping` in backups from before the shopping list; each then counts as empty. `portionSizes` (portion sizes the user saved per food, by the food code they were saved under) is missing in backups from before 2026-10-18; restoring such a backup leaves the portion sizes on the device as they are.
+Each record has a `schemaVersion`; older records are migrated on import. `products` may be missing in backups from before the Open Food Facts lookup, `journal` in backups from before the journal, `sleep` in backups from before sleep, `activities` in backups from before activities, `water` in backups from before water, `shopping` in backups from before the shopping list, and `pantry` in backups from before the At home list; each then counts as empty. `portionSizes` (portion sizes the user saved per food, by the food code they were saved under) is missing in backups from before 2026-10-18; restoring such a backup leaves the portion sizes on the device as they are.
 
 Journal entries (`data.journal[]`): `id`, `schemaVersion`, `time` (epoch ms the entry is about), `day` (the local `YYYY-MM-DD` of `time`) and `text` (what the user wrote, plain text).
 
@@ -49,6 +49,8 @@ Activities (`data.activities[]`): `id`, `schemaVersion`, `kind` (`walk`, `run`, 
 Water (`data.water[]`): `id`, `schemaVersion`, `time` (epoch ms it was drunk), `day` (local `YYYY-MM-DD` of `time`) and `ml`. Plain water only; other drinks are log entries with a food.
 
 Shopping list (`data.shopping[]`): `id`, `schemaVersion`, `name`, optional `ref` (the food, as in log entries, when it was picked from the database or came from a recipe), `section` (`produce`, `bakery`, `dairy`, `meat`, `dry`, `pantry`, `drinks`, `ready` or `other`), optional `grams`, optional `amount` (any other amount as typed, e.g. "2 l"), optional `recipes` (names of the recipes it is for), `addedAt` (epoch ms), optional `checkedAt` (epoch ms it was put in the basket) and optional `clearedAt` (epoch ms "Clear" took it off the list; such lines are kept as suggestions).
+
+At home (`data.pantry[]`): `id`, `schemaVersion`, `name`, optional `ref` (the food, as in log entries), `place` (`fridge`, `freezer`, `cupboard` or `spices`), optional `pieces`, optional `grams`, optional `amount` (any other amount as typed, e.g. "1 l", shown but not counted down), `since` (epoch ms the amount was set: bought or counted), optional `status` (`low` or `out`, as the user marked it) and `addedAt` (epoch ms). Only the amount at `since` is stored: what is left is worked out from the log and cooked batches from `since` on (one piece per log entry of the food or pot cooked with it, grams as logged or cooked).
 
 Products (`data.products[]`) are foods from online databases as fetched: Open Food Facts products (data licence ODbL) and USDA FoodData Central foods (public domain). Fields: `id` (`OFF:<barcode>` or `USDA:<fdcId>`), `source` (`"OFF"` or `"USDA"`), `code` (barcode or FoodData Central id), `usdaType` (USDA only: `Foundation`, `SR Legacy`, `Survey (FNDDS)` or `Branded`), `name`, optional `brand`, `quantity`, `serving` (`{ label, grams }`), `per100` (values per 100 g, or per 100 ml if `perMl`, by BLS component code in BLS units: label values, or the USDA database values for USDA generic foods; a nutrient without a value is absent, not 0), `categories`, optional `lastModified`, `fetchedAt`, and optional `match` (`{ version, code }`: the BLS food whose values fill in what the source lacks).
 

@@ -30,6 +30,8 @@ import { LogSection } from './LogSection';
 import { FavouriteStar } from './FavouriteButton';
 import { refKey } from '../../lib/refs';
 import { WaterSheet } from '../water/WaterSheet';
+import { loggable } from '../../logic/pantry';
+import { leftLabel, placeName, usePantry, usePantryLeft } from '../pantry/usePantry';
 
 type Selected =
   | { kind: 'food'; food: Food }
@@ -120,6 +122,33 @@ export function LogPage({ day: dayParam, foodCode }: { day?: string; foodCode?: 
   );
   const addedEntries = added.map((id) => d.log.find((e) => e.id === id)).filter((e): e is LogEntry => !!e);
   const stock = d.batches.filter((b) => totalLeft(b) > 0);
+  // Bought things at home that are foods, with what tapping one opens.
+  const atHomeOn = isOn(d.settings.features, 'atHome');
+  const pantry = usePantry();
+  const pantryLeft = usePantryLeft();
+  const homeFoods = useMemo(() => {
+    if (!atHomeOn) return [];
+    const out: Array<{ id: string; pick: Selected; name: string; detail: string }> = [];
+    for (const item of pantry ?? []) {
+      const left = pantryLeft(item);
+      if (!loggable(item, left) || !item.ref) continue;
+      const detail = [leftLabel(item, left), placeName(item.place)].filter(Boolean).join(' · ');
+      const ref = item.ref;
+      if (ref.source === 'BLS') {
+        const food = d.foods.byCode.get(ref.code);
+        if (food) out.push({ id: item.id, pick: { kind: 'food', food }, name: item.name, detail });
+      } else if (ref.source === 'custom') {
+        const food = d.customFoodsById.get(ref.id);
+        if (food) out.push({ id: item.id, pick: { kind: 'custom', food }, name: item.name, detail });
+      } else {
+        const product = d.productsById.get(refKey(ref));
+        if (product) out.push({ id: item.id, pick: { kind: 'product', product }, name: item.name, detail });
+      }
+    }
+    return out.sort((a, b) => a.name.localeCompare(b.name));
+    // pantryLeft changes with the log, which d.log covers.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [atHomeOn, pantry, d.log, d.batches, d.foods, d.customFoodsById, d.productsById]);
 
   function onAdded(entry: LogEntry) {
     setAdded((a) => [...a, entry.id]);
@@ -265,24 +294,43 @@ export function LogPage({ day: dayParam, foodCode }: { day?: string; foodCode?: 
             )}
           </LogSection>
 
-          {stock.length > 0 && (
-            <LogSection id="stock" title={t('stock.title')} count={stock.length}>
-              <div className="chips">
-                {stock.map((b) => {
-                  const s = nextStorage(b, day);
-                  return (
-                    <button
-                      key={b.id}
-                      className="chip"
-                      disabled={!s}
-                      onClick={() => s && setSelected({ kind: 'portion', batch: b })}
-                    >
-                      <Icon name={s === 'freezer' ? 'snow' : s === 'fridge' ? 'fridge' : 'pot'} size={16} />
-                      {b.recipe.name} · {t('stock.left', { n: totalLeft(b) })}
-                    </button>
-                  );
-                })}
-              </div>
+          {stock.length + homeFoods.length > 0 && (
+            <LogSection id="stock" title={t(atHomeOn ? 'log.atHome' : 'stock.title')} count={stock.length + homeFoods.length}>
+              {stock.length > 0 && (
+                <div className="chips">
+                  {stock.map((b) => {
+                    const s = nextStorage(b, day);
+                    return (
+                      <button
+                        key={b.id}
+                        className="chip"
+                        disabled={!s}
+                        onClick={() => s && setSelected({ kind: 'portion', batch: b })}
+                      >
+                        <Icon name={s === 'freezer' ? 'snow' : s === 'fridge' ? 'fridge' : 'pot'} size={16} />
+                        {b.recipe.name} · {t('stock.left', { n: totalLeft(b) })}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+              {homeFoods.length > 0 && (
+                <ul className="result-list">
+                  {homeFoods.map((f) => (
+                    <li key={f.id}>
+                      <button className="result" onClick={() => setSelected(f.pick)}>
+                        <span className="result-name">{f.name}</span>
+                        <span className="muted small">{f.detail}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {atHomeOn && (
+                <a className="small log-home-link" href={href('athome')}>
+                  {t('pantry.openPage')}
+                </a>
+              )}
             </LogSection>
           )}
 

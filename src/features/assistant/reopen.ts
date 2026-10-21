@@ -138,6 +138,8 @@ export function restoreCard(summary: Summary, logged: boolean, ctx: RestoreConte
       return { kind: 'water', water: c, logged };
     case 'L':
       return { kind: 'shopping', shopping: c, logged };
+    case 'H':
+      return { kind: 'home', home: c, logged };
     case 'R':
       return ctx.recipe ? { kind: 'ingredients', ingredients: c, logged } : { kind: 'recipe', recipe: c, logged };
     case 'P':
@@ -177,6 +179,7 @@ export function rebuildConversation(messages: Beta.BetaMessageParam[], events: r
     activities: highest('A'),
     waters: highest('W'),
     lists: highest('L'),
+    homes: highest('H'),
     recipes: highest('R'),
     portions: highest('P'),
     batches: highest('B'),

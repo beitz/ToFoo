@@ -6,6 +6,7 @@ import { refKey } from '../lib/refs';
 import { overlaps, sleepDay } from '../logic/sleep';
 import { withPot, type PotDetails } from '../logic/batch';
 import { dailyBackupDue, keepCount, PORTIONS_PREFIX, pruneAutoBackups, readSnapshot, SNAPSHOT_TABLES, writeAutoBackup } from './autoBackup';
+import type { Table } from 'dexie';
 import { db as defaultDb, runMigrations, type ToFooDB } from './db';
 import { defaultProfile, defaultSettings } from './defaults';
 import {
@@ -23,6 +24,7 @@ import {
   type ActivityRecord,
   type WaterRecord,
   type ShoppingItem,
+  type PantryItem,
   type LogEntry,
   type NewLogEntry as NewLog,
   type Product,
@@ -52,6 +54,7 @@ export interface Snapshot {
   activities: ActivityRecord[];
   water: WaterRecord[];
   shopping: ShoppingItem[];
+  pantry: PantryItem[];
   /** Missing in backups from before portion sizes were included; restoring one keeps the sizes on the phone. */
   portionSizes?: FoodPortionSizes[];
 }
@@ -61,6 +64,34 @@ export interface Snapshot {
 export interface ShoppingUndo {
   before: ShoppingItem[];
   created: string[];
+}
+
+/** What a change to the At home list (and the shopping list with it) replaced and created. */
+export interface HomeUndo {
+  pantry: { before: PantryItem[]; created: string[] };
+  shopping: ShoppingUndo;
+}
+
+/** Records to write and ids to delete in one list. */
+interface ListChange<T> {
+  put: T[];
+  remove: string[];
+}
+
+/** Apply a list change inside a transaction; returns what it replaced and created. */
+async function applyChange<T extends { id: string; schemaVersion: number }>(table: Table<T, string>, change: ListChange<T> | undefined, v: number): Promise<{ before: T[]; created: string[] }> {
+  if (!change) return { before: [], created: [] };
+  const { put, remove } = change;
+  const before = (await table.bulkGet([...put.map((i) => i.id), ...remove])).filter((i): i is T => !!i);
+  const existed = new Set(before.map((i) => i.id));
+  await table.bulkDelete(remove);
+  await table.bulkPut(put.map((i) => ({ ...i, schemaVersion: v })));
+  return { before, created: put.filter((i) => !existed.has(i.id)).map((i) => i.id) };
+}
+
+async function undoChange<T>(table: Table<T, string>, u: { before: T[]; created: string[] }): Promise<void> {
+  await table.bulkDelete(u.created);
+  await table.bulkPut(u.before);
 }
 
 export function createRepo(db: ToFooDB) {
@@ -405,20 +436,28 @@ export function createRepo(db: ToFooDB) {
      * says what to write and delete. Returns what it changed, for undo via undoShopping.
      */
     async changeShopping(plan: (items: ShoppingItem[]) => { put: ShoppingItem[]; remove: string[] }): Promise<ShoppingUndo> {
-      return db.transaction('rw', db.shopping, async () => {
-        const { put, remove } = plan(await db.shopping.toArray());
-        const ids = [...put.map((i) => i.id), ...remove];
-        const before = (await db.shopping.bulkGet(ids)).filter((i): i is ShoppingItem => !!i);
-        const existed = new Set(before.map((i) => i.id));
-        await db.shopping.bulkDelete(remove);
-        await db.shopping.bulkPut(put.map((i) => ({ ...i, schemaVersion: v })));
-        return { before, created: put.filter((i) => !existed.has(i.id)).map((i) => i.id) };
-      });
+      return db.transaction('rw', db.shopping, async () => applyChange(db.shopping, plan(await db.shopping.toArray()), v));
     },
     async undoShopping(u: ShoppingUndo): Promise<void> {
-      await db.transaction('rw', db.shopping, async () => {
-        await db.shopping.bulkDelete(u.created);
-        await db.shopping.bulkPut(u.before);
+      await db.transaction('rw', db.shopping, () => undoChange(db.shopping, u));
+    },
+
+    // ── At home ──
+    /**
+     * Change what is at home, and the shopping list with it in one go (put away what was bought,
+     * put what runs low on the list): `plan` gets both lists inside the transaction. Returns what it
+     * changed, for undo via undoHome.
+     */
+    async changeHome(plan: (pantry: PantryItem[], shopping: ShoppingItem[]) => { pantry?: ListChange<PantryItem>; shopping?: ListChange<ShoppingItem> }): Promise<HomeUndo> {
+      return db.transaction('rw', db.pantry, db.shopping, async () => {
+        const change = plan(await db.pantry.toArray(), await db.shopping.toArray());
+        return { pantry: await applyChange(db.pantry, change.pantry, v), shopping: await applyChange(db.shopping, change.shopping, v) };
+      });
+    },
+    async undoHome(u: HomeUndo): Promise<void> {
+      await db.transaction('rw', db.pantry, db.shopping, async () => {
+        await undoChange(db.pantry, u.pantry);
+        await undoChange(db.shopping, u.shopping);
       });
     },
 
@@ -473,7 +512,7 @@ export function createRepo(db: ToFooDB) {
      * `backupFirst`, an automatic backup of the data it replaces is saved in the same transaction.
      */
     async restore(s: Snapshot, { backupFirst = false } = {}): Promise<void> {
-      const tables = [db.profile, db.settings, db.recipes, db.batches, db.log, db.customFoods, db.dayStatus, db.fasts, db.sunEntries, db.products, db.journal, db.sleep, db.activities, db.water, db.shopping];
+      const tables = [db.profile, db.settings, db.recipes, db.batches, db.log, db.customFoods, db.dayStatus, db.fasts, db.sunEntries, db.products, db.journal, db.sleep, db.activities, db.water, db.shopping, db.pantry];
       await db.transaction('rw', [...SNAPSHOT_TABLES, 'autoBackups'], async () => {
         if (backupFirst) await writeAutoBackup((name) => db.table(name), 'restore', new Date());
         await Promise.all(tables.map((t) => t.clear()));
@@ -492,6 +531,7 @@ export function createRepo(db: ToFooDB) {
         await db.activities.bulkPut(s.activities);
         await db.water.bulkPut(s.water);
         await db.shopping.bulkPut(s.shopping);
+        await db.pantry.bulkPut(s.pantry);
         if (s.portionSizes) {
           await db.meta.where('key').startsWith(PORTIONS_PREFIX).delete();
           await db.meta.bulkPut(s.portionSizes.map((p) => ({ key: PORTIONS_PREFIX + p.food, value: p.sizes })));

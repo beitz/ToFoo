@@ -43,6 +43,7 @@ export function QuickActions({ onFast }: { onFast: () => void }) {
       <div className={`fab-stack dial${open ? ' open' : ''}`}>
         {/* Hidden items stay rendered so they can animate out; visibility keeps them out of reach. */}
         <div className="dial-items" id="home-actions" role="group" aria-label={t('home.quickActions')}>
+          {on('atHome') && <DialItem icon="pantry" label={t('home.atHome')} onClick={() => go('athome')} />}
           {on('shoppingList') && <DialItem icon="cart" label={toBuy ? t('shopping.open', { n: toBuy }) : t('home.shopping')} onClick={() => go('shopping')} />}
           {on('journal') && <DialItem icon="journal" label={t('home.journal')} onClick={() => go('journal')} />}
           {on('activity') && (

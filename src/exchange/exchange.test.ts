@@ -94,6 +94,12 @@ const snapshot: Snapshot = {
     { id: 's1', schemaVersion: 1, name: 'Oat flakes', ref: { source: 'BLS', version: '4.0', code: 'C133000' }, section: 'dry', grams: 750, amount: '1 pack', recipes: ['Porridge'], addedAt: 11 },
     { id: 's2', schemaVersion: 1, name: 'Toilet paper', section: 'other', addedAt: 12, checkedAt: 13, clearedAt: 14 },
   ],
+  pantry: [
+    { id: 'h1', schemaVersion: 1, name: 'Lasagne', ref: { source: 'OFF', code: '4001234567890' }, place: 'freezer', pieces: 2, since: 15, addedAt: 15 },
+    { id: 'h2', schemaVersion: 1, name: 'Oat flakes', ref: { source: 'BLS', version: '4.0', code: 'C133000' }, place: 'cupboard', grams: 500, since: 15, addedAt: 15 },
+    { id: 'h3', schemaVersion: 1, name: 'Milk', place: 'fridge', amount: '1 l', since: 16, addedAt: 16 },
+    { id: 'h4', schemaVersion: 1, name: 'Cumin', place: 'spices', status: 'low', since: 16, addedAt: 16 },
+  ],
   portionSizes: [{ food: 'C133000', sizes: [{ label: 'My bowl', grams: 60 }] }],
 };
 
@@ -108,8 +114,8 @@ describe('exchange format', () => {
     }
   });
 
-  it('reads backups made before products, the journal, sleep, activities, water and the shopping list existed', () => {
-    const { products: _products, journal: _journal, sleep: _sleep, activities: _activities, water: _water, shopping: _shopping, portionSizes: _sizes, ...older } = snapshot;
+  it('reads backups made before products, the journal, sleep, activities, water, the shopping list and the At home list existed', () => {
+    const { products: _products, journal: _journal, sleep: _sleep, activities: _activities, water: _water, shopping: _shopping, pantry: _pantry, portionSizes: _sizes, ...older } = snapshot;
     const parsed = parseExchange(JSON.stringify(buildBackup({ ...older, log: snapshot.log.slice(0, 2) } as Snapshot, '0.1.0', new Date())));
     expect(parsed.ok && parsed.value.type === 'backup' && parsed.value.data.products).toEqual([]);
     expect(parsed.ok && parsed.value.type === 'backup' && parsed.value.data.journal).toEqual([]);
@@ -117,6 +123,7 @@ describe('exchange format', () => {
     expect(parsed.ok && parsed.value.type === 'backup' && parsed.value.data.activities).toEqual([]);
     expect(parsed.ok && parsed.value.type === 'backup' && parsed.value.data.water).toEqual([]);
     expect(parsed.ok && parsed.value.type === 'backup' && parsed.value.data.shopping).toEqual([]);
+    expect(parsed.ok && parsed.value.type === 'backup' && parsed.value.data.pantry).toEqual([]);
     // Left missing, so restoring an older backup keeps the portion sizes on the phone.
     expect(parsed.ok && parsed.value.type === 'backup' && parsed.value.data.portionSizes).toBeUndefined();
   });

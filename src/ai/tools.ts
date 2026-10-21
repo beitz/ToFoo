@@ -10,7 +10,7 @@ import { z } from 'zod';
 import type { Food, FoodDb } from '../foods/foodDb';
 import type { FindResult, UsdaFindResult } from '../foods/findProduct';
 import { normalizeBarcode } from '../foods/openFoodFacts';
-import { hasOwnMicros, isProductCode, productFood, productId, productLabel } from '../foods/products';
+import { hasOwnMicros, isProductCode, productFood, productId, productLabel, productRef } from '../foods/products';
 import { normalize, search, type SearchIndex } from '../foods/search';
 import { parseLocalDateTime } from './photoTime';
 import { fmtNumber } from '../lib/format';
@@ -23,7 +23,8 @@ import type { Preparation } from '../model/paramTypes';
 import type { RawValue } from '../model/types';
 import type { SkinExposure } from '../model/sun';
 import { excludedFoods, type RecipeInfo } from '../logic/recipeIdeas';
-import { ACTIVITY_KINDS, INTENSITIES, type ActivityKind, type Ingredient, type Intensity, type Product, type Profile } from '../storage/types';
+import { stockAmount } from '../logic/pantry';
+import { ACTIVITY_KINDS, HOME_PLACES, INTENSITIES, type ActivityKind, type FoodRef, type HomePlace, type Ingredient, type Intensity, type Product, type Profile } from '../storage/types';
 
 export const PREPARATIONS = ['asListed', 'raw', 'boiled', 'steamed', 'baked', 'fried'] as const satisfies readonly Preparation[];
 const SKIN_EXPOSURES = ['faceHands', 'faceHandsForearms', 'faceHandsArms', 'armsLegs', 'mostOfBody'] as const satisfies readonly SkinExposure[];
@@ -213,6 +214,35 @@ export interface ShoppingProposal {
   replaces?: string;
 }
 
+export const homeProposalInput = z.object({
+  /** Things bought, running low or used up, in the user's words. */
+  items: z
+    .array(z.object({ name: z.string(), code: z.string().optional(), amount: z.string().optional(), place: z.string().optional(), status: z.string().optional() }))
+    .default([]),
+  /** Id of the open At home card this replaces (e.g. "H1"); empty for a new one. */
+  replaces: z.string().optional(),
+});
+
+/** One thing for the At home list, checked: the food it is (when known), its amount and place. */
+export interface HomeProposedItem {
+  name: string;
+  ref?: FoodRef;
+  /** A product looked up in the chat, saved when the card is. */
+  product?: Product;
+  pieces?: number;
+  grams?: number;
+  amount?: string;
+  /** Where it is kept; missing: the app guesses. */
+  place?: HomePlace;
+  status: 'bought' | 'low' | 'out';
+}
+
+/** Things bought, running low or used up that the assistant proposes for At home, for the user to check. */
+export interface HomeProposal {
+  items: HomeProposedItem[];
+  replaces?: string;
+}
+
 /** Most things on one card: a week's shopping, not a whole shop. */
 const MAX_SHOPPING_ITEMS = 60;
 
@@ -320,6 +350,8 @@ export interface ToolContext {
   water?: boolean;
   /** The shopping list is on: the assistant may propose things to put on it. */
   shopping?: boolean;
+  /** At home is on: the assistant may propose things bought or running low, and search_foods marks what is at home (by refKey). */
+  pantry?: ReadonlySet<string>;
   /**
    * The chat belongs to the recipe editor: the assistant proposes ingredients for the recipe
    * instead of meals, and nothing else (no journal, sleep, activity or water).
@@ -349,7 +381,7 @@ export interface IdeaTools {
 }
 
 /** Which online sources the assistant is offered (decides the prompt and tool variant). */
-export function sourcesOf(ctx: Pick<ToolContext, 'products' | 'journal' | 'sleep' | 'activity' | 'water' | 'shopping' | 'recipe' | 'recipes'>): {
+export function sourcesOf(ctx: Pick<ToolContext, 'products' | 'journal' | 'sleep' | 'activity' | 'water' | 'shopping' | 'pantry' | 'recipe' | 'recipes'>): {
   off: boolean;
   usda: boolean;
   webSearch: boolean;
@@ -358,13 +390,14 @@ export function sourcesOf(ctx: Pick<ToolContext, 'products' | 'journal' | 'sleep
   activity: boolean;
   water: boolean;
   shopping: boolean;
+  pantry: boolean;
   recipe: boolean;
   recipes: boolean;
   ideas: boolean;
 } {
   const { products } = ctx;
   const online = { off: !!products?.find, usda: !!products?.searchUsda, webSearch: !!products?.find && !!products.webSearch };
-  if (ctx.recipe) return { ...online, journal: false, sleep: false, activity: false, water: false, shopping: false, recipe: true, recipes: false, ideas: false };
+  if (ctx.recipe) return { ...online, journal: false, sleep: false, activity: false, water: false, shopping: false, pantry: false, recipe: true, recipes: false, ideas: false };
   return {
     ...online,
     journal: !!ctx.journal,
@@ -372,6 +405,7 @@ export function sourcesOf(ctx: Pick<ToolContext, 'products' | 'journal' | 'sleep
     activity: !!ctx.activity,
     water: !!ctx.water,
     shopping: !!ctx.shopping,
+    pantry: !!ctx.pantry,
     recipe: false,
     recipes: !!ctx.recipes,
     ideas: !!ctx.recipes?.ideas,
@@ -419,7 +453,9 @@ export function runSearchFoods(input: unknown, ctx: ToolContext): { ok: boolean;
       .map((h) => ctx.db.byCode.get(h.key))
       .filter((f): f is Food => !!f);
     const products = savedProductHits(q, ctx.products);
-    const lines = [...products.map((p) => describeProduct(p, ctx.db)), ...hits.map((f) => describeFood(f, ctx.db))];
+    // What is at home is marked, so the model picks the exact product the user has.
+    const home = (key: string) => (ctx.pantry?.has(key) ? ' [at home]' : '');
+    const lines = [...products.map((p) => describeProduct(p, ctx.db) + home(p.id)), ...hits.map((f) => describeFood(f, ctx.db) + home(`BLS:${f.code}`))];
     return `Results for "${q}":\n${lines.length ? lines.join('\n') : 'No matches. Try a shorter or more generic word, in English or German.'}`;
   });
   return { ok: true, text: blocks.join('\n\n') };
@@ -591,6 +627,48 @@ export function validateShoppingProposal(input: unknown, recipes: readonly Pick<
   if (problems.length) return { ok: false, error: `${problems.join('\n')}\nFix these and call propose_shopping again.` };
   const replaces = parsed.data.replaces?.trim();
   return { ok: true, proposal: { items: items.map((i) => ({ name: i.name, ...(i.amount ? { amount: i.amount } : {}) })), recipes: chosen, ...(replaces ? { replaces } : {}) } };
+}
+
+const HOME_STATUS: Record<string, HomeProposedItem['status']> = { '': 'bought', bought: 'bought', low: 'low', used_up: 'out' };
+
+/** Check a `propose_home` call: names, known codes, places and statuses. */
+export function validateHomeProposal(input: unknown, db: Pick<FoodDb, 'byCode'> & { version?: string }, products?: ProductTools): { ok: true; proposal: HomeProposal } | { ok: false; error: string } {
+  const parsed = homeProposalInput.safeParse(input);
+  if (!parsed.success) return { ok: false, error: `Invalid input: ${parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}` };
+  const problems: string[] = [];
+  const items: HomeProposedItem[] = [];
+  for (const it of parsed.data.items) {
+    const name = it.name.trim();
+    if (!name) continue;
+    const item: HomeProposedItem = { name, status: 'bought' };
+    const code = it.code?.trim() ?? '';
+    if (code && isProductCode(code)) {
+      const product = knownProduct(code, products);
+      if (!product) problems.push(`${name}: unknown product ${code}; use only codes returned by lookup_barcode, search_usda or search_foods.`);
+      else {
+        item.ref = productRef(product);
+        if (!products?.saved.has(code)) item.product = product;
+      }
+    } else if (code) {
+      if (!db.byCode.has(code)) problems.push(`${name}: unknown code ${code}; use only codes returned by search_foods, or none.`);
+      else item.ref = { source: 'BLS', version: db.version ?? '4.0', code };
+    }
+    Object.assign(item, stockAmount(it.amount ?? ''));
+    const place = it.place?.trim() ?? '';
+    if (place) {
+      if ((HOME_PLACES as readonly string[]).includes(place)) item.place = place as HomePlace;
+      else problems.push(`${name}: place "${place}" is not one of ${HOME_PLACES.join(', ')}; leave it empty to let the app choose.`);
+    }
+    const status = HOME_STATUS[it.status?.trim() ?? ''];
+    if (status) item.status = status;
+    else problems.push(`${name}: status "${it.status}" is not bought, low or used_up.`);
+    items.push(item);
+  }
+  if (items.length === 0) problems.push('Nothing to save: give items.');
+  if (items.length > MAX_SHOPPING_ITEMS) problems.push(`${items.length} items is more than ${MAX_SHOPPING_ITEMS} on one card; split them over two cards.`);
+  if (problems.length) return { ok: false, error: `${problems.join('\n')}\nFix these and call propose_home again.` };
+  const replaces = parsed.data.replaces?.trim();
+  return { ok: true, proposal: { items, ...(replaces ? { replaces } : {}) } };
 }
 
 /** A product the assistant may use: looked up in this conversation or saved on this phone. */
