@@ -134,6 +134,49 @@ describe('energy target', () => {
     expect(own.byNutrient.get('ENERCC')!.recommended).toBe(2000);
     // Saturated fat: at most 10 % of energy, 9 kcal/g.
     expect(own.byNutrient.get('FASAT')!.recommended).toBeCloseTo(2000 * 0.1 / 9);
+    expect(own.byNutrient.get('ENERCC')!.own).toEqual({ referenceRecommended: 2880, target: { amount: 2000, per: 'day' } });
+    expect(resolveRequirements({ sex: 'male', birthYear: 1996, weightKg: 80 }, 2026).byNutrient.get('ENERCC')!.own).toBeUndefined();
+  });
+});
+
+describe('own nutrient targets', () => {
+  const profile = { sex: 'male' as const, birthYear: 1996, weightKg: 80 };
+
+  it('replaces the protein reference per kg body weight, keeping the DGE value for comparison', () => {
+    const req = resolveRequirements({ ...profile, nutrientTargets: { PROT625: { amount: 1.6, per: 'kg' } } }, 2026);
+    const p = req.byNutrient.get('PROT625')!;
+    expect(p.recommended).toBeCloseTo(128);
+    expect(p.physiological).toBeCloseTo(128);
+    expect(p.own).toEqual({ referenceRecommended: 64, target: { amount: 1.6, per: 'kg' } });
+    // Amino acids keep their own WHO need per kg.
+    expect(req.byNutrient.get('LEU')!.recommended).toBeCloseTo(0.039 * 80);
+    expect(req.byNutrient.get('LEU')!.own).toBeUndefined();
+  });
+
+  it('takes a target per day as it is, whatever the weight', () => {
+    const p = resolveRequirements({ ...profile, weightKg: 60, nutrientTargets: { PROT625: { amount: 150, per: 'day' } } }, 2026).byNutrient.get('PROT625')!;
+    expect(p.recommended).toBe(150);
+    expect(p.own?.referenceRecommended).toBeCloseTo(48);
+  });
+
+  it('ignores targets for nutrients without own targets, limits and empty amounts', () => {
+    const req = resolveRequirements(
+      { ...profile, nutrientTargets: { FASAT: { amount: 5, per: 'day' }, FE: { amount: 30, per: 'day' }, PROT625: { amount: 0, per: 'kg' } } },
+      2026,
+    );
+    expect(req.byNutrient.get('FASAT')!.own).toBeUndefined();
+    expect(req.byNutrient.get('FE')!.own).toBeUndefined();
+    expect(req.byNutrient.get('PROT625')!.recommended).toBeCloseTo(64);
+  });
+
+  it('marks results compared with an own target', () => {
+    const requirements = resolveRequirements({ ...profile, nutrientTargets: { PROT625: { amount: 1.6, per: 'kg' } } }, 2026);
+    const days = ['2026-10-01', '2026-10-02', '2026-10-03', '2026-10-04'];
+    const entries = days.slice(0, 3).map((day) => manual(`p-${day}`, day, 12, { PROT625: 64 }));
+    const res = simulate(baseInput(days, entries, { requirements })).nutrients;
+    expect(res.get('PROT625')!.ownTarget).toBe(true);
+    expect(res.get('PROT625')!.value.central).toBeCloseTo(0.5);
+    expect(res.get('FE')!.ownTarget).toBe(false);
   });
 });
 

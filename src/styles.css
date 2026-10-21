@@ -839,6 +839,13 @@ textarea:focus-visible,
 .gauge-default {
   color: var(--text-muted);
 }
+/* Own-target mark: a small symbol, so the line reads differently without relying on colour. */
+.gauge-own {
+  display: inline-flex;
+  vertical-align: -1px;
+  margin-left: 3px;
+  color: var(--text-muted);
+}
 .gauge-body {
   display: flex;
   align-items: center;

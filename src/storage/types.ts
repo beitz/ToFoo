@@ -4,6 +4,7 @@
  */
 import type { ActivityLevel, Menstruation, PhytateIntake, Preparation, Sex, Storage } from '../model/paramTypes';
 import type { EntryConfidence } from '../model/types';
+import type { OwnTarget } from '../model/requirements';
 import type { SkinExposure } from '../model/sun';
 import type { StartingLevelChoice } from '../model/simulate';
 import type { ProductData } from '../foods/openFoodFacts';
@@ -52,6 +53,8 @@ export interface Profile extends Versioned {
   activity?: ActivityLevel;
   /** Own energy target in kcal/day; not set: estimated from age, sex, weight and activity. */
   energyTargetKcal?: number;
+  /** Own daily targets by nutrient id (only OWN_TARGET_NUTRIENTS, so far protein); not set: the DGE value. */
+  nutrientTargets?: Record<string, OwnTarget>;
   phytate?: PhytateIntake;
   /** Women only, for the iron reference value. */
   menstruation?: Menstruation;

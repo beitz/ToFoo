@@ -24,6 +24,17 @@ const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
  */
 export const hasNoData = (r: NutrientResult) => r.knownDays === 0;
 
+/** Marks a line whose percent compares with the user's own target instead of the reference value. */
+function OwnMark({ result: r }: { result: NutrientResult }) {
+  return r.ownTarget ? (
+    <span className="gauge-own" title={t('gauge.ownTarget')}>
+      <Icon name="target" size={12} />
+    </span>
+  ) : null;
+}
+
+const ownSpoken = (r: NutrientResult) => (r.ownTarget ? `, ${t('gauge.ownTarget')}` : '');
+
 /** Visual scale: averages show 0–150 % of the need, so the 100 % mark sits at two thirds of the bar. */
 const toScale = (v: number) => clamp01(v / 1.5);
 
@@ -48,13 +59,14 @@ export function CompactGauge({ result: r, onClick, defaultBased, variant = 'row'
     <button
       className={`cgauge cgauge-${variant} gauge-${r.kind} gauge-${r.status}`}
       onClick={onClick}
-      aria-label={`${def?.name ?? r.id}: ${noData ? '' : gaugeLabel(r)}, ${statusLabel(r.status)}`}
+      aria-label={`${def?.name ?? r.id}: ${noData ? '' : gaugeLabel(r)}, ${statusLabel(r.status)}${ownSpoken(r)}`}
     >
       <span className="cgauge-line">
         {variant === 'row' && icon}
         <span className="cgauge-name">
           {name}
           {defaultBased && <span className="gauge-default">*</span>}
+          <OwnMark result={r} />
         </span>
         {variant === 'row' && <span className="cgauge-value">{value}</span>}
       </span>
@@ -148,12 +160,13 @@ export function GaugeRow({ result: r, showRange, onClick, defaultBased }: Pick<P
     <button
       className={`nrow gauge-${r.kind} gauge-${r.status}`}
       onClick={onClick}
-      aria-label={`${def?.name ?? r.id}: ${noData ? t('gauge.noData') : gaugeLabel(r)}${range}, ${statusLabel(r.status)}`}
+      aria-label={`${def?.name ?? r.id}: ${noData ? t('gauge.noData') : gaugeLabel(r)}${range}, ${statusLabel(r.status)}${ownSpoken(r)}`}
     >
       <Icon name={STATUS_ICON[r.status]} size={14} />
       <span className="nrow-name">
         {name}
         {defaultBased && <span className="gauge-default">*</span>}
+        <OwnMark result={r} />
       </span>
       {isInfo ? <span className="nrow-bar" aria-hidden /> : <Bar value={scaled} showRange={showRange} target={1 / 1.5} />}
       <span className="nrow-value" aria-hidden>

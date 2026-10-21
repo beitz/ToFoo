@@ -19,6 +19,9 @@ import { hasNoData, storeTrendLabel, trendArrows, trendLabel } from '../../ui/Ga
 import { StatusBadge } from '../../ui/status';
 import { Icon } from '../../ui/Icon';
 import { energyBasisText } from '../settings/EnergyTarget';
+import { proteinBasisText } from '../settings/ProteinTarget';
+import { currentWeight } from '../../logic/resolve';
+import { PROFILE_DEFAULTS } from '../../model/requirements';
 import { testHintText } from './testHint';
 import { BloodTests, markersFor } from './BloodTests';
 import { formatDay } from '../../lib/dates';
@@ -99,7 +102,7 @@ export function NutrientPage({ id }: { id: string }) {
         </p>
         {r.kind !== 'info' && req && (
           <p className="small muted">
-            {t('nutrient.averageIntake', { amount: fmtAmount(id, r.averageIntake), ref: fmtAmount(id, req.recommended) })}
+            {t(req.own ? 'nutrient.averageIntakeOwn' : 'nutrient.averageIntake', { amount: fmtAmount(id, r.averageIntake), ref: fmtAmount(id, req.recommended) })}
             {r.leftOutDays > 0
               ? ` ${t('nutrient.knownDaysLeftOut', { known: r.knownDays, days: r.windowDays - r.leftOutDays, left: r.leftOutDays })}`
               : r.knownDays < r.windowDays
@@ -114,6 +117,11 @@ export function NutrientPage({ id }: { id: string }) {
               {energyBasisText(d.requirements.energy)} <a href={href('settings', 'profile')}>{t('energy.change')}</a>
             </p>
           </>
+        )}
+        {id === 'PROT625' && req && (
+          <p className="small muted">
+            {proteinBasisText(req, currentWeight(d.profile) ?? PROFILE_DEFAULTS.weightKg)} <a href={href('settings', 'profile')}>{t('protein.change')}</a>
+          </p>
         )}
         <TestHint r={r} name={def.name} />
         {r.missingDataDays > 0 && <p className="small notice">{t('nutrient.missingData', { n: r.missingDataDays })}</p>}
@@ -208,8 +216,13 @@ export function NutrientPage({ id }: { id: string }) {
         {req && (
           <ul className="plain-list">
             <li>
-              {t(`refKind.${req.kind}` as MessageKey)}: <strong>{fmtAmount(id, req.recommended)}</strong>/{t('nutrient.day')}
+              {req.own ? t('nutrient.ownTarget') : t(`refKind.${req.kind}` as MessageKey)}: <strong>{fmtAmount(id, req.recommended)}</strong>/{t('nutrient.day')}
             </li>
+            {req.own && (
+              <li>
+                {t('nutrient.withoutOwn')}: {fmtAmount(id, req.own.referenceRecommended)}/{t('nutrient.day')}
+              </li>
+            )}
             {req.physiological !== req.recommended && (
               <li>
                 {t('nutrient.absorbedNeed')}: {fmtAmount(id, req.physiological)}/{t('nutrient.day')}
