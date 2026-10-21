@@ -7,6 +7,7 @@ import { amountField, leftOf, stockAmount, withAmount } from '../../logic/pantry
 import { repo } from '../../storage/repo';
 import { HOME_PLACES, type FoodRef, type HomePlace, type PantryItem } from '../../storage/types';
 import { Field, Segmented, Sheet } from '../../ui/controls';
+import { refHref } from '../food/links';
 import { BarcodeSheet } from '../log/BarcodeSheet';
 import { FoodPicker, type PickedFood } from '../log/FoodPicker';
 import { placeName, useMarkPantry, usePantryFoods, usePantryLeft } from './usePantry';
@@ -106,7 +107,11 @@ export function PantryItemSheet({ item, onClose }: { item: PantryItem; onClose: 
           <Field label={t('pantry.food')} hint={t('pantry.foodHint')}>
             {(id) => (
               <div className="row-between pantry-food" id={id}>
-                <span className={ref ? '' : 'muted'}>{ref ? (nameOfRef(ref) ?? item.name) : t('pantry.noFood')}</span>
+                {ref && ref === item.ref && refHref(d, ref) ? (
+                  <a href={refHref(d, ref)}>{nameOfRef(ref) ?? item.name}</a>
+                ) : (
+                  <span className={ref ? '' : 'muted'}>{ref ? (nameOfRef(ref) ?? item.name) : t('pantry.noFood')}</span>
+                )}
                 <button className="btn btn-small btn-ghost" onClick={() => setPicking('search')}>
                   {ref ? t('pantry.changeFood') : t('pantry.chooseFood')}
                 </button>

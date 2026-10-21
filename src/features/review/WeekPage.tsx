@@ -155,8 +155,8 @@ export function WeekPage({ week: param }: { week?: string }) {
               {recap.closed.length > 0 && <RecapLine icon="check" cls="week-st-fine" text={t('week.closed', { names: names(recap.closed) })} />}
               {recap.opened.length > 0 && <RecapLine icon="alert" cls="week-st-low" text={t('week.opened', { names: names(recap.opened) })} />}
               {recap.tooHigh.length > 0 && <RecapLine icon="up" cls="week-st-tooHigh" text={t('week.tooHigh', { names: names(recap.tooHigh) })} />}
-              {recap.improved && <RecapLine icon="up" cls="" text={t('week.improved', { name: nutrientName(recap.improved.id), from: fmtPercent(recap.improved.from), to: fmtPercent(recap.improved.to) })} />}
-              {recap.dropped && <RecapLine icon="down" cls="" text={t('week.dropped', { name: nutrientName(recap.dropped.id), from: fmtPercent(recap.dropped.from), to: fmtPercent(recap.dropped.to) })} />}
+              {recap.improved && <RecapLine to={href('nutrient', recap.improved.id)} icon="up" cls="" text={t('week.improved', { name: nutrientName(recap.improved.id), from: fmtPercent(recap.improved.from), to: fmtPercent(recap.improved.to) })} />}
+              {recap.dropped && <RecapLine to={href('nutrient', recap.dropped.id)} icon="down" cls="" text={t('week.dropped', { name: nutrientName(recap.dropped.id), from: fmtPercent(recap.dropped.from), to: fmtPercent(recap.dropped.to) })} />}
               {compare && !recap.closed.length && !recap.opened.length && !recap.improved && !recap.dropped && <li className="muted">{t('week.steady')}</li>}
             </ul>
             {suggestion?.kind === 'recipe' && (
@@ -224,11 +224,18 @@ export function WeekPage({ week: param }: { week?: string }) {
   );
 }
 
-function RecapLine({ icon, cls, text }: { icon: string; cls: string; text: string }) {
+/** One recap line; one about a single nutrient opens its page. */
+function RecapLine({ icon, cls, text, to }: { icon: string; cls: string; text: string; to?: string }) {
   return (
     <li className={`week-recap-line ${cls}`}>
       <Icon name={icon} size={16} />
-      <span>{text}</span>
+      {to ? (
+        <a className="week-recap-link" href={to}>
+          {text}
+        </a>
+      ) : (
+        <span>{text}</span>
+      )}
     </li>
   );
 }

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useData } from '../../app/data';
 import { useToast } from '../../app/toast';
-import { navigate } from '../../app/router';
+import { href, navigate } from '../../app/router';
 import { t } from '../../i18n';
 import { dayKey } from '../../lib/dates';
 import { refKey } from '../../lib/refs';
@@ -114,6 +114,11 @@ export function EditEntrySheet({ entry, onClose, nutrientsLink = true }: { entry
             </p>
           )}
           {draft.kind === 'food' && productDraft && <ProductInfo product={productDraft} />}
+          {draft.kind === 'food' && productDraft && d.productsById.has(productDraft.id) && (
+            <p className="muted small">
+              <a href={href('food', productDraft.id)}>{t('log.details')}</a>
+            </p>
+          )}
           {draft.kind === 'food' && !productDraft && food && (
             <p className="muted small">
               {food.nameDe} · <a href={`#/food/${food.code}`}>{t('log.details')}</a>

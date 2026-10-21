@@ -352,6 +352,7 @@ export const en = {
   'log.timeNote': 'Entries are timed {time} (when the meal ended). Change it in each entry.',
   'log.noResults': 'No food found. Try another word, or enter it manually.',
   'log.details': 'Nutrient profile',
+  'log.recipeDetails': 'Recipe and its nutrients',
   'log.amount': 'Amount',
   'log.lastTime': 'Last time',
   'log.wholePack': 'Whole pack',
@@ -696,6 +697,8 @@ export const en = {
   'shopping.addN': 'Add {n} to the list',
   'shopping.recipeAdded': '{n} items for {name} on the list.',
   'shopping.forRecipes': 'For {names}',
+  'shopping.forRecipesLead': 'For',
+  'shopping.foodPage': 'Nutrient profile',
   'shopping.empty': 'Nothing on the list. Type what you need, or add the ingredients of a recipe you plan to cook.',
   'shopping.basket': 'In the basket ({n})',
   'shopping.allInBasket': 'Everything is in the basket.',
@@ -1038,6 +1041,8 @@ export const en = {
   'mealNutrients.wholeMeal': 'Whole meal ({n} items)',
   'mealNutrients.per100': 'Per 100 g',
   'mealNutrients.edit': 'Edit',
+  'mealNutrients.recipe': 'Recipe: {name}',
+  'mealNutrients.food': 'Food page',
   'mealNutrients.drink': 'A tea or coffee mark has no nutrients of its own: it lowers how much iron the meals around it give you. Log the drink as a food to count what is in it.',
   'mealNutrients.ofEnergy': '{pct} of your day\'s energy',
   'mealNutrients.most': 'Most of your day',
@@ -1311,6 +1316,7 @@ export const en = {
   'food.noData': 'no data',
   'food.trace': 'trace',
   'food.someMissing': 'Some ingredients lack data',
+  'food.legendProduct': '% = share of your daily reference intake. Letters show where the value comes from: O the Open Food Facts label, U USDA, B the similar BLS food.',
   'food.legend': '% = share of your daily reference intake. Letters show where BLS took the value from (A analysis, R recipe calculation, L literature, D other database, U taken from a similar food, …).',
 
   // Settings

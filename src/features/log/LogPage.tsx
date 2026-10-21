@@ -56,6 +56,9 @@ export function LogPage({ day: dayParam, foodCode }: { day?: string; foodCode?: 
   const day = dayParam && /^\d{4}-\d{2}-\d{2}$/.test(dayParam) ? dayParam : d.today;
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<Selected>(() => {
+    // A food page's "Log this food": a BLS food, or a scanned or USDA product.
+    const product = foodCode ? d.productsById.get(foodCode) : undefined;
+    if (product) return { kind: 'product', product };
     const food = foodCode ? d.foods.byCode.get(foodCode) : undefined;
     return food ? { kind: 'food', food } : null;
   });
