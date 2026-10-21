@@ -7,7 +7,7 @@ import { refKey } from '../lib/refs';
 import { isOn } from '../settings/features';
 import { repo } from '../storage/repo';
 import { startAutoBackups } from './autoBackup';
-import type { Batch, CustomFood, DayStatusRecord, Fast, LogEntry, Product, Profile, Recipe, Settings, SunEntry } from '../storage/types';
+import type { ActivityRecord, Batch, CustomFood, DayStatusRecord, Fast, LogEntry, Product, Profile, Recipe, Settings, SunEntry } from '../storage/types';
 import { resolveRequirements, type ResolvedRequirements } from '../model/requirements';
 import { simulate, type SimulationResult } from '../model/simulate';
 import type { ModelEntry } from '../model/types';
@@ -44,6 +44,8 @@ export interface AppData {
   /** The days the model covers, aligned with `model.daily`. */
   modelDays: string[];
   activeFast: Fast | undefined;
+  /** Logged activities (also when the Activity module is off; then there are none new). */
+  activities: ActivityRecord[];
   /** Food code → recency boost (0–1), for search. */
   recentFoods: Map<string, number>;
   weightKg: number;
@@ -181,6 +183,7 @@ export function DataProvider({ children, fallback }: { children: ReactNode; fall
       model,
       modelDays: days,
       activeFast: activeFast(fasts, log, customFoodsById, today),
+      activities,
       recentFoods,
       weightKg: weight ?? 70,
     };

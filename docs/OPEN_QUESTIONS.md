@@ -72,6 +72,9 @@ Still open:
 - [ ] **Vitamin C** absorption at 3000 mg (extrapolated beyond Levine 1996).
 - [ ] **Vitamin K typical absorption** (0.5): EFSA says an average cannot be estimated; only affects the absorbed amount shown.
 
+- [ ] **Ketosis estimate** (`ketosis` in model/parameters.ts, 2026-10-21): the low-carbohydrate shift (central 7 h) is read off the reference curve from Gipson 2025's 12- and 24-h values, its high end (1.5 × central) and the straight line between 5 % and 55 % of energy from carbohydrate are assumptions; that shake also contained MCT oil. Exercise counts from 30 min moderate or hard (Deru 2021's session length not checked). The level spread between people (± 56 %) is from one time point in older overweight adults and assumed for every hour. The body-fat factor compares two different studies (Owen 1969 vs Cahill 1966) and fades out between 158 and 240 h. The phase lines 1.5 and 3 mmol/L are display choices. No source found for how long insulin stays raised after a meal, so the estimate shows no insulin phase.
+- [ ] **Ketosis band width:** ± 1 SD in timing plus ± 1 SD in level is a modelling choice; revisit once the owner's own meter readings exist.
+
 ## Engineering
 
 - [ ] **Model speed:** the whole history is recomputed after each change (≈0.2 s per year of heavy logging on a desktop CPU). If it feels slow on the phone, move the model into a Web Worker and/or cache daily totals.

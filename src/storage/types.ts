@@ -94,7 +94,8 @@ export type FeatureKey =
   | 'recipeIdeas'
   | 'saveChats'
   | 'shoppingList'
-  | 'atHome';
+  | 'atHome'
+  | 'ketosis';
 
 export interface Settings extends Versioned {
   id: 'settings';

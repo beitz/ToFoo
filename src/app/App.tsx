@@ -36,6 +36,7 @@ import { SavedChatsPage } from '../features/settings/SavedChatsPage';
 import { BackupPage, ExclusionsPage, NutrientVisibilityPage, SavedPage, StartPage } from '../features/settings/MorePages';
 import { InsightsPage } from '../features/insights/InsightsPage';
 import { Onboarding } from '../features/onboarding/Onboarding';
+import { FastPage } from '../features/fast/FastPage';
 
 function Page({ route }: { route: string[] }) {
   const d = useData();
@@ -108,6 +109,8 @@ function Page({ route }: { route: string[] }) {
       return <WeekPage week={b} />;
     case 'fast':
       return <FastShortcut />;
+    case 'fasting':
+      return <FastPage />;
     case 'sleep':
       return <SleepShortcut />;
     default:

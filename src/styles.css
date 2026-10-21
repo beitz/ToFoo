@@ -2091,6 +2091,94 @@ body:has(.composer) .toast-area {
   color: var(--accent);
   font-weight: 600;
 }
+.home-fasting {
+  min-height: 44px;
+  text-decoration: none;
+}
+.home-fasting > svg {
+  flex: none;
+}
+.home-fasting > span {
+  flex: 1;
+}
+.home-fasting-ketosis {
+  font-weight: 400;
+}
+.fast-hours {
+  font-size: 2rem;
+  font-weight: 700;
+  margin: 0;
+}
+.fast-phase {
+  margin: 0 0 4px;
+}
+.fast-phase::first-letter {
+  text-transform: uppercase;
+}
+.fast-sub {
+  font-size: 1rem;
+  margin: 14px 0 4px;
+}
+.fast-factors {
+  margin: 0;
+  padding-left: 1.2em;
+}
+.fast-factors li {
+  margin: 3px 0;
+}
+.fast-guide {
+  margin-top: 12px;
+}
+.fast-sources {
+  padding-left: 1.2em;
+}
+.fast-sources li {
+  margin: 6px 0;
+}
+.fast-guide summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  color: var(--accent);
+  font-weight: 600;
+}
+.ketosis-chart {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin: 8px 0 4px;
+}
+.ketosis-chart-band {
+  fill: var(--accent-soft);
+}
+.ketosis-chart-line {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+.ketosis-chart-phase {
+  stroke: var(--border);
+  stroke-dasharray: 3 3;
+}
+.ketosis-chart-base {
+  stroke: var(--border);
+}
+.ketosis-chart-now {
+  stroke: var(--text-muted);
+  stroke-dasharray: 2 2;
+}
+.ketosis-chart-dot {
+  fill: var(--accent);
+  stroke: var(--surface);
+  stroke-width: 2;
+}
+.ketosis-chart-axis,
+.ketosis-chart-label {
+  font-size: 10px;
+  fill: var(--text-muted);
+}
 
 /* ── Journal ─────────────────────────────────────────────────── */
 .diary-actions {
