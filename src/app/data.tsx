@@ -1,6 +1,7 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { loadFoodDb, groupSearchBoost, type FoodDb } from '../foods/foodDb';
+import { autoMatches, wantsAutoMatch } from '../foods/productMatch';
 import { buildIndex, type SearchIndex } from '../foods/search';
 import { dayRange, todayKey, addDays } from '../lib/dates';
 import { refKey } from '../lib/refs';
@@ -108,6 +109,19 @@ export function DataProvider({ children, fallback }: { children: ReactNode; fall
   const ketones = useLiveQuery(() => repo.db.ketones.orderBy('time').toArray(), []);
 
   const searchIndex = useMemo(() => (foods ? buildIndex(foods.foods.map((f) => ({ key: f.code, nameEn: f.nameEn, nameDe: f.nameDe }))) : null), [foods]);
+
+  // Products saved without a similar BLS food (scanned for At home, logged before the app picked one)
+  // get the app's best match, marked as its own pick for the user to check. Each product is tried
+  // once per session; one without a close enough food stays unpaired and shows up to check.
+  const triedMatch = useRef(new Set<string>());
+  useEffect(() => {
+    if (!initialised || !foods || !searchIndex || !productList) return;
+    const todo = productList.filter((p) => wantsAutoMatch(p) && !triedMatch.current.has(p.id));
+    if (!todo.length) return;
+    for (const p of todo) triedMatch.current.add(p.id);
+    const picks = autoMatches(todo, searchIndex, foods.version, (key) => groupSearchBoost(key.charAt(0)));
+    if (picks.length) void repo.setAutoMatches(picks);
+  }, [initialised, foods, searchIndex, productList]);
 
   const theme = settings?.theme;
   useEffect(() => {

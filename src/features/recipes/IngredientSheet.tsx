@@ -4,14 +4,13 @@ import { t } from '../../i18n';
 import type { Food } from '../../foods/foodDb';
 import { productFood, productLabel } from '../../foods/products';
 import type { Preparation } from '../../model/paramTypes';
-import { repo } from '../../storage/repo';
 import type { Product } from '../../storage/types';
 import { Field, NumberInput, Sheet } from '../../ui/controls';
 import { Icon } from '../../ui/Icon';
 import { BarcodeSheet } from '../log/BarcodeSheet';
 import { FoodPicker, type PickedFood } from '../log/FoodPicker';
 import { PreparationSelect } from '../log/PreparationSelect';
-import { MatchPicker, ProductInfo } from '../log/ProductParts';
+import { MatchPicker, ProductInfo, saveProductChoice, useMatchChoice } from '../log/ProductParts';
 
 /** An ingredient being added or changed: a BLS food, or a product (Open Food Facts or USDA) as a food. */
 export interface IngredientDraft {
@@ -59,18 +58,13 @@ export function IngredientSheet({
   const [mode, setMode] = useState<'edit' | 'pick' | 'scan'>(startWith);
   const [food, setFood] = useState<Food | undefined>(initial.product ? undefined : initial.food);
   const [product, setProduct] = useState<Product | undefined>(initial.product);
-  const [match, setMatch] = useState<Food | undefined>(() => (initial.product?.match ? d.foods.byCode.get(initial.product.match.code) : undefined));
   const [grams, setGrams] = useState<number | undefined>(initial.grams);
   const [preparation, setPreparation] = useState<Preparation>(initial.preparation);
-  const productDraft = useMemo<Product | undefined>(() => {
-    if (!product) return undefined;
-    const { match: _saved, ...rest } = product;
-    return match ? { ...rest, match: { version: d.foods.version, code: match.code } } : rest;
-  }, [product, match, d.foods.version]);
+  const { choice, setChoice, draft: productDraft, reset: resetChoice } = useMatchChoice(product);
   const current = productDraft ? productFood(productDraft, d.foods) : food;
   const name = productDraft ? productLabel(productDraft) : (current?.nameEn ?? label ?? '');
   // A product with no label values and no matched food would count nothing but a name.
-  const hasValues = !productDraft || Object.keys(productDraft.per100).length > 0 || !!match;
+  const hasValues = !productDraft || Object.keys(productDraft.per100).length > 0 || !!choice.food;
   const valid = !!current && !!grams && grams > 0 && hasValues;
   const item = useMemo<SavedIngredient | undefined>(
     () => (valid && current ? { food: current, ...(productDraft ? { product: productDraft } : {}), grams: grams!, preparation } : undefined),
@@ -86,12 +80,12 @@ export function IngredientSheet({
 
   function pick(p: PickedFood) {
     if (p.product) {
-      setMatch(p.product.match ? d.foods.byCode.get(p.product.match.code) : blsBefore());
+      resetChoice(p.product, blsBefore());
       setProduct(p.product);
       setFood(undefined);
     } else {
       setProduct(undefined);
-      setMatch(undefined);
+      resetChoice(undefined);
       setFood(p.food);
     }
     setMode('edit');
@@ -101,8 +95,7 @@ export function IngredientSheet({
     if (!valid || !current) return;
     if (productDraft) {
       // Saved on this phone, as when a product is logged, so the recipe can refer to it.
-      await repo.saveProduct(productDraft);
-      await repo.setProductMatch(productDraft.id, productDraft.match ?? null);
+      await saveProductChoice(productDraft);
     }
     onSave(item!);
   }
@@ -128,7 +121,7 @@ export function IngredientSheet({
           <Field label={gramsLabel ?? t('recipes.gramsInRecipe')}>
             {(id) => <NumberInput id={id} value={grams} onChange={setGrams} placeholder="0" suffix={productDraft?.perMl ? 'ml' : 'g'} min={0} autoFocus={!grams} />}
           </Field>
-          {productDraft && <MatchPicker key={productDraft.id} product={productDraft} match={match} onChange={setMatch} />}
+          {productDraft && <MatchPicker key={productDraft.id} product={productDraft} choice={choice} onChange={setChoice} />}
           <PreparationSelect id="ingredient-prep" value={preparation} onChange={setPreparation} />
           {preview?.(item)}
           <div className="sheet-actions">

@@ -181,7 +181,11 @@ export const productSchema = z
     perMl: z.boolean().optional(),
     categories: z.array(z.string()),
     lastModified: z.number().optional(),
-    match: z.object({ version: z.string(), code: blsRef.shape.code }).optional().describe('BLS food that supplies the nutrients the source lacks'),
+    match: z
+      .object({ version: z.string(), code: blsRef.shape.code, auto: z.literal(true).optional().describe('Picked by the app, not checked by the user yet') })
+      .optional()
+      .describe('BLS food that supplies the nutrients the source lacks'),
+    labelOnly: z.literal(true).optional().describe('The user chose no similar food: only the values from the source count'),
     fetchedAt: z.number(),
   })
   .describe('A food from an online database, as fetched: a packaged product from Open Food Facts (ODbL) or a food from USDA FoodData Central (public domain)');

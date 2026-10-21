@@ -1,11 +1,15 @@
 import { useMemo, useState } from 'react';
 import { useData } from '../../app/data';
+import { href } from '../../app/router';
+import { useToast } from '../../app/toast';
 import { t } from '../../i18n';
 import type { Food } from '../../foods/foodDb';
-import { hasOwnMicros, matchQueries, productPageUrl } from '../../foods/products';
+import { hasOwnMicros, productLabel, productPageUrl } from '../../foods/products';
+import { initialChoice, rankMatches, withChoice, type MatchChoice } from '../../foods/productMatch';
 import { search } from '../../foods/search';
 import { fmtAmount, fmtNumber } from '../../lib/format';
 import { NUTRIENT_BY_ID } from '../../model/nutrients';
+import { repo } from '../../storage/repo';
 import type { Product } from '../../storage/types';
 import { Icon } from '../../ui/Icon';
 
@@ -47,17 +51,19 @@ export function ProductInfo({ product }: { product: Product }) {
 }
 
 /** Choose the BLS food whose vitamins and minerals stand in for what the label (or USDA) lacks. */
-export function MatchPicker({ product, match, onChange }: { product: Product; match: Food | undefined; onChange: (f: Food | undefined) => void }) {
+export function MatchPicker({ product, choice, onChange, linked }: { product: Product; choice: MatchChoice; onChange: (c: MatchChoice) => void; linked?: boolean }) {
   const d = useData();
   // USDA generic foods have their own vitamins and minerals, so the picker starts closed.
   const own = hasOwnMicros(product);
-  const [open, setOpen] = useState(!match && !own);
+  const match = choice.food;
+  const [open, setOpen] = useState(!match && choice.auto && !own);
   const [query, setQuery] = useState('');
   const options = useMemo(() => {
-    const opts = { limit: SUGGESTIONS, boost: d.searchBoost };
     const keys = query.trim()
-      ? search(d.searchIndex, query, opts).map((r) => r.key)
-      : [...new Set(matchQueries(product).flatMap((q) => search(d.searchIndex, q, { ...opts, limit: 2 }).map((r) => r.key)))].slice(0, SUGGESTIONS);
+      ? search(d.searchIndex, query, { limit: SUGGESTIONS, boost: d.searchBoost }).map((r) => r.key)
+      : rankMatches(product, d.searchIndex, d.searchBoost)
+          .slice(0, SUGGESTIONS)
+          .map((r) => r.key);
     return keys.map((k) => d.foods.byCode.get(k)).filter((f): f is Food => !!f);
   }, [query, product, d.searchIndex, d.searchBoost, d.foods]);
 
@@ -65,13 +71,27 @@ export function MatchPicker({ product, match, onChange }: { product: Product; ma
     <div className="field match-picker">
       <span className="field-label">{t(own ? 'usda.matchLabel' : 'off.matchLabel')}</span>
       <div className="row-between">
-        <span>{match ? match.nameEn : <span className="muted">{t(own ? 'usda.matchNone' : 'off.matchNone')}</span>}</span>
+        <span>
+          {match ? (
+            linked ? <a href={href('food', match.code)}>{match.nameEn}</a> : match.nameEn
+          ) : (
+            <span className="muted">{t(!choice.auto ? 'match.labelOnly' : own ? 'usda.matchNone' : 'match.noneFound')}</span>
+          )}
+        </span>
         {!open && (
           <button className="btn btn-small btn-ghost" onClick={() => setOpen(true)}>
             {t('off.matchChange')}
           </button>
         )}
       </div>
+      {match && choice.auto && !open && (
+        <div className="row-between match-auto">
+          <span className="muted small">{t('match.auto')}</span>
+          <button className="btn btn-small btn-secondary" onClick={() => onChange({ food: match, auto: false })}>
+            {t('match.confirm')}
+          </button>
+        </div>
+      )}
       <div className="field-hint">{t(own ? 'usda.matchHint' : 'off.matchHint')}</div>
       {open && (
         <>
@@ -86,7 +106,7 @@ export function MatchPicker({ product, match, onChange }: { product: Product; ma
                 <button
                   className={`result${match?.code === f.code ? ' on' : ''}`}
                   onClick={() => {
-                    onChange(f);
+                    onChange({ food: f, auto: false });
                     setOpen(false);
                     setQuery('');
                   }}
@@ -99,19 +119,54 @@ export function MatchPicker({ product, match, onChange }: { product: Product; ma
               </li>
             ))}
           </ul>
-          {match && (
-            <button
-              className="btn btn-small btn-ghost"
-              onClick={() => {
-                onChange(undefined);
-                setOpen(false);
-              }}
-            >
-              {t(own ? 'usda.matchNone' : 'off.matchClear')}
-            </button>
-          )}
+          <button
+            className="btn btn-small btn-ghost"
+            onClick={() => {
+              onChange({ auto: false });
+              setOpen(false);
+            }}
+          >
+            {t(own ? 'usda.matchNone' : 'off.matchClear')}
+          </button>
         </>
       )}
     </div>
   );
+}
+
+/** The sheets' choice of similar food: the saved one, else the app's pick; and the product as it will be saved. */
+export function useMatchChoice(product: Product | undefined) {
+  const d = useData();
+  const start = (p: Product | undefined, guess?: Food): MatchChoice => {
+    if (!p) return { auto: true };
+    // The food a replaced entry or ingredient had is a better first guess than a name search.
+    if (guess && !p.match && !p.labelOnly) return { food: guess, auto: true };
+    return initialChoice(p, d.foods, d.searchIndex, d.searchBoost);
+  };
+  const [choice, setChoice] = useState<MatchChoice>(() => start(product));
+  const draft = useMemo(() => (product ? withChoice(product, choice, d.foods.version) : undefined), [product, choice, d.foods.version]);
+  /** Start over for another product (picked in the sheet). */
+  const reset = (p: Product | undefined, guess?: Food) => setChoice(start(p, guess));
+  return { choice, setChoice, draft, reset };
+}
+
+/** Save a product with its pairing, as chosen in a sheet. */
+export async function saveProductChoice(draft: Product): Promise<void> {
+  await repo.saveProduct(draft);
+  await repo.setProductMatch(draft.id, draft);
+}
+
+/** A saved product's similar food, on its page: checked or changed straight away, with undo. */
+export function SavedMatchPicker({ product }: { product: Product }) {
+  const d = useData();
+  const toast = useToast();
+  const food = product.match ? d.foods.byCode.get(product.match.code) : undefined;
+  const choice: MatchChoice = food ? { food, auto: !!product.match?.auto } : { auto: !product.labelOnly };
+  async function change(c: MatchChoice) {
+    const before: Pick<Product, 'match' | 'labelOnly'> = { ...(product.match ? { match: product.match } : {}), ...(product.labelOnly ? { labelOnly: true as const } : {}) };
+    await repo.setProductMatch(product.id, withChoice(product, c, d.foods.version));
+    const name = productLabel(product);
+    toast(c.food ? t('match.saved', { name, food: c.food.nameEn }) : t('match.savedNone', { name }), () => repo.setProductMatch(product.id, before));
+  }
+  return <MatchPicker key={product.id} product={product} choice={choice} onChange={(c) => void change(c)} linked />;
 }

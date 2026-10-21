@@ -35,7 +35,7 @@ async function saveChangedProducts(changes: readonly ProposedChange[], used: rea
     const p = c.item?.product;
     if (!p || !ids.has(p.id)) continue;
     await repo.saveProduct(p);
-    await repo.setProductMatch(p.id, p.match ?? null);
+    await repo.setProductMatch(p.id, p);
   }
 }
 

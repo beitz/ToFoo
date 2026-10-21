@@ -5,9 +5,9 @@ import { t } from '../../i18n';
 import { fmtAmount, fmtPercent } from '../../lib/format';
 import { NUTRIENTS } from '../../model/nutrients';
 import { Icon } from '../../ui/Icon';
-import { hasOwnMicros, isProductCode, productFood } from '../../foods/products';
+import { isProductCode, productFood } from '../../foods/products';
 import { partSource } from '../../logic/mealNutrients';
-import { ProductInfo } from '../log/ProductParts';
+import { ProductInfo, SavedMatchPicker } from '../log/ProductParts';
 import { nutrientType } from '../home/grouping';
 import { GroupInfoButton, groupTitle, hasGroupInfo } from '../info/GroupInfo';
 import { BackButton } from '../../ui/BackButton';
@@ -22,7 +22,6 @@ export function FoodPage({ code }: { code: string }) {
   const food = product ? productFood(product, d.foods) : d.foods.byCode.get(code);
   if (!food) return <p>{t('food.notFound')}</p>;
   const group = d.foods.groups[food.group];
-  const match = product?.match ? d.foods.byCode.get(product.match.code) : undefined;
   return (
     <section>
       <header className="page-head row">
@@ -32,15 +31,7 @@ export function FoodPage({ code }: { code: string }) {
       {product ? (
         <>
           <ProductInfo product={product} />
-          <p className="muted small">
-            {match ? (
-              <>
-                {t(hasOwnMicros(product) ? 'source.gapsFrom' : 'source.restFrom')} <a href={href('food', match.code)}>{match.nameEn}</a> <span className="muted">(BLS {match.code})</span>
-              </>
-            ) : (
-              t(hasOwnMicros(product) ? 'source.noMatchGeneric' : 'source.noMatch')
-            )}
-          </p>
+          <SavedMatchPicker product={product} />
         </>
       ) : (
         <p className="muted">

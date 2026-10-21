@@ -1237,7 +1237,7 @@ function ProposalCard({ card, day, toast, onLogged, register }: CardProps<Extrac
         let ref: FoodRef = { source: 'BLS', version: d.foods.version, code: it.food.code };
         if (it.product) {
           await repo.saveProduct(it.product);
-          await repo.setProductMatch(it.product.id, it.product.match ?? null);
+          await repo.setProductMatch(it.product.id, it.product);
           ref = productRef(it.product);
         }
         const entry = await repo.addLog({
@@ -1359,7 +1359,7 @@ function IngredientsCard({ card, toast, onLogged, register, recipe }: CardProps<
       for (const it of items) {
         if (!it.product) continue;
         await repo.saveProduct(it.product);
-        await repo.setProductMatch(it.product.id, it.product.match ?? null);
+        await repo.setProductMatch(it.product.id, it.product);
       }
     } finally {
       setSaving(false);

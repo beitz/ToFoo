@@ -231,8 +231,9 @@ export type LogEntry =
  * A food fetched from an online database (Open Food Facts or USDA FoodData Central), kept so
  * entries stay computable offline and the same after the source edits it. For a packaged product
  * the label values come from the source; everything the label lacks (most vitamins and minerals)
- * is borrowed from `match`, the closest BLS food, when one is chosen. USDA generic foods carry
- * most nutrients themselves; `match` only fills their gaps.
+ * is borrowed from `match`, the closest BLS food. The app picks one by itself (`auto`) until the
+ * user checks or changes it; `labelOnly` records that the user wants none. USDA generic foods carry
+ * most nutrients themselves; `match` only fills their gaps and is never picked by the app.
  */
 export interface Product extends Versioned, ProductData {
   /** `OFF:<barcode>` or `USDA:<fdcId>`. */
@@ -240,7 +241,10 @@ export interface Product extends Versioned, ProductData {
   source: ProductSource;
   /** USDA only: which FoodData Central data type the food comes from. */
   usdaType?: UsdaDataType;
-  match?: { version: string; code: string };
+  /** `auto`: picked by the app (src/foods/productMatch.ts), not checked by the user yet. */
+  match?: { version: string; code: string; auto?: true };
+  /** The user chose no similar food: only the source's own values count. */
+  labelOnly?: true;
   /** When the label values were fetched (epoch ms). */
   fetchedAt: number;
 }

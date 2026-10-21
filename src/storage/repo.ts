@@ -96,6 +96,12 @@ async function undoChange<T>(table: Table<T, string>, u: { before: T[]; created:
   await table.bulkPut(u.before);
 }
 
+/** A product's BLS pairing on its own: the match, else "label only", else nothing. */
+function pairOf(p: Pick<Product, 'match' | 'labelOnly'> | undefined): Pick<Product, 'match' | 'labelOnly'> {
+  if (p?.match) return { match: p.match };
+  return p?.labelOnly ? { labelOnly: true } : {};
+}
+
 export function createRepo(db: ToFooDB) {
   const v = CURRENT_SCHEMA_VERSION;
 
@@ -273,24 +279,37 @@ export function createRepo(db: ToFooDB) {
     async getProduct(id: string): Promise<Product | undefined> {
       return db.products.get(id);
     },
-    /** Save (or refresh) a product; a refresh keeps the chosen BLS match unless a new one is given. */
+    /** Save (or refresh) a product; a refresh keeps the BLS match (or "label only") unless a new choice is given. */
     async saveProduct(product: Omit<Product, 'schemaVersion'>): Promise<Product> {
       return db.transaction('rw', db.products, async () => {
         const old = await db.products.get(product.id);
-        const match = product.match ?? old?.match;
-        const rec: Product = { ...product, ...(match ? { match } : {}), schemaVersion: v };
+        const { match: _m, labelOnly: _l, ...rest } = product;
+        const pair = product.match || product.labelOnly ? product : old;
+        const rec: Product = { ...rest, ...pairOf(pair), schemaVersion: v };
         await db.products.put(rec);
         return rec;
       });
     },
-    async setProductMatch(id: string, match: Product['match'] | null): Promise<void> {
+    /** Set a product's similar BLS food, or none (`labelOnly` when the user chose none). */
+    async setProductMatch(id: string, pair: Pick<Product, 'match' | 'labelOnly'>): Promise<void> {
       await db.transaction('rw', db.products, async () => {
         const p = await db.products.get(id);
         if (!p) return;
-        const next: Product = { ...p, schemaVersion: v };
-        if (match) next.match = match;
-        else delete next.match;
-        await db.products.put(next);
+        const { match: _m, labelOnly: _l, ...rest } = p;
+        await db.products.put({ ...rest, ...pairOf(pair), schemaVersion: v });
+      });
+    },
+    /** Store the app's own picks, for products that still have no similar food and no "label only". */
+    async setAutoMatches(picks: ReadonlyArray<{ id: string; match: NonNullable<Product['match']> }>): Promise<number> {
+      return db.transaction('rw', db.products, async () => {
+        let n = 0;
+        for (const { id, match } of picks) {
+          const p = await db.products.get(id);
+          if (!p || p.match || p.labelOnly) continue;
+          await db.products.put({ ...p, match: { ...match, auto: true }, schemaVersion: v });
+          n++;
+        }
+        return n;
       });
     },
 

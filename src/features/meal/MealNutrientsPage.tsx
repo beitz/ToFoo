@@ -494,9 +494,12 @@ function ItemSource({ code, entry }: { code?: string; entry: LogEntry }) {
           {match ? (
             <>
               {t(generic ? 'source.gapsFrom' : 'source.restFrom')} <a href={href('food', match.code)}>{match.nameEn}</a> <span className="muted">(BLS {match.code})</span>
+              {product.match?.auto && <span className="muted"> · {t('match.autoShort')}</span>} · <a href={href('food', product.id)}>{t('off.matchChange')}</a>
             </>
           ) : (
-            t(generic ? 'source.noMatchGeneric' : 'source.noMatch')
+            <>
+              {t(generic ? 'source.noMatchGeneric' : 'source.noMatch')} <a href={href('food', product.id)}>{t('match.choose')}</a>
+            </>
           )}
         </p>
       </>

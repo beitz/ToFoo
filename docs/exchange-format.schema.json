@@ -2310,12 +2310,22 @@
                       "code": {
                         "type": "string",
                         "pattern": "^[A-Z][0-9A-Z]{6}$"
+                      },
+                      "auto": {
+                        "description": "Picked by the app, not checked by the user yet",
+                        "type": "boolean",
+                        "const": true
                       }
                     },
                     "required": [
                       "version",
                       "code"
                     ]
+                  },
+                  "labelOnly": {
+                    "description": "The user chose no similar food: only the values from the source count",
+                    "type": "boolean",
+                    "const": true
                   },
                   "fetchedAt": {
                     "type": "number"

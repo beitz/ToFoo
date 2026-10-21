@@ -34,6 +34,7 @@ import { ProfilePage } from '../features/settings/ProfilePage';
 import { SunPage } from '../features/settings/SunPage';
 import { DiagnosticsPage } from '../features/settings/DiagnosticsPage';
 import { SavedChatsPage } from '../features/settings/SavedChatsPage';
+import { ProductsPage } from '../features/settings/ProductsPage';
 import { BackupPage, ExclusionsPage, NutrientVisibilityPage, SavedPage, StartPage } from '../features/settings/MorePages';
 import { InsightsPage } from '../features/insights/InsightsPage';
 import { Onboarding } from '../features/onboarding/Onboarding';
@@ -97,6 +98,8 @@ function Page({ route }: { route: string[] }) {
           return <DiagnosticsPage />;
         case 'chats':
           return <SavedChatsPage />;
+        case 'products':
+          return <ProductsPage />;
         default:
           return <SettingsPage />;
       }

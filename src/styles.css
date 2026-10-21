@@ -1041,6 +1041,20 @@ textarea:focus-visible,
   min-width: 0;
   border-bottom: none;
 }
+.product-check {
+  padding: 0 14px;
+}
+.product-check > li:last-child {
+  border-bottom: none;
+}
+.product-check .btn {
+  flex: none;
+  margin-left: 8px;
+}
+.match-auto {
+  gap: 8px;
+  margin-top: 4px;
+}
 .fav-star {
   color: var(--text-muted);
 }
