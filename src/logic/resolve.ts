@@ -45,6 +45,7 @@ export function ingredientFood(ing: Ingredient, ctx: FoodContext & { salt: Profi
 function partFromFood(food: Food, grams: number, preparation: FoodPart['preparation'], storage: FoodPart['storage']): FoodPart {
   return {
     label: food.nameEn,
+    code: food.code,
     grams,
     per100: food.per100,
     provenance: food.provenance,
