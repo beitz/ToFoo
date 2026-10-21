@@ -8,7 +8,7 @@ import { search } from '../../foods/search';
 import type { Food } from '../../foods/foodDb';
 import { repo } from '../../storage/repo';
 import type { Batch, CustomFood, FavouriteMeal, FoodRef, LogEntry, Product } from '../../storage/types';
-import { productLabel } from '../../foods/products';
+import { needsCheck, productLabel } from '../../foods/products';
 import { UsdaResults } from './UsdaResults';
 import { FoodList } from './FoodList';
 import { EditEntrySheet } from '../diary/EditEntrySheet';
@@ -77,6 +77,7 @@ export function LogPage({ day: dayParam, foodCode }: { day?: string; foodCode?: 
   }, [query, d.customFoods]);
   const offOn = isOn(d.settings.features, 'openFoodFacts');
   const usdaOn = isOn(d.settings.features, 'usda');
+  const productsToCheck = useMemo(() => d.products.filter(needsCheck).length, [d.products]);
   // Products looked up before stay on this phone and are found by name without any request.
   const productMatches = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -419,6 +420,11 @@ export function LogPage({ day: dayParam, foodCode }: { day?: string; foodCode?: 
 
           {(offOn || usdaOn) && d.products.length > 0 && (
             <LogSection id="products" title={t(usdaOn ? 'products.saved' : 'off.products')}>
+              {productsToCheck > 0 && (
+                <p className="small">
+                  <a href={href('settings', 'products')}>{t('match.toCheckLink', { n: productsToCheck })}</a>
+                </p>
+              )}
               <ProductList pinnable products={d.products.slice(0, RECENT_PRODUCTS)} onPick={(product) => setSelected({ kind: 'product', product })} />
             </LogSection>
           )}

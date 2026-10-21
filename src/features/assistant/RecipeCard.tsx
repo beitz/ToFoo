@@ -61,7 +61,7 @@ export function RecipeCard({ card, toast, onLogged, register }: CardProps<Extrac
       for (const it of items) {
         if (!it.product) continue;
         await repo.saveProduct(it.product);
-        await repo.setProductMatch(it.product.id, it.product.match ?? null);
+        await repo.setProductMatch(it.product.id, it.product);
       }
       const fields = { name: name.trim(), portions: portions!, ingredients: ingredients(items) };
       const summary = { name: fields.name, portions: fields.portions, items: items.map(itemSummary), ...(instructions.trim() ? { instructions: instructions.trim() } : {}) };

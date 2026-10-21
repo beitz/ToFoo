@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useData } from '../../app/data';
 import { t } from '../../i18n';
@@ -15,7 +15,7 @@ import { Field, NumberInput, Sheet } from '../../ui/controls';
 import { ConfidenceField } from './ConfidenceField';
 import { TimeField } from './TimeField';
 import { PreparationSelect } from './PreparationSelect';
-import { MatchPicker, ProductInfo } from './ProductParts';
+import { MatchPicker, ProductInfo, saveProductChoice, useMatchChoice } from './ProductParts';
 import { FavouriteButton } from './FavouriteButton';
 
 /** Saved portion sizes are in backups (src/storage/autoBackup.ts `readSnapshot`). */
@@ -27,12 +27,7 @@ type Target = { food: Food; product?: undefined } | { product: Product; food?: u
 export function AmountSheet({ day, time: initialTime, onClose, onAdded, ...target }: Target & { day: string; time: number; onClose: () => void; onAdded: (e: LogEntry) => void }) {
   const d = useData();
   const product = target.product;
-  const [match, setMatch] = useState<Food | undefined>(() => (product?.match ? d.foods.byCode.get(product.match.code) : undefined));
-  const draft = useMemo<Product | undefined>(() => {
-    if (!product) return undefined;
-    const { match: _saved, ...rest } = product;
-    return match ? { ...rest, match: { version: d.foods.version, code: match.code } } : rest;
-  }, [product, match, d.foods.version]);
+  const { choice, setChoice, draft } = useMatchChoice(product);
   const food = draft ? productFood(draft, d.foods) : target.food!;
   const name = draft ? productLabel(draft) : food.nameEn;
 
@@ -50,14 +45,13 @@ export function AmountSheet({ day, time: initialTime, onClose, onAdded, ...targe
   const pack = packGrams && packGrams !== draft?.serving?.grams ? [{ label: t('log.wholePack'), grams: packGrams }] : [];
   const chips: PortionHelper[] = [...helpers, ...serving, ...pack, ...(last ? [{ label: t('log.lastTime'), grams: last }] : []), { label: '50 g', grams: 50 }, { label: '100 g', grams: 100 }, { label: '200 g', grams: 200 }];
   // A product with no label values and no matched food would log nothing but a name.
-  const hasValues = !draft || Object.keys(draft.per100).length > 0 || !!match;
+  const hasValues = !draft || Object.keys(draft.per100).length > 0 || !!choice.food;
 
   async function save() {
     if (!grams || !hasValues) return;
     let ref: FoodRef = { source: 'BLS', version: d.foods.version, code: food.code };
     if (draft) {
-      await repo.saveProduct(draft);
-      await repo.setProductMatch(draft.id, draft.match ?? null);
+      await saveProductChoice(draft);
       ref = productRef(draft);
     }
     const entry = await repo.addLog({ kind: 'food', ref, grams, preparation: prep, time, day: time ? dayKey(new Date(time)) : day, confidence, label: name });
@@ -106,7 +100,7 @@ export function AmountSheet({ day, time: initialTime, onClose, onAdded, ...targe
           </button>
         </div>
       ) : null}
-      {draft && <MatchPicker product={draft} match={match} onChange={setMatch} />}
+      {draft && <MatchPicker product={draft} choice={choice} onChange={setChoice} />}
       <PreparationSelect value={prep} onChange={setPrep} />
       <ConfidenceField value={confidence} onChange={setConfidence} />
       <TimeField value={time} onChange={setTime} />

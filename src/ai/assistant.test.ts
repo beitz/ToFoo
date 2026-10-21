@@ -314,6 +314,17 @@ describe('packaged products (Open Food Facts lookup on)', () => {
     expect(kept.ok && kept.proposal.items[0]!.product?.match?.code).toBe('S450000');
     const unknown = validateProposal(item('OFF:1234', 'S450000'), db, p);
     expect(!unknown.ok && unknown.error).toContain('Unknown product OFF:1234');
+    // The app's own pick stands without micros_from, and gives way to the assistant's.
+    p.seen.set(giotto.id, { ...giotto, match: { version: '4.0', code: 'S450000', auto: true } });
+    const auto = validateProposal(item('OFF:4008400121925', ''), db, p);
+    expect(auto.ok && auto.proposal.items[0]!.product?.match).toEqual({ version: '4.0', code: 'S450000', auto: true });
+    const closer = validateProposal(item('OFF:4008400121925', 'D7A5400'), db, p);
+    expect(closer.ok && closer.proposal.items[0]!.product?.match).toEqual({ version: '4.0', code: 'D7A5400' });
+    // "Label values only" is the user's choice too.
+    p.seen.set(giotto.id, { ...giotto, labelOnly: true });
+    const labelOnly = validateProposal(item('OFF:4008400121925', 'S450000'), db, p);
+    expect(labelOnly.ok && labelOnly.proposal.items[0]!.product).toMatchObject({ labelOnly: true });
+    expect(labelOnly.ok && labelOnly.proposal.items[0]!.product?.match).toBeUndefined();
   });
 
   it('offers lookup_barcode only when the lookup is on, and passes barcodes read from photos', async () => {

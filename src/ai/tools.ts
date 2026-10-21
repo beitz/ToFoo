@@ -454,7 +454,13 @@ export function describeProduct(p: Product, db: Pick<FoodDb, 'byCode'>): string 
     ...(p.source === 'USDA' ? [own ? `USDA ${p.usdaType}, generic food with full nutrient data` : 'USDA branded product (US label)'] : []),
     sizes || 'size unknown',
     label.length ? `${own ? '' : 'label '}${per}: ${label.join(', ')}` : 'no nutrition values on the label data',
-    match ? `${own ? 'gaps filled' : 'micronutrients'} from ${match.code} ${match.nameEn} (chosen by the user)` : own ? 'no similar BLS food chosen (optional)' : 'no similar BLS food chosen yet',
+    match
+      ? `${own ? 'gaps filled' : 'micronutrients'} from ${match.code} ${match.nameEn} (${p.match?.auto ? 'picked by the app, not checked: give micros_from if a closer food fits' : 'chosen by the user'})`
+      : p.labelOnly
+        ? 'label values only (the user chose no similar food)'
+        : own
+          ? 'no similar BLS food chosen (optional)'
+          : 'no similar BLS food chosen yet',
   ].join(' | ');
 }
 
@@ -734,16 +740,17 @@ function validateItems(
     let product: Product | undefined;
     if (isProductCode(code)) {
       const found = knownProduct(code, products);
+      const microsFrom = it.micros_from?.trim() ?? '';
+      const match = microsFrom ? db.byCode.get(microsFrom) : undefined;
       if (!found) problems.push(`Unknown product ${code}: use only codes returned by lookup_barcode, search_usda or search_foods.`);
-      else if (found.match) product = found;
-      else {
-        const microsFrom = it.micros_from?.trim() ?? '';
-        const match = microsFrom ? db.byCode.get(microsFrom) : undefined;
-        // USDA generic foods have their own vitamins and minerals; a similar BLS food only fills gaps.
-        if (match) product = { ...found, match: { version: db.version ?? '4.0', code: match.code } };
-        else if (hasOwnMicros(found) && !microsFrom) product = found;
-        else problems.push(`${code}: micros_from must be the BLS code (from search_foods) of the most similar generic food${microsFrom ? `; ${microsFrom} is not one` : ''}.`);
-      }
+      // The user's own choice (a food, or "label values only") always wins.
+      else if ((found.match && !found.match.auto) || found.labelOnly) product = found;
+      // The assistant's food replaces the app's own pick.
+      else if (match) product = { ...found, match: { version: db.version ?? '4.0', code: match.code } };
+      else if (microsFrom) problems.push(`${code}: micros_from must be the BLS code (from search_foods) of the most similar generic food; ${microsFrom} is not one.`);
+      // USDA generic foods have their own vitamins and minerals; a similar BLS food only fills gaps.
+      else if (found.match || hasOwnMicros(found)) product = found;
+      else problems.push(`${code}: micros_from must be the BLS code (from search_foods) of the most similar generic food.`);
       if (product) food = productFood(product, db);
     } else {
       food = db.byCode.get(code);

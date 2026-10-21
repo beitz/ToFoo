@@ -1,6 +1,7 @@
 import { useData } from '../../app/data';
 import { href } from '../../app/router';
 import { t, type MessageKey } from '../../i18n';
+import { needsCheck } from '../../foods/products';
 import { FEATURES, isOn } from '../../settings/features';
 import { repo } from '../../storage/repo';
 import { Field, NumberInput, Segmented, Toggle } from '../../ui/controls';
@@ -25,6 +26,7 @@ export function SettingsPage() {
   const s = d.settings;
   const p = d.profile;
   const hiddenCount = s.hiddenNutrients.length;
+  const toCheck = d.products.filter(needsCheck).length;
   return (
     <section>
       <header className="page-head">
@@ -38,6 +40,7 @@ export function SettingsPage() {
         <LinkRow to={['settings', 'exclusions']} label={t('settings.exclusions')} detail={t('settings.exclusionsDetail', { n: p.exclusions.groups.length + p.exclusions.foods.length })} />
         <LinkRow to={['settings', 'nutrients']} label={t('settings.nutrients')} detail={hiddenCount ? t('settings.hidden', { n: hiddenCount }) : t('settings.allVisible')} />
         <LinkRow to={['settings', 'saved']} label={t('settings.saved')} detail={t('settings.savedDetail', { n: d.customFoods.length })} />
+        {d.products.length > 0 && <LinkRow to={['settings', 'products']} label={t('match.title')} detail={toCheck ? t('match.settingsDetailCheck', { n: d.products.length, c: toCheck }) : t('match.settingsDetail', { n: d.products.length })} />}
         <LinkRow to={['settings', 'backup']} label={t('settings.backup')} detail={isOn(s.features, 'autoBackup') ? t('backup.linkOn') : t('backup.linkOff')} />
         <LinkRow to={['settings', 'assistant']} label={t('ai.settingsTitle')} detail={isOn(s.features, 'aiAssistant') ? t('ai.statusOn') : t('ai.statusOff')} />
         <LinkRow to={['settings', 'usda']} label={t('usda.heading')} detail={isOn(s.features, 'usda') ? t('ai.statusOn') : t('ai.statusOff')} />

@@ -142,3 +142,44 @@ export function search(index: SearchIndex, query: string, opts: SearchOptions = 
   scored.sort((a, b) => b.score - a.score || a.item.nameEn.length - b.item.nameEn.length);
   return scored.slice(0, limit).map((s) => s.item);
 }
+
+const singular = (w: string) => (w.endsWith('ies') ? `${w.slice(0, -3)}y` : w.slice(0, -1));
+
+/**
+ * Loose search for matching a product to a similar food: tokens may go unmatched, and a name
+ * scores by how many of them it covers (squared, so covering most of them wins over one exact
+ * word). Used where the query is a category or product name, not something the user typed.
+ */
+export function looseSearch(index: SearchIndex, query: string, opts: { limit?: number; boost?: (key: string) => number } = {}): Array<{ key: string; score: number }> {
+  const tokens = words(normalize(query));
+  if (!tokens.length) return [];
+  const scored: Array<{ key: string; score: number; len: number }> = [];
+  for (const it of index.items) {
+    let total = 0;
+    let hits = 0;
+    for (let i = 0; i < tokens.length; i++) {
+      // Product names mix languages, so each word may hit the English or the German name.
+      // Category names are plural ("Chocolates"); typo-level hits are left out ("candies" is not "candied").
+      const tok = tokens[i]!;
+      const last = i === tokens.length - 1;
+      // A hit worth counting always shares the first three letters; checking that first keeps this fast.
+      const head = tok.slice(0, 3);
+      if (!it.en.includes(head) && !it.de.includes(head)) continue;
+      const forms = tok.length > 3 && tok.endsWith('s') ? [tok, singular(tok)] : [tok];
+      let s = 0;
+      for (const f of forms) s = Math.max(s, tokenScore(f, it.enWords, it.en, last), 0.8 * tokenScore(f, it.deWords, it.de, last));
+      if (s < 4) continue;
+      hits++;
+      total += s;
+    }
+    if (!hits) continue;
+    const covered = hits / tokens.length;
+    const rest = it.enWords.filter((w) => !tokens.some((t) => w.startsWith(t) || stem(w) === stem(t)) && !/^[0-9.%]+$/.test(w));
+    const plain = rest.every((w) => PLAIN_WORDS.has(w)) ? 1.4 : 1;
+    let score = total * covered * covered * plain * (1 + 2 / (2 + it.enWords.length));
+    if (opts.boost) score *= opts.boost(it.item.key);
+    scored.push({ key: it.item.key, score, len: it.item.nameEn.length });
+  }
+  scored.sort((a, b) => b.score - a.score || a.len - b.len);
+  return scored.slice(0, opts.limit ?? 30).map(({ key, score }) => ({ key, score }));
+}

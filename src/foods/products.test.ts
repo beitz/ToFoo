@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Product } from '../storage/types';
 import type { BlsFile } from './blsTypes';
 import { buildFoodDb } from './foodDb';
-import { matchQueries, productFood, productLabel } from './products';
+import { needsCheck, productFood, productLabel } from './products';
 import { resolveEntry, type ResolveContext } from '../logic/resolve';
 
 const bls: BlsFile = {
@@ -82,7 +82,16 @@ describe('products as foods', () => {
     expect(productLabel(giotto)).toBe('GiOTTO Haselnuss · Ferrero');
     expect(productLabel({ name: 'Giotto Haselnuss', brand: 'Ferrero, Giotto' })).toBe('Giotto Haselnuss · Ferrero');
     expect(productLabel({ name: 'Ferrero Küsschen', brand: 'Ferrero' })).toBe('Ferrero Küsschen');
-    expect(matchQueries(giotto, 2)).toEqual(['Nut confectioneries', 'Chocolate candies']);
+  });
+
+  it('asks for a check of pairs the app picked and of products without one', () => {
+    expect(needsCheck(giotto)).toBe(true);
+    expect(needsCheck({ ...giotto, match: { version: '4.0', code: 'S610000', auto: true } })).toBe(true);
+    expect(needsCheck({ ...giotto, match: { version: '4.0', code: 'S610000' } })).toBe(false);
+    expect(needsCheck({ ...giotto, labelOnly: true })).toBe(false);
+    // USDA generic foods have their own vitamins and minerals.
+    expect(needsCheck({ ...giotto, source: 'USDA', usdaType: 'Foundation' })).toBe(false);
+    expect(needsCheck({ ...giotto, source: 'USDA', usdaType: 'Branded' })).toBe(true);
   });
 
   it('resolves logged products for the model', () => {

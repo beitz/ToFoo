@@ -71,14 +71,38 @@ describe('repository', () => {
     const repo = await fresh();
     const product = { id: 'OFF:8000500319475', source: 'OFF' as const, code: '8000500319475', name: 'GiOTTO', per100: { ENERCC: 632 }, categories: [], fetchedAt: 1 };
     await repo.saveProduct(product);
-    await repo.setProductMatch(product.id, { version: '4.0', code: 'S610000' });
+    await repo.setProductMatch(product.id, { match: { version: '4.0', code: 'S610000' } });
     await repo.saveProduct({ ...product, per100: { ENERCC: 630 }, fetchedAt: 2 });
     expect(await repo.getProduct(product.id)).toMatchObject({ per100: { ENERCC: 630 }, match: { code: 'S610000' }, schemaVersion: 1 });
-    await repo.setProductMatch(product.id, null);
+    await repo.setProductMatch(product.id, {});
     expect((await repo.getProduct(product.id))!.match).toBeUndefined();
     const b = await fresh();
     await b.restore(await repo.snapshot());
     expect(await b.db.products.count()).toBe(1);
+  });
+
+  it('keeps "label only" and the app\'s own picks through refreshes and backups', async () => {
+    const repo = await fresh();
+    const giotto = { id: 'OFF:1', source: 'OFF' as const, code: '1', name: 'GiOTTO', per100: { ENERCC: 632 }, categories: [], fetchedAt: 1 };
+    const goldbaeren = { ...giotto, id: 'OFF:2', code: '2', name: 'Goldbären' };
+    await repo.saveProduct(giotto);
+    await repo.saveProduct(goldbaeren);
+    await repo.setProductMatch(goldbaeren.id, { labelOnly: true });
+    // The app pairs only products with neither a match nor "label only".
+    expect(await repo.setAutoMatches([giotto, goldbaeren].map((p) => ({ id: p.id, match: { version: '4.0', code: 'S610000' } })))).toBe(1);
+    expect((await repo.getProduct(giotto.id))!.match).toEqual({ version: '4.0', code: 'S610000', auto: true });
+    await repo.saveProduct({ ...goldbaeren, fetchedAt: 2 });
+    expect(await repo.getProduct(goldbaeren.id)).toMatchObject({ labelOnly: true, fetchedAt: 2 });
+    // A chosen food replaces "label only".
+    await repo.saveProduct({ ...goldbaeren, match: { version: '4.0', code: 'S361000' } });
+    expect((await repo.getProduct(goldbaeren.id))!.labelOnly).toBeUndefined();
+    const b = await fresh();
+    await b.restore(await repo.snapshot());
+    expect((await b.getProduct(giotto.id))!.match).toEqual({ version: '4.0', code: 'S610000', auto: true });
+    await b.setProductMatch(goldbaeren.id, { labelOnly: true });
+    const c = await fresh();
+    await c.restore(await b.snapshot());
+    expect((await c.getProduct(goldbaeren.id))!.labelOnly).toBe(true);
   });
 
   it('adds, edits, deletes and restores journal entries, and backs them up', async () => {

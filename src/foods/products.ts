@@ -26,6 +26,9 @@ export const productRef = (p: Pick<Product, 'source' | 'code'>): FoodRef => ({ s
 /** USDA generic foods (not branded) carry most nutrients themselves; a BLS match is optional. */
 export const hasOwnMicros = (p: Pick<Product, 'source' | 'usdaType'>) => p.source === 'USDA' && p.usdaType !== 'Branded';
 
+/** A pairing the user has not looked at: picked by the app, or none found (and "label only" not chosen). */
+export const needsCheck = (p: Pick<Product, 'source' | 'usdaType' | 'match' | 'labelOnly'>) => !hasOwnMicros(p) && (p.match ? !!p.match.auto : !p.labelOnly);
+
 /** The food's page at its source. */
 export const productPageUrl = (p: Pick<Product, 'source' | 'code'>) => (p.source === 'USDA' ? usdaFoodUrl(p.code) : productUrl(p.code));
 
@@ -82,12 +85,4 @@ export function productLabel(p: Pick<Product, 'name' | 'brand'>): string {
     .map((b) => b.trim())
     .filter((b) => b && !name.includes(b.toLowerCase()));
   return brands.length ? `${p.name} · ${brands.join(', ')}` : p.name;
-}
-
-/**
- * Search words for suggesting a similar BLS food: the most specific categories first
- * (Open Food Facts lists them from general to specific).
- */
-export function matchQueries(p: Pick<Product, 'categories'>, max = 3): string[] {
-  return [...p.categories].reverse().slice(0, max);
 }

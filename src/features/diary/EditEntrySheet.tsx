@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useData } from '../../app/data';
 import { useToast } from '../../app/toast';
 import { href, navigate } from '../../app/router';
@@ -17,7 +17,7 @@ import { ConfidenceField } from '../log/ConfidenceField';
 import { FoodPicker, type PickedFood } from '../log/FoodPicker';
 import { PreparationSelect } from '../log/PreparationSelect';
 import { PortionFields, portionDraftValid, type PortionDraft } from '../log/PortionFields';
-import { MatchPicker, ProductInfo } from '../log/ProductParts';
+import { MatchPicker, ProductInfo, saveProductChoice, useMatchChoice } from '../log/ProductParts';
 import { TimeField } from '../log/TimeField';
 
 /** A portion entry with changed fields; a field set to undefined is left out (not stored as undefined). */
@@ -40,18 +40,13 @@ export function EditEntrySheet({ entry, onClose, nutrientsLink = true }: { entry
   // The entry's product (Open Food Facts or USDA), if it is one; replaced when another product is picked.
   const savedProduct = entry.kind === 'food' && (entry.ref.source === 'OFF' || entry.ref.source === 'USDA') ? d.productsById.get(refKey(entry.ref)) : undefined;
   const [product, setProduct] = useState<Product | undefined>(savedProduct);
-  const [match, setMatch] = useState<Food | undefined>(() => (savedProduct?.match ? d.foods.byCode.get(savedProduct.match.code) : undefined));
   const set = (patch: Partial<EntryDraft>) => setDraft((e) => ({ ...e, ...patch }) as EntryDraft);
 
-  const productDraft = useMemo<Product | undefined>(() => {
-    if (!product) return undefined;
-    const { match: _saved, ...rest } = product;
-    return match ? { ...rest, match: { version: d.foods.version, code: match.code } } : rest;
-  }, [product, match, d.foods.version]);
+  const { choice, setChoice, draft: productDraft, reset: resetChoice } = useMatchChoice(product);
   const food = draft.kind !== 'food' ? undefined : productDraft ? productFood(productDraft, d.foods) : draft.ref.source === 'BLS' ? d.foods.byCode.get(draft.ref.code) : undefined;
   const replaced = draft.kind === 'food' && (entry.kind !== 'food' || refKey(draft.ref) !== refKey(entry.ref));
   // A product with no label values and no matched food would count nothing but a name.
-  const hasValues = !productDraft || Object.keys(productDraft.per100).length > 0 || !!match;
+  const hasValues = !productDraft || Object.keys(productDraft.per100).length > 0 || !!choice.food;
   const batch = draft.kind === 'portion' ? d.batchesById.get(draft.batchId) : undefined;
   const finished = draft.kind === 'portion' && batch && !portionDraftValid(draft, batch) ? undefined : completeDraft(draft);
 
@@ -65,11 +60,11 @@ export function EditEntrySheet({ entry, onClose, nutrientsLink = true }: { entry
   function pick(p: PickedFood) {
     if (p.product) {
       setProduct(p.product);
-      setMatch(p.product.match ? d.foods.byCode.get(p.product.match.code) : oldFood());
+      resetChoice(p.product, oldFood());
       setDraft(replaceFood(draft, productRef(p.product), productLabel(p.product), d.customFoodsById));
     } else {
       setProduct(undefined);
-      setMatch(undefined);
+      resetChoice(undefined);
       setDraft(replaceFood(draft, { source: 'BLS', version: d.foods.version, code: p.food.code }, p.food.nameEn, d.customFoodsById));
     }
     setMode('edit');
@@ -78,14 +73,14 @@ export function EditEntrySheet({ entry, onClose, nutrientsLink = true }: { entry
   function keepOld() {
     setDraft(entry);
     setProduct(savedProduct);
-    setMatch(savedProduct?.match ? d.foods.byCode.get(savedProduct.match.code) : undefined);
+    resetChoice(savedProduct);
   }
 
   async function save() {
     if (!finished || !hasValues) return;
     if (productDraft) {
-      if (product !== savedProduct) await repo.saveProduct(productDraft);
-      if (product !== savedProduct || productDraft.match?.code !== product?.match?.code) await repo.setProductMatch(productDraft.id, productDraft.match ?? null);
+      // Saves the pairing too: the app's pick for a product that had none, or the user's choice.
+      await saveProductChoice(productDraft);
     }
     await repo.updateLog({ ...finished, day: dayKey(new Date(finished.time)) });
     toast(replaced ? t('edit.replaced', { name: finished.label }) : t('diary.saved'), () => void repo.updateLog(entry));
@@ -139,7 +134,7 @@ export function EditEntrySheet({ entry, onClose, nutrientsLink = true }: { entry
               <Field label={t('log.amount')}>
                 {(id) => <NumberInput id={id} value={draft.grams} onChange={(v) => set({ grams: v })} placeholder="0" suffix={productDraft?.perMl ? 'ml' : 'g'} min={0} autoFocus={!draft.grams} />}
               </Field>
-              {productDraft && <MatchPicker key={productDraft.id} product={productDraft} match={match} onChange={setMatch} />}
+              {productDraft && <MatchPicker key={productDraft.id} product={productDraft} choice={choice} onChange={setChoice} />}
               <PreparationSelect value={draft.preparation} onChange={(p) => set({ preparation: p })} />
             </>
           )}
