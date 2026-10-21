@@ -1,4 +1,7 @@
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
+import { useData } from '../../app/data';
+import { href } from '../../app/router';
+import { refHref } from '../food/links';
 import { useToast } from '../../app/toast';
 import { t, type MessageKey } from '../../i18n';
 import { amountText, parseAmount } from '../../logic/shopping';
@@ -10,7 +13,9 @@ export const sectionName = (s: ShopSection) => t(`shopping.section.${s}` as Mess
 
 /** Change a line: its name, amount and shop section, or take it off the list. */
 export function ItemSheet({ item, onClose }: { item: ShoppingItem; onClose: () => void }) {
+  const d = useData();
   const toast = useToast();
+  const food = refHref(d, item.ref);
   const [name, setName] = useState(item.name);
   const [amount, setAmount] = useState(amountText(item));
   const [section, setSection] = useState<ShopSection>(item.section);
@@ -49,7 +54,25 @@ export function ItemSheet({ item, onClose }: { item: ShoppingItem; onClose: () =
           </select>
         )}
       </Field>
-      {item.recipes?.length ? <p className="muted small">{t('shopping.forRecipes', { names: item.recipes.join(', ') })}</p> : null}
+      {food && (
+        <p className="small">
+          <a href={food}>{t('shopping.foodPage')}</a>
+        </p>
+      )}
+      {item.recipes?.length ? (
+        <p className="muted small">
+          {t('shopping.forRecipesLead')}{' '}
+          {item.recipes.map((n, i) => {
+            const recipe = d.recipes.find((r) => r.name === n);
+            return (
+              <Fragment key={n}>
+                {i > 0 && ', '}
+                {recipe ? <a href={href('recipes', recipe.id)}>{n}</a> : n}
+              </Fragment>
+            );
+          })}
+        </p>
+      ) : null}
       <div className="sheet-actions">
         <button className="btn btn-danger-ghost" onClick={() => void remove()}>
           {t('shopping.remove')}

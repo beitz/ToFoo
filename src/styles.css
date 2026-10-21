@@ -3818,3 +3818,18 @@ a.split-row:focus-visible {
   flex: none;
   color: var(--text-muted);
 }
+/* "Where it came from": each line opens what it was (its recipe or food). */
+a.contributor-link {
+  min-height: 44px;
+  color: inherit;
+  text-decoration: none;
+}
+a.contributor-link > span:first-child {
+  color: var(--accent);
+}
+.plain-list.card.contributors {
+  padding: 2px 14px;
+}
+.plain-list.contributors > li {
+  padding: 0;
+}

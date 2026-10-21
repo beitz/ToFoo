@@ -31,6 +31,7 @@ import { nutrientType } from '../home/grouping';
 import { GroupInfoButton, groupTitle, hasGroupInfo } from '../info/GroupInfo';
 import { EditEntrySheet } from '../diary/EditEntrySheet';
 import { entryAmount } from '../log/describe';
+import { foodHref } from '../food/links';
 import { BackButton } from '../../ui/BackButton';
 
 const MACROS = ['PROT625', 'FAT', 'CHO', 'FIBT'];
@@ -170,6 +171,15 @@ export function EntryNutrientsPage({ entryId, part: partParam }: { entryId: stri
   // The food behind the item: the ingredient's, or the logged food's (BLS code or product id).
   const code = ingredient ? ingredient.code : entry.kind === 'food' ? (entry.ref.source === 'BLS' ? entry.ref.code : refKey(entry.ref)) : undefined;
   const w = ingredient ? { grams: ingredient.grams, raw: false } : weightOf(d, entry, model);
+  // What the item is, one tap away: its food's page, or the recipe a portion was cooked from.
+  const batch = !ingredient && entry.kind === 'portion' ? d.batchesById.get(entry.batchId) : undefined;
+  const foodTo = foodHref(d, code);
+  const about =
+    batch && d.recipes.some((r) => r.id === batch.recipeId)
+      ? { to: href('recipes', batch.recipeId), icon: 'pot', label: t('mealNutrients.recipe', { name: batch.recipe.name }) }
+      : foodTo
+        ? { to: foodTo, icon: 'search', label: t('mealNutrients.food') }
+        : undefined;
   const weight = w === 'none' ? undefined : w;
   return (
     <section>
@@ -188,6 +198,11 @@ export function EntryNutrientsPage({ entryId, part: partParam }: { entryId: stri
               <Icon name="bars" size={16} /> {t('mealNutrients.wholeMeal', { n: meal.length })}
             </a>
           )
+        )}
+        {about && (
+          <a className="btn btn-small btn-ghost" href={about.to}>
+            <Icon name={about.icon} size={16} /> {about.label}
+          </a>
         )}
         {!ingredient && (
           <button className="btn btn-small btn-ghost" onClick={() => setEditing(true)}>

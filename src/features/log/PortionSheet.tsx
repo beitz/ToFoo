@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useData } from '../../app/data';
+import { href } from '../../app/router';
 import { t } from '../../i18n';
 import { dayKey } from '../../lib/dates';
 import { portionGrams } from '../../logic/batch';
@@ -43,6 +44,11 @@ export function PortionSheet({ batch, day, time: initialTime, onClose, onAdded }
 
   return (
     <Sheet title={batch.recipe.name} onClose={onClose}>
+      {d.recipes.some((r) => r.id === batch.recipeId) && (
+        <p className="muted small">
+          <a href={href('recipes', batch.recipeId)}>{t('log.recipeDetails')}</a>
+        </p>
+      )}
       <PortionFields batch={d.batchesById.get(batch.id) ?? batch} value={draft} onChange={(patch) => setDraft((v) => ({ ...v, ...patch }))} />
       <TimeField value={time} onChange={setTime} />
       <div className="sheet-actions">

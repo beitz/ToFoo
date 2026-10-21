@@ -170,7 +170,11 @@ function ProteinInfo({ onNavigate }: { onNavigate: () => void }) {
               const need = aminoAcidPattern.value[id];
               return (
                 <tr key={id}>
-                  <th scope="row">{NUTRIENT_BY_ID.get(id)?.short ?? id}</th>
+                  <th scope="row">
+                    <NutrientLink id={id} onNavigate={onNavigate}>
+                      {NUTRIENT_BY_ID.get(id)?.short ?? id}
+                    </NutrientLink>
+                  </th>
                   {profiles.map((p) => {
                     const v = p.mgPerG[id];
                     const ratio = v !== undefined && need ? v / need : undefined;

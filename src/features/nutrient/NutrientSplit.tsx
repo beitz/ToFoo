@@ -12,6 +12,7 @@ import { isOn } from '../../settings/features';
 import type { Recipe } from '../../storage/types';
 import { entryAmount } from '../log/describe';
 import { mealOf } from '../meal/MealNutrientsPage';
+import { foodHref } from '../food/links';
 
 /** One part of the whole as the list shows it: name, its amount (grams…) and where tapping it goes. */
 export interface ShownPiece extends SplitPiece {
@@ -36,7 +37,7 @@ export function recipePieces(d: AppData, recipe: Pick<Recipe, 'name' | 'portions
     key: String(p.index),
     label: p.ingredient.isSalt ? t('recipes.salt') : p.label,
     sub: fmtGrams(p.ingredient.grams / recipe.portions),
-    to: link && p.code && d.foods.byCode.has(p.code) ? href('food', p.code) : undefined,
+    to: link ? foodHref(d, p.code) : undefined,
   }));
 }
 

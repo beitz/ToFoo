@@ -5,25 +5,48 @@ import { t } from '../../i18n';
 import { fmtAmount, fmtPercent } from '../../lib/format';
 import { NUTRIENTS } from '../../model/nutrients';
 import { Icon } from '../../ui/Icon';
+import { hasOwnMicros, isProductCode, productFood } from '../../foods/products';
+import { partSource } from '../../logic/mealNutrients';
+import { ProductInfo } from '../log/ProductParts';
 import { nutrientType } from '../home/grouping';
 import { GroupInfoButton, groupTitle, hasGroupInfo } from '../info/GroupInfo';
 import { BackButton } from '../../ui/BackButton';
 
-/** A food's nutrient profile per 100 g. */
+/**
+ * A food's nutrient profile per 100 g: a BLS food, or a scanned or USDA product (`OFF:<barcode>`,
+ * `USDA:<id>`) with its label values and the similar BLS food's for the rest, each marked by source.
+ */
 export function FoodPage({ code }: { code: string }) {
   const d = useData();
-  const food = d.foods.byCode.get(code);
+  const product = isProductCode(code) ? d.productsById.get(code) : undefined;
+  const food = product ? productFood(product, d.foods) : d.foods.byCode.get(code);
   if (!food) return <p>{t('food.notFound')}</p>;
   const group = d.foods.groups[food.group];
+  const match = product?.match ? d.foods.byCode.get(product.match.code) : undefined;
   return (
     <section>
       <header className="page-head row">
         <BackButton />
         <h1 className="grow">{food.nameEn}</h1>
       </header>
-      <p className="muted">
-        {food.nameDe} · {group?.en} · BLS {food.code}
-      </p>
+      {product ? (
+        <>
+          <ProductInfo product={product} />
+          <p className="muted small">
+            {match ? (
+              <>
+                {t(hasOwnMicros(product) ? 'source.gapsFrom' : 'source.restFrom')} <a href={href('food', match.code)}>{match.nameEn}</a> <span className="muted">(BLS {match.code})</span>
+              </>
+            ) : (
+              t(hasOwnMicros(product) ? 'source.noMatchGeneric' : 'source.noMatch')
+            )}
+          </p>
+        </>
+      ) : (
+        <p className="muted">
+          {food.nameDe} · {group?.en} · BLS {food.code}
+        </p>
+      )}
       <a className="btn btn-primary btn-block" href={href('log', d.today, food.code)}>
         <Icon name="plus" /> {t('food.log')}
       </a>
@@ -54,16 +77,20 @@ export function FoodPage({ code }: { code: string }) {
                   </td>
                   <td className="num">{v === null || v === undefined ? <span className="muted">{t('food.noData')}</span> : v === 't' ? t('food.trace') : fmtAmount(n.id, v)}</td>
                   <td className="num muted">{pct !== undefined ? fmtPercent(pct) : ''}</td>
-                  <td className="muted small" title={d.foods.provenanceCodes[food.provenance[n.id] ?? '-'] ?? ''}>
-                    {food.provenance[n.id] !== '-' ? food.provenance[n.id] : ''}
-                  </td>
+                  {product ? (
+                    <td className="muted small">{partSource(food, n.id) ?? ''}</td>
+                  ) : (
+                    <td className="muted small" title={d.foods.provenanceCodes[food.provenance[n.id] ?? '-'] ?? ''}>
+                      {food.provenance[n.id] !== '-' ? food.provenance[n.id] : ''}
+                    </td>
+                  )}
                 </tr>
               </Fragment>
             );
           })}
         </tbody>
       </table>
-      <p className="muted small">{t('food.legend')}</p>
+      <p className="muted small">{t(product ? 'food.legendProduct' : 'food.legend')}</p>
     </section>
   );
 }

@@ -1,5 +1,7 @@
 import { useMemo } from 'react';
-import { useData } from '../../app/data';
+import { useData, type AppData } from '../../app/data';
+import type { LogEntry } from '../../storage/types';
+import { refHref } from '../food/links';
 import { href } from '../../app/router';
 import { t, type MessageKey } from '../../i18n';
 import { fmtAmount, fmtFill, fmtNumber, fmtPercent } from '../../lib/format';
@@ -163,16 +165,30 @@ export function NutrientPage({ id, context }: { id: string; context?: SplitConte
       {r.contributors.length > 0 && (
         <>
           <h2 className="section-title">{t('nutrient.contributors')}</h2>
-          <ul className="plain-list card">
-            {r.contributors.map((c) => (
-              <li key={c.label} className="row-between">
-                <span>{c.label}</span>
-                <span className="muted small">
-                  {fmtPercent(c.share)}
-                  {advanced ? ` · ${fmtAmount(id, c.amount)}/${t('nutrient.day')}` : ''}
-                </span>
-              </li>
-            ))}
+          <ul className="plain-list card contributors">
+            {r.contributors.map((c) => {
+              const body = (
+                <>
+                  <span>{c.label}</span>
+                  <span className="muted small">
+                    {fmtPercent(c.share)}
+                    {advanced ? ` · ${fmtAmount(id, c.amount)}/${t('nutrient.day')}` : ''}
+                  </span>
+                </>
+              );
+              const to = contributorHref(d, c.label);
+              return (
+                <li key={c.label}>
+                  {to ? (
+                    <a className="row-between contributor-link" href={to}>
+                      {body}
+                    </a>
+                  ) : (
+                    <div className="row-between">{body}</div>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         </>
       )}
@@ -252,6 +268,22 @@ export function NutrientPage({ id, context }: { id: string; context?: SplitConte
       </div>
     </section>
   );
+}
+
+/**
+ * Where a "Where it came from" line leads: contributors are summed by name, so the latest entry of
+ * that name says what it is: a recipe portion its recipe, a food its page, anything else that entry.
+ */
+function contributorHref(d: AppData, label: string): string | undefined {
+  let latest: LogEntry | undefined;
+  for (const e of d.log) if (e.label === label && (!latest || e.time > latest.time)) latest = e;
+  if (!latest) return undefined;
+  if (latest.kind === 'portion') {
+    const recipeId = d.batchesById.get(latest.batchId)?.recipeId;
+    if (recipeId && d.recipes.some((r) => r.id === recipeId)) return href('recipes', recipeId);
+  }
+  if (latest.kind === 'food') return refHref(d, latest.ref) ?? href('entry', latest.id);
+  return href('entry', latest.id);
 }
 
 /** What the nutrient does and what too little / too much means. */

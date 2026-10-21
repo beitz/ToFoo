@@ -18,6 +18,7 @@ import { prepLabel } from '../log/PreparationSelect';
 import { PlanEditor } from './PlanEditor';
 import { PortionNutrients } from './PortionNutrients';
 import { SourceTag } from './SourceTag';
+import { refHref } from '../food/links';
 import { refKey } from '../../lib/refs';
 import { isOn } from '../../settings/features';
 import { RecipeToListSheet } from '../shopping/RecipeToListSheet';
@@ -67,6 +68,8 @@ export function RecipeView({ id }: { id: string }) {
       <ul className="plain-list">
         {recipe.ingredients.map((ing, i) => {
           const food = ing.ref.source === 'BLS' ? d.foods.byCode.get(ing.ref.code) : undefined;
+          // Salt follows the profile's choice, so it has no one food to show.
+          const to = ing.isSalt ? undefined : refHref(d, ing.ref);
           const body = (
             <>
               <span>
@@ -81,15 +84,14 @@ export function RecipeView({ id }: { id: string }) {
               </span>
               <span className="muted">
                 {fmtGrams(ing.grams)}
-                {food && !ing.isSalt && <Icon name="chevron" size={16} />}
+                {to && <Icon name="chevron" size={16} />}
               </span>
             </>
           );
           return (
             <li key={i}>
-              {/* A BLS food opens its page; salt follows the profile's choice, so it has no one food to show. */}
-              {food && !ing.isSalt ? (
-                <a className="row-between ingredient-line ingredient-link" href={href('food', food.code)}>
+              {to ? (
+                <a className="row-between ingredient-line ingredient-link" href={to}>
                   {body}
                 </a>
               ) : (

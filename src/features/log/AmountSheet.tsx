@@ -75,7 +75,14 @@ export function AmountSheet({ day, time: initialTime, onClose, onAdded, ...targe
     <Sheet title={name} onClose={onClose}>
       <FavouriteButton foodRef={draft ? productRef(draft) : { source: 'BLS', version: d.foods.version, code: food.code }} />
       {draft ? (
-        <ProductInfo product={draft} />
+        <>
+          <ProductInfo product={draft} />
+          {d.productsById.has(draft.id) && (
+            <p className="muted small">
+              <a href={`#/food/${encodeURIComponent(draft.id)}`}>{t('log.details')}</a>
+            </p>
+          )}
+        </>
       ) : (
         <p className="muted small">
           {food.nameDe} · <a href={`#/food/${food.code}`}>{t('log.details')}</a>
