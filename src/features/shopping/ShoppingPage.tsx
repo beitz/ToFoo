@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useData } from '../../app/data';
 import { useToast } from '../../app/toast';
-import { href } from '../../app/router';
 import { t } from '../../i18n';
 import { newId } from '../../lib/id';
 import { errorText } from '../../lib/shareFile';
@@ -19,6 +18,7 @@ import { isOn } from '../../settings/features';
 import { needsBuying, onShoppingList } from '../../logic/pantry';
 import { PutAwaySheet } from '../pantry/PutAwaySheet';
 import { usePantry, usePantryFoods, usePantryLeft } from '../pantry/usePantry';
+import { BackButton } from '../../ui/BackButton';
 
 /** Foods from the database offered while typing, after things bought before. */
 const FOOD_SUGGESTIONS = 3;
@@ -101,9 +101,7 @@ export function ShoppingPage() {
   return (
     <section className="shopping-page">
       <header className="page-head row-between">
-        <a className="icon-btn" href={href()} aria-label={t('common.back')}>
-          <Icon name="back" />
-        </a>
+        <BackButton />
         <h1 className="grow">{t('shopping.title')}</h1>
         <button className="icon-btn" onClick={() => void share()} disabled={toBuy.length === 0} aria-label={t('shopping.share')} title={t('shopping.share')}>
           <Icon name="share" />

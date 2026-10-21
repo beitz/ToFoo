@@ -32,6 +32,7 @@ import { refKey } from '../../lib/refs';
 import { WaterSheet } from '../water/WaterSheet';
 import { loggable } from '../../logic/pantry';
 import { leftLabel, placeName, usePantry, usePantryLeft } from '../pantry/usePantry';
+import { BackButton } from '../../ui/BackButton';
 
 type Selected =
   | { kind: 'food'; food: Food }
@@ -196,9 +197,7 @@ export function LogPage({ day: dayParam, foodCode }: { day?: string; foodCode?: 
   return (
     <section>
       <header className="page-head row">
-        <a className="icon-btn" href={href()} aria-label={t('common.back')}>
-          <Icon name="back" />
-        </a>
+        <BackButton />
         <h1>{day === d.today ? t('log.title') : t('log.titleDay', { day: formatDay(day, d.today) })}</h1>
       </header>
 

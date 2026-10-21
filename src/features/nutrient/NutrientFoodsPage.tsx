@@ -9,6 +9,7 @@ import { NON_SINGLE_FOOD_GROUPS } from '../../foods/foodDb';
 import { diverseTop } from '../../foods/variety';
 import { Segmented, Toggle } from '../../ui/controls';
 import { Icon } from '../../ui/Icon';
+import { BackButton } from '../../ui/BackButton';
 
 const PAGE = 50;
 
@@ -54,9 +55,7 @@ export function NutrientFoodsPage({ id }: { id: string }) {
   return (
     <section>
       <header className="page-head row">
-        <a className="icon-btn" href={href('nutrient', id)} aria-label={t('common.back')}>
-          <Icon name="back" />
-        </a>
+        <BackButton to={['nutrient', id]} />
         <h1 className="grow">{t('foods.title', { nutrient: def.name })}</h1>
       </header>
 

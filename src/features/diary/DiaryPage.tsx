@@ -311,7 +311,7 @@ function sleepDefault(day: string): { start: number; end: number } {
   return { start: end - 8 * 3_600_000, end };
 }
 
-/** One meal: its items, each tappable to edit, "Log again", and its energy with a link to all its nutrients. */
+/** One meal: its items, each opening its page (with a pencil to edit straight away), "Log again", and its energy with a link to all its nutrients. */
 function MealCard({ meal, day, onEdit }: { meal: LogEntry[]; day: string; onEdit: (e: LogEntry) => void }) {
   const d = useData();
   const toast = useToast();
@@ -335,16 +335,16 @@ function MealCard({ meal, day, onEdit }: { meal: LogEntry[]; day: string; onEdit
       </div>
       <ul className="plain-list">
         {meal.map((e) => (
-          <li key={e.id}>
-            <button className="entry-row" onClick={() => onEdit(e)}>
+          <li key={e.id} className="entry-line">
+            <a className="entry-row" href={href('entry', e.id)}>
               <span className="entry-label">{e.label}</span>
               <span className="muted small">{entryAmount(e, d)}</span>
               <span className={`conf conf-${e.confidence}`} title={t(`confidence.${e.confidence}` as MessageKey)}>
                 {e.confidence}
               </span>
-              <span className="entry-edit">
-                <Icon name="edit" size={16} />
-              </span>
+            </a>
+            <button className="icon-btn entry-edit-btn" onClick={() => onEdit(e)} aria-label={t('diary.editItem', { name: e.label })}>
+              <Icon name="edit" size={16} />
             </button>
           </li>
         ))}

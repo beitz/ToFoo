@@ -28,8 +28,10 @@ import { formatDay } from '../../lib/dates';
 import { fmtDuration } from '../../ui/duration';
 import { GroupInfoLink, hasGroupInfo } from '../info/GroupInfo';
 import { nutrientType } from '../home/grouping';
+import { SplitCard, type SplitContext } from './NutrientSplit';
+import { BackButton } from '../../ui/BackButton';
 
-export function NutrientPage({ id }: { id: string }) {
+export function NutrientPage({ id, context }: { id: string; context?: SplitContext }) {
   const d = useData();
   const def = NUTRIENT_BY_ID.get(id);
   const r = d.model.nutrients.get(id);
@@ -68,11 +70,15 @@ export function NutrientPage({ id }: { id: string }) {
   return (
     <section>
       <header className="page-head row">
-        <a className="icon-btn" href={href()} aria-label={t('common.back')}>
-          <Icon name="back" />
-        </a>
+        <BackButton />
         <h1 className="grow">{def.name}</h1>
       </header>
+      {context && (
+        <>
+          <SplitCard nutrient={id} context={context} />
+          <h2 className="section-title">{t('split.overall', { name: def.name })}</h2>
+        </>
+      )}
       <div className="card">
         <StatusBadge status={r.status} />
         <p className="big-number">

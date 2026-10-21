@@ -22,9 +22,9 @@ import { sameIngredients } from './batch';
 
 type RecipeLike = Pick<Recipe, 'name' | 'portions' | 'ingredients' | 'saltOverride'>;
 
-/** Nutrients in one portion after cooking (and storage) losses, as the recipe page shows them. */
-export function portionIntake(recipe: RecipeLike, ctx: ResolveContext, storage: Storage = 'fresh'): { intake: Record<string, number>; missing: string[] } {
-  const batch: Batch = {
+/** A whole pot of the recipe, never stored: what a portion of it is computed from. */
+export function previewBatch(recipe: RecipeLike): Batch {
+  return {
     id: 'preview',
     schemaVersion: 1,
     recipeId: 'preview',
@@ -35,6 +35,11 @@ export function portionIntake(recipe: RecipeLike, ctx: ResolveContext, storage: 
     remaining: { fresh: 1, fridge: 0, freezer: 0 },
     corrections: [],
   };
+}
+
+/** Nutrients in one portion after cooking (and storage) losses, as the recipe page shows them. */
+export function portionIntake(recipe: RecipeLike, ctx: ResolveContext, storage: Storage = 'fresh'): { intake: Record<string, number>; missing: string[] } {
+  const batch = previewBatch(recipe);
   const parts = batchParts(batch, 1 / recipe.portions, storage, ctx);
   const res = entryIntake({ id: 'portion', label: recipe.name, time: 0, dayKey: '', confidence: 'A', isSupplement: false, parts }, 'central', { retention: true });
   return { intake: res.intake, missing: res.missing };

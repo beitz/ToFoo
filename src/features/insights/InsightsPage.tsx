@@ -24,6 +24,7 @@ import { ChatExport } from '../assistant/ChatExport';
 import { VoiceFailed } from '../assistant/VoiceFailed';
 import { useJournal } from '../journal/useJournal';
 import { describeConditions, verdict } from './describe';
+import { BackButton } from '../../ui/BackButton';
 
 type Period = '2w' | '4w' | '3m' | 'all';
 const PERIOD_DAYS: Record<Exclude<Period, 'all'>, number> = { '2w': 14, '4w': 28, '3m': 91 };
@@ -83,9 +84,7 @@ export function InsightsPage() {
   return (
     <section className="assistant-page">
       <header className="page-head row-between">
-        <a className="icon-btn" href={href('diary')} aria-label={t('common.back')}>
-          <Icon name="back" />
-        </a>
+        <BackButton to={['diary']} />
         <h1>{t('insights.title')}</h1>
         <button
           className="btn btn-small btn-ghost"
