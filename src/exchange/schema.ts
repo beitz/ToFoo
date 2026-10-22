@@ -77,6 +77,7 @@ export const profileSchema = z.object({
   activity: z.enum(['low', 'medium', 'high']).optional(),
   energyTargetKcal: z.number().positive().optional(),
   nutrientTargets: z.record(z.string(), z.object({ amount: z.number().positive(), per: z.enum(['kg', 'day']) })).optional(),
+  sleepNeedMinutes: z.number().positive().max(1440).optional(),
   phytate: z.enum(['low', 'medium', 'high']).optional(),
   menstruation: z.enum(['menstruating', 'postmenopausal', 'none']).optional(),
   latitude: z.number().min(-90).max(90).optional(),

@@ -11,6 +11,8 @@ import { Field, NumberInput, Segmented } from '../../ui/controls';
 import { Icon } from '../../ui/Icon';
 import { EnergyTargetCard } from './EnergyTarget';
 import { ProteinTargetCard } from './ProteinTarget';
+import { SleepNeedCard } from './SleepNeed';
+import { isOn } from '../../settings/features';
 import { CarbMaxCard } from './CarbMax';
 
 export function SubPage({ title, children, back = href('settings') }: { title: string; children: React.ReactNode; back?: string }) {
@@ -150,6 +152,13 @@ export function ProfilePage() {
 
       <h2 className="section-title">{t('profile.carbs')}</h2>
       <CarbMaxCard />
+
+      {isOn(d.settings.features, 'sleep') && (
+        <>
+          <h2 className="section-title">{t('profile.sleep')}</h2>
+          <SleepNeedCard />
+        </>
+      )}
     </SubPage>
   );
 }

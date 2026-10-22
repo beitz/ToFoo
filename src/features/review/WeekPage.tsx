@@ -243,6 +243,14 @@ export function WeekPage({ week: param }: { week?: string }) {
           </ul>
         </details>
       )}
+      {isOn(f, 'sleep') && (
+        <a className="card week-link" href={href('nights')}>
+          <Icon name="moon" size={18} />
+          <span className="grow">{t('week.sleepPage')}</span>
+          <Icon name="chevron" size={16} />
+        </a>
+      )}
+
       <a className="btn btn-secondary btn-block week-review" href={href('review', monday, sunday > d.today ? d.today : sunday)}>
         <Icon name="bars" size={18} /> {t('week.allNumbers')}
       </a>

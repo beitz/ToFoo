@@ -42,6 +42,7 @@ import { InsightsPage } from '../features/insights/InsightsPage';
 import { Onboarding } from '../features/onboarding/Onboarding';
 import { FastPage } from '../features/fast/FastPage';
 import { CookPage } from '../features/recipes/CookPage';
+import { SleepPage } from '../features/sleep/SleepPage';
 
 function Page({ route }: { route: string[] }) {
   const d = useData();
@@ -124,6 +125,8 @@ function Page({ route }: { route: string[] }) {
       return <FastPage />;
     case 'sleep':
       return <SleepShortcut />;
+    case 'nights':
+      return <SleepPage />;
     default:
       return <HomePage />;
   }
@@ -151,6 +154,7 @@ const TAB_OF: Record<string, (typeof NAV)[number]['key'] | null> = {
   meal: 'insights',
   entry: 'insights',
   journal: 'insights',
+  nights: 'insights',
   kitchen: 'kitchen',
   athome: 'kitchen',
   recipes: 'kitchen',

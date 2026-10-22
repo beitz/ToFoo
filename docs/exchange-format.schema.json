@@ -122,6 +122,11 @@
                         ]
                       }
                     },
+                    "sleepNeedMinutes": {
+                      "type": "number",
+                      "exclusiveMinimum": 0,
+                      "maximum": 1440
+                    },
                     "phytate": {
                       "type": "string",
                       "enum": [
