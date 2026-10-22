@@ -49,11 +49,12 @@ export function useFast(): FastView | undefined {
   const weightKg = currentWeight(d.profile);
   const clock = fastClock(fast, d.log, d.customFoodsById, d.settings.mealWindowMinutes);
   const on = isOn(d.settings.features, 'ketosis');
-  const personal = on
+  // Personal timing learns from readings, so only with readings on.
+  const personal = on && isOn(d.settings.features, 'ketoneReadings')
     ? personalTiming(d.ketones, { fasts: d.fasts, log: d.log, customFoods: d.customFoodsById, mealWindowMinutes: d.settings.mealWindowMinutes, entries, activities: d.activities, profile: d.profile, weightKg })
     : null;
   const input = { ...ketosisInput({ clock, now, entries, activities: d.activities, profile: d.profile, weightKg }), ...(personal ? { personal } : {}) };
   // The fast still runs, so nothing has been eaten since the clock started.
-  const readings = d.ketones.filter((r) => r.time >= clock.since);
+  const readings = isOn(d.settings.features, 'ketoneReadings') ? d.ketones.filter((r) => r.time >= clock.since) : [];
   return { fast, clock, now, input, estimate: on ? estimateKetosis(input) : null, readings };
 }

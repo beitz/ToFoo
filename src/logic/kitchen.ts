@@ -2,7 +2,8 @@
  * The Kitchen tab's sections (design 2026-10-22, "Kitchen · one flow"): what is at home by place,
  * with cooked portions where they are kept. Pure; the page adds the basket in front.
  */
-import type { Batch, HomePlace, PantryItem } from '../storage/types';
+import type { Batch, HomePlace, Ingredient, PantryItem } from '../storage/types';
+import { refKey } from '../lib/refs';
 import { HOME_PLACES } from '../storage/types';
 
 export interface PortionsHere {
@@ -48,4 +49,15 @@ export function sectionInView(tops: readonly number[], line: number): number {
     if (top <= line) current = i;
   });
   return current;
+}
+
+/**
+ * How many of a recipe's ingredients are at home (salt left out: it is always there or not worth
+ * counting). An ingredient is at home when something at home is the same food and not used up.
+ */
+export function ingredientsAtHome(ingredients: readonly Ingredient[], items: readonly PantryItem[], out: (item: PantryItem) => boolean): { have: number; of: number; missing: string[] } {
+  const here = new Set(items.filter((i) => i.ref && !out(i)).map((i) => refKey(i.ref!)));
+  const counted = ingredients.filter((i) => !i.isSalt);
+  const missing = counted.filter((i) => !here.has(refKey(i.ref))).map((i) => i.name);
+  return { have: counted.length - missing.length, of: counted.length, missing };
 }

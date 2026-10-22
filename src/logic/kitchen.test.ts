@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { kitchenPlaces, placeCount, sectionInView } from './kitchen';
+import { ingredientsAtHome, kitchenPlaces, placeCount, sectionInView } from './kitchen';
 import type { Batch, PantryItem } from '../storage/types';
 
 const pot = (id: string, cookedAt: number, remaining: Batch['remaining']): Batch =>
@@ -31,5 +31,21 @@ describe('sectionInView', () => {
     expect(sectionInView([-300, 80, 600], 120)).toBe(1);
     expect(sectionInView([-900, -500, -20], 120)).toBe(2);
     expect(sectionInView([300, 600], 120)).toBe(0);
+  });
+});
+
+describe('ingredientsAtHome', () => {
+  const ref = (code: string) => ({ source: 'BLS', version: '4.0', code }) as const;
+  it('counts ingredients whose food is at home and not used up, without salt', () => {
+    const items = [{ ...item('Lentils', 'cupboard'), ref: ref('H730000') }, { ...item('Spinach', 'freezer'), ref: ref('G211100') }, { ...item('Onions', 'cupboard'), ref: ref('G480100') }];
+    const ingredients = [
+      { ref: ref('H730000'), name: 'Lentils', grams: 400, preparation: 'boiled' },
+      { ref: ref('G211100'), name: 'Spinach', grams: 450, preparation: 'boiled' },
+      { ref: ref('G480100'), name: 'Onions', grams: 200, preparation: 'fried' },
+      { ref: ref('F000000'), name: 'Lemon', grams: 60, preparation: 'raw' },
+      { ref: ref('S000000'), name: 'Salt', grams: 5, preparation: 'asListed', isSalt: true },
+    ] as const;
+    const res = ingredientsAtHome(ingredients as never, items, (i) => i.name === 'Onions');
+    expect(res).toEqual({ have: 2, of: 4, missing: ['Onions', 'Lemon'] });
   });
 });

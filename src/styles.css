@@ -4074,3 +4074,635 @@ a.contributor-link > span:first-child {
 .kitchen-page .card > .card-head {
   top: 88px;
 }
+
+/* ── Home (design 2026-10-22, "everything on one screen") ─────── */
+.home-head h1 {
+  font-size: 1.5rem;
+}
+.home-card {
+  padding: 10px 12px 12px;
+}
+.card-note-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 44px;
+  margin: -12px 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text-faint);
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.fast-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1.5px dashed var(--edge);
+  border-radius: 999px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* Status colour per status, for tiles, marks and chips. Shape carries the status too. */
+.smark-fine,
+.ntile-fine,
+.sq-fine {
+  --c: var(--ok);
+}
+.smark-gettingLow,
+.ntile-gettingLow,
+.sq-gettingLow {
+  --c: var(--warn);
+}
+.smark-low,
+.ntile-low,
+.sq-low {
+  --c: var(--low);
+}
+.smark-tooHigh,
+.ntile-tooHigh,
+.sq-tooHigh {
+  --c: var(--high);
+}
+.smark-unknown,
+.smark-info,
+.ntile-unknown,
+.ntile-info,
+.sq-unknown {
+  --c: var(--unknown);
+}
+.smark {
+  color: var(--c);
+  flex: none;
+}
+
+/* Day strip: the days behind the averages, then today. */
+.day-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  grid-auto-flow: column;
+  gap: 4px;
+  margin: 4px 0 8px;
+  padding: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.day-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  min-width: 0;
+  min-height: 56px;
+  padding: 4px 0;
+  border-radius: 12px;
+  color: var(--text);
+  text-decoration: none;
+}
+.day-wd {
+  font-size: 0.72rem;
+  color: var(--text-faint);
+}
+.day-num {
+  font-weight: 700;
+  font-size: 1.05rem;
+  line-height: 1.2;
+}
+/* The mark under each day: solid = logged, half = partly, outline = fasted, dashed = not logged. */
+.day-mark {
+  width: 22px;
+  height: 5px;
+  margin-top: 3px;
+  border-radius: 3px;
+  background: var(--text-muted);
+}
+.day-partial .day-mark {
+  background: linear-gradient(90deg, var(--text-muted) 50%, transparent 50%);
+  border: 1px solid var(--text-muted);
+}
+.day-fasted .day-mark,
+.day-filled .day-mark {
+  background: none;
+  border: 1.5px solid var(--text-muted);
+}
+.day-unknown .day-mark,
+.day-excluded .day-mark,
+.day-pending .day-mark {
+  background: none;
+  border: 1.5px dashed var(--text-faint);
+}
+.day-unknown .day-num {
+  color: var(--text-faint);
+}
+.day-today {
+  border: 1.5px solid var(--edge);
+}
+.day-today .day-mark {
+  background: none;
+  border: 1.5px dotted var(--text-faint);
+}
+
+.status-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 4px;
+}
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+.status-chip strong {
+  color: var(--text);
+}
+
+/* Stores: the blue tanks, for the six stores only. */
+.store-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(44px, 1fr));
+  gap: 4px;
+}
+.store-col {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-areas:
+    'tank name'
+    'tank pct'
+    'lasts lasts';
+  align-items: center;
+  column-gap: 5px;
+  min-height: 64px;
+  padding: 4px 2px;
+  position: relative;
+  border: none;
+  border-radius: 10px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.store-mark {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  display: flex;
+}
+.store-mark .icon {
+  color: var(--low);
+}
+.store-tank {
+  grid-area: tank;
+  position: relative;
+  width: 16px;
+  height: 40px;
+  border: 1.5px solid var(--tank);
+  border-radius: 5px;
+  overflow: hidden;
+}
+.store-fill {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--tank);
+}
+.store-band {
+  position: absolute;
+  left: 0;
+  right: 0;
+  background: var(--tank-soft);
+}
+.store-level {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--text);
+  opacity: 0.6;
+}
+.store-name {
+  grid-area: name;
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+.store-pct {
+  grid-area: pct;
+  font-size: 0.8rem;
+}
+.store-lasts {
+  grid-area: lasts;
+  margin-top: 2px;
+  font-size: 0.72rem;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+
+/* Nutrient tiles: fill from the bottom, full = 100 %; limits striped under a lid; unknown dashed. */
+.tile-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(44px, 1fr));
+  gap: 4px;
+  margin: 4px 0;
+}
+.ntile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-width: 0;
+  height: 64px;
+  padding: 3px 2px 3px 3px;
+  border: 1.5px solid var(--c);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.ntile-fill,
+.ntile-band {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+.ntile-fill {
+  background: color-mix(in srgb, var(--c) 42%, transparent);
+}
+.ntile-band {
+  background: color-mix(in srgb, var(--c) 18%, transparent);
+}
+.ntile-limit .ntile-fill {
+  background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--c) 55%, transparent) 0 3px, color-mix(in srgb, var(--c) 18%, transparent) 3px 6px);
+}
+.ntile-limit {
+  border-top-width: 4px;
+}
+.ntile-unknown {
+  border-style: dashed;
+  background: none;
+}
+.ntile-tick {
+  position: absolute;
+  left: 0;
+  width: 8px;
+  height: 2px;
+  background: var(--text);
+}
+.ntile-top,
+.ntile-value {
+  position: relative;
+}
+.ntile-top {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+}
+.ntile-name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 700;
+  font-size: 0.8rem;
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.ntile-name-long {
+  font-size: 0.68rem;
+}
+.ntile-value {
+  font-size: 0.7rem;
+  font-weight: 600;
+  white-space: nowrap;
+  letter-spacing: -0.02em;
+}
+.tile-group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+}
+.tile-group-head h3 {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+.needs-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  margin-top: 6px;
+  padding: 6px 0 0;
+  border: none;
+  border-top: 1px solid var(--border);
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 0.85rem;
+  text-align: left;
+  cursor: pointer;
+}
+.needs-squares {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+/* Squares: filled = enough, half = a bit low, hollow = low, diamond = too much, dashed = unknown. */
+.sq {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  border: 1.5px solid var(--c);
+  background: var(--c);
+}
+.sq-gettingLow {
+  background: linear-gradient(0deg, var(--c) 50%, transparent 50%);
+}
+.sq-low {
+  background: none;
+}
+.sq-tooHigh {
+  transform: rotate(45deg) scale(0.85);
+}
+.sq-unknown {
+  background: none;
+  border-style: dashed;
+}
+.needs-counts {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.25;
+}
+.needs-counts strong {
+  color: var(--text);
+}
+.chev-up {
+  display: inline-flex;
+  transform: rotate(-90deg);
+}
+.needs-summary .chev:not(.chev-up) {
+  transform: rotate(90deg);
+}
+
+/* Energy and macros: amounts against the target, two lines per row. */
+.macro-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 14px;
+}
+.macro-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  min-height: 48px;
+  padding: 4px 0;
+  border: none;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.macro-item:first-child {
+  grid-column: 1 / -1;
+}
+.macro-line {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.macro-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  margin-right: auto;
+}
+.macro-value strong {
+  font-size: 1.05rem;
+}
+.macro-target,
+.macro-unit {
+  font-size: 0.8rem;
+  color: var(--text-faint);
+}
+.macro-bar {
+  position: relative;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--surface-3);
+}
+.macro-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: 3px;
+  background: var(--text-muted);
+}
+.macro-item.gauge-low .macro-fill {
+  background: var(--low);
+}
+.macro-item.gauge-gettingLow .macro-fill {
+  background: var(--warn);
+}
+.macro-item.gauge-tooHigh .macro-fill {
+  background: var(--high);
+}
+.macro-tick {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--text);
+}
+
+/* Fasting card: only while a fast runs. */
+.fast-card {
+  scroll-margin-top: 12px;
+}
+.fast-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.fast-card-clock {
+  display: flex;
+  flex-direction: column;
+  color: var(--text);
+  text-decoration: none;
+}
+.fast-card-clock strong {
+  font-size: 1.7rem;
+  line-height: 1.2;
+}
+.fast-card-chart {
+  display: block;
+  margin-top: 6px;
+  color: inherit;
+}
+.fast-card-more {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 44px;
+  color: var(--text-muted);
+}
+
+/* Next to cook. */
+.next-list > li {
+  cursor: default;
+}
+.next-item + .next-item {
+  border-top: 1px solid var(--border);
+}
+.next-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.next-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  flex: none;
+  border-radius: 12px;
+  background: var(--surface-2);
+}
+.next-name {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  color: var(--text);
+  text-decoration: none;
+}
+.next-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0 2px 50px;
+}
+.next-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  font-size: 0.85rem;
+  text-decoration: none;
+}
+.next-missing {
+  display: block;
+  margin: 4px 0 0 50px;
+}
+.next-ask {
+  margin-top: 6px;
+}
+
+/* Today and yesterday. */
+.recent-days {
+  margin-top: 18px;
+}
+.recent-day-head {
+  margin: 14px 0 6px;
+  font-size: 1rem;
+}
+.recent-day-head a {
+  color: var(--text);
+}
+.recent-list {
+  margin: 0;
+}
+.recent-list > li {
+  padding: 0;
+  margin-bottom: 6px;
+}
+.recent-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  text-decoration: none;
+}
+.recent-time {
+  color: var(--text-faint);
+  font-size: 0.85rem;
+}
+.recent-what {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.recent-kcal {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+.recent-all {
+  display: flex;
+  align-items: center;
+  min-height: 48px;
+  margin-top: 8px;
+  padding: 0 14px;
+  border: 1.5px dashed var(--edge);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  text-decoration: none;
+}
+.home-card .hscroll {
+  margin: 4px -12px 0;
+  padding: 0 12px 4px;
+  align-items: flex-start;
+}
+.home-card .food-card {
+  background: var(--surface-2);
+}
+.fast-card-top .btn,
+.next-line .btn {
+  flex: none;
+  white-space: nowrap;
+}
+.card-head h2 {
+  white-space: nowrap;
+}

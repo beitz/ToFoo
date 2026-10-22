@@ -10,14 +10,8 @@ import { Icon } from './Icon';
 /** Whether an API key was set when last read: shown at once, then read again on every mount. */
 let keyKnown: boolean | undefined;
 
-/**
- * Question shortcuts (design 2026-10-22, "Q1 How am I doing?"): small chips that open the assistant
- * with the question already typed. The user still presses Send, so a tap never costs anything.
- * Hidden without the assistant, its API key or the "Question shortcuts" setting.
- */
-export function AskChips({ questions }: { questions: string[] }) {
-  const d = useData();
-  const on = isOn(d.settings.features, 'aiAssistant') && isOn(d.settings.features, 'questionShortcuts');
+/** Whether an API key is set; undefined until read. Only read when `on`. */
+export function useHasApiKey(on: boolean): boolean | undefined {
   const [hasKey, setHasKey] = useState(keyKnown);
   useEffect(() => {
     if (!on) return;
@@ -30,6 +24,18 @@ export function AskChips({ questions }: { questions: string[] }) {
       live = false;
     };
   }, [on]);
+  return hasKey;
+}
+
+/**
+ * Question shortcuts (design 2026-10-22, "Q1 How am I doing?"): small chips that open the assistant
+ * with the question already typed. The user still presses Send, so a tap never costs anything.
+ * Hidden without the assistant, its API key or the "Question shortcuts" setting.
+ */
+export function AskChips({ questions }: { questions: string[] }) {
+  const d = useData();
+  const on = isOn(d.settings.features, 'aiAssistant') && isOn(d.settings.features, 'questionShortcuts');
+  const hasKey = useHasApiKey(on);
   if (!on || !hasKey || questions.length === 0) return null;
   return (
     <div className="ask-chips" role="group" aria-label={t('ask.label')}>

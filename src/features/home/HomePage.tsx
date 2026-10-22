@@ -1,61 +1,54 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useData } from '../../app/data';
-import { href, navigate } from '../../app/router';
-import { t, type MessageKey } from '../../i18n';
-import { formatDate } from '../../lib/dates';
+import { href } from '../../app/router';
+import { t } from '../../i18n';
 import { isOn } from '../../settings/features';
-import { repo } from '../../storage/repo';
-import { CompactGauge, GaugeRow, TankCard } from '../../ui/Gauge';
-import { Icon } from '../../ui/Icon';
-import { statusLabel } from '../../ui/status';
+import { hasNoData } from '../../ui/Gauge';
 import { NUTRIENT_BY_ID, NUTRIENTS } from '../../model/nutrients';
 import { rankFoods } from '../../model/ranking';
 import { NON_SINGLE_FOOD_GROUPS } from '../../foods/foodDb';
 import { diverseTop } from '../../foods/variety';
-import { Segmented } from '../../ui/controls';
-import type { NutrientResult } from '../../model/simulate';
+import type { GaugeStatus, NutrientResult } from '../../model/simulate';
 import { Prompts } from './Prompts';
 import { SettingsButton } from '../../ui/SettingsButton';
 import { AskChips } from '../../ui/AskChips';
 import { SleepQuestion } from '../sleep/SleepQuestion';
 import { WaterCard } from '../water/WaterCard';
-import { FastingLine } from './FastingLine';
-import { StockChips } from './StockChips';
-import { GroupInfoButton, hasGroupInfo } from '../info/GroupInfo';
 import { withStores } from '../../logic/stores';
-import { attentionCounts, COLLAPSED_BY_DEFAULT, groupNutrients, type HomeGrouping } from './grouping';
+import { DayStrip } from './DayStrip';
+import { FastCard, FastChip } from './FastCard';
+import { MacrosCard } from './MacrosCard';
+import { NeedsCard, StatusChips } from './NeedsCard';
+import { NextToCook } from './NextToCook';
+import { RecentDays } from './RecentDays';
+import { StoresCard } from './StoresCard';
 
-/** Shown first, in one row: energy and the macronutrients. */
+/** Energy and the macronutrients, in their own card with amounts; fibre too (owner's ask). */
 const MACRO_ROW = ['ENERCC', 'PROT625', 'FAT', 'CHO', 'FIBT'];
 
 /** Nutrients whose need or store scales with body weight. */
 const PER_KG = new Set(['PROT625', 'HIS', 'ILE', 'LEU', 'LYS', 'SAA', 'AAA', 'THR', 'TRP', 'VAL']);
 
+/**
+ * Home, "everything on one screen" (owner's pick from the design, 2026-10-22): the days behind the
+ * averages, stores, what needs attention, energy and macros, what to cook next, then today and
+ * yesterday. Every number taps through to its page.
+ */
 export function HomePage() {
   const d = useData();
   const { model, settings, today } = d;
-  const [legendOpen, setLegendOpen] = useState(false);
-  const [storesLegendOpen, setStoresLegendOpen] = useState(false);
   const showRange = isOn(settings.features, 'uncertaintyRanges');
   const hidden = new Set(settings.hiddenNutrients);
-  const todayStatus = model.dayStatus[today];
-  const todayEntries = d.log.filter((e) => e.day === today);
+  const windowDays = settings.shortWindowDays;
 
-  const macros = MACRO_ROW.map((id) => (hidden.has(id) ? undefined : model.nutrients.get(id))).filter((r): r is NutrientResult => !!r);
-  const grouping: HomeGrouping = settings.homeGrouping ?? 'status';
-  const groups = useMemo(
-    () =>
-      groupNutrients(
-        NUTRIENTS.filter((n) => !hidden.has(n.id) && !MACRO_ROW.includes(n.id))
-          .map((n) => model.nutrients.get(n.id)!)
-          .filter((r) => r && !r.store),
-        grouping,
-      ),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [model, settings.hiddenNutrients, grouping],
-  );
-  const isCollapsed = (key: string) => settings.homeCollapsed?.[key] ?? COLLAPSED_BY_DEFAULT.has(key);
-  const toggleGroup = (key: string) => void repo.updateSettings({ homeCollapsed: { ...settings.homeCollapsed, [key]: !isCollapsed(key) } });
+  const shown = NUTRIENTS.filter((n) => !hidden.has(n.id))
+    .map((n) => model.nutrients.get(n.id))
+    .filter((r): r is NutrientResult => !!r);
+  const macros = MACRO_ROW.map((id) => shown.find((r) => r.id === id)).filter((r): r is NutrientResult => !!r);
+  const stores = withStores(shown);
+  const rest = shown.filter((r) => !r.store && !MACRO_ROW.includes(r.id) && r.kind !== 'info');
+  const statusOf = (r: NutrientResult): GaugeStatus => (r.store ? r.store.status : hasNoData(r) ? 'unknown' : r.status);
+  const statuses = [...stores, ...rest, ...macros].map(statusOf).filter((s) => s !== 'info');
 
   const gaps = useMemo(() => {
     const excludedGroups = new Set(d.profile.exclusions.groups);
@@ -67,167 +60,58 @@ export function HomePage() {
     return diverseTop(ranked, 12, (g) => d.foods.byCode.get(g.key) ?? { code: g.key, nameEn: g.key });
   }, [d.foods, d.profile.exclusions, model, d.requirements]);
 
-  // Store nutrients show as tank cards, everything else as lines.
-  const stores = withStores(NUTRIENTS.filter((n) => !hidden.has(n.id)).map((n) => model.nutrients.get(n.id)!).filter(Boolean));
   const weightDefault = d.requirements.defaultsUsed.includes('weight');
   // An own target per day doesn't use body weight.
   const perKgOnDefault = (id: string) => weightDefault && PER_KG.has(id) && d.requirements.byNutrient.get(id)?.own?.target.per !== 'day';
-  const sexDefault = d.requirements.defaultsUsed.includes('sex');
-
-  const statusText = todayEntries.length ? t('home.logToday', { n: todayEntries.length }) : todayStatus === 'fasted' ? t('day.fasted') : t('home.nothingYet');
 
   return (
-    <section>
-      <header className="page-head row-between">
-        <div className="grow">
-          <h1>{t('app.name')}</h1>
-          <span className="muted">
-            {new Date().toLocaleDateString('en-GB', { weekday: 'long' })} {formatDate(new Date())}
-            {!d.activeFast && ` · ${statusText}`}
-          </span>
-        </div>
+    <section className="home">
+      <header className="page-head row-between home-head">
+        <h1 className="grow">{t('home.lastDays', { n: windowDays })}</h1>
+        <FastChip />
         <SettingsButton />
       </header>
       <AskChips questions={[t('ask.howAmIDoing'), t('ask.whatNext')]} />
-      <FastingLine />
-      <StockChips />
+      <DayStrip days={windowDays} />
+      <StatusChips statuses={statuses} />
+      <FastCard />
 
       {isOn(d.settings.features, 'sleep') && <SleepQuestion />}
       <Prompts />
-      {isOn(d.settings.features, 'water') && <WaterCard day={today} compact />}
 
-      <div className="section-title home-gauges-head">
-        <h2>{t('home.gauges')}</h2>
-        <button
-          className="icon-btn"
-          aria-label={t('home.legendTitle')}
-          aria-expanded={legendOpen}
-          aria-controls="home-legend"
-          onClick={() => setLegendOpen((o) => !o)}
-        >
-          <Icon name="info" />
-        </button>
-      </div>
-      {legendOpen && (
-        <p className="muted small home-legend" id="home-legend">
-          {t('home.legend')}
-        </p>
-      )}
-      {(weightDefault || sexDefault) && (
-        <p className="muted small">
-          {weightDefault ? '* ' : ''}
-          {t('home.defaultsNote')}{' '}
-          <a href={href('settings', 'profile')}>{t('home.addProfile')}</a>
-        </p>
-      )}
-      {macros.length > 0 && (
-        <div className="macro-row" role="group" aria-label={t('home.macros')}>
-          {macros.map((r) => (
-            <CompactGauge key={r.id} variant="cell" result={r} defaultBased={perKgOnDefault(r.id)} onClick={() => navigate('nutrient', r.id)} />
-          ))}
-        </div>
-      )}
-      {stores.length > 0 && (
-        <>
-          <div className="home-stores-head">
-            <h3>{t('home.stores')}</h3>
-            <button
-              className="icon-btn"
-              aria-label={t('home.storesHint')}
-              aria-expanded={storesLegendOpen}
-              aria-controls="home-stores-legend"
-              onClick={() => setStoresLegendOpen((o) => !o)}
-            >
-              <Icon name="info" />
-            </button>
+      <StoresCard stores={stores} showRange={showRange} startLevel={d.profile.startingLevel} />
+      <NeedsCard results={rest} showRange={showRange} windowDays={windowDays} />
+      <MacrosCard results={macros} defaultBased={perKgOnDefault} windowDays={windowDays} />
+      {isOn(d.settings.features, 'water') && <WaterCard day={today} compact />}
+      <NextToCook />
+
+      {gaps.length > 0 && (
+        <div className="card home-card">
+          <div className="card-head">
+            <h2>{t('home.gaps')}</h2>
           </div>
-          {storesLegendOpen && (
-            <p className="muted small home-legend" id="home-stores-legend">
-              {t('home.storesLegend', { start: t(`start.${d.profile.startingLevel}` as MessageKey) })}
-            </p>
-          )}
-          <div className="tank-grid" role="group" aria-label={t('home.storesHint')}>
-            {stores.map((r) => (
-              <TankCard key={r.id} result={r} showRange={showRange} onClick={() => navigate('nutrient', r.id)} />
-            ))}
-          </div>
-        </>
-      )}
-      <Segmented
-        label={t('home.grouping')}
-        className="home-grouping"
-        value={grouping}
-        onChange={(v) => void repo.updateSettings({ homeGrouping: v })}
-        options={[
-          { value: 'status', label: t('home.groupStatus') },
-          { value: 'type', label: t('home.groupType') },
-          { value: 'none', label: t('home.groupNone') },
-        ]}
-      />
-      {groups.map((g) => {
-        const grid = (
-          <div className="nrow-list" id={`group-${g.key}`}>
-            {g.items.map((r) => {
-              const defaultBased = perKgOnDefault(r.id);
-              const open = () => navigate('nutrient', r.id);
-              return <GaugeRow key={r.id} result={r} showRange={showRange} defaultBased={defaultBased} onClick={open} />;
+          <div className="hscroll" role="list">
+            {gaps.map((g) => {
+              const food = d.foods.byCode.get(g.key)!;
+              return (
+                <a key={g.key} role="listitem" className="food-card" href={href('food', g.key)}>
+                  <strong className="food-card-name">{food.nameEn}</strong>
+                  <span className="muted small">{food.nameDe}</span>
+                  <span className="food-card-helps small">
+                    {g.helps
+                      .slice(0, 3)
+                      .map((h) => NUTRIENT_BY_ID.get(h.id)?.short ?? h.id)
+                      .join(' · ')}
+                  </span>
+                  <span className="muted small">{t('home.perPortion', { g: Math.round(g.grams) })}</span>
+                </a>
+              );
             })}
           </div>
-        );
-        if (grouping === 'none') return <div key={g.key}>{grid}</div>;
-        const collapsed = isCollapsed(g.key);
-        const counts = grouping === 'type' ? attentionCounts(g.items) : [];
-        // Status headings say what to do; type headings say how many need attention.
-        const hint =
-          grouping === 'status'
-            ? ['tooHigh', 'low', 'gettingLow'].includes(g.id)
-              ? t(`home.groupHint.${g.id}` as MessageKey)
-              : ''
-            : counts.length
-              ? counts.map((c) => `${c.n} ${statusLabel(c.status).toLowerCase()}`).join(' · ')
-              : t('home.groupAllFine');
-        return (
-          <div key={g.key} className={`home-group home-group-${g.id}`}>
-            <div className="home-group-row">
-              <button className="home-group-head" aria-expanded={!collapsed} aria-controls={`group-${g.key}`} onClick={() => toggleGroup(g.key)}>
-                <span className={collapsed ? 'chev' : 'chev chev-open'} aria-hidden>
-                  <Icon name="chevron" size={16} />
-                </span>
-                <span className="home-group-title">
-                  {t(`home.group.${grouping}.${g.id}` as MessageKey)} <span className="home-group-count">{g.items.length}</span>
-                </span>
-                {hint && <span className="home-group-hint">{hint}</span>}
-              </button>
-              {grouping === 'type' && hasGroupInfo(g.id) && <GroupInfoButton group={g.id} />}
-            </div>
-            {!collapsed && grid}
-          </div>
-        );
-      })}
-
-      <h2 className="section-title">{t('home.gaps')}</h2>
-      {gaps.length === 0 ? (
-        <p className="muted">{t('home.noGaps')}</p>
-      ) : (
-        <div className="hscroll" role="list">
-          {gaps.map((g) => {
-            const food = d.foods.byCode.get(g.key)!;
-            return (
-              <a key={g.key} role="listitem" className="food-card" href={href('food', g.key)}>
-                <strong className="food-card-name">{food.nameEn}</strong>
-                <span className="muted small">{food.nameDe}</span>
-                <span className="food-card-helps small">
-                  {g.helps
-                    .slice(0, 3)
-                    .map((h) => NUTRIENT_BY_ID.get(h.id)?.short ?? h.id)
-                    .join(' · ')}
-                </span>
-                <span className="muted small">{t('home.perPortion', { g: Math.round(g.grams) })}</span>
-              </a>
-            );
-          })}
         </div>
       )}
+
+      <RecentDays />
       <p className="muted small disclaimer">{t('home.disclaimer')}</p>
     </section>
   );
