@@ -4653,3 +4653,20 @@ a.contributor-link > span:first-child {
 .proposal .sheet-actions .btn {
   white-space: nowrap;
 }
+/* Log screen: the meal's time once, at the top. */
+.meal-time {
+  margin: 0 0 8px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+.meal-time .field {
+  margin: 0;
+  min-height: 48px;
+  align-items: center;
+}
+.meal-time .field .muted {
+  color: var(--text);
+  font-weight: 600;
+}

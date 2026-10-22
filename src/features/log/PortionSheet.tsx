@@ -2,14 +2,13 @@ import { useState } from 'react';
 import { useData } from '../../app/data';
 import { href } from '../../app/router';
 import { t } from '../../i18n';
-import { dayKey } from '../../lib/dates';
+import { dayKey, formatDateTime } from '../../lib/dates';
 import { portionGrams } from '../../logic/batch';
 import { bookingSlot, nextStorage } from '../../logic/stock';
 import { repo } from '../../storage/repo';
 import type { Batch, LogEntry } from '../../storage/types';
 import { Sheet } from '../../ui/controls';
 import { PortionFields, portionDraftValid, type PortionDraft } from './PortionFields';
-import { TimeField } from './TimeField';
 
 /**
  * Log some of a batch in stock: one portion by default, or by grams once its pot was weighed (then
@@ -17,7 +16,8 @@ import { TimeField } from './TimeField';
  */
 export function PortionSheet({ batch, day, time: initialTime, onClose, onAdded }: { batch: Batch; day: string; time: number; onClose: () => void; onAdded: (e: LogEntry) => void }) {
   const d = useData();
-  const [time, setTime] = useState(initialTime);
+  // The meal's time is set once, at the top of the Log screen (owner's ask, 2026-10-22).
+  const time = initialTime;
   const [draft, setDraft] = useState<PortionDraft>(() => {
     const storage = bookingSlot(batch, nextStorage(batch, day) ?? 'freezer');
     const per = portionGrams(batch);
@@ -50,7 +50,7 @@ export function PortionSheet({ batch, day, time: initialTime, onClose, onAdded }
         </p>
       )}
       <PortionFields batch={d.batchesById.get(batch.id) ?? batch} value={draft} onChange={(patch) => setDraft((v) => ({ ...v, ...patch }))} />
-      <TimeField value={time} onChange={setTime} />
+      <p className="muted small">{t('log.atMealTime', { time: formatDateTime(time) })}</p>
       <div className="sheet-actions">
         <button className="btn btn-primary" disabled={!valid} onClick={() => void log()}>
           {t('log.add')}

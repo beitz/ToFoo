@@ -1,13 +1,12 @@
 import { useState } from 'react';
 import { t } from '../../i18n';
-import { dayKey } from '../../lib/dates';
+import { dayKey, formatDateTime } from '../../lib/dates';
 import { NUTRIENTS, NUTRIENT_BY_ID } from '../../model/nutrients';
 import type { EntryConfidence } from '../../model/types';
 import { repo } from '../../storage/repo';
 import type { LogEntry } from '../../storage/types';
 import { Field, NumberInput, Segmented, Sheet, Toggle } from '../../ui/controls';
 import { ConfidenceField } from './ConfidenceField';
-import { TimeField } from './TimeField';
 
 const FOOD_FIELDS = ['ENERCC', 'PROT625', 'FAT', 'FASAT', 'CHO', 'SUGAR', 'FIBT'];
 const SUPPLEMENT_FIELDS = ['VITD', 'VITB12', 'FOLAC', 'VITC', 'FE', 'ZN', 'MG', 'ID', 'CA', 'EPADHA'];
@@ -26,7 +25,8 @@ export function ManualSheet({ supplement, time: initialTime, onClose, onAdded }:
   const [values, setValues] = useState<Record<string, number | undefined>>({});
   const [showAll, setShowAll] = useState(false);
   const [confidence, setConfidence] = useState<EntryConfidence>(supplement ? 'A' : 'C');
-  const [time, setTime] = useState(initialTime);
+  // The meal's time is set once, at the top of the Log screen (owner's ask, 2026-10-22).
+  const time = initialTime;
   const [saveForLater, setSaveForLater] = useState(supplement);
   const [servingLabel, setServingLabel] = useState(supplement ? t('manual.oneTablet') : t('manual.oneServing'));
 
@@ -111,7 +111,7 @@ export function ManualSheet({ supplement, time: initialTime, onClose, onAdded }:
       <ConfidenceField value={confidence} onChange={setConfidence} />
       <Toggle checked={saveForLater} onChange={setSaveForLater} label={t('manual.saveForLater')} />
       {saveForLater && <Field label={t('manual.servingLabel')}>{(id) => <input id={id} value={servingLabel} onChange={(e) => setServingLabel(e.target.value)} />}</Field>}
-      <TimeField value={time} onChange={setTime} />
+      <p className="muted small">{t('log.atMealTime', { time: formatDateTime(time) })}</p>
       <div className="sheet-actions">
         <button className="btn btn-primary" disabled={!valid} onClick={() => void save()}>
           {t('log.add')}
