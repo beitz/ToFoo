@@ -101,7 +101,7 @@ export function ShoppingPage() {
   return (
     <section className="shopping-page">
       <header className="page-head row-between">
-        <BackButton />
+        <BackButton to={['kitchen']} />
         <h1 className="grow">{t('shopping.title')}</h1>
         <button className="icon-btn" onClick={() => void share()} disabled={toBuy.length === 0} aria-label={t('shopping.share')} title={t('shopping.share')}>
           <Icon name="share" />

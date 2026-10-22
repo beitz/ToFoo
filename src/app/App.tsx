@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect } from 'react';
+import { useEffect, useLayoutEffect, type ReactNode } from 'react';
 import { useRoute, href } from './router';
 import { t } from '../i18n';
 import { DataProvider, useData } from './data';
@@ -20,7 +20,8 @@ import { UsdaSettingsPage } from '../features/settings/UsdaSettingsPage';
 import { DiaryPage } from '../features/diary/DiaryPage';
 import { JournalPage } from '../features/journal/JournalPage';
 import { ShoppingPage } from '../features/shopping/ShoppingPage';
-import { PantryPage } from '../features/pantry/PantryPage';
+import { KitchenPage } from '../features/kitchen/KitchenPage';
+import { QuickActions, hidesQuickActions } from '../features/home/QuickActions';
 import { RecipesPage } from '../features/recipes/RecipesPage';
 import { RecipeEditor } from '../features/recipes/RecipeEditor';
 import { RecipeView } from '../features/recipes/RecipeView';
@@ -59,7 +60,8 @@ function Page({ route }: { route: string[] }) {
     case 'shopping':
       return <ShoppingPage />;
     case 'athome':
-      return <PantryPage />;
+    case 'kitchen':
+      return <KitchenPage />;
     case 'recipes':
       if (b === 'new') return <RecipeEditor key="new" />;
       if (b && c === 'edit') return <RecipeEditor key={b} id={b} />;
@@ -122,17 +124,40 @@ function Page({ route }: { route: string[] }) {
   }
 }
 
+/** Three tabs (owner's decision, 2026-10-22); Settings sits top right on each tab's first screen. */
+/** Its children only once the user has been through onboarding. */
+function Onboarded({ children }: { children: ReactNode }) {
+  return useData().profile.onboarded ? <>{children}</> : null;
+}
+
 const NAV = [
   { key: 'home', to: [] as string[], icon: 'home', label: 'nav.home' },
-  { key: 'diary', to: ['diary'], icon: 'diary', label: 'nav.diary' },
-  { key: 'recipes', to: ['recipes'], icon: 'recipes', label: 'nav.recipes' },
-  { key: 'settings', to: ['settings'], icon: 'settings', label: 'nav.settings' },
+  { key: 'insights', to: ['diary'], icon: 'chart', label: 'nav.insights' },
+  { key: 'kitchen', to: ['kitchen'], icon: 'kitchen', label: 'nav.kitchen' },
 ] as const;
+
+/** Which tab a screen belongs to; none for Settings and its pages. */
+const TAB_OF: Record<string, (typeof NAV)[number]['key'] | null> = {
+  diary: 'insights',
+  insights: 'insights',
+  week: 'insights',
+  calendar: 'insights',
+  review: 'insights',
+  meal: 'insights',
+  entry: 'insights',
+  journal: 'insights',
+  kitchen: 'kitchen',
+  athome: 'kitchen',
+  recipes: 'kitchen',
+  shopping: 'kitchen',
+  settings: null,
+  about: null,
+};
 
 export function App() {
   const route = useRoute();
-  const section = route[0] === 'about' ? 'settings' : route[0] === 'insights' || route[0] === 'week' || route[0] === 'meal' || route[0] === 'entry' ? 'diary' : (route[0] ?? 'home');
-  const active = NAV.some((n) => n.key === section) ? section : 'home';
+  const section = route[0] ?? 'home';
+  const active = section in TAB_OF ? TAB_OF[section] : 'home';
   const path = route.join('/');
   // Braces matter: an effect's return value is its cleanup, and newer Chrome returns a Promise
   // from scrollTo. React then called that Promise on the next screen change ("is not a function")
@@ -166,6 +191,7 @@ export function App() {
               <ErrorBoundary key={path} showHome={route.length > 0}>
                 <Page route={route} />
               </ErrorBoundary>
+              {!hidesQuickActions(route) && <Onboarded>{<QuickActions key={route[0] ?? 'home'} />}</Onboarded>}
             </DataProvider>
           </main>
           <nav className="bottom-nav" aria-label="Main">

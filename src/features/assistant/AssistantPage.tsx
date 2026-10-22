@@ -61,6 +61,7 @@ import { refKey } from '../../lib/refs';
 import { itemIngredient } from '../../logic/ingredients';
 import { checkPortion, describeCheck, describeStatus, gapFoods, oftenEaten, portionIntake, recipeInfos } from '../../logic/recipeIdeas';
 import type { AppData } from '../../app/data';
+import { takeAsk } from '../../app/ask';
 import { openCardIds, reopenChat, type Reopened } from './reopen';
 
 export type { RecipeChat } from './cards';
@@ -203,7 +204,8 @@ function Chat({ apiKey, model, day, recipe, reopened }: { apiKey: string; model:
   const pagesKey = useRef(was?.pages ?? 0);
   /** While pages are open, the microphone fills the comment box of the page shown. */
   const dictationTarget: DictationTarget = useRef(null);
-  const [text, setText] = useState('');
+  // A question shortcut's question starts in the box, for the user to send or change.
+  const [text, setText] = useState(() => takeAsk() ?? '');
   const [images, setImages] = useState<ComposerPhoto[]>([]);
   /** Photos sent so far, so numbers stay unique across the chat, and their size (base64 characters). */
   const [photoCount, setPhotoCount] = useState(was?.photoCount ?? 0);

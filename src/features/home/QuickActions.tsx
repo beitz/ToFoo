@@ -2,25 +2,33 @@ import { useEffect, useState } from 'react';
 import { useData } from '../../app/data';
 import { useBackCloses } from '../../app/history';
 import { navigate } from '../../app/router';
+import { useToast } from '../../app/toast';
 import { t } from '../../i18n';
+import { addDays } from '../../lib/dates';
 import { isOn } from '../../settings/features';
+import { repo } from '../../storage/repo';
+import { Field, Sheet } from '../../ui/controls';
+import { DateInput } from '../../ui/DateInputs';
 import { Icon } from '../../ui/Icon';
 import { ActivitySheet } from '../activity/ActivitySheet';
 import { SleepButton } from '../sleep/SleepButton';
 import { DialItem } from './DialItem';
-import { useShopping } from '../shopping/useShopping';
-import { isOpen } from '../../logic/shopping';
 
 /**
- * The round button on Home, with the assistant's button right above it. Closed they take two
- * buttons' space; the first tap turns the big one into + and fans out the other quick actions
- * above, the second tap on + opens Log meal.
- * Tapping outside, Escape or the phone's back gesture closes it again.
+ * The round button bottom right, on every screen but full-screen tasks (owner's ask, 2026-10-22).
+ * Closed it takes one button's space; the first tap turns it into + and fans out the quick actions
+ * above, the assistant nearest; the second tap on + opens Log meal. Tapping outside, Escape or the
+ * phone's back gesture closes it again. The Kitchen tab holds At home and the basket, so they are
+ * not in the fan.
  */
-export function QuickActions({ onFast }: { onFast: () => void }) {
+export function QuickActions() {
   const d = useData();
+  const toast = useToast();
+  const { today } = d;
   const [open, setOpen] = useState(false);
   const [activity, setActivity] = useState(false);
+  const [fastSheet, setFastSheet] = useState(false);
+  const [fastStart, setFastStart] = useState(today);
   const close = () => setOpen(false);
   useBackCloses(open, close);
   useEffect(() => {
@@ -35,16 +43,30 @@ export function QuickActions({ onFast }: { onFast: () => void }) {
     navigate(...parts);
   };
   const on = (key: Parameters<typeof isOn>[1]) => isOn(d.settings.features, key);
-  const toBuy = useShopping()?.filter(isOpen).length ?? 0;
+
+  async function toggleFast() {
+    if (d.activeFast) {
+      const f = d.activeFast;
+      await repo.endFast(f.id, addDays(today, -1) < f.startDay ? f.startDay : addDays(today, -1));
+      toast(t('home.fastEnded'), () => void repo.db.fasts.put(f));
+    } else {
+      setFastStart(today);
+      setFastSheet(true);
+    }
+  }
+
+  async function startFast() {
+    const f = await repo.startFast(fastStart <= today ? fastStart : today);
+    setFastSheet(false);
+    toast(t('home.fastStarted'), () => repo.deleteFast(f.id));
+  }
 
   return (
     <>
       <div className={`dial-scrim${open ? ' open' : ''}`} onClick={close} aria-hidden />
       <div className={`fab-stack dial${open ? ' open' : ''}`}>
         {/* Hidden items stay rendered so they can animate out; visibility keeps them out of reach. */}
-        <div className="dial-items" id="home-actions" role="group" aria-label={t('home.quickActions')}>
-          {on('atHome') && <DialItem icon="pantry" label={t('home.atHome')} onClick={() => go('athome')} />}
-          {on('shoppingList') && <DialItem icon="cart" label={toBuy ? t('shopping.open', { n: toBuy }) : t('home.shopping')} onClick={() => go('shopping')} />}
+        <div className="dial-items" id="quick-actions" role="group" aria-label={t('home.quickActions')}>
           {on('journal') && <DialItem icon="journal" label={t('home.journal')} onClick={() => go('journal')} />}
           {on('activity') && (
             <DialItem
@@ -63,12 +85,11 @@ export function QuickActions({ onFast }: { onFast: () => void }) {
             on={!!d.activeFast}
             onClick={() => {
               close();
-              onFast();
+              void toggleFast();
             }}
           />
+          {on('aiAssistant') && <DialItem icon="chat" label={t('ai.pageTitle')} onClick={() => go('assistant')} />}
         </div>
-        {/* The assistant is always one tap away, right above Log meal; its name shows with the others. */}
-        {on('aiAssistant') && <DialItem icon="chat" label={t('ai.pageTitle')} pinned onClick={() => go('assistant')} />}
         <div className="dial-main">
           <span className="dial-label" aria-hidden>
             {t('home.logMeal')}
@@ -79,7 +100,7 @@ export function QuickActions({ onFast }: { onFast: () => void }) {
             aria-label={open ? t('home.logMeal') : t('home.quickActions')}
             title={open ? t('home.logMeal') : t('home.quickActions')}
             aria-expanded={open}
-            aria-controls="home-actions"
+            aria-controls="quick-actions"
           >
             <span className="dial-icon dial-icon-closed">
               <Icon name="apps" size={26} />
@@ -91,6 +112,25 @@ export function QuickActions({ onFast }: { onFast: () => void }) {
         </div>
       </div>
       {activity && <ActivitySheet defaultTime={Date.now()} onClose={() => setActivity(false)} />}
+      {fastSheet && (
+        <Sheet title={t('home.fasting')} onClose={() => setFastSheet(false)}>
+          <Field label={t('home.fastSince')} hint={t('home.fastHint')}>
+            {(id) => <DateInput id={id} value={fastStart} max={today} onChange={(e) => e.target.value && setFastStart(e.target.value)} />}
+          </Field>
+          <div className="sheet-actions">
+            <button className="btn btn-primary" onClick={() => void startFast()}>
+              {t('home.startFast')}
+            </button>
+          </div>
+        </Sheet>
+      )}
     </>
   );
+}
+
+/** Routes that fill the screen with one task, where the round button would cover its controls. */
+export function hidesQuickActions(route: readonly string[]): boolean {
+  const [a, b, c] = route;
+  if (a === 'log' || a === 'assistant' || a === 'shopping' || a === 'fast' || a === 'sleep') return true;
+  return a === 'recipes' && (b === 'new' || c === 'edit');
 }

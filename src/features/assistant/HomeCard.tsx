@@ -68,7 +68,7 @@ export function HomeCard({ card, toast, onLogged, register }: CardProps<Extract<
       <div className="card proposal-done row">
         <Icon name="check" size={18} />
         <span>
-          {t('pantry.savedN', { n: chosen.length })} <a href={href('athome')}>{t('pantry.openPage')}</a>
+          {t('pantry.savedN', { n: chosen.length })} <a href={href('kitchen')}>{t('pantry.openPage')}</a>
         </span>
       </div>
     );

@@ -53,6 +53,11 @@ const paths: Record<string, string> = {
   warning: 'M12 4 2.5 20h19zM12 10v4.5M12 17.25v.25',
   target: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 7.5a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9zM12 11.25a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5z',
   tank: 'M8 4h8a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z',
+  person: 'M12 4a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM4.5 20.5a7.5 7.5 0 0 1 15 0',
+  kitchen: 'M4 10h16v6a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4zM2 10h2M20 10h2M9 6c0-1 1-1 1-2M14 6c0-1 1-1 1-2',
+  chart: 'M4 20h16M7 16v-5M12 16V6M17 16v-8',
+  leaf: 'M5 19C5 11 11 5 19 5c0 8-6 14-14 14zM5 19l7-7',
+  basket: 'M3.5 9.5h17l-1.8 10H5.3zM8 9.5 11 4M16 9.5 13 4M9 13v3M15 13v3',
 };
 
 export function Icon({ name, size = 20, title, filled }: { name: keyof typeof paths | string; size?: number; title?: string; filled?: boolean }) {
