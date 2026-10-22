@@ -56,6 +56,19 @@ describe('repository', () => {
     expect((await repo.db.batches.get(batch.id))!.remaining.fresh).toBe(1);
   });
 
+  it('cooks a pot into its own number of portions and changes them later, the recipe untouched', async () => {
+    const repo = await fresh();
+    const celeriac = { ref: { source: 'BLS' as const, version: '4.0', code: 'G580000' }, name: 'Celeriac', grams: 500, preparation: 'boiled' as const };
+    const recipe = await repo.saveRecipe({ name: 'Celeriac soup', portions: 4, ingredients: [celeriac], tags: [] });
+    const batch = await repo.cookBatch(recipe, { fresh: 1, fridge: 1, freezer: 3 }, '2026-10-22', undefined, { ingredients: [{ ...celeriac, grams: 666 }], portions: 5 });
+    expect([batch.recipe.portions, batch.remaining.freezer, batch.recipeIngredients]).toEqual([5, 3, [celeriac]]);
+    const old = await repo.updateBatchPot(batch.id, { ingredients: batch.recipe.ingredients, portions: 6 });
+    const now = (await repo.db.batches.get(batch.id))!;
+    expect([now.recipe.portions, now.plan.freezer, now.remaining.freezer]).toEqual([6, 4, 4]);
+    expect(old!.recipe.portions).toBe(5);
+    expect((await repo.db.recipes.get(recipe.id))!.portions).toBe(4);
+  });
+
   it('restores a snapshot', async () => {
     const a = await fresh();
     await a.updateProfile({ sex: 'female', birthYear: 1985 });

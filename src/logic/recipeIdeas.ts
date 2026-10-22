@@ -208,6 +208,8 @@ export interface RecipeInfo {
 export interface StockBatch {
   id: string;
   cookedDay: string;
+  /** Portions this pot was shared into (the recipe's number unless the user changed it). */
+  portions: number;
   left: Batch['remaining'];
   cookedGrams?: number;
   /** What went into this pot (the recipe's ingredients unless the pot was made differently). */
@@ -240,6 +242,7 @@ export function recipeInfos(recipes: readonly Recipe[], batches: readonly Batch[
           .map((b) => ({
             id: b.id,
             cookedDay: b.cookedDay,
+            portions: b.recipe.portions,
             left: b.remaining,
             ...(b.cookedGrams ? { cookedGrams: b.cookedGrams } : {}),
             ingredients: b.recipe.ingredients,

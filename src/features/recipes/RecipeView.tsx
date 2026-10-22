@@ -12,6 +12,7 @@ import { cookedWeight, sameIngredients } from '../../logic/batch';
 import { BatchSheet, initialPot } from './BatchSheet';
 import { IngredientChanges } from './IngredientChanges';
 import { PotWeight, type PotScale } from './PotWeight';
+import { PotPortions, potPortionsValid } from './PotPortions';
 import { Field, Sheet, Toggle } from '../../ui/controls';
 import { Icon } from '../../ui/Icon';
 import { prepLabel } from '../log/PreparationSelect';
@@ -159,6 +160,11 @@ function batchLine(b: Batch): string {
   return parts.join(' · ');
 }
 
+/**
+ * Cooking a batch: what actually went into the pot (the recipe's amounts to start with, every one
+ * editable, foods swapped, taken out or added), how many portions it made, its weight and where the
+ * portions go. All of it is this pot's own; the recipe stays as it is.
+ */
 function CookSheet({ recipe, onClose }: { recipe: Recipe; onClose: () => void }) {
   const d = useData();
   const toast = useToast();
@@ -167,35 +173,30 @@ function CookSheet({ recipe, onClose }: { recipe: Recipe; onClose: () => void })
   const [remember, setRemember] = useState(false);
   const [pot, setPot] = useState<PotScale>(() => initialPot(undefined, recipe.potGrams ?? d.settings.potGrams));
   const [ingredients, setIngredients] = useState<Ingredient[]>(recipe.ingredients);
-  const [changing, setChanging] = useState(false);
+  const [portions, setPortions] = useState<number | undefined>(recipe.portions);
   const cooked = cookedWeight(pot.full, pot.empty);
-  const valid = ingredients.length > 0 && ingredients.every((i) => i.grams > 0) && (!pot.full || cooked !== undefined);
+  const valid = ingredients.length > 0 && ingredients.every((i) => i.grams > 0) && (!pot.full || cooked !== undefined) && potPortionsValid(portions);
+  const n = potPortionsValid(portions) ? portions : recipe.portions;
   async function cook() {
     if (!valid) return;
-    const resolved = resolvePlan(plan, recipe.portions);
-    const batch = await repo.cookBatch(recipe, resolved, day, remember ? plan : undefined, { ingredients, ...(cooked ? { cookedGrams: cooked, emptyPotGrams: pot.empty } : {}) });
-    toast(t('recipes.cooked', { n: recipe.portions }), () => void repo.deleteBatch(batch.id));
+    const resolved = resolvePlan(plan, n);
+    const batch = await repo.cookBatch(recipe, resolved, day, remember ? plan : undefined, { ingredients, portions: n, ...(cooked ? { cookedGrams: cooked, emptyPotGrams: pot.empty } : {}) });
+    toast(t('recipes.cooked', { n }), () => void repo.deleteBatch(batch.id));
     onClose();
     navigate('recipes');
   }
   return (
     <Sheet title={t('recipes.cookTitle', { name: recipe.name })} onClose={onClose}>
       <Field label={t('recipes.cookDay')}>{(id) => <DateInput id={id} value={day} max={d.today} onChange={(e) => e.target.value && setDay(e.target.value)} />}</Field>
-      <PlanEditor plan={plan} portions={recipe.portions} onChange={setPlan} />
-      <Toggle checked={remember} onChange={setRemember} label={t('recipes.rememberPlan')} />
+      <h3 className="section-title">{t('batch.whatGoesIn')}</h3>
+      <p className="muted small">{t('batch.cookChangesHint')}</p>
+      <IngredientChanges original={recipe.ingredients} value={ingredients} scale={1} gramsLabel={t('batch.gramsInPot')} onChange={setIngredients} />
       <h3 className="section-title">{t('batch.weighTitleOptional')}</h3>
-      <PotWeight value={pot} portions={recipe.portions} onChange={setPot} />
-      {changing ? (
-        <>
-          <h3 className="section-title">{t('batch.potIngredients')}</h3>
-          <p className="muted small">{t('batch.cookChangesHint')}</p>
-          <IngredientChanges original={recipe.ingredients} value={ingredients} scale={1} gramsLabel={t('batch.gramsInPot')} onChange={setIngredients} />
-        </>
-      ) : (
-        <button className="btn btn-secondary btn-block" onClick={() => setChanging(true)}>
-          <Icon name="edit" size={16} /> {t('batch.changeForPot')}
-        </button>
-      )}
+      <PotWeight value={pot} portions={n} onChange={setPot} />
+      <h3 className="section-title">{t('batch.portionsTitle')}</h3>
+      <PotPortions value={portions} recipePortions={recipe.portions} onChange={setPortions} />
+      <PlanEditor plan={plan} portions={n} onChange={setPlan} />
+      <Toggle checked={remember} onChange={setRemember} label={t('recipes.rememberPlan')} />
       <div className="sheet-actions">
         <button className="btn btn-primary" disabled={!valid} onClick={() => void cook()}>
           {t('recipes.cookConfirm')}

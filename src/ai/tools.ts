@@ -18,7 +18,7 @@ import { refKey } from '../lib/refs';
 import { MAX_SLEEP_MS } from '../logic/sleep';
 import { MAX_ACTIVITY_MINUTES } from '../logic/activity';
 import { MAX_WATER_ML } from '../logic/water';
-import { MAX_POT_GRAMS } from '../logic/batch';
+import { MAX_POT_GRAMS, MAX_POT_PORTIONS } from '../logic/batch';
 import type { Preparation } from '../model/paramTypes';
 import type { RawValue } from '../model/types';
 import type { SkinExposure } from '../model/sun';
@@ -848,8 +848,8 @@ export function runListRecipes(input: unknown, ctx: ToolContext): { ok: boolean;
     const ings = r.ingredients.map(line);
     const stock = r.stock.map((b) => {
       const where = (['fresh', 'fridge', 'freezer'] as const).filter((k) => b.left[k] > 0).map((k) => `${b.left[k]} ${k === 'fresh' ? 'fresh (not yet stored)' : `in the ${k}`}`);
-      const weight = b.cookedGrams ? `cooked food ${b.cookedGrams} g, about ${Math.round(b.cookedGrams / r.portions)} g a portion` : 'not weighed';
-      return `- batch_id ${b.id} | cooked ${b.cookedDay} | ${where.join(', ')} | ${weight}${b.changed ? `\n  This pot was made differently: ${b.ingredients.map(line).join('; ')}` : ''}`;
+      const weight = b.cookedGrams ? `cooked food ${b.cookedGrams} g, about ${Math.round(b.cookedGrams / b.portions)} g a portion` : 'not weighed';
+      return `- batch_id ${b.id} | cooked ${b.cookedDay} | ${b.portions} portions | ${where.join(', ')} | ${weight}${b.changed ? `\n  This pot was made differently: ${b.ingredients.map(line).join('; ')}` : ''}`;
     });
     return [
       head,
@@ -967,6 +967,10 @@ export const portionProposalInput = z.object({
 
 export const batchProposalInput = z.object({
   recipe_id: z.string(),
+  /** A batch already cooked (in stock) whose pot this changes; empty to cook a new batch. */
+  batch_id: z.string().default(''),
+  /** Portions this pot made when not the recipe's number; 0 for the recipe's (or the batch's). */
+  portions: z.number().default(0),
   /** Local "YYYY-MM-DD" it was cooked; empty for today (or the chat's day). */
   day: z.string().default(''),
   /** Use the recipe's usual storage plan (then fresh and fridge are ignored). */
@@ -1011,6 +1015,10 @@ export interface PortionProposal {
 /** Cooking a batch of a recipe in the book, as the assistant proposes it. */
 export interface BatchProposal {
   recipeId: string;
+  /** A batch already cooked whose pot this changes (weight, portions, ingredients); absent to cook a new one. */
+  batchId?: string;
+  /** Portions this pot made, when not the recipe's (or, for a cooked batch, its current) number. */
+  portions?: number;
   /** The recipe's name, for the card's title. */
   name: string;
   /** Local day it was cooked; absent for the chat's day. */
@@ -1021,7 +1029,7 @@ export interface BatchProposal {
   potGrams?: number;
   /** The cooked food weighed on its own. */
   foodGrams?: number;
-  /** For this pot; amounts for the whole pot. */
+  /** For this pot; amounts for the whole pot, against the recipe (or a cooked batch's pot). */
   changes: ProposedChange[];
   /** Some of it eaten right away. */
   ate?: { portions: number; grams?: number; time?: number };
@@ -1106,6 +1114,44 @@ export function validatePortionProposal(input: unknown, ctx: ToolContext): { ok:
   };
 }
 
+const potPortionsOk = (n: number) => Number.isInteger(n) && n >= 1 && n <= MAX_POT_PORTIONS;
+
+/**
+ * Check a `propose_batch` call for a pot already cooked (batch_id): a batch in stock, its weight,
+ * portions and changes against what that pot has now. Day, plan and what was eaten belong to
+ * cooking (and propose_portion), so they must not be given.
+ */
+function validatePotChange(p: z.infer<typeof batchProposalInput>, batchId: string, ctx: ToolContext): { ok: true; proposal: BatchProposal } | { ok: false; error: string } {
+  const found = stockBatch(ctx, batchId);
+  if (!found) return { ok: false, error: `Unknown batch_id ${batchId}: use a batch_id from list_recipes (batches in stock), or leave it empty to cook a new batch.\nFix this and call propose_batch again.` };
+  const { recipe, batch } = found;
+  const problems: string[] = [];
+  if (p.portions !== 0 && !potPortionsOk(p.portions)) problems.push(`portions ${p.portions} must be a whole number from 1 to ${MAX_POT_PORTIONS} (0 to keep ${batch.portions}).`);
+  if (p.pot_grams < 0 || p.food_grams < 0) problems.push('pot_grams and food_grams must not be negative.');
+  if (p.pot_grams > 0 && p.food_grams > 0) problems.push('give pot_grams (full pot) or food_grams (food weighed alone), not both.');
+  for (const g of [p.pot_grams, p.food_grams]) if (g > MAX_POT_GRAMS) problems.push(`${g} g is more than ${MAX_POT_GRAMS} g for one pot; check the unit (kg or g).`);
+  if (p.ate_portions > 0 || p.ate_grams > 0) problems.push('ate_portions and ate_grams are for a new batch; for eating from this pot, call propose_portion with its batch_id.');
+  const { changes, problems: cp } = validateChanges(p.changes, batch.ingredients, ctx, MAX_INGREDIENT_GRAMS, 'this pot');
+  problems.push(...cp);
+  if (changes.length === 0 && p.pot_grams <= 0 && p.food_grams <= 0 && (p.portions === 0 || p.portions === batch.portions)) problems.push('Nothing to change: give changes, portions, pot_grams or food_grams.');
+  if (problems.length) return { ok: false, error: `${problems.join('\n')}\nFix these and call propose_batch again.` };
+  const replaces = p.replaces?.trim();
+  return {
+    ok: true,
+    proposal: {
+      recipeId: recipe.id,
+      batchId: batch.id,
+      name: recipe.name,
+      ...(p.portions > 0 && p.portions !== batch.portions ? { portions: p.portions } : {}),
+      ...(p.pot_grams > 0 ? { potGrams: Math.round(p.pot_grams) } : {}),
+      ...(p.food_grams > 0 ? { foodGrams: Math.round(p.food_grams) } : {}),
+      changes,
+      assumptions: p.assumptions.map((a) => a.trim()).filter(Boolean),
+      ...(replaces ? { replaces } : {}),
+    },
+  };
+}
+
 /**
  * Check a `propose_batch` call: a recipe in the book, a plausible day, storage plan, pot weight and
  * changes to the recipe's ingredients, and what was eaten right away.
@@ -1114,9 +1160,13 @@ export function validateBatchProposal(input: unknown, ctx: ToolContext): { ok: t
   const parsed = batchProposalInput.safeParse(input);
   if (!parsed.success) return { ok: false, error: `Invalid input: ${parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}` };
   const p = parsed.data;
+  const batchId = p.batch_id.trim();
+  if (batchId) return validatePotChange(p, batchId, ctx);
   const recipe = ctx.recipes?.list.find((r) => r.id === p.recipe_id.trim());
   if (!recipe) return { ok: false, error: `Unknown recipe_id ${p.recipe_id}: use an id from list_recipes. A dish not in the book is saved with propose_recipe first.\nFix this and call propose_batch again.` };
   const problems: string[] = [];
+  const portions = p.portions > 0 ? p.portions : recipe.portions;
+  if (p.portions !== 0 && !potPortionsOk(p.portions)) problems.push(`portions ${p.portions} must be a whole number from 1 to ${MAX_POT_PORTIONS} (0 for the recipe's ${recipe.portions}).`);
   const day = p.day.trim();
   if (day) {
     const t = DAY_RE.test(day) ? parseLocalDateTime(`${day} 12:00`) : undefined;
@@ -1126,14 +1176,14 @@ export function validateBatchProposal(input: unknown, ctx: ToolContext): { ok: t
   }
   if (!p.usual_plan) {
     for (const [k, v] of [['fresh', p.fresh], ['fridge', p.fridge]] as const) if (!Number.isInteger(v) || v < 0) problems.push(`${k} ${v} must be a whole number, 0 or more.`);
-    if (p.fresh + p.fridge > recipe.portions) problems.push(`fresh + fridge is ${p.fresh + p.fridge}, more than the ${recipe.portions} portions the recipe makes.`);
+    if (p.fresh + p.fridge > portions) problems.push(`fresh + fridge is ${p.fresh + p.fridge}, more than the ${portions} portions this pot makes.`);
   }
   if (p.pot_grams < 0 || p.food_grams < 0) problems.push('pot_grams and food_grams must not be negative.');
   if (p.pot_grams > 0 && p.food_grams > 0) problems.push('give pot_grams (full pot) or food_grams (food weighed alone), not both.');
   for (const g of [p.pot_grams, p.food_grams]) if (g > MAX_POT_GRAMS) problems.push(`${g} g is more than ${MAX_POT_GRAMS} g for one pot; check the unit (kg or g).`);
   const { changes, problems: cp } = validateChanges(p.changes, recipe.ingredients, ctx, MAX_INGREDIENT_GRAMS, 'the recipe');
   problems.push(...cp);
-  if (p.ate_portions < 0 || p.ate_portions > recipe.portions) problems.push(`ate_portions ${p.ate_portions} is not plausible (0 to ${recipe.portions}).`);
+  if (p.ate_portions < 0 || p.ate_portions > portions) problems.push(`ate_portions ${p.ate_portions} is not plausible (0 to ${portions}).`);
   if (p.ate_grams < 0) problems.push('ate_grams must not be negative.');
   if (p.ate_grams > 0 && !(p.pot_grams > 0 || p.food_grams > 0)) problems.push('ate_grams needs the pot weighed (pot_grams or food_grams); give ate_portions instead.');
   const ateTime = checkTime(p.ate_time, ctx.now);
@@ -1147,6 +1197,7 @@ export function validateBatchProposal(input: unknown, ctx: ToolContext): { ok: t
       recipeId: recipe.id,
       name: recipe.name,
       ...(day ? { day } : {}),
+      ...(p.portions > 0 && p.portions !== recipe.portions ? { portions: p.portions } : {}),
       ...(p.usual_plan ? {} : { plan: { fresh: p.fresh, fridge: p.fridge } }),
       ...(p.pot_grams > 0 ? { potGrams: Math.round(p.pot_grams) } : {}),
       ...(p.food_grams > 0 ? { foodGrams: Math.round(p.food_grams) } : {}),

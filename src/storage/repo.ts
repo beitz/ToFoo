@@ -211,13 +211,14 @@ export function createRepo(db: ToFooDB) {
     },
     /**
      * Cook a batch of a recipe: a copy of the recipe, and optionally what this pot had instead of
-     * the recipe's ingredients, its cooked weight and the empty pot's weight (remembered for next time).
+     * the recipe's ingredients, its cooked weight, the portions it made (the plan is for those) and
+     * the empty pot's weight (remembered for next time).
      */
     async cookBatch(recipe: Recipe, plan: { fresh: number; fridge: number; freezer: number }, day: string, rememberPlan?: StoragePlan, pot?: Partial<PotDetails> & { emptyPotGrams?: number }): Promise<Batch> {
       const cooked: Batch = {
         id: newId(),
         recipeId: recipe.id,
-        recipe: { name: recipe.name, portions: recipe.portions, ingredients: recipe.ingredients.map((i) => ({ ...i })), ...(recipe.saltOverride ? { saltOverride: recipe.saltOverride } : {}) },
+        recipe: { name: recipe.name, portions: pot?.portions ?? recipe.portions, ingredients: recipe.ingredients.map((i) => ({ ...i })), ...(recipe.saltOverride ? { saltOverride: recipe.saltOverride } : {}) },
         cookedDay: day,
         cookedAt: Date.now(),
         plan,
@@ -233,7 +234,7 @@ export function createRepo(db: ToFooDB) {
       });
       return batch;
     },
-    /** Change what a cooked pot had, or its weight; returns the batch as it was, for undo via restoreBatch. */
+    /** Change what a cooked pot had, its weight or its portions; returns the batch as it was, for undo via restoreBatch. */
     async updateBatchPot(batchId: string, pot: PotDetails & { emptyPotGrams?: number }): Promise<Batch | undefined> {
       return db.transaction('rw', db.batches, db.recipes, db.settings, async () => {
         const old = await db.batches.get(batchId);

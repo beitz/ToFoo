@@ -6,7 +6,7 @@ import type { ProposedChange } from '../../ai/tools';
 import { t } from '../../i18n';
 import { dayKey, formatDateTime, formatDay } from '../../lib/dates';
 import { fmtGrams, fmtNumber } from '../../lib/format';
-import { applyChanges, cookedWeight, potShare, stockPortionsFor, type IngredientChange } from '../../logic/batch';
+import { applyChanges, cookedWeight, potShare, sameIngredients, stockPortionsFor, type IngredientChange } from '../../logic/batch';
 import { itemIngredient } from '../../logic/ingredients';
 import { bookingSlot, nextStorage } from '../../logic/stock';
 import { resolvePlan } from '../../storage/defaults';
@@ -21,6 +21,7 @@ import { initialPot } from '../recipes/BatchSheet';
 import { IngredientChanges } from '../recipes/IngredientChanges';
 import { PlanEditor } from '../recipes/PlanEditor';
 import { PotWeight, type PotScale } from '../recipes/PotWeight';
+import { PotPortions, potPortionsValid } from '../recipes/PotPortions';
 import { useRegister, type Card, type CardProps, type Undo } from './cards';
 import { DateInput } from '../../ui/DateInputs';
 
@@ -154,12 +155,17 @@ export function PortionCard({ card, day, toast, onLogged, register }: CardProps<
   );
 }
 
+/** A B card: a batch cooked now, or (with a batch id) changes to a pot already cooked. */
+export function BatchCard(props: CardProps<Extract<Card, { kind: 'batch' }>>) {
+  return props.card.batch.batchId ? <PotCard {...props} /> : <CookCard {...props} />;
+}
+
 /**
- * A batch cooked of a recipe in the book (B1, …): the day, the storage plan, the pot's weight, what
- * this pot had instead of the recipe, and what was eaten of it right away. Saving cooks the batch
- * (and logs that serving), with one undo.
+ * A batch cooked of a recipe in the book (B1, …): the day, the portions, the storage plan, the pot's
+ * weight, what this pot had instead of the recipe, and what was eaten of it right away. Saving cooks
+ * the batch (and logs that serving), with one undo.
  */
-export function BatchCard({ card, day, toast, onLogged, register }: CardProps<Extract<Card, { kind: 'batch' }>>) {
+function CookCard({ card, day, toast, onLogged, register }: CardProps<Extract<Card, { kind: 'batch' }>>) {
   const { batch: proposal } = card;
   const d = useData();
   const recipe = d.recipes.find((r) => r.id === proposal.recipeId);
@@ -175,12 +181,14 @@ export function BatchCard({ card, day, toast, onLogged, register }: CardProps<Ex
     if (!recipe) return [];
     return (proposal.changes.length ? applyChanges(recipe.ingredients, asChanges(proposal.changes, d.foods.version, d.profile.salt), 1) : undefined) ?? recipe.ingredients;
   });
+  const [portions, setPortions] = useState<number | undefined>(proposal.portions ?? recipe?.portions);
   const [eat, setEat] = useState(!!proposal.ate);
   const [ateTime, setAteTime] = useState(() => proposal.ate?.time ?? defaultTimeFor(day, d.today));
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState<Batch>();
   const cooked = cookedWeight(pot.full, pot.empty);
-  const valid = !!recipe && ingredients.length > 0 && ingredients.every((i) => i.grams > 0) && (!pot.full || cooked !== undefined);
+  const valid = !!recipe && ingredients.length > 0 && ingredients.every((i) => i.grams > 0) && (!pot.full || cooked !== undefined) && potPortionsValid(portions);
+  const n = potPortionsValid(portions) ? portions : (recipe?.portions ?? 1);
   const ate = proposal.ate;
   // Grams eaten count only from a weighed pot; otherwise one portion stands in.
   const ateGrams = ate?.grams && cooked ? ate.grams : undefined;
@@ -191,7 +199,7 @@ export function BatchCard({ card, day, toast, onLogged, register }: CardProps<Ex
     setSaving(true);
     try {
       await saveChangedProducts(proposal.changes, ingredients);
-      const batch = await repo.cookBatch(recipe, resolvePlan(plan, recipe.portions), cookDay, undefined, { ingredients, ...(cooked ? { cookedGrams: cooked, emptyPotGrams: pot.empty } : {}) });
+      const batch = await repo.cookBatch(recipe, resolvePlan(plan, n), cookDay, undefined, { ingredients, portions: n, ...(cooked ? { cookedGrams: cooked, emptyPotGrams: pot.empty } : {}) });
       let entryId: string | undefined;
       if (ate && eat) {
         const portions = ateGrams ? stockPortionsFor(ateGrams, batch) : ate.portions || 1;
@@ -200,7 +208,7 @@ export function BatchCard({ card, day, toast, onLogged, register }: CardProps<Ex
         entryId = entry.id;
       }
       setSaved(batch);
-      onLogged(true, localTimes({ recipe: recipe.name, recipeId: recipe.id, batchId: batch.id, day: cookDay, plan: batch.plan, ...(cooked ? { cookedGrams: cooked } : {}), changed: !!batch.recipeIngredients, ...(entryId ? { ate: ateText, ateTime } : {}) }));
+      onLogged(true, localTimes({ recipe: recipe.name, recipeId: recipe.id, batchId: batch.id, day: cookDay, portions: n, plan: batch.plan, ...(cooked ? { cookedGrams: cooked } : {}), changed: !!batch.recipeIngredients, ...(entryId ? { ate: ateText, ateTime } : {}) }));
       return async () => {
         if (entryId) await repo.deleteLog(entryId);
         await repo.deleteBatch(batch.id);
@@ -214,7 +222,7 @@ export function BatchCard({ card, day, toast, onLogged, register }: CardProps<Ex
 
   async function saveOne() {
     const undo = await save();
-    if (undo) toast(t('recipes.cooked', { n: recipe?.portions ?? 0 }), undo);
+    if (undo) toast(t('recipes.cooked', { n }), undo);
   }
 
   const name = recipe?.name ?? proposal.name;
@@ -249,9 +257,10 @@ export function BatchCard({ card, day, toast, onLogged, register }: CardProps<Ex
             <label htmlFor={`cook-${proposal.id}`}>{t('recipes.cookDay')}</label>
             <DateInput id={`cook-${proposal.id}`} value={cookDay} max={d.today} onChange={(e) => e.target.value && setCookDay(e.target.value)} />
           </div>
-          <PlanEditor plan={plan} portions={recipe.portions} onChange={setPlan} />
+          <PotPortions value={portions} recipePortions={recipe.portions} onChange={setPortions} />
+          <PlanEditor plan={plan} portions={n} onChange={setPlan} />
           <h3 className="section-title">{t('batch.weighTitleOptional')}</h3>
-          <PotWeight value={pot} portions={recipe.portions} onChange={setPot} />
+          <PotWeight value={pot} portions={n} onChange={setPot} />
           {proposal.changes.length > 0 && (
             <>
               <h3 className="section-title">{t('batch.potIngredients')}</h3>
@@ -270,6 +279,101 @@ export function BatchCard({ card, day, toast, onLogged, register }: CardProps<Ex
       <div className="sheet-actions">
         <button className="btn btn-primary" disabled={!valid || saving} onClick={() => void saveOne()}>
           {t('ai.saveBatch')}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Changes to a pot already cooked (B1, … with a batch id): what went into it, its weight and its
+ * portions, against the pot as it is now, the recipe's own list beside it to mark what differs.
+ * Counts for every portion of that pot, as "What went into this pot" on the recipe page.
+ */
+function PotCard({ card, toast, onLogged, register }: CardProps<Extract<Card, { kind: 'batch' }>>) {
+  const { batch: proposal } = card;
+  const d = useData();
+  const batch = d.batchesById.get(proposal.batchId!);
+  const recipe = d.recipes.find((r) => r.id === proposal.recipeId);
+  const [pot, setPot] = useState<PotScale>(() => {
+    const remembered = recipe?.potGrams ?? d.settings.potGrams;
+    if (proposal.potGrams) return { full: proposal.potGrams, empty: remembered };
+    return initialPot(proposal.foodGrams ?? batch?.cookedGrams, proposal.foodGrams ? 0 : remembered);
+  });
+  const [ingredients, setIngredients] = useState<Ingredient[]>(() => {
+    if (!batch) return [];
+    return (proposal.changes.length ? applyChanges(batch.recipe.ingredients, asChanges(proposal.changes, d.foods.version, d.profile.salt), 1) : undefined) ?? batch.recipe.ingredients;
+  });
+  const [portions, setPortions] = useState<number | undefined>(proposal.portions ?? batch?.recipe.portions);
+  const [saving, setSaving] = useState(false);
+  const cooked = cookedWeight(pot.full, pot.empty);
+  const valid = !!batch && ingredients.length > 0 && ingredients.every((i) => i.grams > 0) && (!pot.full || cooked !== undefined) && potPortionsValid(portions);
+  const n = potPortionsValid(portions) ? portions : (batch?.recipe.portions ?? 1);
+
+  async function save(): Promise<Undo | undefined> {
+    if (!valid || saving || !batch) return;
+    setSaving(true);
+    try {
+      await saveChangedProducts(proposal.changes, ingredients);
+      const old = await repo.updateBatchPot(batch.id, { ingredients, portions: n, ...(cooked ? { cookedGrams: cooked, emptyPotGrams: pot.empty } : {}) });
+      if (!old) return;
+      onLogged(true, localTimes({ batchId: batch.id, recipe: batch.recipe.name, portions: n, ...(cooked ? { cookedGrams: cooked } : {}), changedFromRecipe: !sameIngredients(batch.recipeIngredients ?? batch.recipe.ingredients, ingredients) }));
+      return async () => {
+        await repo.restoreBatch(old);
+        onLogged(false);
+      };
+    } finally {
+      setSaving(false);
+    }
+  }
+  useRegister(proposal.id, card.logged ? undefined : save, register);
+
+  async function saveOne() {
+    const undo = await save();
+    if (undo) toast(t('batch.saved', { name: batch?.recipe.name ?? proposal.name }), undo);
+  }
+
+  const name = batch?.recipe.name ?? proposal.name;
+  if (card.logged) {
+    return (
+      <div className="card proposal-done row">
+        <Icon name="check" size={18} />
+        <span>
+          {t('batch.saved', { name })} <a href={href('recipes', proposal.recipeId)}>{t('ai.openRecipe')}</a>
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="card proposal">
+      <div className="row-between">
+        <strong className="journal-label">
+          <Icon name="pot" size={18} /> {t('ai.potTitle', { name })}
+        </strong>
+        <span className="muted small" title={t('ai.cardIdBatch')}>
+          {proposal.id}
+        </span>
+      </div>
+      {!batch ? (
+        <p className="notice small" role="alert">
+          {t('ai.potGone')}
+        </p>
+      ) : (
+        <>
+          <p className="muted small">{t('stock.cooked', { day: formatDay(batch.cookedDay, d.today) })}</p>
+          <h3 className="section-title">{t('batch.potIngredients')}</h3>
+          <IngredientChanges original={batch.recipeIngredients ?? batch.recipe.ingredients} value={ingredients} scale={1} gramsLabel={t('batch.gramsInPot')} onChange={setIngredients} />
+          <PotPortions value={portions} recipePortions={recipe?.portions ?? batch.recipe.portions} onChange={setPortions} />
+          {n !== batch.recipe.portions && <p className="muted small">{t('batch.portionsChangeHint')}</p>}
+          <h3 className="section-title">{t('batch.weighTitle')}</h3>
+          <PotWeight value={pot} portions={n} onChange={setPot} />
+        </>
+      )}
+      <Assumptions list={proposal.assumptions} />
+      <div className="sheet-actions">
+        <button className="btn btn-primary" disabled={!valid || saving} onClick={() => void saveOne()}>
+          {t('common.save')}
         </button>
       </div>
     </div>
