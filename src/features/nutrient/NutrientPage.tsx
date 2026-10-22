@@ -22,6 +22,7 @@ import { StatusBadge } from '../../ui/status';
 import { Icon } from '../../ui/Icon';
 import { energyBasisText } from '../settings/EnergyTarget';
 import { proteinBasisText } from '../settings/ProteinTarget';
+import { carbBasisText } from '../settings/CarbMax';
 import { currentWeight } from '../../logic/resolve';
 import { PROFILE_DEFAULTS } from '../../model/requirements';
 import { testHintText } from './testHint';
@@ -101,7 +102,7 @@ export function NutrientPage({ id, context }: { id: string; context?: SplitConte
         )}
         <p className="small">
           {r.kind === 'limit'
-            ? t('nutrient.limitExplain', { days: r.windowDays })
+            ? t(req?.own ? 'nutrient.limitExplainOwn' : 'nutrient.limitExplain', { days: r.windowDays })
             : r.kind === 'info'
               ? t('nutrient.infoExplain', { days: r.windowDays })
               : r.store
@@ -110,7 +111,7 @@ export function NutrientPage({ id, context }: { id: string; context?: SplitConte
         </p>
         {r.kind !== 'info' && req && (
           <p className="small muted">
-            {t(req.own ? 'nutrient.averageIntakeOwn' : 'nutrient.averageIntake', { amount: fmtAmount(id, r.averageIntake), ref: fmtAmount(id, req.recommended) })}
+            {t(req.own ? (req.limitOnly ? 'nutrient.averageIntakeOwnMax' : 'nutrient.averageIntakeOwn') : 'nutrient.averageIntake', { amount: fmtAmount(id, r.averageIntake), ref: fmtAmount(id, req.recommended) })}
             {r.leftOutDays > 0
               ? ` ${t('nutrient.knownDaysLeftOut', { known: r.knownDays, days: r.windowDays - r.leftOutDays, left: r.leftOutDays })}`
               : r.knownDays < r.windowDays
@@ -125,6 +126,11 @@ export function NutrientPage({ id, context }: { id: string; context?: SplitConte
               {energyBasisText(d.requirements.energy)} <a href={href('settings', 'profile')}>{t('energy.change')}</a>
             </p>
           </>
+        )}
+        {id === 'CHO' && (
+          <p className="small muted">
+            {carbBasisText(req)} <a href={href('settings', 'profile')}>{t('carbs.change')}</a>
+          </p>
         )}
         {id === 'PROT625' && req && (
           <p className="small muted">
@@ -238,9 +244,9 @@ export function NutrientPage({ id, context }: { id: string; context?: SplitConte
         {req && (
           <ul className="plain-list">
             <li>
-              {req.own ? t('nutrient.ownTarget') : t(`refKind.${req.kind}` as MessageKey)}: <strong>{fmtAmount(id, req.recommended)}</strong>/{t('nutrient.day')}
+              {req.own ? t(req.limitOnly ? 'nutrient.ownMax' : 'nutrient.ownTarget') : t(`refKind.${req.kind}` as MessageKey)}: <strong>{fmtAmount(id, req.recommended)}</strong>/{t('nutrient.day')}
             </li>
-            {req.own && (
+            {req.own?.referenceRecommended !== undefined && (
               <li>
                 {t('nutrient.withoutOwn')}: {fmtAmount(id, req.own.referenceRecommended)}/{t('nutrient.day')}
               </li>

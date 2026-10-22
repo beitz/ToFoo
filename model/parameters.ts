@@ -403,6 +403,22 @@ export const proteinForTraining: {
   },
 };
 
+// ── Own carbohydrate maximum (docs/SPEC.md, "Own nutrient targets") ────────────────
+
+/**
+ * Carbohydrate goal of very-low-carbohydrate (ketogenic) eating, shown next to the own carbohydrate
+ * maximum as guidance. ToFoo's carbohydrate (BLS "available carbohydrate", OFF label carbohydrate,
+ * USDA total minus fibre) excludes fibre, like the "nonfiber carbohydrate" here.
+ */
+export const ketogenicCarbs: Valued<{ low: number; high: number }> = {
+  value: { low: 20, high: 50 },
+  source:
+    'Evert AB et al. (2019): Nutrition Therapy for Adults With Diabetes or Prediabetes: A Consensus Report. Diabetes Care 42(5):731–754, very low-carbohydrate eating pattern',
+  url: 'https://doi.org/10.2337/dci19-0014',
+  confidence: 'medium',
+  note: 'The very low-carbohydrate (VLC) eating pattern "often has a goal of 20–50 g of nonfiber carbohydrate per day to induce nutritional ketosis". A description of common practice, not a threshold that guarantees ketosis: where ketosis starts differs between people. Checked against the full text (Europe PMC) on 2026-10-22.',
+};
+
 // ── Iron (rule type "iron") ─────────────────────────────────────────────────────
 
 export const iron = {

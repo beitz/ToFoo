@@ -11,6 +11,7 @@ import { Field, NumberInput, Segmented } from '../../ui/controls';
 import { Icon } from '../../ui/Icon';
 import { EnergyTargetCard } from './EnergyTarget';
 import { ProteinTargetCard } from './ProteinTarget';
+import { CarbMaxCard } from './CarbMax';
 
 export function SubPage({ title, children, back = href('settings') }: { title: string; children: React.ReactNode; back?: string }) {
   return (
@@ -146,6 +147,9 @@ export function ProfilePage() {
 
       <h2 className="section-title">{t('profile.protein')}</h2>
       <ProteinTargetCard />
+
+      <h2 className="section-title">{t('profile.carbs')}</h2>
+      <CarbMaxCard />
     </SubPage>
   );
 }

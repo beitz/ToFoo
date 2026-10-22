@@ -110,6 +110,8 @@ export interface NutrientResult {
   contributors: Contributor[];
   /** The value compares with the user's own target, not the reference value. */
   ownTarget?: boolean;
+  /** Limit lines: the daily maximum the average intake is compared with. */
+  limit?: number;
 }
 
 export interface SimulationResult {
@@ -449,6 +451,7 @@ export function simulate(input: SimulationInput): SimulationResult {
       missingDataDays,
       contributors,
       ownTarget: !!r?.own,
+      limit: kind === 'limit' ? r!.recommended : undefined,
     };
 
     const sunAt = (s: Scenario, i: number) => (id === 'VITD' && settings.sun ? (input.sunByDay?.[days[i]!]?.[s] ?? 0) : 0);
