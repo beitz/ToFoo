@@ -779,9 +779,11 @@ textarea:focus-visible,
 .toast-undo {
   background: none;
   border: none;
-  color: var(--accent-soft);
+  /* The toast is inverted (text colour as its ground), so Undo takes the page ground as its colour. */
+  color: var(--bg);
   font: inherit;
-  font-weight: 700;
+  font-weight: 800;
+  text-decoration: underline;
   min-height: 40px;
   padding: 0 10px;
   cursor: pointer;
@@ -5306,4 +5308,208 @@ a.contributor-link > span:first-child {
   margin-top: 16px;
   padding-top: 12px;
   border-top: 1px solid var(--border);
+}
+
+/* Cook a batch (design 2026-10-22) */
+.cook-title {
+  font-size: 20px;
+  line-height: 1.2;
+}
+.cook-steps {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+}
+.cook-steps li {
+  padding: 0;
+  border: none;
+}
+.cook-steps button {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  min-height: 44px;
+  padding: 4px 0;
+  border: none;
+  background: none;
+  color: var(--text-faint);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+.cook-step-bar {
+  display: block;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--surface-3);
+}
+.cook-steps .done button {
+  color: var(--text-muted);
+}
+.cook-steps .done .cook-step-bar {
+  background: var(--text-muted);
+}
+.cook-steps .on button {
+  color: var(--text);
+  font-weight: 700;
+}
+.cook-steps .on .cook-step-bar {
+  background: var(--accent);
+}
+.cook-full {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border: 2px solid var(--text);
+  border-radius: 14px;
+}
+.cook-full .number-input {
+  max-width: 170px;
+}
+.cook-full input {
+  max-width: 170px;
+  border-color: transparent;
+  background: none;
+  font-size: 26px;
+  font-weight: 800;
+  text-align: right;
+}
+.cook-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  border-bottom: 1px solid var(--border);
+  font-variant-numeric: tabular-nums;
+}
+.cook-total {
+  border-bottom: none;
+}
+.cook-total strong {
+  font-size: 24px;
+}
+.cook-op {
+  width: 16px;
+  color: var(--text-faint);
+  font-weight: 700;
+  text-align: center;
+}
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.stepper .icon-btn {
+  border: 1px solid var(--edge);
+  border-radius: 50%;
+}
+.stepper-n {
+  min-width: 36px;
+  font-size: 24px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.cook-boxes {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin: 10px 0;
+}
+.cook-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 72px;
+  padding: 6px 2px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.cook-box-now {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-text);
+}
+.cook-box-freezer {
+  border-color: var(--tank);
+  background: var(--tank-soft);
+}
+.cook-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.cook-summary span {
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: var(--surface-3);
+}
+.cook-taken li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 0;
+  border-bottom: 1px solid var(--border);
+}
+.cook-taken li:last-child {
+  border-bottom: none;
+}
+.cook-instructions {
+  margin: 8px 0 0;
+  padding-left: 22px;
+}
+.cook-instructions li {
+  margin: 0 0 10px;
+  line-height: 1.45;
+}
+.cook-nav {
+  display: flex;
+  gap: 8px;
+  margin: 14px 0 6px;
+}
+.cook-over {
+  display: block;
+  margin: 10px auto 0;
+}
+.pot-list {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.pot-list li {
+  padding: 0;
+  border: none;
+}
+.pot-choice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 52px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.pot-choice.on {
+  border: 2px solid var(--accent);
+  padding: 0 13px;
 }

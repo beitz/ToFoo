@@ -47,7 +47,7 @@ interface Use {
 /** Uses of every food, by food key (refKey): one piece per log entry or pot, the grams eaten or cooked. */
 export type Usage = ReadonlyMap<string, readonly Use[]>;
 
-export function usageOf(log: readonly LogEntry[], batches: readonly Batch[]): Usage {
+export function usageOf(log: readonly LogEntry[], batches: ReadonlyArray<Pick<Batch, 'cookedAt'> & { recipe: Pick<Batch['recipe'], 'ingredients'> }>): Usage {
   const usage = new Map<string, Use[]>();
   const add = (key: string, use: Use) => {
     const list = usage.get(key);

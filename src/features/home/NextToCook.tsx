@@ -84,7 +84,7 @@ export function NextToCook() {
                   </span>
                 </a>
                 {o.kind === 'recipe' ? (
-                  <button type="button" className="btn btn-small" onClick={() => navigate('recipes', o.recipe.id)}>
+                  <button type="button" className="btn btn-small" onClick={() => navigate('cook', o.recipe.id)}>
                     {t('home.cookIt')}
                   </button>
                 ) : (

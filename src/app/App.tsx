@@ -41,6 +41,7 @@ import { BackupPage, ExclusionsPage, NutrientVisibilityPage, SavedPage, StartPag
 import { InsightsPage } from '../features/insights/InsightsPage';
 import { Onboarding } from '../features/onboarding/Onboarding';
 import { FastPage } from '../features/fast/FastPage';
+import { CookPage } from '../features/recipes/CookPage';
 
 function Page({ route }: { route: string[] }) {
   const d = useData();
@@ -63,6 +64,8 @@ function Page({ route }: { route: string[] }) {
     case 'athome':
     case 'kitchen':
       return <KitchenPage />;
+    case 'cook':
+      return <CookPage key={b} id={b ?? ''} />;
     case 'recipes':
       if (b === 'new') return <RecipeEditor key="new" />;
       if (b && c === 'edit') return <RecipeEditor key={b} id={b} />;
@@ -151,6 +154,7 @@ const TAB_OF: Record<string, (typeof NAV)[number]['key'] | null> = {
   kitchen: 'kitchen',
   athome: 'kitchen',
   recipes: 'kitchen',
+  cook: 'kitchen',
   shopping: 'kitchen',
   settings: null,
   about: null,
