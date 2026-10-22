@@ -3214,17 +3214,33 @@ button.week-row:focus-visible {
   border-bottom: none;
 }
 .shop-section {
-  font-size: 0.95rem;
+  margin: 1.1rem 0 0.4rem;
   color: var(--text-muted);
-  margin: 1.1rem 0 0.2rem;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 .shop-list > li,
 .shop-pick > li {
   padding: 0;
 }
+.shop-list {
+  display: grid;
+  gap: 6px;
+}
+.shop-list > li {
+  border: none;
+}
 .shop-item {
   display: flex;
   align-items: center;
+}
+.shop-list .shop-item {
+  padding: 2px 4px 2px 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
 }
 .shop-row {
   display: flex;
@@ -3253,7 +3269,7 @@ button.week-row:focus-visible {
   flex: none;
   width: 26px;
   height: 26px;
-  border-radius: 50%;
+  border-radius: 6px;
   border: 2px solid var(--text-muted);
   color: var(--accent-text);
 }
@@ -3273,11 +3289,66 @@ button.week-row:focus-visible {
   overflow-wrap: anywhere;
 }
 .shop-amount {
-  flex: none;
-  max-width: 40%;
-  text-align: right;
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
+}
+.shop-for {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.shop-goes {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: 8px;
+  background: var(--surface-3);
+  color: var(--text);
+}
+.offline-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border: 1px solid var(--edge);
+  border-radius: 999px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.shop-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: -4px 0 6px;
+}
+.shop-bar {
+  flex: 1;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--surface-3);
+  overflow: hidden;
+}
+.shop-bar span {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  background: var(--text);
+}
+.shop-trolley {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 14px 0 10px;
+}
+.shop-dock {
+  position: sticky;
+  bottom: calc(var(--nav-h) + 8px + env(safe-area-inset-bottom));
+  z-index: 5;
+  margin: 12px calc(-1 * var(--gutter)) 0;
+  padding: 8px var(--gutter);
+  background: var(--bg);
+}
+.shop-dock .shop-suggestions {
+  margin: 0 0 8px;
 }
 .shop-edit {
   color: var(--text-muted);
@@ -5512,4 +5583,11 @@ a.contributor-link > span:first-child {
 .pot-choice.on {
   border: 2px solid var(--accent);
   padding: 0 13px;
+}
+/* Card-like lists draw their own edges; no divider lines between them. */
+.shop-list > li + li,
+.swap-options > li + li,
+.pot-list > li + li,
+.cook-taken > li + li {
+  border-top: none;
 }

@@ -14,6 +14,7 @@ import { isOn } from '../../settings/features';
 import { repo } from '../../storage/repo';
 import { CURRENT_SCHEMA_VERSION, type Batch, type HomePlace, type PantryItem, type Product } from '../../storage/types';
 import { Icon } from '../../ui/Icon';
+import { AskChips } from '../../ui/AskChips';
 import { formatDay } from '../../lib/dates';
 import { BarcodeSheet } from '../log/BarcodeSheet';
 import { useShopping } from '../shopping/useShopping';
@@ -92,7 +93,9 @@ export function KitchenPage() {
   const products = useMemo(() => {
     if (!q) return [];
     const lower = q.toLowerCase();
-    return d.products.filter((p) => `${p.name} ${p.brand ?? ''}`.toLowerCase().includes(lower) && !known.some((k) => k.ref && k.ref.source === p.source && 'code' in k.ref && k.ref.code === p.code)).slice(0, FOOD_SUGGESTIONS);
+    return d.products
+      .filter((p) => `${p.name} ${p.brand ?? ''}`.toLowerCase().includes(lower) && !known.some((k) => k.ref && k.ref.source === p.source && 'code' in k.ref && k.ref.code === p.code))
+      .slice(0, FOOD_SUGGESTIONS);
   }, [q, d.products, known]);
   const foods = useMemo(() => {
     if (!q) return [];
@@ -133,6 +136,7 @@ export function KitchenPage() {
         </a>
         <SettingsButton />
       </header>
+      {homeOn && <AskChips questions={[t('kitchen.ask')]} />}
 
       {sections.length > 0 && (
         <nav className="kitchen-tiles" ref={tilesRef} aria-label={t('kitchen.overview')}>
@@ -147,26 +151,26 @@ export function KitchenPage() {
       )}
 
       {homeOn && (
-      <form
-        className="shop-add"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (q) void add({ name: q });
-        }}
-      >
-        <div className="search-box grow">
-          <Icon name="plus" />
-          <input value={text} onChange={(e) => setText(e.target.value)} placeholder={t('pantry.addPlaceholder')} aria-label={t('pantry.addPlaceholder')} enterKeyHint="done" autoComplete="off" />
-        </div>
-        {offOn && (
-          <button type="button" className="icon-btn scan-btn" onClick={() => setScanning(true)} aria-label={t('pantry.scan')} title={t('pantry.scan')}>
-            <Icon name="barcode" />
+        <form
+          className="shop-add"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (q) void add({ name: q });
+          }}
+        >
+          <div className="search-box grow">
+            <Icon name="plus" />
+            <input value={text} onChange={(e) => setText(e.target.value)} placeholder={t('pantry.addPlaceholder')} aria-label={t('pantry.addPlaceholder')} enterKeyHint="done" autoComplete="off" />
+          </div>
+          {offOn && (
+            <button type="button" className="icon-btn scan-btn" onClick={() => setScanning(true)} aria-label={t('pantry.scan')} title={t('pantry.scan')}>
+              <Icon name="barcode" />
+            </button>
+          )}
+          <button className="btn btn-primary" type="submit" disabled={!q}>
+            {t('pantry.add')}
           </button>
-        )}
-        <button className="btn btn-primary" type="submit" disabled={!q}>
-          {t('pantry.add')}
-        </button>
-      </form>
+        </form>
       )}
       {homeOn && showSuggestions && (
         <ul className="result-list shop-suggestions" aria-label={t('pantry.suggestions')}>

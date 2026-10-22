@@ -17,7 +17,10 @@ import { useWakeLock } from './useWakeLock';
 import { isOn } from '../../settings/features';
 import { needsBuying, onShoppingList } from '../../logic/pantry';
 import { PutAwaySheet } from '../pantry/PutAwaySheet';
-import { usePantry, usePantryFoods, usePantryLeft } from '../pantry/usePantry';
+import { placeName, usePantry, usePantryFoods, usePantryLeft } from '../pantry/usePantry';
+import { useGaps } from '../recipes/useGaps';
+import { portionGrams } from '../../model/ranking';
+import { NUTRIENT_BY_ID } from '../../model/nutrients';
 import { BackButton } from '../../ui/BackButton';
 
 /** Foods from the database offered while typing, after things bought before. */
@@ -39,7 +42,7 @@ export function ShoppingPage() {
   const atHome = isOn(d.settings.features, 'atHome');
   const pantry = usePantry();
   const left = usePantryLeft();
-  const { asShopping } = usePantryFoods();
+  const { asShopping, placeOf } = usePantryFoods();
   // Running low or used up at home and not on the list yet (marking it puts it on; eating it up does not).
   const needed = atHome ? (pantry ?? []).filter((p) => needsBuying(left(p)) && !onShoppingList(p, all ?? [])).sort((a, b) => a.name.localeCompare(b.name)) : [];
   const { typed } = useShopFoods();
@@ -66,7 +69,15 @@ export function ShoppingPage() {
 
   async function addNeeded(names: readonly string[]) {
     const things = needed.filter((p) => names.includes(p.id));
-    const undo = await repo.changeShopping((current) => planAdd(current, things.map((p) => asShopping(p, current)), Date.now(), newId, CURRENT_SCHEMA_VERSION));
+    const undo = await repo.changeShopping((current) =>
+      planAdd(
+        current,
+        things.map((p) => asShopping(p, current)),
+        Date.now(),
+        newId,
+        CURRENT_SCHEMA_VERSION,
+      ),
+    );
     toast(t('shopping.added', { n: things.length }), () => repo.undoShopping(undo));
   }
 
@@ -97,55 +108,28 @@ export function ShoppingPage() {
   }
 
   const showSuggestions = entry.name.trim() !== '' && (past.length > 0 || foods.length > 0);
+  const done = items.length > 0 ? basket.length / items.length : 0;
 
   return (
     <section className="shopping-page">
       <header className="page-head row-between">
         <BackButton to={['kitchen']} />
         <h1 className="grow">{t('shopping.title')}</h1>
+        <span className="offline-pill small">
+          <Icon name="check" size={14} /> {t('shopping.offline')}
+        </span>
         <button className="icon-btn" onClick={() => void share()} disabled={toBuy.length === 0} aria-label={t('shopping.share')} title={t('shopping.share')}>
           <Icon name="share" />
         </button>
       </header>
-
-      <form
-        className="shop-add"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (entry.name.trim()) void add(typed(entry.name.trim(), all ?? []));
-        }}
-      >
-        <div className="search-box grow">
-          <Icon name="plus" />
-          <input value={text} onChange={(e) => setText(e.target.value)} placeholder={t('shopping.addPlaceholder')} aria-label={t('shopping.addPlaceholder')} enterKeyHint="done" autoComplete="off" />
+      {items.length > 0 && (
+        <div className="shop-progress">
+          <span className="shop-bar" aria-hidden>
+            <span style={{ width: `${done * 100}%` }} />
+          </span>
+          <span className="small muted">{t('shopping.progress', { get: toBuy.length, trolley: basket.length })}</span>
         </div>
-        <button className="btn btn-primary" type="submit" disabled={!entry.name.trim()}>
-          {t('shopping.add')}
-        </button>
-      </form>
-      {showSuggestions && (
-        <ul className="result-list shop-suggestions" aria-label={t('shopping.suggestions')}>
-          {past.map((p) => (
-            <li key={p.id}>
-              <button className="result" onClick={() => void add({ name: p.name, section: p.section, ...(p.ref ? { ref: p.ref } : {}) })}>
-                <span className="result-name">{p.name}</span>
-                <span className="muted small">{t('shopping.boughtBefore')}</span>
-              </button>
-            </li>
-          ))}
-          {foods.map((f) => (
-            <li key={f.code}>
-              <button className="result" onClick={() => void add({ name: f.nameEn, ref: { source: 'BLS', version: d.foods.version, code: f.code }, section: sectionOfCode(f.code) })}>
-                <span className="result-name">{f.nameEn}</span>
-                <span className="muted small">{f.nameDe}</span>
-              </button>
-            </li>
-          ))}
-        </ul>
       )}
-      <button className="btn btn-secondary btn-block" onClick={() => setFromRecipe(true)}>
-        <Icon name="recipes" size={18} /> {t('shopping.fromRecipe')}
-      </button>
 
       {needed.length > 0 && (
         <div className="card shop-needed">
@@ -178,45 +162,75 @@ export function ShoppingPage() {
       )}
 
       {all && items.length === 0 && <p className="muted empty">{t('shopping.empty')}</p>}
-      {bySection(toBuy).map((g) => (
+      {/* Ticked things stay in their section (design 2026-10-22), after what is still to get. */}
+      {bySection(items).map((g) => (
         <div key={g.section}>
-          <h2 className="section-title shop-section">{sectionName(g.section)}</h2>
+          <h2 className="shop-section">{sectionName(g.section)}</h2>
           <ul className="plain-list shop-list">
-            {g.items.map((i) => (
+            {[...g.items.filter(isOpen), ...g.items.filter((i) => !isOpen(i))].map((i) => (
               <li key={i.id}>
-                <Row item={i} onToggle={() => void toggle(i)} onEdit={() => setEditing(i)} />
+                <Row item={i} goesTo={atHome && !isOpen(i) ? placeName(placeOf(i.name, i.ref)) : undefined} onToggle={() => void toggle(i)} onEdit={() => setEditing(i)} />
               </li>
             ))}
           </ul>
         </div>
       ))}
-      {toBuy.length === 0 && basket.length > 0 && <p className="muted">{t('shopping.allInBasket')}</p>}
 
       {basket.length > 0 && (
-        <>
-          <div className="section-title row-between">
-            <h2>{t('shopping.basket', { n: basket.length })}</h2>
-            <span className="row">
-              {atHome && (
-                <button className="btn btn-small btn-secondary" onClick={() => setPuttingAway(true)}>
-                  <Icon name="pantry" size={16} /> {t('shopping.putAway')}
+        <div className="card shop-trolley">
+          <span className="grow">{t('shopping.basket', { n: basket.length })}</span>
+          {atHome && (
+            <button className="btn btn-small btn-secondary" onClick={() => setPuttingAway(true)}>
+              <Icon name="pantry" size={16} /> {t('shopping.putAway')}
+            </button>
+          )}
+          <button className="btn btn-small btn-ghost" onClick={() => void clear()}>
+            {t('shopping.clear')}
+          </button>
+        </div>
+      )}
+      <button className="btn btn-secondary btn-block" onClick={() => setFromRecipe(true)}>
+        <Icon name="recipes" size={18} /> {t('shopping.fromRecipe')}
+      </button>
+      {items.length > 0 && 'wakeLock' in navigator && <p className="muted small shop-awake">{t('shopping.screenOn')}</p>}
+
+      <div className="shop-dock">
+        {showSuggestions && (
+          <ul className="result-list shop-suggestions" aria-label={t('shopping.suggestions')}>
+            {past.map((p) => (
+              <li key={p.id}>
+                <button className="result" onClick={() => void add({ name: p.name, section: p.section, ...(p.ref ? { ref: p.ref } : {}) })}>
+                  <span className="result-name">{p.name}</span>
+                  <span className="muted small">{t('shopping.boughtBefore')}</span>
                 </button>
-              )}
-              <button className="btn btn-small btn-ghost" onClick={() => void clear()}>
-                {t('shopping.clear')}
-              </button>
-            </span>
-          </div>
-          <ul className="plain-list shop-list">
-            {basket.map((i) => (
-              <li key={i.id}>
-                <Row item={i} onToggle={() => void toggle(i)} onEdit={() => setEditing(i)} />
+              </li>
+            ))}
+            {foods.map((f) => (
+              <li key={f.code}>
+                <button className="result" onClick={() => void add({ name: f.nameEn, ref: { source: 'BLS', version: d.foods.version, code: f.code }, section: sectionOfCode(f.code) })}>
+                  <span className="result-name">{f.nameEn}</span>
+                  <span className="muted small">{f.nameDe}</span>
+                </button>
               </li>
             ))}
           </ul>
-        </>
-      )}
-      {items.length > 0 && 'wakeLock' in navigator && <p className="muted small shop-awake">{t('shopping.screenOn')}</p>}
+        )}
+        <form
+          className="shop-add"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (entry.name.trim()) void add(typed(entry.name.trim(), all ?? []));
+          }}
+        >
+          <div className="search-box grow">
+            <Icon name="plus" />
+            <input value={text} onChange={(e) => setText(e.target.value)} placeholder={t('shopping.addPlaceholder')} aria-label={t('shopping.addPlaceholder')} enterKeyHint="done" autoComplete="off" />
+          </div>
+          <button className="btn btn-primary" type="submit" disabled={!entry.name.trim()}>
+            {t('shopping.add')}
+          </button>
+        </form>
+      </div>
 
       {fromRecipe && <RecipeToListSheet onClose={() => setFromRecipe(false)} />}
       {editing && <ItemSheet key={editing.id} item={editing} onClose={() => setEditing(null)} />}
@@ -225,8 +239,13 @@ export function ShoppingPage() {
   );
 }
 
-/** One line: tap to put it in the basket (or back), the pen to change it. */
-function Row({ item, onToggle, onEdit }: { item: ShoppingItem; onToggle: () => void; onEdit: () => void }) {
+/**
+ * One line as a card (design 2026-10-22, "Basket in the shop"): tap to put it in the trolley (or
+ * back), the pen to change it. Under the name: the recipes it is for, else which of the user's gaps
+ * a portion of it fills, else that it was typed. A ticked line says where it goes at home.
+ */
+function Row({ item, goesTo, onToggle, onEdit }: { item: ShoppingItem; goesTo?: string; onToggle: () => void; onEdit: () => void }) {
+  const fills = useFills(item);
   const done = item.checkedAt !== undefined;
   const amount = amountText(item);
   return (
@@ -236,14 +255,56 @@ function Row({ item, onToggle, onEdit }: { item: ShoppingItem; onToggle: () => v
           {done && <Icon name="check" size={16} />}
         </span>
         <span className="shop-text">
-          <span className="shop-name">{item.name}</span>
-          {item.recipes?.length ? <span className="muted small shop-for">{t('shopping.forRecipes', { names: item.recipes.join(', ') })}</span> : null}
+          <span className="shop-name">
+            {item.name}
+            {amount && <span className="shop-amount"> {amount}</span>}
+          </span>
+          <span className="muted small shop-for">
+            {item.recipes?.length ? (
+              <>
+                <Icon name="pot" size={14} /> {t('shopping.forRecipes', { names: item.recipes.join(', ') })}
+              </>
+            ) : fills.length ? (
+              <>
+                <Icon name="target" size={14} /> {t('shopping.fills', { names: fills.join(', ') })}
+              </>
+            ) : !item.ref ? (
+              <>
+                <Icon name="edit" size={14} /> {t('shopping.typed')}
+              </>
+            ) : null}
+          </span>
         </span>
-        {amount && <span className="shop-amount">{amount}</span>}
+        {goesTo && <span className="shop-goes small">→ {goesTo}</span>}
       </button>
       <button className="icon-btn shop-edit" onClick={onEdit} aria-label={t('shopping.editItem', { name: item.name })}>
         <Icon name="edit" size={18} />
       </button>
     </div>
   );
+}
+
+/** A gap this item fills: one usual portion of its food gives at least this share of a day's need. */
+const FILLS_SHARE = 0.1;
+
+/** The user's gaps (low or a bit low) one portion of the item's food fills well, biggest first, at most two. */
+function useFills(item: ShoppingItem): string[] {
+  const d = useData();
+  const gaps = useGaps();
+  return useMemo(() => {
+    const food = item.ref?.source === 'BLS' ? d.foods.byCode.get(item.ref.code) : undefined;
+    if (!food) return [];
+    const grams = portionGrams(food.per100);
+    return [...gaps.keys()]
+      .flatMap((id) => {
+        const v = food.per100[id];
+        const req = d.requirements.byNutrient.get(id);
+        if (typeof v !== 'number' || !req) return [];
+        const share = (v * grams) / 100 / req.recommended;
+        return share >= FILLS_SHARE ? [{ id, share }] : [];
+      })
+      .sort((a, b) => b.share - a.share)
+      .slice(0, 2)
+      .map((x) => (NUTRIENT_BY_ID.get(x.id)?.name ?? x.id).replace(/ \(.*\)$/, ''));
+  }, [item.ref, gaps, d.foods, d.requirements]);
 }
