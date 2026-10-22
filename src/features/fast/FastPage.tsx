@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { isOn } from '../../settings/features';
 import { useData } from '../../app/data';
 import { href } from '../../app/router';
 import { t, type MessageKey } from '../../i18n';
@@ -64,6 +65,8 @@ export function FastPage() {
   const d = useData();
   const f = useFast();
   const [sheet, setSheet] = useState<{ reading?: KetoneReading } | null>(null);
+  // Entering readings is its own setting, off by default (owner's pick, 2026-10-22).
+  const readingsOn = isOn(d.settings.features, 'ketoneReadings');
   const latest = f?.readings[f.readings.length - 1];
   const high = f?.readings.some((r) => r.type === 'blood' && r.value > ketosis.highNoteMmol.value);
   const dots = f ? f.readings.filter((r) => r.type === 'blood').map((r) => ({ hours: (r.time - f.clock.since) / 3_600_000, mmol: Math.min(r.value, ketosis.meterMaxMmol.value * 2) })) : [];
@@ -107,6 +110,8 @@ export function FastPage() {
               <KetosisChart input={f.input} dots={dots} />
               <p className="muted small">{t('fast.chart.caption')}</p>
 
+              {readingsOn && (
+                <>
               <h3 className="fast-sub">{t('fast.measureTitle')}</h3>
               {f.readings.length > 0 && (
                 <ul className="plain-list fast-readings">
@@ -126,6 +131,8 @@ export function FastPage() {
                 <Icon name="plus" size={18} /> {t('fast.addMeasurement')}
               </button>
               {!f.input.personal && <p className="muted small">{t('fast.personalHint', { n: ketosis.personal.value.minReadings })}</p>}
+                </>
+              )}
 
               <h3 className="fast-sub">{t('fast.movedTitle')}</h3>
               <ul className="fast-factors">

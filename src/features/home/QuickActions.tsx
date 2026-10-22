@@ -4,7 +4,6 @@ import { useBackCloses } from '../../app/history';
 import { navigate } from '../../app/router';
 import { useToast } from '../../app/toast';
 import { t } from '../../i18n';
-import { addDays } from '../../lib/dates';
 import { isOn } from '../../settings/features';
 import { repo } from '../../storage/repo';
 import { Field, Sheet } from '../../ui/controls';
@@ -13,6 +12,7 @@ import { Icon } from '../../ui/Icon';
 import { ActivitySheet } from '../activity/ActivitySheet';
 import { SleepButton } from '../sleep/SleepButton';
 import { DialItem } from './DialItem';
+import { endFast } from '../fast/fastActions';
 
 /**
  * The round button bottom right, on every screen but full-screen tasks (owner's ask, 2026-10-22).
@@ -46,9 +46,7 @@ export function QuickActions() {
 
   async function toggleFast() {
     if (d.activeFast) {
-      const f = d.activeFast;
-      await repo.endFast(f.id, addDays(today, -1) < f.startDay ? f.startDay : addDays(today, -1));
-      toast(t('home.fastEnded'), () => void repo.db.fasts.put(f));
+      await endFast(d.activeFast, today, toast);
     } else {
       setFastStart(today);
       setFastSheet(true);

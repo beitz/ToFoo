@@ -98,9 +98,14 @@ export function CompactGauge({ result: r, onClick, defaultBased, variant = 'row'
   );
 }
 
-/** Arrows for a trend: ↑↑↑ soon at the next status line, ↑ slow, → steady. */
+/**
+ * One arrow for a trend (design system 2026-10-22): ↑ / ↓ fast (the next status line within a week),
+ * ↗ / ↘ slower, → steady.
+ */
 export function trendArrows(tr: Trend): string {
-  return tr.direction === 'steady' ? '→' : (tr.direction === 'up' ? '↑' : '↓').repeat(tr.speed);
+  if (tr.direction === 'steady') return '→';
+  if (tr.speed === 3) return tr.direction === 'up' ? '↑' : '↓';
+  return tr.direction === 'up' ? '↗' : '↘';
 }
 
 /** Spoken / tooltip text for a trend. */
