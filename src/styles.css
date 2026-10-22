@@ -842,9 +842,18 @@ textarea:focus-visible,
 /* Own-target mark: a small symbol, so the line reads differently without relying on colour. */
 .gauge-own {
   display: inline-flex;
+  flex: none;
   vertical-align: -1px;
   margin-left: 3px;
   color: var(--text-muted);
+}
+/* In the compact lines the flex gap already separates it from the name. */
+.cgauge-line .gauge-own {
+  margin-left: -3px;
+}
+.cgauge-cell .gauge-own svg {
+  width: 10px;
+  height: 10px;
 }
 .gauge-body {
   display: flex;
@@ -1439,6 +1448,12 @@ details.tree details {
   font-weight: 700;
   color: var(--text);
 }
+/* The maximum next to a limit amount: smaller, so "44/50" fits a narrow cell. */
+.cgauge-cell .cgauge-max {
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
 .cgauge-bar {
   position: relative;
   display: block;
@@ -1485,6 +1500,7 @@ details.tree details {
   color: var(--unknown);
 }
 .cgauge-cell .cgauge-name {
+  flex: 0 1 auto;
   font-weight: 500;
   color: var(--text-muted);
 }

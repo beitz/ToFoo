@@ -49,8 +49,19 @@ function gaugeLabel(r: NutrientResult): string {
 export function CompactGauge({ result: r, onClick, defaultBased, variant = 'row' }: Pick<Props, 'result' | 'onClick' | 'defaultBased'> & { variant?: 'row' | 'cell' }) {
   const def = NUTRIENT_BY_ID.get(r.id);
   const name = def?.short ?? r.id;
-  // Cells are narrow: no "of max" / "/day" suffixes there.
-  const cellValue = r.kind === 'info' ? fmtAmount(r.id, r.averageIntake) : fmtPercent(r.value.central);
+  // Cells are narrow: no "of max" / "/day" suffixes or units there. A limit cell shows the amount against
+  // the maximum ("42/50"), so it can't be mistaken for a percent of a need next to it.
+  const cellValue =
+    r.kind === 'info'
+      ? fmtAmount(r.id, r.averageIntake)
+      : r.kind === 'limit' && r.limit !== undefined
+        ? (
+          <>
+            {fmtNumber(r.averageIntake)}
+            <small className="cgauge-max">/{fmtNumber(r.limit)}</small>
+          </>
+        )
+        : fmtPercent(r.value.central);
   const noData = r.status === 'unknown' || hasNoData(r);
   const value = noData ? '–' : variant === 'cell' ? cellValue : gaugeLabel(r);
   const icon = <Icon name={STATUS_ICON[r.status]} size={14} />;
@@ -66,8 +77,9 @@ export function CompactGauge({ result: r, onClick, defaultBased, variant = 'row'
         <span className="cgauge-name">
           {name}
           {defaultBased && <span className="gauge-default">*</span>}
-          <OwnMark result={r} />
         </span>
+        {/* Outside the name, so a cut-off name never hides it. */}
+        <OwnMark result={r} />
         {variant === 'row' && <span className="cgauge-value">{value}</span>}
       </span>
       {variant === 'cell' && (

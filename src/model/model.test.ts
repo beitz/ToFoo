@@ -178,6 +178,20 @@ describe('own nutrient targets', () => {
     expect(res.get('PROT625')!.value.central).toBeCloseTo(0.5);
     expect(res.get('FE')!.ownTarget).toBe(false);
   });
+
+  it('turns carbohydrate into a limit line with an own maximum', () => {
+    expect(resolveRequirements(profile, 2026).infoOnly.has('CHO')).toBe(true);
+    const requirements = resolveRequirements({ ...profile, nutrientTargets: { CHO: { amount: 50, per: 'day' } } }, 2026);
+    expect(requirements.infoOnly.has('CHO')).toBe(false);
+    expect(requirements.byNutrient.get('CHO')).toMatchObject({ recommended: 50, limitOnly: true, own: { target: { amount: 50, per: 'day' } } });
+    expect(requirements.byNutrient.get('CHO')!.own!.referenceRecommended).toBeUndefined();
+    const days = ['2026-10-01', '2026-10-02', '2026-10-03', '2026-10-04'];
+    const run = (grams: number) =>
+      simulate(baseInput(days, days.slice(0, 3).map((day) => manual(`c-${day}`, day, 12, { CHO: grams })), { requirements })).nutrients.get('CHO')!;
+    expect(run(40)).toMatchObject({ kind: 'limit', status: 'fine', limit: 50, ownTarget: true });
+    expect(run(40).value.central).toBeCloseTo(0.8);
+    expect(run(80).status).toBe('tooHigh');
+  });
 });
 
 describe('absorption rules', () => {

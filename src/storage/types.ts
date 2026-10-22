@@ -53,7 +53,7 @@ export interface Profile extends Versioned {
   activity?: ActivityLevel;
   /** Own energy target in kcal/day; not set: estimated from age, sex, weight and activity. */
   energyTargetKcal?: number;
-  /** Own daily targets by nutrient id (only OWN_TARGET_NUTRIENTS, so far protein); not set: the DGE value. */
+  /** Own daily targets by nutrient id (only OWN_TARGETS: a protein need, a carbohydrate maximum); not set: the DGE value, or no limit. */
   nutrientTargets?: Record<string, OwnTarget>;
   phytate?: PhytateIntake;
   /** Women only, for the iron reference value. */

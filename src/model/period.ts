@@ -87,6 +87,8 @@ export function periodBreakdown(input: PeriodInput): PeriodResult {
       missingDataDays: idx.filter((i) => sim.daily[i]!.missing.has(id)).length,
       history: [],
       contributors: [],
+      ownTarget: !!r?.own,
+      limit: kind === 'limit' ? r!.recommended : undefined,
     });
   }
   return { from, to, days: inRange, countedDays: n, statusCounts, nutrients };

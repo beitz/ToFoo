@@ -14,7 +14,7 @@ export interface ModelProfile {
   menstruation?: Menstruation;
   /** The user's own energy target (kcal/day); replaces the estimate when set. */
   energyTargetKcal?: number;
-  /** Own daily targets per nutrient id; each replaces the reference value of a nutrient in OWN_TARGET_NUTRIENTS. */
+  /** Own daily targets per nutrient id, for the nutrients in OWN_TARGETS. */
   nutrientTargets?: Record<string, OwnTarget>;
 }
 
@@ -24,8 +24,12 @@ export interface OwnTarget {
   per: 'kg' | 'day';
 }
 
-/** Nutrients the user can give an own target. Needs only, not limits: an own number changes what "enough" means. */
-export const OWN_TARGET_NUTRIENTS: readonly string[] = ['PROT625'];
+/**
+ * Nutrients the user can give an own target, and what it means. `need`: replaces the reference intake
+ * (what "enough" means). `max`: an own upper amount that turns an amount-only line into a limit line;
+ * only for nutrients without a reference value (a sourced need is never silently turned into a cap).
+ */
+export const OWN_TARGETS: Readonly<Record<string, 'need' | 'max'>> = { PROT625: 'need', CHO: 'max' };
 
 /** Where the energy reference comes from: the user's own number, the personal estimate, or the DGE table. */
 export type EnergyBasis = 'own' | 'estimate' | 'guide';
@@ -71,8 +75,8 @@ export interface Requirement {
 }
 
 export interface OwnRequirement {
-  /** What `recommended` would be without the own target (DGE value or energy estimate). */
-  referenceRecommended: number;
+  /** What `recommended` would be without the own target (DGE value or energy estimate); none for an own maximum. */
+  referenceRecommended?: number;
   /** Energy has no per-kg form; its own target is always per day. */
   target: OwnTarget;
 }
@@ -135,9 +139,9 @@ export function estimateEnergyNeed(sex: Sex | undefined, ageYears: number, weigh
   return { kcal: Math.round((reeKcal * pal) / step) * step, reeKcal: Math.round(reeKcal / step) * step, pal };
 }
 
-/** The own target for a nutrient, if the user set a usable one and the nutrient allows it. */
-function ownTargetFor(profile: ModelProfile, nutrient: string, limitOnly: boolean): OwnTarget | undefined {
-  if (limitOnly || !OWN_TARGET_NUTRIENTS.includes(nutrient)) return undefined;
+/** The own target for a nutrient, if the user set a usable one and the nutrient allows that kind. */
+function ownTargetFor(profile: ModelProfile, nutrient: string, kind: 'need' | 'max'): OwnTarget | undefined {
+  if (OWN_TARGETS[nutrient] !== kind) return undefined;
   const t = profile.nutrientTargets?.[nutrient];
   return t && t.amount > 0 ? t : undefined;
 }
@@ -175,7 +179,7 @@ export function resolveRequirements(profile: ModelProfile, currentYear: number):
   const byNutrient = new Map<string, Requirement>();
   for (const ref of referenceValues) {
     const reference = ref.nutrient === 'ENERCC' ? energy.kcal : amountFor(ref.amount, profile.sex, ageGroup, ctx);
-    const target = ownTargetFor(profile, ref.nutrient, ref.limitOnly ?? false);
+    const target = ref.limitOnly ? undefined : ownTargetFor(profile, ref.nutrient, 'need');
     let own: OwnRequirement | undefined;
     if (ref.nutrient === 'ENERCC' && energy.basis === 'own') own = { referenceRecommended: energy.estimate?.kcal ?? energy.guideKcal, target: { amount: energy.kcal, per: 'day' } };
     else if (target) own = { referenceRecommended: reference, target };
@@ -205,5 +209,26 @@ export function resolveRequirements(profile: ModelProfile, currentYear: number):
       own,
     });
   }
-  return { byNutrient, infoOnly: new Set(infoOnly.map((i) => i.nutrient)), ageGroup, defaultsUsed, underAge, energy };
+  const infoSet = new Set(infoOnly.map((i) => i.nutrient));
+  // An own maximum turns an amount-only nutrient (e.g. carbohydrate for keto) into a limit line.
+  for (const nutrient of Object.keys(OWN_TARGETS)) {
+    const target = ownTargetFor(profile, nutrient, 'max');
+    if (!target || byNutrient.has(nutrient)) continue;
+    const max = target.per === 'kg' ? target.amount * weightKg : target.amount;
+    const f = nutrientParams[nutrient]?.typicalAbsorption.value ?? 1;
+    infoSet.delete(nutrient);
+    byNutrient.set(nutrient, {
+      nutrient,
+      kind: 'guide',
+      recommended: max,
+      physiological: max * f,
+      physiologicalDerived: f !== 1,
+      limitOnly: true,
+      // The user's own number: nothing to be unsure about in the limit itself.
+      confidence: 'high',
+      source: 'Own maximum',
+      own: { target },
+    });
+  }
+  return { byNutrient, infoOnly: infoSet, ageGroup, defaultsUsed, underAge, energy };
 }
