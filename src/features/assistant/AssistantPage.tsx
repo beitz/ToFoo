@@ -43,7 +43,7 @@ import { Icon } from '../../ui/Icon';
 import { ConfidenceField } from '../log/ConfidenceField';
 import { TimeField } from '../log/TimeField';
 import { defaultTimeFor } from '../log/time';
-import { sleepProblem } from '../sleep/SleepSheet';
+import { ReplacesNote, sleepProblem } from '../sleep/SleepSheet';
 import { durationText, spanText } from '../sleep/format';
 import { waterText } from '../water/format';
 import { waterProblem } from '../water/WaterSheet';
@@ -905,6 +905,7 @@ function SleepCard({ card, toast, onLogged, register }: CardProps<Extract<Card, 
       </div>
       <TimeField label={t('sleep.fellAsleep')} value={start} onChange={setStart} />
       <TimeField label={t('sleep.wokeUp')} value={end} onChange={setEnd} />
+      <ReplacesNote start={start} end={end} />
       <div className="sheet-actions">
         <span className={problem ? 'notice small' : 'muted'} role={problem ? 'alert' : undefined}>
           {problem ?? durationText(end - start)}
