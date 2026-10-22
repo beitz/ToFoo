@@ -33,13 +33,13 @@ export function useHasApiKey(on: boolean): boolean | undefined {
  * still presses Send, so a tap never costs anything. Hidden without the assistant, its API key or
  * the "Question shortcuts" setting.
  */
-export function AskChips({ questions, to = 'assistant' }: { questions: string[]; to?: 'assistant' | 'insights' }) {
+export function AskChips({ questions, to = 'assistant', className }: { questions: string[]; to?: 'assistant' | 'insights'; className?: string }) {
   const d = useData();
   const on = isOn(d.settings.features, 'aiAssistant') && isOn(d.settings.features, 'questionShortcuts');
   const hasKey = useHasApiKey(on);
   if (!on || !hasKey || questions.length === 0) return null;
   return (
-    <div className="ask-chips" role="group" aria-label={t('ask.label')}>
+    <div className={className ? `ask-chips ${className}` : 'ask-chips'} role="group" aria-label={t('ask.label')}>
       {questions.map((q) => (
         <button
           key={q}
