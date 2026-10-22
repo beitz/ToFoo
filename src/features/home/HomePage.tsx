@@ -1,9 +1,8 @@
 import { useMemo, useState } from 'react';
 import { useData } from '../../app/data';
-import { useToast } from '../../app/toast';
 import { href, navigate } from '../../app/router';
 import { t, type MessageKey } from '../../i18n';
-import { addDays, formatDate } from '../../lib/dates';
+import { formatDate } from '../../lib/dates';
 import { isOn } from '../../settings/features';
 import { repo } from '../../storage/repo';
 import { CompactGauge, GaugeRow, TankCard } from '../../ui/Gauge';
@@ -13,18 +12,18 @@ import { NUTRIENT_BY_ID, NUTRIENTS } from '../../model/nutrients';
 import { rankFoods } from '../../model/ranking';
 import { NON_SINGLE_FOOD_GROUPS } from '../../foods/foodDb';
 import { diverseTop } from '../../foods/variety';
-import { Field, Segmented, Sheet } from '../../ui/controls';
+import { Segmented } from '../../ui/controls';
 import type { NutrientResult } from '../../model/simulate';
 import { Prompts } from './Prompts';
+import { SettingsButton } from '../../ui/SettingsButton';
+import { AskChips } from '../../ui/AskChips';
 import { SleepQuestion } from '../sleep/SleepQuestion';
 import { WaterCard } from '../water/WaterCard';
-import { QuickActions } from './QuickActions';
 import { FastingLine } from './FastingLine';
 import { StockChips } from './StockChips';
 import { GroupInfoButton, hasGroupInfo } from '../info/GroupInfo';
 import { withStores } from '../../logic/stores';
 import { attentionCounts, COLLAPSED_BY_DEFAULT, groupNutrients, type HomeGrouping } from './grouping';
-import { DateInput } from '../../ui/DateInputs';
 
 /** Shown first, in one row: energy and the macronutrients. */
 const MACRO_ROW = ['ENERCC', 'PROT625', 'FAT', 'CHO', 'FIBT'];
@@ -34,10 +33,7 @@ const PER_KG = new Set(['PROT625', 'HIS', 'ILE', 'LEU', 'LYS', 'SAA', 'AAA', 'TH
 
 export function HomePage() {
   const d = useData();
-  const toast = useToast();
   const { model, settings, today } = d;
-  const [fastSheet, setFastSheet] = useState(false);
-  const [fastStart, setFastStart] = useState(today);
   const [legendOpen, setLegendOpen] = useState(false);
   const [storesLegendOpen, setStoresLegendOpen] = useState(false);
   const showRange = isOn(settings.features, 'uncertaintyRanges');
@@ -78,34 +74,21 @@ export function HomePage() {
   const perKgOnDefault = (id: string) => weightDefault && PER_KG.has(id) && d.requirements.byNutrient.get(id)?.own?.target.per !== 'day';
   const sexDefault = d.requirements.defaultsUsed.includes('sex');
 
-  async function toggleFast() {
-    if (d.activeFast) {
-      const f = d.activeFast;
-      await repo.endFast(f.id, addDays(today, -1) < f.startDay ? f.startDay : addDays(today, -1));
-      toast(t('home.fastEnded'), () => void repo.db.fasts.put(f));
-    } else {
-      setFastStart(today);
-      setFastSheet(true);
-    }
-  }
-
-  async function startFast() {
-    const f = await repo.startFast(fastStart <= today ? fastStart : today);
-    setFastSheet(false);
-    toast(t('home.fastStarted'), () => repo.deleteFast(f.id));
-  }
-
   const statusText = todayEntries.length ? t('home.logToday', { n: todayEntries.length }) : todayStatus === 'fasted' ? t('day.fasted') : t('home.nothingYet');
 
   return (
     <section>
-      <header className="page-head">
-        <h1>{t('app.name')}</h1>
-        <span className="muted">
-          {new Date().toLocaleDateString('en-GB', { weekday: 'long' })} {formatDate(new Date())}
-          {!d.activeFast && ` · ${statusText}`}
-        </span>
+      <header className="page-head row-between">
+        <div className="grow">
+          <h1>{t('app.name')}</h1>
+          <span className="muted">
+            {new Date().toLocaleDateString('en-GB', { weekday: 'long' })} {formatDate(new Date())}
+            {!d.activeFast && ` · ${statusText}`}
+          </span>
+        </div>
+        <SettingsButton />
       </header>
+      <AskChips questions={[t('ask.howAmIDoing'), t('ask.whatNext')]} />
       <FastingLine />
       <StockChips />
 
@@ -246,19 +229,6 @@ export function HomePage() {
         </div>
       )}
       <p className="muted small disclaimer">{t('home.disclaimer')}</p>
-      <QuickActions onFast={() => void toggleFast()} />
-      {fastSheet && (
-        <Sheet title={t('home.fasting')} onClose={() => setFastSheet(false)}>
-          <Field label={t('home.fastSince')} hint={t('home.fastHint')}>
-            {(id) => <DateInput id={id} value={fastStart} max={today} onChange={(e) => e.target.value && setFastStart(e.target.value)} />}
-          </Field>
-          <div className="sheet-actions">
-            <button className="btn btn-primary" onClick={() => void startFast()}>
-              {t('home.startFast')}
-            </button>
-          </div>
-        </Sheet>
-      )}
     </section>
   );
 }

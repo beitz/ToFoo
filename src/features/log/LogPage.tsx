@@ -330,7 +330,7 @@ export function LogPage({ day: dayParam, foodCode }: { day?: string; foodCode?: 
                 </ul>
               )}
               {atHomeOn && (
-                <a className="small log-home-link" href={href('athome')}>
+                <a className="small log-home-link" href={href('kitchen')}>
                   {t('pantry.openPage')}
                 </a>
               )}

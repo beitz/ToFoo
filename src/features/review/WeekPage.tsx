@@ -18,6 +18,7 @@ import { isOn } from '../../settings/features';
 import { repo } from '../../storage/repo';
 import { Icon } from '../../ui/Icon';
 import { STATUS_ICON, statusLabel, urgencyRank } from '../../ui/status';
+import { InsightsTabs } from './InsightsTabs';
 import { DAY_ICON } from './dayStatus';
 
 const DAY_KEY = /^\d{4}-\d{2}-\d{2}$/;
@@ -107,6 +108,7 @@ export function WeekPage({ week: param }: { week?: string }) {
 
   return (
     <section>
+      <InsightsTabs view="week" day={monday} />
       <header className="page-head row-between">
         <button className="icon-btn" onClick={() => navigate('week', addDays(monday, -7))} aria-label={t('week.prev')}>
           <Icon name="back" />

@@ -5,7 +5,6 @@ import { href, navigate } from '../../app/router';
 import { t, type MessageKey } from '../../i18n';
 import { addDays, formatDay, formatTime, parseDay } from '../../lib/dates';
 import { followOnSleep, NEW_SLEEP_MS } from '../../logic/sleep';
-import { weekStart } from '../../lib/periods';
 import { fmtAmount } from '../../lib/format';
 import { groupMeals } from '../../model/simulate';
 import { repo } from '../../storage/repo';
@@ -33,6 +32,7 @@ import { WaterCard } from '../water/WaterCard';
 import { WaterSheet } from '../water/WaterSheet';
 import { useWater } from '../water/useWater';
 import { waterText } from '../water/format';
+import { InsightsTabs } from '../review/InsightsTabs';
 import { waterTarget } from '../../logic/water';
 
 type StatusChoice = 'auto' | 'logged' | 'partial' | 'fasted' | 'filled' | 'excluded';
@@ -105,6 +105,7 @@ export function DiaryPage({ day: dayParam }: { day?: string }) {
 
   return (
     <section>
+      <InsightsTabs view="diary" day={day} />
       <header className="page-head row-between">
         <button className="icon-btn" onClick={() => navigate('diary', addDays(day, -1))} aria-label={t('diary.prev')}>
           <Icon name="back" />
@@ -116,12 +117,6 @@ export function DiaryPage({ day: dayParam }: { day?: string }) {
       </header>
 
       <div className="row diary-links">
-        <a className="btn btn-small btn-secondary" href={href('calendar', day.slice(0, 7))}>
-          <Icon name="calendar" size={18} /> {t('diary.calendar')}
-        </a>
-        <a className="btn btn-small btn-secondary" href={href('week', weekStart(day))}>
-          <Icon name="bars" size={18} /> {t('diary.week')}
-        </a>
         <a className="btn btn-small btn-secondary" href={href('review', day, day)}>
           <Icon name="bars" size={18} /> {t('diary.dayNutrients')}
         </a>

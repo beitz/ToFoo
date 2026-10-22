@@ -98,7 +98,8 @@ export type FeatureKey =
   | 'saveChats'
   | 'shoppingList'
   | 'atHome'
-  | 'ketosis';
+  | 'ketosis'
+  | 'questionShortcuts';
 
 export interface Settings extends Versioned {
   id: 'settings';

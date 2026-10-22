@@ -6,6 +6,7 @@ import { addMonths, formatMonth, monthGrid, presetRange } from '../../lib/period
 import type { DayStatus } from '../../model/types';
 import { Icon } from '../../ui/Icon';
 import { isOn } from '../../settings/features';
+import { InsightsTabs } from './InsightsTabs';
 import { DAY_ICON } from './dayStatus';
 
 const STATUSES: Array<DayStatus | 'pending'> = ['logged', 'partial', 'fasted', 'unknown', 'filled', 'excluded'];
@@ -26,6 +27,7 @@ export function CalendarPage({ month: monthParam }: { month?: string }) {
 
   return (
     <section>
+      <InsightsTabs view="calendar" day={month === d.today.slice(0, 7) ? d.today : `${month}-01`} />
       <header className="page-head row-between">
         <button className="icon-btn" onClick={() => navigate('calendar', addMonths(month, -1))} aria-label={t('calendar.prev')}>
           <Icon name="back" />

@@ -1,81 +1,99 @@
 /* ToFoo styles: mobile-first, light and dark. Colours are tokens; never encode status by colour alone. */
 :root {
+  /* Design system 2026-10-22 (Claude Design, "Quiet surfaces. Colour only where it means something"):
+     neutral ground, one cream/ink action colour, four status colours, one store blue. */
   color-scheme: light;
-  --bg: #f6f5f1;
+  --bg: #f3f2ee;
   --surface: #ffffff;
-  --surface-2: #eeece6;
-  --text: #1d2420;
-  --text-muted: #5b655f;
-  --border: #d9d6cd;
-  --accent: #2f6f4e;
+  --surface-2: #eceae4;
+  --surface-3: #e0ddd5;
+  --text: #15181b;
+  --text-muted: #454d53;
+  --text-faint: #5f676e;
+  --border: #d6d3cb;
+  --edge: #857f73;
+  --accent: #15181b;
   --accent-text: #ffffff;
-  --accent-soft: #dcebe2;
-  --ok: #2f7d4f;
-  --ok-soft: #dff0e5;
-  --warn: #9a6400;
-  --warn-soft: #fbeccb;
-  --low: #b3361f;
-  --low-soft: #f8ddd6;
-  --high: #7b3fa0;
-  --high-soft: #eadcf4;
-  --unknown: #6b7280;
-  --range: rgba(29, 36, 32, 0.18);
-  --shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 2px 8px rgba(0, 0, 0, 0.05);
-  --radius: 14px;
-  --radius-sm: 9px;
+  --accent-soft: color-mix(in srgb, var(--accent) 9%, transparent);
+  --ok: #0b7656;
+  --ok-soft: color-mix(in srgb, var(--ok) 14%, transparent);
+  --warn: #7d5c00;
+  --warn-soft: color-mix(in srgb, var(--warn) 14%, transparent);
+  --low: #b0441a;
+  --low-soft: color-mix(in srgb, var(--low) 14%, transparent);
+  --high: #6a45d6;
+  --high-soft: color-mix(in srgb, var(--high) 14%, transparent);
+  --unknown: #5f676e;
+  --tank: #1a66ae;
+  --tank-soft: color-mix(in srgb, var(--tank) 26%, transparent);
+  --range: rgba(21, 24, 27, 0.16);
+  --shadow: none;
+  --radius: 18px;
+  --radius-sm: 12px;
   --gutter: 16px;
   --nav-h: 64px;
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   font-size: 16px;
   line-height: 1.45;
+  font-variant-numeric: tabular-nums;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
     color-scheme: dark;
-    --bg: #121714;
-    --surface: #1b221e;
-    --surface-2: #232c27;
-    --text: #e8ece9;
-    --text-muted: #a3aea7;
-    --border: #334039;
-    --accent: #6cc396;
-    --accent-text: #0e1a13;
-    --accent-soft: #23392d;
-    --ok: #6cc396;
-    --ok-soft: #1f3529;
-    --warn: #e7b453;
-    --warn-soft: #3a2f17;
-    --low: #f08a72;
-    --low-soft: #3d221c;
-    --high: #c79be6;
-    --high-soft: #33243f;
-    --unknown: #9aa3ad;
-    --range: rgba(232, 236, 233, 0.22);
+    --bg: #0d1012;
+    --surface: #181d21;
+    --surface-2: #232a2f;
+    --surface-3: #2e363c;
+    --text: #eef1f3;
+    --text-muted: #b0b9c0;
+    --text-faint: #8e99a1;
+    --border: #2c3338;
+    --edge: #6b777f;
+    --accent: #f3eedf;
+    --accent-text: #121517;
+    --accent-soft: color-mix(in srgb, var(--accent) 12%, transparent);
+    --ok: #4cc79f;
+    --ok-soft: color-mix(in srgb, var(--ok) 16%, transparent);
+    --warn: #e6c14a;
+    --warn-soft: color-mix(in srgb, var(--warn) 16%, transparent);
+    --low: #f2874a;
+    --low-soft: color-mix(in srgb, var(--low) 16%, transparent);
+    --high: #b69cff;
+    --high-soft: color-mix(in srgb, var(--high) 16%, transparent);
+    --unknown: #8e99a1;
+    --tank: #5baef2;
+    --tank-soft: color-mix(in srgb, var(--tank) 26%, transparent);
+    --range: rgba(238, 241, 243, 0.2);
     --shadow: none;
   }
 }
 :root[data-theme='dark'] {
   color-scheme: dark;
-  --bg: #121714;
-  --surface: #1b221e;
-  --surface-2: #232c27;
-  --text: #e8ece9;
-  --text-muted: #a3aea7;
-  --border: #334039;
-  --accent: #6cc396;
-  --accent-text: #0e1a13;
-  --accent-soft: #23392d;
-  --ok: #6cc396;
-  --ok-soft: #1f3529;
-  --warn: #e7b453;
-  --warn-soft: #3a2f17;
-  --low: #f08a72;
-  --low-soft: #3d221c;
-  --high: #c79be6;
-  --high-soft: #33243f;
-  --unknown: #9aa3ad;
-  --range: rgba(232, 236, 233, 0.22);
+  --bg: #0d1012;
+  --surface: #181d21;
+  --surface-2: #232a2f;
+  --surface-3: #2e363c;
+  --text: #eef1f3;
+  --text-muted: #b0b9c0;
+  --text-faint: #8e99a1;
+  --border: #2c3338;
+  --edge: #6b777f;
+  --accent: #f3eedf;
+  --accent-text: #121517;
+  --accent-soft: color-mix(in srgb, var(--accent) 12%, transparent);
+  --ok: #4cc79f;
+  --ok-soft: color-mix(in srgb, var(--ok) 16%, transparent);
+  --warn: #e6c14a;
+  --warn-soft: color-mix(in srgb, var(--warn) 16%, transparent);
+  --low: #f2874a;
+  --low-soft: color-mix(in srgb, var(--low) 16%, transparent);
+  --high: #b69cff;
+  --high-soft: color-mix(in srgb, var(--high) 16%, transparent);
+  --unknown: #8e99a1;
+  --tank: #5baef2;
+  --tank-soft: color-mix(in srgb, var(--tank) 26%, transparent);
+  --range: rgba(238, 241, 243, 0.2);
   --shadow: none;
 }
 
@@ -94,6 +112,7 @@ body {
 }
 a {
   color: var(--accent);
+  text-underline-offset: 2px;
 }
 h1 {
   font-size: 1.5rem;
@@ -140,9 +159,9 @@ p {
   right: 0;
   bottom: 0;
   height: calc(var(--nav-h) + env(safe-area-inset-bottom));
-  padding-bottom: env(safe-area-inset-bottom);
+  padding: 0 max(0px, calc((100vw - 640px) / 2)) env(safe-area-inset-bottom);
   display: flex;
-  background: var(--surface);
+  background: var(--bg);
   border-top: 1px solid var(--border);
   z-index: 20;
 }
@@ -155,7 +174,8 @@ p {
   gap: 2px;
   color: var(--text-muted);
   text-decoration: none;
-  font-size: 0.78rem;
+  font-size: 0.75rem;
+  font-weight: 600;
   min-height: 48px;
 }
 .bottom-nav a svg {
@@ -163,8 +183,12 @@ p {
   height: 24px;
 }
 .bottom-nav a[aria-current='page'] {
-  color: var(--accent);
-  font-weight: 600;
+  color: var(--text);
+  font-weight: 700;
+}
+/* The active tab's icon is the only filled icon in the app (design system). */
+.bottom-nav a[aria-current='page'] svg {
+  fill: color-mix(in srgb, currentColor 22%, transparent);
 }
 
 /* ── Layout helpers ─────────────────────────────────────────── */
@@ -248,8 +272,34 @@ header.page-head:not(.row):not(.row-between) {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 12px 14px;
-  margin: 10px 0;
+  margin: 12px 0;
   box-shadow: var(--shadow);
+}
+/* A long card keeps its heading in view while the user scrolls through it (owner's ask, 2026-10-22):
+   sticky inside its own card only, so it leaves with the card. */
+.card > .card-head,
+.card > h2:first-child,
+.card > h3:first-child {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  padding: 6px 0;
+  background: var(--surface);
+}
+.card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.card-head h2,
+.card-head h3 {
+  margin: 0;
+}
+.card-head .card-note {
+  color: var(--text-faint);
+  font-size: 0.8rem;
+  text-align: right;
 }
 .plain-list {
   list-style: none;
@@ -516,9 +566,10 @@ textarea:focus-visible,
   border-radius: 11px;
   min-height: 44px;
 }
-.segmented button.on {
-  background: var(--surface);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+.segmented button.on,
+.segmented a.on {
+  background: var(--accent);
+  color: var(--accent-text);
   font-weight: 600;
 }
 .toggle-row {
@@ -3912,4 +3963,114 @@ a.contributor-link > span:first-child {
   flex: 1;
   width: auto;
   min-width: 150px;
+}
+
+/* ── Tabs, settings, question shortcuts (design 2026-10-22) ───── */
+.settings-btn {
+  border: 1.5px solid var(--edge);
+  background: var(--surface);
+}
+.tab-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.tab-switch {
+  flex: 1;
+  margin: 0;
+}
+.tab-switch a {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  border-radius: 999px;
+  color: var(--text);
+  font-size: 0.9rem;
+  text-decoration: none;
+}
+.ask-chips {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  margin: 4px calc(-1 * var(--gutter)) 8px;
+  padding: 2px var(--gutter);
+  scrollbar-width: none;
+}
+.ask-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1.5px dashed var(--edge);
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+.ask-chip svg {
+  color: var(--text-faint);
+}
+
+/* ── Kitchen tab ─────────────────────────────────────────────── */
+.kitchen-tiles {
+  position: sticky;
+  top: 0;
+  z-index: 15;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  grid-auto-flow: column;
+  gap: 6px;
+  margin: 0 calc(-1 * var(--gutter)) 4px;
+  padding: 8px var(--gutter);
+  background: var(--bg);
+}
+.kitchen-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  min-height: 72px;
+  padding: 8px 2px;
+  border: 1.5px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--text-muted);
+  font: inherit;
+  cursor: pointer;
+}
+.kitchen-tile strong {
+  color: var(--text);
+  font-size: 1.1rem;
+  line-height: 1.1;
+}
+.kitchen-tile span {
+  font-size: 0.75rem;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.kitchen-tile.on {
+  border-color: var(--accent);
+  color: var(--text);
+}
+.kitchen-section {
+  /* Jumping to a section leaves it under the sticky overview, not behind it. */
+  scroll-margin-top: 100px;
+}
+.kitchen-section .card-head a {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}
+.kitchen-page .card > .card-head {
+  top: 88px;
 }
