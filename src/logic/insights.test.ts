@@ -42,6 +42,15 @@ const data = buildInsightData(input);
 const headache = { kind: 'journal' as const, words: ['kopfschmerz', 'headache'] };
 
 describe('insight day facts', () => {
+  it('counts a night with waking up in between as one night, its parts added up', () => {
+    const split: SleepRecord[] = [
+      { id: 'a', schemaVersion: 1, day: key(2), start: at(1, 23), end: at(2, 1, 30) },
+      { id: 'b', schemaVersion: 1, day: key(2), start: at(2, 2, 30), end: at(2, 7) },
+    ];
+    const v = buildInsightData({ ...input, sleep: split }).days.get(key(2))!.values;
+    expect(v).toMatchObject({ sleep_hours: 7, bedtime: 23, wake_time: 7, nap_minutes: 0 });
+  });
+
   it('derives sleep, meals, alcohol and nutrients per day, and leaves unknown days unknown', () => {
     const d3 = data.days.get(key(3))!;
     expect(d3.values.sleep_hours).toBe(5);

@@ -4,6 +4,7 @@ import { useToast } from '../../app/toast';
 import { href, navigate } from '../../app/router';
 import { t, type MessageKey } from '../../i18n';
 import { addDays, formatDay, formatTime, parseDay } from '../../lib/dates';
+import { followOnSleep, NEW_SLEEP_MS } from '../../logic/sleep';
 import { weekStart } from '../../lib/periods';
 import { fmtAmount } from '../../lib/format';
 import { groupMeals } from '../../model/simulate';
@@ -48,6 +49,8 @@ export function DiaryPage({ day: dayParam }: { day?: string }) {
   const notes = useJournal(day) ?? [];
   const sleepOn = isOn(d.settings.features, 'sleep');
   const sleeps = useSleep(day) ?? [];
+  // All sleeps, for a new one that follows on from the last (it may have ended the day before).
+  const allSleeps = useSleep();
   // A sleep being edited, or 'new' for one being added.
   const [sleepSheet, setSleepSheet] = useState<SleepRecord | 'new' | null>(null);
   const activityOn = isOn(d.settings.features, 'activity');
@@ -284,7 +287,7 @@ export function DiaryPage({ day: dayParam }: { day?: string }) {
       {sleepSheet && (
         <SleepSheet
           record={sleepSheet === 'new' ? undefined : sleepSheet}
-          initial={sleepSheet === 'new' ? sleepDefault(day) : undefined}
+          initial={sleepSheet === 'new' ? sleepDefault(day, d.today, allSleeps ?? []) : undefined}
           onClose={() => setSleepSheet(null)}
         />
       )}
@@ -303,12 +306,19 @@ export function DiaryPage({ day: dayParam }: { day?: string }) {
   );
 }
 
-/** A new sleep in the diary: the night that ended that morning, 23:00 to 07:00 (the user adjusts it). */
-function sleepDefault(day: string): { start: number; end: number } {
+/**
+ * A new sleep in the diary: today, right after a sleep that ended in the last few hours, from half an
+ * hour after it until now (waking up in the night); otherwise the night that ended that morning,
+ * 23:00 to 07:00. The user adjusts it.
+ */
+function sleepDefault(day: string, today: string, records: SleepRecord[]): { start: number; end: number } {
+  const now = Date.now();
+  const next = day === today ? followOnSleep(records, now) : undefined;
+  if (next) return next;
   const morning = parseDay(day);
   morning.setHours(7, 0, 0, 0);
-  const end = Math.min(morning.getTime(), Date.now());
-  return { start: end - 8 * 3_600_000, end };
+  const end = Math.min(morning.getTime(), now);
+  return { start: end - NEW_SLEEP_MS, end };
 }
 
 /** One meal: its items, each opening its page (with a pencil to edit straight away), "Log again", and its energy with a link to all its nutrients. */

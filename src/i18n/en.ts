@@ -699,6 +699,7 @@ export const en = {
   'sleep.problem.order': 'Waking up has to come after falling asleep. Check the dates.',
   'sleep.problem.long': 'That is more than 20 hours. Check the dates.',
   'sleep.problem.future': 'Waking up is in the future.',
+  'sleep.replaces': 'Saving replaces {spans}.',
   'shopping.title': 'Shopping list',
   'shopping.add': 'Add',
   'shopping.addPlaceholder': 'Add an item, e.g. "milk 2 l"',

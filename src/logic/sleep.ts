@@ -14,6 +14,12 @@ export const MAX_SLEEP_MS = 20 * HOUR;
 export const NIGHT_MIN_MS = 3 * HOUR;
 /** Nights looked at for the usual bed and wake times. */
 const USUAL_NIGHTS = 14;
+/** Sleeps less awake time apart than this are one night: waking up in the night, then sleeping again. */
+export const NIGHT_GAP_MS = 3 * HOUR;
+/** A sleep logged after another starts this long after it: falling asleep again takes a while (the user adjusts it). */
+export const FOLLOW_ON_MS = 30 * MIN;
+/** Length of a new sleep proposed with nothing else to go on, and how far back a new sleep looks for one it follows. */
+export const NEW_SLEEP_MS = 8 * HOUR;
 
 export type SleepSpan = { start: number; end?: number };
 
@@ -33,6 +39,52 @@ export function overlaps(a: SleepSpan, b: SleepSpan): boolean {
   return a.start < bEnd && b.start < aEnd;
 }
 
+type Finished = SleepRecord & { end: number };
+
+const finished = (records: readonly SleepRecord[]): Finished[] => records.filter((r): r is Finished => r.end !== undefined);
+
+/** Sleeps joined into one stretch: from the first falling asleep to the last waking up, with the time actually asleep. */
+export type SleepBlock = { start: number; end: number; asleep: number; parts: Finished[] };
+
+/**
+ * Finished sleeps joined into blocks, oldest first: sleeps less than NIGHT_GAP_MS apart are one block,
+ * so a night with waking up in between counts as one night. A block with NIGHT_MIN_MS or more of sleep
+ * is a night (it belongs to the day it ended); the parts of a shorter one are naps.
+ */
+export function sleepBlocks(records: readonly SleepRecord[]): SleepBlock[] {
+  const blocks: SleepBlock[] = [];
+  for (const r of finished(records).sort((a, b) => a.start - b.start)) {
+    const last = blocks[blocks.length - 1];
+    if (last && r.start - last.end < NIGHT_GAP_MS) {
+      last.end = Math.max(last.end, r.end);
+      last.asleep += duration(r);
+      last.parts.push(r);
+    } else blocks.push({ start: r.start, end: r.end, asleep: duration(r), parts: [r] });
+  }
+  return blocks;
+}
+
+export const isNight = (b: SleepBlock): boolean => b.asleep >= NIGHT_MIN_MS;
+
+/** The latest finished sleep that ended by `now`. */
+function lastFinished(records: readonly SleepRecord[], now: number): Finished | undefined {
+  return finished(records)
+    .filter((r) => r.end <= now)
+    .reduce<Finished | undefined>((a, r) => (!a || r.end > a.end ? r : a), undefined);
+}
+
+/**
+ * A sleep added now, right after another (several sleeps a night, owner's ask 2026-10-22): when a sleep
+ * ended less than NEW_SLEEP_MS ago, from FOLLOW_ON_MS after it until now, so the proposal does not run
+ * into it. Undefined otherwise.
+ */
+export function followOnSleep(records: readonly SleepRecord[], now: number): { start: number; end: number } | undefined {
+  const last = lastFinished(records, now);
+  if (!last || now - last.end >= NEW_SLEEP_MS) return undefined;
+  // Woken up less than half an hour ago: start right where the last one ended.
+  return { start: now - last.end > FOLLOW_ON_MS ? last.end + FOLLOW_ON_MS : last.end, end: now };
+}
+
 /** Minutes after local midnight. */
 function minuteOfDay(t: number): number {
   const d = new Date(t);
@@ -50,8 +102,8 @@ function median(xs: number[]): number {
  * without any. Bed times are compared from noon, so 23:30 and 00:30 average to midnight, not noon.
  */
 export function usualTimes(records: SleepRecord[]): { bed: number; wake: number } | undefined {
-  const nights = records
-    .filter((r): r is SleepRecord & { end: number } => r.end !== undefined && duration(r as { start: number; end: number }) >= NIGHT_MIN_MS)
+  const nights = sleepBlocks(records)
+    .filter(isNight)
     .sort((a, b) => b.end - a.end)
     .slice(0, USUAL_NIGHTS);
   if (nights.length === 0) return undefined;
@@ -72,17 +124,24 @@ const FALLBACK = { bed: 23 * 60, wake: 7 * 60 };
 
 /**
  * What the morning question proposes: the sleep still going (from "Going to sleep") until now, or
- * last night at the usual times. Undefined when last night is already logged.
+ * last night at the usual times. When part of last night is logged (woke up in the night), it asks
+ * about the rest: from half an hour after that part until the usual wake time, if a night's worth is
+ * left. Undefined when last night is already logged.
  */
 export function morningGuess(records: SleepRecord[], now: number): { start: number; end: number; open?: SleepRecord } | undefined {
   const open = records.find((r) => r.end === undefined);
   if (open) return { start: open.start, end: Math.max(open.start, now), open };
-  const today = dayKey(new Date(now));
-  if (records.some((r) => r.day === today && r.end !== undefined && duration(r as { start: number; end: number }) >= NIGHT_MIN_MS)) return undefined;
   const usual = usualTimes(records) ?? FALLBACK;
   const end = Math.min(atMinute(now, usual.wake), now);
   let start = atMinute(end, usual.bed);
   if (start >= end) start -= 24 * HOUR;
+  const last = lastFinished(records, now);
+  if (last && last.end > start) {
+    const rest = { start: last.end + FOLLOW_ON_MS, end };
+    return rest.end - rest.start >= NIGHT_MIN_MS ? rest : undefined;
+  }
+  const today = dayKey(new Date(now));
+  if (sleepBlocks(records).some((b) => isNight(b) && dayKey(new Date(b.end)) === today)) return undefined;
   return { start, end };
 }
 
