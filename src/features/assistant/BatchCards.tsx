@@ -24,6 +24,7 @@ import { PotWeight, type PotScale } from '../recipes/PotWeight';
 import { PotPortions, potPortionsValid } from '../recipes/PotPortions';
 import { useRegister, type Card, type CardProps, type Undo } from './cards';
 import { DateInput } from '../../ui/DateInputs';
+import { ChangeButton, DoneRow } from './CardFrame';
 
 /** The assistant's changes as ingredient changes (salt becomes the kitchen's salt, as everywhere). */
 function asChanges(changes: readonly ProposedChange[], version: string, salt: Profile['salt']): IngredientChange[] {
@@ -115,12 +116,11 @@ export function PortionCard({ card, day, toast, onLogged, register }: CardProps<
   const name = batch?.recipe.name ?? proposal.name;
   if (card.logged) {
     return (
-      <div className="card proposal-done row">
-        <Icon name="check" size={18} />
+      <DoneRow>
         <span>
           {t('ai.cardLogged', { name, when: when(time) })} <a href={href('diary', dayKey(new Date(time)))}>{t('edit.inDiary')}</a>
         </span>
-      </div>
+      </DoneRow>
     );
   }
 
@@ -147,6 +147,7 @@ export function PortionCard({ card, day, toast, onLogged, register }: CardProps<
       <Assumptions list={proposal.assumptions} />
       <TimeField value={time} onChange={setTime} />
       <div className="sheet-actions">
+        <ChangeButton />
         <button className="btn btn-primary" disabled={!valid || saving} onClick={() => void log()}>
           {t('ai.log')}
         </button>
@@ -228,12 +229,11 @@ function CookCard({ card, day, toast, onLogged, register }: CardProps<Extract<Ca
   const name = recipe?.name ?? proposal.name;
   if (card.logged) {
     return (
-      <div className="card proposal-done row">
-        <Icon name="check" size={18} />
+      <DoneRow>
         <span>
           {t('ai.batchSavedDone', { name, day: formatDay(cookDay, d.today) })} {(saved?.recipeId ?? recipe?.id) && <a href={href('recipes', saved?.recipeId ?? recipe!.id)}>{t('ai.openRecipe')}</a>}
         </span>
-      </div>
+      </DoneRow>
     );
   }
 
@@ -277,6 +277,7 @@ function CookCard({ card, day, toast, onLogged, register }: CardProps<Extract<Ca
       )}
       <Assumptions list={proposal.assumptions} />
       <div className="sheet-actions">
+        <ChangeButton />
         <button className="btn btn-primary" disabled={!valid || saving} onClick={() => void saveOne()}>
           {t('ai.saveBatch')}
         </button>
@@ -336,12 +337,11 @@ function PotCard({ card, toast, onLogged, register }: CardProps<Extract<Card, { 
   const name = batch?.recipe.name ?? proposal.name;
   if (card.logged) {
     return (
-      <div className="card proposal-done row">
-        <Icon name="check" size={18} />
+      <DoneRow>
         <span>
           {t('batch.saved', { name })} <a href={href('recipes', proposal.recipeId)}>{t('ai.openRecipe')}</a>
         </span>
-      </div>
+      </DoneRow>
     );
   }
 
@@ -372,6 +372,7 @@ function PotCard({ card, toast, onLogged, register }: CardProps<Extract<Card, { 
       )}
       <Assumptions list={proposal.assumptions} />
       <div className="sheet-actions">
+        <ChangeButton />
         <button className="btn btn-primary" disabled={!valid || saving} onClick={() => void saveOne()}>
           {t('common.save')}
         </button>

@@ -16,6 +16,7 @@ import { Icon } from '../../ui/Icon';
 import { IngredientSheet } from '../recipes/IngredientSheet';
 import { SourceTag } from '../recipes/SourceTag';
 import { useRegister, type Card, type CardProps, type Undo } from './cards';
+import { ChangeButton, DoneRow } from './CardFrame';
 
 type Item = Omit<ProposedItem, 'grams'> & { grams: number | undefined };
 
@@ -95,12 +96,11 @@ export function RecipeCard({ card, toast, onLogged, register }: CardProps<Extrac
 
   if (card.logged) {
     return (
-      <div className="card proposal-done row">
-        <Icon name="check" size={18} />
+      <DoneRow>
         <span>
           {t(changing ? 'ai.recipeUpdatedDone' : 'ai.recipeSavedDone', { name: name.trim() })} {savedId && <a href={href('recipes', savedId)}>{t('ai.openRecipe')}</a>}
         </span>
-      </div>
+      </DoneRow>
     );
   }
 
@@ -195,6 +195,7 @@ export function RecipeCard({ card, toast, onLogged, register }: CardProps<Extrac
       <p className="muted small">{t('ai.correctHintRecipeBook')}</p>
       <div className="sheet-actions">
         {kcal !== undefined && <span className="muted">{t('ai.kcalPerPortion', { kcal: fmtNumber(Math.round(kcal)) })}</span>}
+        <ChangeButton />
         <button className="btn btn-primary" disabled={!valid || saving} onClick={() => void saveOne()}>
           {t(changing ? 'ai.updateRecipe' : 'ai.saveRecipe')}
         </button>

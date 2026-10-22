@@ -9,6 +9,7 @@ import { CURRENT_SCHEMA_VERSION } from '../../storage/types';
 import { Icon } from '../../ui/Icon';
 import { useShopFoods, useShopping } from '../shopping/useShopping';
 import { useRegister, type Card, type CardProps, type Undo } from './cards';
+import { ChangeButton, DoneRow } from './CardFrame';
 
 /**
  * Things for the shopping list the assistant proposes (L1, …): what the user named, and the
@@ -61,12 +62,11 @@ export function ShoppingCard({ card, toast, onLogged, register }: CardProps<Extr
 
   if (card.logged) {
     return (
-      <div className="card proposal-done row">
-        <Icon name="check" size={18} />
+      <DoneRow>
         <span>
           {t('shopping.added', { n: chosen.length })} <a href={href('shopping')}>{t('shopping.openList')}</a>
         </span>
-      </div>
+      </DoneRow>
     );
   }
 
@@ -104,6 +104,7 @@ export function ShoppingCard({ card, toast, onLogged, register }: CardProps<Extr
         ))}
       </ul>
       <div className="sheet-actions">
+        <ChangeButton />
         <button className="btn btn-primary" disabled={!chosen.length || saving} onClick={() => void saveOne()}>
           {t('shopping.addN', { n: chosen.length })}
         </button>

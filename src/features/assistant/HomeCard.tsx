@@ -11,6 +11,7 @@ import { CURRENT_SCHEMA_VERSION } from '../../storage/types';
 import { Icon } from '../../ui/Icon';
 import { placeName, usePantryFoods, usePantryLeft } from '../pantry/usePantry';
 import { useRegister, type Card, type CardProps, type Undo } from './cards';
+import { ChangeButton, DoneRow } from './CardFrame';
 
 /**
  * Things for At home the assistant proposes (H1, …): what was bought (put away, adding to what is
@@ -65,12 +66,11 @@ export function HomeCard({ card, toast, onLogged, register }: CardProps<Extract<
 
   if (card.logged) {
     return (
-      <div className="card proposal-done row">
-        <Icon name="check" size={18} />
+      <DoneRow>
         <span>
           {t('pantry.savedN', { n: chosen.length })} <a href={href('kitchen')}>{t('pantry.openPage')}</a>
         </span>
-      </div>
+      </DoneRow>
     );
   }
 
@@ -111,6 +111,7 @@ export function HomeCard({ card, toast, onLogged, register }: CardProps<Extract<
         ))}
       </ul>
       <div className="sheet-actions">
+        <ChangeButton />
         <button className="btn btn-primary" disabled={!chosen.length || saving} onClick={() => void saveOne()}>
           {t('pantry.saveN', { n: chosen.length })}
         </button>

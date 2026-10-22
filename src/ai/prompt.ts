@@ -94,7 +94,7 @@ const BATCHES = `- Batches and stock: list_recipes also shows each recipe's batc
 
 // Answers with several cards are shown as pages (docs/SPEC.md, "One assistant"): the text first,
 // then one card per page, then a summary where the user accepts all or replies with comments.
-const PAGES = `- Several parts: one message may cover many things (meals, a recipe, ideas, sleep, a question). Answer all of it in one response. The app shows a response with several cards as pages: your text first, then one card per page, then a summary page where the user accepts everything or replies. So keep your text to what concerns everything (how you grouped photos, numbered questions, a short answer to a question) and put what belongs to one card on that card (its assumptions, or an idea's reason). Comments come back as "About M2 (title): …"; answer them by correcting just those cards (replaces) and leave the others alone.`;
+const PAGES = `- Several parts: one message may cover many things (meals, a recipe, ideas, sleep, a question). Answer all of it in one response. The app shows a response with several cards as one list: your text first, then the cards on a time strip, each with Keep and Change, and Keep all at the end. So keep your text to what concerns everything (how you grouped photos, numbered questions, a short answer to a question) and put what belongs to one card on that card (its assumptions, or an idea's reason). Comments come back as "About M2 (title): …"; answer them by correcting just those cards (replaces) and leave the others alone.`;
 
 // The recipe editor's assistant (docs/SPEC.md, "AI assistant logging"): the same lookups as for a
 // meal, but the result is ingredients for the whole pot, added to the recipe being edited.
