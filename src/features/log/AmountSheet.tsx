@@ -6,14 +6,13 @@ import type { Food } from '../../foods/foodDb';
 import { productFood, productLabel, productRef } from '../../foods/products';
 import { fmtNumber } from '../../lib/format';
 import { parseAmount } from '../../logic/shopping';
-import { dayKey } from '../../lib/dates';
+import { dayKey, formatDateTime } from '../../lib/dates';
 import type { Preparation } from '../../model/paramTypes';
 import type { EntryConfidence } from '../../model/types';
 import { repo } from '../../storage/repo';
 import type { FoodRef, LogEntry, PortionSize, Product } from '../../storage/types';
 import { Field, NumberInput, Sheet } from '../../ui/controls';
 import { ConfidenceField } from './ConfidenceField';
-import { TimeField } from './TimeField';
 import { PreparationSelect } from './PreparationSelect';
 import { MatchPicker, ProductInfo, saveProductChoice, useMatchChoice } from './ProductParts';
 import { FavouriteButton } from './FavouriteButton';
@@ -36,7 +35,8 @@ export function AmountSheet({ day, time: initialTime, onClose, onAdded, ...targe
   const [grams, setGrams] = useState<number>();
   const [prep, setPrep] = useState<Preparation>('asListed');
   const [confidence, setConfidence] = useState<EntryConfidence>('A');
-  const [time, setTime] = useState(initialTime);
+  // The meal's time is set once, at the top of the Log screen (owner's ask, 2026-10-22).
+  const time = initialTime;
   const [helperName, setHelperName] = useState('');
   const kcal = typeof food.per100.ENERCC === 'number' && grams ? (food.per100.ENERCC * grams) / 100 : undefined;
   const serving = draft?.serving ? [{ label: draft.serving.label, grams: draft.serving.grams }] : [];
@@ -103,7 +103,7 @@ export function AmountSheet({ day, time: initialTime, onClose, onAdded, ...targe
       {draft && <MatchPicker product={draft} choice={choice} onChange={setChoice} />}
       <PreparationSelect value={prep} onChange={setPrep} />
       <ConfidenceField value={confidence} onChange={setConfidence} />
-      <TimeField value={time} onChange={setTime} />
+      <p className="muted small">{t('log.atMealTime', { time: formatDateTime(time) })}</p>
       <div className="sheet-actions">
         {kcal !== undefined && <span className="muted">{fmtNumber(kcal)} kcal</span>}
         <button className="btn btn-primary" disabled={!grams || !hasValues} onClick={() => void save()}>

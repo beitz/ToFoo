@@ -3,7 +3,7 @@ import { useData } from '../../app/data';
 import { useToast } from '../../app/toast';
 import { href, navigate } from '../../app/router';
 import { t } from '../../i18n';
-import { formatDay, formatTime } from '../../lib/dates';
+import { dayKey, formatDay, formatTime } from '../../lib/dates';
 import { search } from '../../foods/search';
 import type { Food } from '../../foods/foodDb';
 import { repo } from '../../storage/repo';
@@ -22,6 +22,7 @@ import { BarcodeSheet } from './BarcodeSheet';
 import { CustomSheet } from './CustomSheet';
 import { ManualSheet } from './ManualSheet';
 import { defaultTimeFor } from './time';
+import { TimeField } from './TimeField';
 import { entryAmount } from './describe';
 import { logMealAgain, mealTitle } from './logAgain';
 import { favouriteAsMeal, favouriteFromMeal, mealSignature, recentMeals } from '../../logic/repeat';
@@ -126,6 +127,11 @@ export function LogPage({ day: dayParam, foodCode }: { day?: string; foodCode?: 
     [d.log, added, d.settings.mealWindowMinutes, d.batchesById],
   );
   const addedEntries = added.map((id) => d.log.find((e) => e.id === id)).filter((e): e is LogEntry => !!e);
+  /** A new meal time moves what this meal already has too: it is one meal. */
+  async function changeMealTime(time: number) {
+    setMealTime(time);
+    for (const e of addedEntries) await repo.updateLog({ ...e, time, day: dayKey(new Date(time)) });
+  }
   const stock = d.batches.filter((b) => totalLeft(b) > 0);
   // Bought things at home that are foods, with what tapping one opens.
   const atHomeOn = isOn(d.settings.features, 'atHome');
@@ -242,6 +248,11 @@ export function LogPage({ day: dayParam, foodCode }: { day?: string; foodCode?: 
           <Icon name="camera" /> {t('ai.entry')}
         </a>
       )}
+
+      {/* The meal's time, set once for everything added here (owner's ask, 2026-10-22). */}
+      <div className="meal-time">
+        <TimeField label={t('log.mealAt')} value={mealTime} onChange={(time) => void changeMealTime(time)} />
+      </div>
 
       <div className="search-row">
         <div className="search-box">
@@ -429,7 +440,6 @@ export function LogPage({ day: dayParam, foodCode }: { day?: string; foodCode?: 
             </LogSection>
           )}
 
-          <p className="muted small">{t('log.timeNote', { time: formatTime(mealTime) })}</p>
         </>
       )}
 
