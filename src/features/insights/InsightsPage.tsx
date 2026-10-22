@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { takeAsk } from '../../app/ask';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useData } from '../../app/data';
 import { href } from '../../app/router';
@@ -145,7 +146,8 @@ function Chat({ apiKey, model }: { apiKey: string; model: AiModel }) {
     lastChat = state.bubbles.length ? state : undefined;
   }, [state]);
   const [turnTokens, setTurnTokens] = useState<ModelTokens>({});
-  const [text, setText] = useState('');
+  // A question shortcut (e.g. on the sleep page) arrives typed in, never sent by itself.
+  const [text, setText] = useState(() => takeAsk() ?? '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<{ key: MessageKey; detail?: string }>();
   const [create] = useState(() => makeCreate(apiKey));
@@ -205,6 +207,12 @@ function Chat({ apiKey, model }: { apiKey: string; model: AiModel }) {
     }
   }
 
+  // Example questions for the trackers that are on; a tap types one in (the user still presses Send).
+  const examples = [
+    ...(isOn(f, 'sleep') ? [t('insights.exSleepMood'), t('nights.ask')] : []),
+    ...(isOn(f, 'journal') ? [t('insights.exHeadache')] : []),
+    t('insights.exEnergy'),
+  ];
   const thin = ov && (ov.foodComplete < THIN_FOOD_DAYS || (isOn(f, 'journal') && ov.journalEntries < THIN_JOURNAL_ENTRIES));
   const { recording, transcribing } = dictation;
 
@@ -240,6 +248,14 @@ function Chat({ apiKey, model }: { apiKey: string; model: AiModel }) {
                 {thin && <p className="muted small">{t('insights.thin')}</p>}
               </>
             )}
+            <div className="ask-chips ask-chips-stack" role="group" aria-label={t('insights.examples')}>
+              {examples.map((q) => (
+                <button key={q} type="button" className="ask-chip" onClick={() => setText(q)}>
+                  <Icon name="chat" size={16} />
+                  {q}
+                </button>
+              ))}
+            </div>
             <button className="btn btn-primary" disabled={busy || !data} onClick={() => void send(t('insights.lookPrompt'))}>
               <Icon name="insights" size={18} /> {t('insights.open')}
             </button>

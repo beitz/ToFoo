@@ -2,9 +2,10 @@ import { useMemo, useState } from 'react';
 import { useData } from '../../app/data';
 import { href, navigate } from '../../app/router';
 import { t } from '../../i18n';
-import { formatTime, parseDay } from '../../lib/dates';
+import { formatDate, formatTime, parseDay, weekdayShort } from '../../lib/dates';
 import { lastMealBefore, minuteOfDay, nightsWindow, nightTimes, sleepDebt, weeklySleep, type Night, type Spread } from '../../logic/nights';
 import { sleepNeed } from '../../../model/parameters';
+import { isOn } from '../../settings/features';
 import { AskChips } from '../../ui/AskChips';
 import { BackButton } from '../../ui/BackButton';
 import { Segmented } from '../../ui/controls';
@@ -22,8 +23,8 @@ const AXIS_START_MIN = 18 * 60;
 const AXIS_MIN = 18 * 60;
 const AXIS_TICKS = [22, 2, 6, 10];
 
-const weekday = (day: string) => parseDay(day).toLocaleDateString('en-GB', { weekday: 'short' });
-const dayLabel = (day: string) => `${weekday(day)} ${parseDay(day).getDate()}`;
+/** "Wed 21": the month is in the window's dates already, and the rows are narrow. */
+const dayLabel = (day: string) => `${weekdayShort(day)} ${parseDay(day).getDate()}`;
 
 /**
  * The sleep page (design 2026-10-22, "Sleep"; route #/nights): sleep debt against the need over a
@@ -179,7 +180,7 @@ export function SleepPage() {
         </>
       )}
 
-      <AskChips questions={[t('nights.ask')]} />
+      <AskChips questions={[t('nights.ask')]} to={isOn(d.settings.features, 'insights') ? 'insights' : 'assistant'} />
       <p className="muted small disclaimer">{t('nights.explain')}</p>
     </section>
   );
@@ -334,7 +335,7 @@ function WeekBars({ weeks, need }: { weeks: Array<{ monday: string; average?: nu
       {weeks.map((w, i) => {
         const now = i === weeks.length - 1;
         const label = now ? t('nights.thisWeek') : `−${weeks.length - 1 - i}`;
-        const spokenWeek = parseDay(w.monday).toLocaleDateString('en-GB', { day: 'numeric', month: 'long' });
+        const spokenWeek = formatDate(w.monday, false);
         const value = w.average !== undefined ? clockText(w.average).replace(/^0/, '') : '–';
         return (
           <li key={w.monday}>
