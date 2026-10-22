@@ -2,7 +2,10 @@ import { Fragment } from 'react';
 import { useData } from '../../app/data';
 import { href } from '../../app/router';
 import { t } from '../../i18n';
-import { fmtAmount, fmtPercent } from '../../lib/format';
+import { fmtAmount, fmtNumber, fmtPercent } from '../../lib/format';
+import { portionGrams, RANK_PORTION } from '../../model/ranking';
+import type { RawValue } from '../../model/types';
+import { StatusMark, symbolOf } from '../../ui/Tile';
 import { NUTRIENTS } from '../../model/nutrients';
 import { Icon } from '../../ui/Icon';
 import { isProductCode, productFood } from '../../foods/products';
@@ -38,6 +41,7 @@ export function FoodPage({ code }: { code: string }) {
           {food.nameDe} · {group?.en} · BLS {food.code}
         </p>
       )}
+      <PortionCard per100={food.per100} />
       <a className="btn btn-primary btn-block" href={href('log', d.today, food.code)}>
         <Icon name="plus" /> {t('food.log')}
       </a>
@@ -83,5 +87,66 @@ export function FoodPage({ code }: { code: string }) {
       </table>
       <p className="muted small">{t(product ? 'food.legendProduct' : 'food.legend')}</p>
     </section>
+  );
+}
+
+/** Shares below this are left out of "One portion gives": a tenth of a day is where a food starts to count. */
+const PORTION_MIN_SHARE = 0.1;
+const PORTION_MAX_CHIPS = 12;
+
+/**
+ * "One portion gives" (design 2026-10-22): a typical portion's share of a day for the nutrients it
+ * gives a lot of, biggest first, with your own gaps marked, each tapping through to its nutrient.
+ */
+function PortionCard({ per100 }: { per100: Readonly<Record<string, RawValue>> }) {
+  const d = useData();
+  const grams = portionGrams(per100);
+  const shares = NUTRIENTS.flatMap((n) => {
+    const v = per100[n.id];
+    const req = d.requirements.byNutrient.get(n.id);
+    // Amino acids follow protein; listing nine of them would bury the rest.
+    if (typeof v !== 'number' || !req || req.limitOnly || !(req.recommended > 0) || n.id === 'ENERCC' || n.path.includes('eaa')) return [];
+    const share = (v * grams) / 100 / req.recommended;
+    return share >= PORTION_MIN_SHARE ? [{ id: n.id, name: n.name, share }] : [];
+  })
+    .sort((a, b) => b.share - a.share)
+    .slice(0, PORTION_MAX_CHIPS);
+  const kcal = typeof per100.ENERCC === 'number' ? (per100.ENERCC * grams) / 100 : undefined;
+  return (
+    <div className="card portion-card">
+      <div className="card-head">
+        <h2>{t('food.portionTitle', { g: Math.round(grams) })}</h2>
+        {kcal !== undefined && <span className="card-note">{t('food.portionKcal', { kcal: fmtNumber(kcal) })}</span>}
+      </div>
+      {shares.length === 0 ? (
+        <p className="muted small">{t('food.portionNone')}</p>
+      ) : (
+        <div className="next-chips portion-chips">
+          {shares.map((x) => {
+            const status = d.model.nutrients.get(x.id)?.store?.status ?? d.model.nutrients.get(x.id)?.status;
+            const gap = status === 'low' || status === 'gettingLow';
+            return (
+              <a
+                key={x.id}
+                className={`next-chip${gap ? ' chip-gap' : ''}`}
+                href={href('nutrient', x.id)}
+                aria-label={t(gap ? 'food.portionChipGap' : 'food.portionChip', { name: x.name, pct: fmtPercent(x.share) })}
+              >
+                {gap && status && <StatusMark status={status} size={10} />}
+                <strong aria-hidden>{symbolOf(x.id)}</strong>
+                <span aria-hidden>{fmtPercent(x.share).replace(/\s/g, '')}</span>
+              </a>
+            );
+          })}
+        </div>
+      )}
+      <p className="muted small">
+        {t('food.portionNote', {
+          kcal: RANK_PORTION.kcal,
+          min: RANK_PORTION.minGrams,
+          max: RANK_PORTION.maxGrams,
+        })}
+      </p>
+    </div>
   );
 }

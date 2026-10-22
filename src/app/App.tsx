@@ -28,6 +28,7 @@ import { RecipeView } from '../features/recipes/RecipeView';
 import { splitContext } from '../features/nutrient/NutrientSplit';
 import { NutrientPage } from '../features/nutrient/NutrientPage';
 import { NutrientFoodsPage } from '../features/nutrient/NutrientFoodsPage';
+import { WhyPage } from '../features/nutrient/WhyPage';
 import { FoodPage } from '../features/food/FoodPage';
 import { EntryNutrientsPage, MealNutrientsPage } from '../features/meal/MealNutrientsPage';
 import { SettingsPage } from '../features/settings/SettingsPage';
@@ -69,6 +70,7 @@ function Page({ route }: { route: string[] }) {
       return <RecipesPage />;
     case 'nutrient':
       if (c === 'foods') return <NutrientFoodsPage key={b} id={b ?? ''} />;
+      if (c === 'why') return <WhyPage key={b} id={b ?? ''} />;
       return <NutrientPage key={route.join('/')} id={b ?? ''} context={splitContext(c, e)} />;
     case 'food':
       return <FoodPage code={b ?? ''} />;
