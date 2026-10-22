@@ -15,16 +15,17 @@ import { useState } from 'react';
 const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
 
 /**
- * The six body stores on Home (design 2026-10-22): a blue tank each, used for stores only, with its
- * status mark, % full, the filling / draining arrow and how long it would last with none.
+ * The six body stores on Home (design 2026-10-22), at the top of the "Last 7 days" card: a blue tank
+ * each, used for stores only, with its status mark, % full, the filling / draining arrow and how long
+ * it would last with none.
  */
-export function StoresCard({ stores, showRange, startLevel }: { stores: Array<NutrientResult & { store: StoreResult }>; showRange: boolean; startLevel: string }) {
+export function StoresSection({ stores, showRange, startLevel }: { stores: Array<NutrientResult & { store: StoreResult }>; showRange: boolean; startLevel: string }) {
   const [legend, setLegend] = useState(false);
   if (stores.length === 0) return null;
   return (
-    <div className="card home-card">
-      <div className="card-head">
-        <h2>{t('home.stores')}</h2>
+    <section className="home-sub" aria-labelledby="stores-head">
+      <div className="home-sub-head">
+        <h3 id="stores-head">{t('home.stores')}</h3>
         <button className="card-note card-note-btn" aria-expanded={legend} aria-controls="stores-legend" onClick={() => setLegend((o) => !o)}>
           {t('home.storesNote')} <Icon name="info" size={14} />
         </button>
@@ -39,7 +40,7 @@ export function StoresCard({ stores, showRange, startLevel }: { stores: Array<Nu
           <StoreTank key={r.id} result={r} showRange={showRange} />
         ))}
       </div>
-    </div>
+    </section>
   );
 }
 

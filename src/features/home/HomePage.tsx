@@ -3,12 +3,11 @@ import { useData } from '../../app/data';
 import { href } from '../../app/router';
 import { t } from '../../i18n';
 import { isOn } from '../../settings/features';
-import { hasNoData } from '../../ui/Gauge';
 import { NUTRIENT_BY_ID, NUTRIENTS } from '../../model/nutrients';
 import { rankFoods } from '../../model/ranking';
 import { NON_SINGLE_FOOD_GROUPS } from '../../foods/foodDb';
 import { diverseTop } from '../../foods/variety';
-import type { GaugeStatus, NutrientResult } from '../../model/simulate';
+import type { NutrientResult } from '../../model/simulate';
 import { Prompts } from './Prompts';
 import { SettingsButton } from '../../ui/SettingsButton';
 import { AskChips } from '../../ui/AskChips';
@@ -17,22 +16,23 @@ import { WaterCard } from '../water/WaterCard';
 import { withStores } from '../../logic/stores';
 import { DayStrip } from './DayStrip';
 import { FastCard, FastChip } from './FastCard';
-import { MacrosCard } from './MacrosCard';
-import { NeedsCard, StatusChips } from './NeedsCard';
 import { NextToCook } from './NextToCook';
+import { NutrientsSection } from './NutrientsSection';
 import { RecentDays } from './RecentDays';
-import { StoresCard } from './StoresCard';
+import { StoresSection } from './StoresSection';
+import { TodayRings } from './TodayRings';
 
-/** Energy and the macronutrients, in their own card with amounts; fibre too (owner's ask). */
+/** Energy and the macronutrients: today's rings at the top, not in the 7-day list; fibre too (owner's ask). */
 const MACRO_ROW = ['ENERCC', 'PROT625', 'FAT', 'CHO', 'FIBT'];
 
 /** Nutrients whose need or store scales with body weight. */
 const PER_KG = new Set(['PROT625', 'HIS', 'ILE', 'LEU', 'LYS', 'SAA', 'AAA', 'THR', 'TRP', 'VAL']);
 
 /**
- * Home, "everything on one screen" (owner's pick from the design, 2026-10-22): the days behind the
- * averages, stores, what needs attention, energy and macros, what to cook next, then today and
- * yesterday. Every number taps through to its page.
+ * Home, "everything on one screen" (owner's pick from the design, 2026-10-22; refined the same day):
+ * the days behind the averages, today's energy and macros as rings, one "Last N days" card with the
+ * stores and every nutrient, what to cook next, today and yesterday, and the question chips last.
+ * Every number taps through to its page.
  */
 export function HomePage() {
   const d = useData();
@@ -44,11 +44,8 @@ export function HomePage() {
   const shown = NUTRIENTS.filter((n) => !hidden.has(n.id))
     .map((n) => model.nutrients.get(n.id))
     .filter((r): r is NutrientResult => !!r);
-  const macros = MACRO_ROW.map((id) => shown.find((r) => r.id === id)).filter((r): r is NutrientResult => !!r);
   const stores = withStores(shown);
   const rest = shown.filter((r) => !r.store && !MACRO_ROW.includes(r.id) && r.kind !== 'info');
-  const statusOf = (r: NutrientResult): GaugeStatus => (r.store ? r.store.status : hasNoData(r) ? 'unknown' : r.status);
-  const statuses = [...stores, ...rest, ...macros].map(statusOf).filter((s) => s !== 'info');
 
   const gaps = useMemo(() => {
     const excludedGroups = new Set(d.profile.exclusions.groups);
@@ -67,21 +64,24 @@ export function HomePage() {
   return (
     <section className="home">
       <header className="page-head row-between home-head">
-        <h1 className="grow">{t('home.lastDays', { n: windowDays })}</h1>
+        <h1 className="grow">{t('home.today')}</h1>
         <FastChip />
         <SettingsButton />
       </header>
-      <AskChips questions={[t('ask.howAmIDoing'), t('ask.whatNext')]} />
       <DayStrip days={windowDays} />
-      <StatusChips statuses={statuses} />
+      <TodayRings defaultBased={perKgOnDefault} />
       <FastCard />
 
       {isOn(d.settings.features, 'sleep') && <SleepQuestion />}
       <Prompts />
 
-      <StoresCard stores={stores} showRange={showRange} startLevel={d.profile.startingLevel} />
-      <NeedsCard results={rest} showRange={showRange} windowDays={windowDays} />
-      <MacrosCard results={macros} defaultBased={perKgOnDefault} windowDays={windowDays} />
+      <div className="card home-card">
+        <div className="card-head">
+          <h2>{t('home.lastDays', { n: windowDays })}</h2>
+        </div>
+        <StoresSection stores={stores} showRange={showRange} startLevel={d.profile.startingLevel} />
+        <NutrientsSection results={rest} showRange={showRange} windowDays={windowDays} />
+      </div>
       {isOn(d.settings.features, 'water') && <WaterCard day={today} compact />}
       <NextToCook />
 
@@ -113,6 +113,7 @@ export function HomePage() {
 
       <RecentDays />
       <p className="muted small disclaimer">{t('home.disclaimer')}</p>
+      <AskChips className="ask-chips-wrap" questions={[t('ask.howAmIDoing'), t('ask.whatNext')]} />
     </section>
   );
 }
