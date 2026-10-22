@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useData } from '../../app/data';
 import { href, navigate } from '../../app/router';
@@ -11,13 +11,32 @@ import { weekStart } from '../../lib/periods';
 import { buildInsightData } from '../../logic/insights';
 import { portionIntake } from '../../logic/recipeIdeas';
 import { hoursMinutes } from '../../logic/sleep';
-import { defaultWeek, nutrientWeeks, suggestBatch, trackerWeeks, weekPeriods, weekRecap, weeksEndingAt, WEEKS_SHOWN, type NutrientWeeks, type TrackerWeeks } from '../../logic/weekly';
+import {
+  defaultWeek,
+  isoWeek,
+  nutrientWeeks,
+  suggestBatch,
+  trackerWeeks,
+  weekMoves,
+  weekPeriods,
+  weekRecap,
+  weeksEndingAt,
+  weekWatch,
+  WEEKS_SHOWN,
+  type NutrientWeeks,
+  type TrackerWeeks,
+  type WeekMove,
+} from '../../logic/weekly';
 import { NUTRIENT_BY_ID, NUTRIENTS } from '../../model/nutrients';
 import { rankFoods } from '../../model/ranking';
 import { isOn } from '../../settings/features';
 import { repo } from '../../storage/repo';
 import { Icon } from '../../ui/Icon';
+import { AskChips } from '../../ui/AskChips';
 import { STATUS_ICON, statusLabel, urgencyRank } from '../../ui/status';
+import { StatusMark, symbolOf } from '../../ui/Tile';
+import type { DayStatus } from '../../model/types';
+import { RecipeToListSheet } from '../shopping/RecipeToListSheet';
 import { InsightsTabs } from './InsightsTabs';
 import { DAY_ICON } from './dayStatus';
 
@@ -25,11 +44,19 @@ const DAY_KEY = /^\d{4}-\d{2}-\d{2}$/;
 const RECAP_NAMES = 4;
 const nutrientName = (id: string) => NUTRIENT_BY_ID.get(id)?.name ?? id;
 const shortMonday = (day: string) => formatDate(day, false);
+const weekday = (day: string) => parseDay(day).toLocaleDateString('en-GB', { weekday: 'short' });
+/** "Mon 13 – Sun 19 Oct", the month on the Monday too only when it differs. */
+function weekRange(monday: string, sunday: string): string {
+  const month = (day: string) => parseDay(day).toLocaleDateString('en-GB', { month: 'short' });
+  const from = `${weekday(monday)} ${parseDay(monday).getDate()}${month(monday) === month(sunday) ? '' : ` ${month(monday)}`}`;
+  return `${from} – ${weekday(sunday)} ${parseDay(sunday).getDate()} ${month(sunday)}`;
+}
 
 /**
- * Weekly look-back (docs/SPEC.md, "Trends and weekly look-back"): one calendar week, what changed
- * since the week before, and every nutrient and tracker over the last weeks. Route: #/week/<monday>;
- * without a date, the current week.
+ * Weekly look-back (docs/SPEC.md, "Trends and weekly look-back"; design 2026-10-22, "A week"): the
+ * days with their energy, what got better and worse since the week before, small charts of what
+ * needs watching, one suggestion for the next batch, and every nutrient and tracker in folds.
+ * Route: #/week/<monday>; without a date, the current week.
  */
 export function WeekPage({ week: param }: { week?: string }) {
   const d = useData();
@@ -38,16 +65,16 @@ export function WeekPage({ week: param }: { week?: string }) {
   const sunday = addDays(monday, 6);
   const impute = isOn(d.settings.features, 'fillUnloggedDays');
   const hidden = useMemo(() => new Set(d.settings.hiddenNutrients), [d.settings.hiddenNutrients]);
+  const [toList, setToList] = useState(false);
 
   const weeks = useMemo(() => weeksEndingAt(monday, WEEKS_SHOWN, d.today), [monday, d.today]);
-  const periods = useMemo(
-    () => weekPeriods({ days: d.modelDays, sim: d.model, requirements: d.requirements, imputeUnlogged: impute }, weeks),
-    [d.modelDays, d.model, d.requirements, impute, weeks],
-  );
+  const periods = useMemo(() => weekPeriods({ days: d.modelDays, sim: d.model, requirements: d.requirements, imputeUnlogged: impute }, weeks), [d.modelDays, d.model, d.requirements, impute, weeks]);
   const shown = periods[periods.length - 1]!;
   const before = periods[periods.length - 2];
   const rows = useMemo(() => nutrientWeeks(periods), [periods]);
   const recap = useMemo(() => weekRecap(rows, hidden), [rows, hidden]);
+  const moves = useMemo(() => weekMoves(rows, hidden), [rows, hidden]);
+  const watch = useMemo(() => weekWatch(rows, moves.worse, hidden), [rows, moves.worse, hidden]);
 
   // Sleep, activity, water and the journal live outside the model: the same day facts Insights uses.
   const journal = useLiveQuery(() => repo.db.journal.toArray(), []);
@@ -81,9 +108,7 @@ export function WeekPage({ week: param }: { week?: string }) {
     if (recipe) return { kind: 'recipe' as const, ...recipe };
     const excludedGroups = new Set(d.profile.exclusions.groups);
     const excludedFoods = new Set(d.profile.exclusions.foods);
-    const candidates = d.foods.foods
-      .filter((f) => !NON_SINGLE_FOOD_GROUPS.has(f.group) && !excludedGroups.has(f.group) && !excludedFoods.has(f.code))
-      .map((f) => ({ key: f.code, per100: f.per100 }));
+    const candidates = d.foods.foods.filter((f) => !NON_SINGLE_FOOD_GROUPS.has(f.group) && !excludedGroups.has(f.group) && !excludedFoods.has(f.code)).map((f) => ({ key: f.code, per100: f.per100 }));
     const foods = diverseTop(rankFoods(candidates, shown.nutrients, d.requirements, 40), 3, (g) => d.foods.byCode.get(g.key) ?? { code: g.key, nameEn: g.key });
     return foods.length ? { kind: 'foods' as const, foods } : undefined;
   }, [shown, d.recipes, d.foods, d.productsById, d.profile.salt, d.profile.exclusions, d.requirements]);
@@ -98,9 +123,9 @@ export function WeekPage({ week: param }: { week?: string }) {
   });
   const rated = NUTRIENTS.filter((n) => !hidden.has(n.id) && shown.nutrients.get(n.id)?.kind !== 'info').length;
 
-  const title = monday === thisMonday ? t('week.thisWeek') : monday === addDays(thisMonday, -7) ? t('week.lastWeek') : `${shortMonday(monday)} – ${shortMonday(sunday)}`;
-  const compare = before && before.countedDays > 0;
-  // A long list would bury the rest of the recap: the first few, and how many more.
+  const compare = !!before && before.countedDays > 0;
+  const range = weekRange(monday, sunday);
+  // A long list would bury the rest: the first few, and how many more.
   const names = (ids: string[]) => {
     const shownNames = ids.slice(0, RECAP_NAMES).map(nutrientName).join(', ');
     return ids.length > RECAP_NAMES ? t('week.andMore', { names: shownNames, n: ids.length - RECAP_NAMES }) : shownNames;
@@ -109,105 +134,106 @@ export function WeekPage({ week: param }: { week?: string }) {
   return (
     <section>
       <InsightsTabs view="week" day={monday} />
-      <header className="page-head row-between">
-        <button className="icon-btn" onClick={() => navigate('week', addDays(monday, -7))} aria-label={t('week.prev')}>
+      <header className="week-head">
+        <div className="grow">
+          <h1>{t('week.number', { n: isoWeek(monday) })}</h1>
+          <p className="muted small">
+            {monday === thisMonday ? `${t('week.thisWeek')} · ` : monday === addDays(thisMonday, -7) ? `${t('week.lastWeek')} · ` : ''}
+            {range}
+            {compare ? ` · ${t('week.comparedWith', { n: isoWeek(addDays(monday, -7)) })}` : ''}
+          </p>
+        </div>
+        <button className="icon-btn round-btn" onClick={() => navigate('week', addDays(monday, -7))} aria-label={t('week.prev')}>
           <Icon name="back" />
         </button>
-        <h1>{title}</h1>
-        <button className="icon-btn" disabled={monday >= thisMonday} onClick={() => navigate('week', addDays(monday, 7))} aria-label={t('week.next')}>
+        <button className="icon-btn round-btn" disabled={monday >= thisMonday} onClick={() => navigate('week', addDays(monday, 7))} aria-label={t('week.next')}>
           <Icon name="chevron" />
         </button>
       </header>
 
-      <ol className="week-days plain-list" aria-label={t('week.days')}>
-        {dayRange(monday, sunday).map((day) => {
-          const future = day > d.today;
-          const st = future ? undefined : (d.model.dayStatus[day] ?? 'unknown');
-          const label = parseDay(day).toLocaleDateString('en-GB', { weekday: 'short' });
-          const inner = (
-            <>
-              <span className="small muted">{label}</span>
-              <strong>{parseDay(day).getDate()}</strong>
-              {st && <Icon name={DAY_ICON[st]} size={16} />}
-            </>
-          );
-          return (
-            <li key={day}>
-              {future ? (
-                <span className="week-day week-day-future">{inner}</span>
-              ) : (
-                <a className={`week-day day-${st}`} href={href('diary', day)} aria-label={`${label} ${parseDay(day).getDate()}: ${t(`day.${st}` as MessageKey)}`}>
-                  {inner}
+      <DaysCard monday={monday} />
+
+      {shown.countedDays === 0 ? (
+        <p className="card muted">{t('week.noDays')}</p>
+      ) : !compare ? (
+        <p className="card muted small">{t('week.noCompare')}</p>
+      ) : (
+        <>
+          <MovesCard title={t('week.better')} moves={moves.better} empty={t('week.noBetter')} note={recap.closed.length ? t('week.closed', { names: names(recap.closed) }) : undefined} />
+          <MovesCard
+            title={t('week.worse')}
+            moves={moves.worse}
+            empty={t('week.noWorse')}
+            note={
+              [recap.opened.length ? t('week.opened', { names: names(recap.opened) }) : '', recap.tooHigh.length ? t('week.tooHigh', { names: names(recap.tooHigh) }) : '']
+                .filter(Boolean)
+                .join(' · ') || undefined
+            }
+          />
+        </>
+      )}
+
+      {watch.length > 0 && <WatchCard ids={watch} rows={rows} weeks={weeks.map((w) => w.from)} />}
+
+      {suggestion?.kind === 'recipe' && (
+        <div className="card week-batch">
+          <p className="muted small">{t('week.nextBatch')}</p>
+          <h2>{suggestion.recipe.name}</h2>
+          <p className="small">{t('week.portionGives', { list: suggestion.helps.map((h) => `${h.name} ${fmtPercent(h.share)}`).join(', ') })}</p>
+          <div className="week-batch-actions">
+            <a className="btn btn-primary" href={href('recipes', suggestion.recipe.id)}>
+              {t('week.openRecipe')}
+            </a>
+            {isOn(f, 'shoppingList') && (
+              <button type="button" className="btn btn-secondary" onClick={() => setToList(true)}>
+                <Icon name="cart" size={16} /> {t('week.toBasket')}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+      {suggestion?.kind === 'foods' && (
+        <div className="card week-batch">
+          <p className="muted small">{t('week.foodsHelp')}</p>
+          <ul className="plain-list week-foods">
+            {suggestion.foods.map((fd) => (
+              <li key={fd.key}>
+                <a className="week-link" href={href('food', fd.key)}>
+                  <span className="grow">{d.foods.byCode.get(fd.key)?.nameEn ?? fd.key}</span>
+                  <Icon name="chevron" size={16} />
                 </a>
-              )}
-            </li>
-          );
-        })}
-      </ol>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {toList && suggestion?.kind === 'recipe' && <RecipeToListSheet recipe={suggestion.recipe} onClose={() => setToList(false)} />}
 
-      <div className="card week-recap">
-        <h2>{t('week.recap')}</h2>
-        {shown.countedDays === 0 ? (
-          <p>{t('week.noDays')}</p>
-        ) : (
-          <>
-            <p className="muted small">{t(shown.countedDays === 1 ? 'week.countedOne' : 'week.counted', { n: shown.countedDays })}</p>
-            <ul className="plain-list week-recap-list">
-              {!compare && <li className="muted">{t('week.noCompare')}</li>}
-              {recap.closed.length > 0 && <RecapLine icon="check" cls="week-st-fine" text={t('week.closed', { names: names(recap.closed) })} />}
-              {recap.opened.length > 0 && <RecapLine icon="alert" cls="week-st-low" text={t('week.opened', { names: names(recap.opened) })} />}
-              {recap.tooHigh.length > 0 && <RecapLine icon="up" cls="week-st-tooHigh" text={t('week.tooHigh', { names: names(recap.tooHigh) })} />}
-              {recap.improved && <RecapLine to={href('nutrient', recap.improved.id)} icon="up" cls="" text={t('week.improved', { name: nutrientName(recap.improved.id), from: fmtPercent(recap.improved.from), to: fmtPercent(recap.improved.to) })} />}
-              {recap.dropped && <RecapLine to={href('nutrient', recap.dropped.id)} icon="down" cls="" text={t('week.dropped', { name: nutrientName(recap.dropped.id), from: fmtPercent(recap.dropped.from), to: fmtPercent(recap.dropped.to) })} />}
-              {compare && !recap.closed.length && !recap.opened.length && !recap.improved && !recap.dropped && <li className="muted">{t('week.steady')}</li>}
-            </ul>
-            {suggestion?.kind === 'recipe' && (
-              <a className="week-suggestion" href={href('recipes', suggestion.recipe.id)}>
-                <Icon name="pot" size={18} />
-                <span>
-                  <strong>{t('week.cookNext', { name: suggestion.recipe.name })}</strong>
-                  <span className="small muted">{t('week.portionGives', { list: suggestion.helps.map((h) => `${h.name} ${fmtPercent(h.share)}`).join(', ') })}</span>
-                </span>
-              </a>
-            )}
-            {suggestion?.kind === 'foods' && (
-              <div className="week-suggestion">
-                <Icon name="search" size={18} />
-                <span>
-                  <strong>{t('week.foodsHelp')}</strong>
-                  <span className="small">
-                    {suggestion.foods.map((f, i) => (
-                      <span key={f.key}>
-                        {i > 0 && ', '}
-                        <a href={href('food', f.key)}>{d.foods.byCode.get(f.key)?.nameEn ?? f.key}</a>
-                      </span>
-                    ))}
-                  </span>
-                </span>
-              </div>
-            )}
-          </>
-        )}
-      </div>
+      <AskChips questions={[t('week.ask')]} />
 
-      <div className="card">
-        <h2>{t('week.enoughTitle', { n: rated })}</h2>
+      <details className="card fold week-fold">
+        <summary>
+          <Icon name="bars" size={18} /> <span className="grow">{t('week.allNutrients', { n: list.length })}</span>
+          <Icon name="down" size={18} />
+        </summary>
+        <h3>{t('week.enoughTitle', { n: rated })}</h3>
         <WeekChart weeks={weeks.map((w) => w.from)} values={enough} max={rated} onPick={(w) => navigate('week', w)} current={monday} />
-      </div>
-
-      <h2 className="week-section">{t('week.nutrients')}</h2>
-      <p className="muted small">{t('week.nutrientsHint', { n: WEEKS_SHOWN })}</p>
-      <ul className="plain-list week-rows">
-        {list.map((r) => (
-          <li key={r.id}>
-            <NutrientRow row={r} />
-          </li>
-        ))}
-      </ul>
+        <p className="muted small">{t('week.nutrientsHint', { n: WEEKS_SHOWN })}</p>
+        <ul className="plain-list week-rows">
+          {list.map((r) => (
+            <li key={r.id}>
+              <NutrientRow row={r} />
+            </li>
+          ))}
+        </ul>
+      </details>
 
       {trackers.length > 0 && (
-        <>
-          <h2 className="week-section">{t('week.trackers')}</h2>
+        <details className="card fold week-fold">
+          <summary>
+            <Icon name="moon" size={18} /> <span className="grow">{t('week.trackers')}</span>
+            <Icon name="down" size={18} />
+          </summary>
           <ul className="plain-list week-rows">
             {trackers.map((tr) => (
               <li key={tr.id}>
@@ -215,9 +241,8 @@ export function WeekPage({ week: param }: { week?: string }) {
               </li>
             ))}
           </ul>
-        </>
+        </details>
       )}
-
       <a className="btn btn-secondary btn-block week-review" href={href('review', monday, sunday > d.today ? d.today : sunday)}>
         <Icon name="bars" size={18} /> {t('week.allNumbers')}
       </a>
@@ -226,19 +251,180 @@ export function WeekPage({ week: param }: { week?: string }) {
   );
 }
 
-/** One recap line; one about a single nutrient opens its page. */
-function RecapLine({ icon, cls, text, to }: { icon: string; cls: string; text: string; to?: string }) {
+/** Energy per day against the target, with how each day was logged; tap a day to open it. */
+function DaysCard({ monday }: { monday: string }) {
+  const d = useData();
+  const target = d.requirements.byNutrient.get('ENERCC')?.recommended;
+  const days = dayRange(monday, addDays(monday, 6)).map((day) => {
+    const i = d.modelDays.indexOf(day);
+    const status: DayStatus | 'pending' | 'future' = day > d.today ? 'future' : day === d.today ? 'pending' : (d.model.dayStatus[day] ?? 'unknown');
+    const kcal = i >= 0 && status !== 'future' ? d.model.daily[i]?.intake.ENERCC : undefined;
+    return { day, status, kcal: kcal && kcal > 0 ? kcal : undefined };
+  });
+  const top = Math.max((target ?? 0) * 1.25, ...days.map((x) => x.kcal ?? 0)) || 1;
   return (
-    <li className={`week-recap-line ${cls}`}>
-      <Icon name={icon} size={16} />
-      {to ? (
-        <a className="week-recap-link" href={to}>
-          {text}
-        </a>
+    <div className="card">
+      <div className="card-head">
+        <h2>{t('week.theDays')}</h2>
+        <span className="card-note">{target ? t('week.energyNote', { kcal: fmtNumber(target) }) : t('week.energy')}</span>
+      </div>
+      <ol className="plain-list week-energy" aria-label={t('week.days')}>
+        {days.map(({ day, status, kcal }) => {
+          const date = parseDay(day);
+          const wd = date.toLocaleDateString('en-GB', { weekday: 'short' });
+          const top10 = (v: number) => `${(v / top) * 100}%`;
+          const label = status === 'fasted' ? t('week.fast') : kcal ? kcalShort(kcal) : status === 'future' ? '' : '–';
+          const statusText = status === 'future' ? '' : t(`day.${status}` as MessageKey);
+          const inner = (
+            <>
+              <span className="week-energy-num small" aria-hidden>
+                {label}
+              </span>
+              <span className="week-energy-track" aria-hidden>
+                {target && <span className="week-energy-target" style={{ bottom: top10(target) }} />}
+                {kcal && <span className={`week-energy-bar${status === 'pending' ? ' is-today' : ''}`} style={{ height: top10(kcal) }} />}
+              </span>
+              {status !== 'future' && (
+                <span className={`week-energy-mark day-${status}`} aria-hidden>
+                  <Icon name={DAY_ICON[status]} size={12} />
+                </span>
+              )}
+              <span className="week-energy-wd" aria-hidden>
+                {date.toLocaleDateString('en-GB', { weekday: 'narrow' })}
+              </span>
+            </>
+          );
+          return (
+            <li key={day}>
+              {status === 'future' ? (
+                <span className="week-energy-col is-future">{inner}</span>
+              ) : (
+                <a className="week-energy-col" href={href('diary', day)} aria-label={`${wd} ${date.getDate()}: ${statusText}${kcal ? `, ${fmtAmount('ENERCC', kcal)}` : ''}`}>
+                  {inner}
+                </a>
+              )}
+            </li>
+          );
+        })}
+      </ol>
+    </div>
+  );
+}
+
+/** 1 480 kcal as "1.5k", so seven fit a phone. */
+const kcalShort = (kcal: number) => (kcal >= 1000 ? `${fmtNumber(kcal / 1000, 1)}k` : fmtNumber(kcal));
+
+/** Got better / Got worse: each nutrient's week before and this week on one line, tap to open. */
+function MovesCard({ title, moves, empty, note }: { title: string; moves: WeekMove[]; empty: string; note?: string }) {
+  return (
+    <div className="card">
+      <div className="card-head">
+        <h2>{title}</h2>
+        <span className="card-note">{t('week.lastToThis')}</span>
+      </div>
+      {moves.length === 0 ? (
+        <p className="muted small">{empty}</p>
       ) : (
-        <span>{text}</span>
+        <ul className="plain-list week-moves">
+          {moves.map((m) => (
+            <li key={m.id}>
+              <MoveRow move={m} />
+            </li>
+          ))}
+        </ul>
       )}
-    </li>
+      {note && <p className="muted small week-moves-note">{note}</p>}
+    </div>
+  );
+}
+
+/** How far the move bar reaches: one and a half times the need or maximum. */
+const MOVE_TOP = 1.5;
+
+function MoveRow({ move: m }: { move: WeekMove }) {
+  const pos = (v: number) => `${(Math.min(v, MOVE_TOP) / MOVE_TOP) * 100}%`;
+  const lo = Math.min(m.from, m.to);
+  const hi = Math.max(m.from, m.to);
+  const name = nutrientName(m.id);
+  const from = fmtPercent(m.from);
+  const to = fmtPercent(m.to);
+  return (
+    <button
+      type="button"
+      className={`week-move ${m.change > 0 ? 'is-better' : 'is-worse'} week-move-${m.kind}`}
+      onClick={() => navigate('nutrient', m.id)}
+      aria-label={t(m.kind === 'limit' ? 'week.moveLimitSpoken' : 'week.moveSpoken', { name, from, to })}
+    >
+      <span className="week-move-name" aria-hidden>
+        {symbolOf(m.id)}
+      </span>
+      <span className="week-move-track" aria-hidden>
+        {m.kind === 'limit' && <span className="week-move-over" style={{ left: pos(1) }} />}
+        <span className="week-move-span" style={{ left: pos(lo), width: `calc(${pos(hi)} - ${pos(lo)})` }} />
+        <span className="week-move-need" style={{ left: pos(1) }} />
+        <span className="week-move-was" style={{ left: pos(m.from) }} />
+        <span className="week-move-now" style={{ left: pos(m.to) }}>
+          <Icon name={m.to > m.from ? 'up' : 'down'} size={12} />
+        </span>
+      </span>
+      <span className="week-move-value" aria-hidden>
+        <span className="muted">{from}</span> → <strong>{to}</strong>
+      </span>
+    </button>
+  );
+}
+
+/** "8 weeks": a small chart per nutrient worth watching, the dashed line at the need or maximum. */
+function WatchCard({ ids, rows, weeks }: { ids: string[]; rows: ReadonlyMap<string, NutrientWeeks>; weeks: string[] }) {
+  return (
+    <div className="card">
+      <div className="card-head">
+        <h2>{t('week.weeksTitle', { n: weeks.length })}</h2>
+        <span className="card-note">{t('week.tapToOpen')}</span>
+      </div>
+      <div className="week-watch">
+        {ids.map((id) => {
+          const r = rows.get(id)!;
+          const value = valueText(r, r.value);
+          return (
+            <button key={id} type="button" className={`week-spark week-st-${r.status}`} onClick={() => navigate('nutrient', id)} aria-label={`${nutrientName(id)}: ${value}, ${statusLabel(r.status)}`}>
+              <span className="week-spark-head" aria-hidden>
+                <span className="week-spark-name">{NUTRIENT_BY_ID.get(id)?.short ?? id}</span>
+                <StatusMark status={r.status} size={10} />
+                <span className="week-spark-value">{r.value === null ? '–' : fmtPercent(r.value)}</span>
+              </span>
+              <Spark values={r.series} />
+              <span className="week-spark-unit small muted" aria-hidden>
+                {t(r.kind === 'limit' ? 'week.ofMax' : 'week.ofNeed')}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/** A week-by-week line, gaps where a week had no counted day, the dashed line at 100 %. */
+function Spark({ values }: { values: Array<number | null> }) {
+  const W = 140;
+  const H = 34;
+  const top = Math.max(1.3, ...values.map((v) => v ?? 0));
+  const x = (i: number) => (values.length > 1 ? (i / (values.length - 1)) * W : W / 2);
+  const y = (v: number) => H - 2 - (Math.min(v, top) / top) * (H - 4);
+  let path = '';
+  values.forEach((v, i) => {
+    if (v === null) return;
+    path += `${i && values[i - 1] !== null ? 'L' : 'M'}${x(i).toFixed(1)},${y(v).toFixed(1)}`;
+  });
+  const last = values.length - 1;
+  const lastV = values[last];
+  return (
+    <svg className="week-spark-svg" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" aria-hidden>
+      <line x1={0} x2={W} y1={y(1)} y2={y(1)} className="week-spark-need" />
+      <path d={path} className="week-spark-line" />
+      {lastV !== null && lastV !== undefined && <circle cx={x(last)} cy={y(lastV)} r={2.5} className="week-spark-dot" />}
+    </svg>
   );
 }
 
@@ -335,7 +521,11 @@ function WeekChart({ weeks, values, max, current, onPick }: { weeks: string[]; v
         const pct = v === null || !max ? 0 : (v / max) * 100;
         return (
           <li key={w}>
-            <button className={`week-chart-col${w === current ? ' is-current' : ''}`} onClick={() => onPick(w)} aria-label={`${shortMonday(w)}: ${v === null ? t('week.noData') : t('week.enoughOf', { n: v, of: max })}`}>
+            <button
+              className={`week-chart-col${w === current ? ' is-current' : ''}`}
+              onClick={() => onPick(w)}
+              aria-label={`${shortMonday(w)}: ${v === null ? t('week.noData') : t('week.enoughOf', { n: v, of: max })}`}
+            >
               <span className="week-chart-num small">{v === null ? '–' : v}</span>
               <span className="week-chart-track">
                 <span className="week-chart-bar" style={{ height: `${pct}%` }} />

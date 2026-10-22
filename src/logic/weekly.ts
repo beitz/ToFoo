@@ -8,7 +8,7 @@
  * days that count in the model, nothing filled in.
  */
 import { trendDisplay } from '../../model/parameters';
-import { addDays, dayRange } from '../lib/dates';
+import { addDays, dayRange, parseDay } from '../lib/dates';
 import { weekStart } from '../lib/periods';
 import { periodBreakdown, type PeriodInput, type PeriodResult } from '../model/period';
 import type { GaugeKind, GaugeStatus } from '../model/simulate';
@@ -119,6 +119,61 @@ export function weekRecap(rows: ReadonlyMap<string, NutrientWeeks>, hidden: Read
     if (change <= -minStep && change < (recap.dropped?.change ?? 0)) recap.dropped = move;
   }
   return recap;
+}
+
+/** A nutrient that moved since the week before: values as shares (1 = the need or the maximum). */
+export interface WeekMove {
+  id: string;
+  kind: GaugeKind;
+  from: number;
+  to: number;
+  /** Positive is better: a need counted up to 100 %, a limit only above it. */
+  change: number;
+}
+
+/**
+ * "Got better" and "Got worse" (design 2026-10-22, "A week"): the biggest moves since the week
+ * before, at least the "steady" step, `n` each. A need counts up to 100 % (more closes no gap); a
+ * limit counts only above 100 %, and rising there is worse.
+ */
+export function weekMoves(rows: ReadonlyMap<string, NutrientWeeks>, hidden: ReadonlySet<string> = new Set(), n = 3): { better: WeekMove[]; worse: WeekMove[] } {
+  const minStep = trendDisplay.steadyPerWeek.value;
+  const moves: WeekMove[] = [];
+  for (const r of rows.values()) {
+    if (hidden.has(r.id) || r.value === null || r.prev === null || r.kind === 'info') continue;
+    const change = r.kind === 'limit' ? Math.max(r.prev, NEED) - Math.max(r.value, NEED) : Math.min(r.value, NEED) - Math.min(r.prev, NEED);
+    if (Math.abs(change) >= minStep) moves.push({ id: r.id, kind: r.kind, from: r.prev, to: r.value, change });
+  }
+  return {
+    better: moves
+      .filter((m) => m.change > 0)
+      .sort((a, b) => b.change - a.change)
+      .slice(0, n),
+    worse: moves
+      .filter((m) => m.change < 0)
+      .sort((a, b) => a.change - b.change)
+      .slice(0, n),
+  };
+}
+
+/**
+ * The nutrients worth a small chart of their weeks: what got worse first, then what is low, a bit
+ * low or over the limit this week, most urgent first; `n` at most.
+ */
+export function weekWatch(rows: ReadonlyMap<string, NutrientWeeks>, worse: readonly WeekMove[], hidden: ReadonlySet<string> = new Set(), n = 6): string[] {
+  const rank: Partial<Record<GaugeStatus, number>> = { low: 0, tooHigh: 1, gettingLow: 2 };
+  const out = worse.map((m) => m.id);
+  const rest = [...rows.values()]
+    .filter((r) => !hidden.has(r.id) && r.value !== null && rank[r.status] !== undefined && !out.includes(r.id))
+    .sort((a, b) => rank[a.status]! - rank[b.status]! || (a.value ?? 0) - (b.value ?? 0));
+  return [...out, ...rest.map((r) => r.id)].slice(0, n);
+}
+
+/** ISO 8601 week number of a day (weeks start on Monday; week 1 holds the year's first Thursday). */
+export function isoWeek(day: string): number {
+  const thursday = parseDay(addDays(weekStart(day), 3));
+  const jan1 = new Date(thursday.getFullYear(), 0, 1);
+  return Math.floor(Math.round((thursday.getTime() - jan1.getTime()) / 86_400_000) / 7) + 1;
 }
 
 /** How the days of a week add up for a tracker: the average over days with a value, or their total. */

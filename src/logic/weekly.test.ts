@@ -5,7 +5,7 @@ import { resolveRequirements } from '../model/requirements';
 import { simulate } from '../model/simulate';
 import { DEFAULT_MODEL_SETTINGS, type ModelEntry } from '../model/types';
 import type { InsightData } from './insights';
-import { defaultWeek, nutrientWeeks, suggestBatch, trackerWeek, trackerWeeks, weekPeriods, weekRecap, weeksEndingAt, type NutrientWeeks } from './weekly';
+import { defaultWeek, isoWeek, nutrientWeeks, suggestBatch, trackerWeek, trackerWeeks, weekMoves, weekPeriods, weekRecap, weeksEndingAt, weekWatch, type NutrientWeeks } from './weekly';
 
 const req = resolveRequirements({ sex: 'male', birthYear: 1996, weightKg: 80, activity: 'medium' }, 2026);
 // Mon 28 Sep to Sun 18 Oct 2026, with today on Wednesday 14 Oct.
@@ -136,5 +136,51 @@ describe('suggestBatch', () => {
   it('suggests nothing when no recipe helps or nothing is low', () => {
     expect(suggestBatch([recipes[2]!], portion, week, { byNutrient })).toBeUndefined();
     expect(suggestBatch(recipes, portion, new Map(), { byNutrient })).toBeUndefined();
+  });
+});
+
+describe('got better, got worse', () => {
+  const row = (id: string, prev: number, value: number, kind: NutrientWeeks['kind'] = 'rolling', status: NutrientWeeks['status'] = 'fine'): NutrientWeeks => ({
+    id,
+    kind,
+    status,
+    value,
+    prev,
+    prevStatus: 'fine',
+    series: [prev, value],
+  });
+  const rows = new Map(
+    [
+      row('VITC', 0.61, 0.84),
+      row('MG', 0.7, 0.79),
+      row('FOL', 1.2, 2.5),
+      row('ID', 0.46, 0.38, 'rolling', 'low'),
+      row('FASAT', 1.04, 1.18, 'limit', 'tooHigh'),
+      row('NA', 0.6, 0.9, 'limit'),
+      row('ZN', 0.8, 0.81, 'rolling', 'gettingLow'),
+    ].map((r) => [r.id, r]),
+  );
+
+  it('counts a need up to 100 % and a limit only above it', () => {
+    const { better, worse } = weekMoves(rows);
+    expect(better.map((m) => m.id)).toEqual(['VITC', 'MG']);
+    // Folate was over the need both weeks; salt stayed under its maximum: neither moved.
+    expect(worse.map((m) => m.id)).toEqual(['FASAT', 'ID']);
+    expect(worse[0]!.change).toBeCloseTo(-0.14);
+    expect(weekMoves(rows, new Set(['VITC'])).better.map((m) => m.id)).toEqual(['MG']);
+  });
+
+  it('charts what got worse first, then what is low, over or a bit low', () => {
+    const { worse } = weekMoves(rows);
+    expect(weekWatch(rows, worse)).toEqual(['FASAT', 'ID', 'ZN']);
+    expect(weekWatch(rows, [], new Set(), 2)).toEqual(['ID', 'FASAT']);
+  });
+
+  it('numbers weeks as ISO 8601 does', () => {
+    expect(isoWeek('2026-10-14')).toBe(42);
+    expect(isoWeek('2026-10-19')).toBe(43);
+    expect(isoWeek('2026-01-01')).toBe(1);
+    // 1 January 2027 is a Friday: it belongs to the last week of 2026.
+    expect(isoWeek('2027-01-01')).toBe(53);
   });
 });

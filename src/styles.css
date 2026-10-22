@@ -2968,102 +2968,290 @@ body:has(.fab-stack) .toast-area {
 }
 
 /* Weekly look-back (features/review/WeekPage.tsx) */
-.week-days > li,
-.week-days > li + li,
 .week-chart > li,
 .week-chart > li + li,
 .week-rows > li,
-.week-rows > li + li {
+.week-rows > li + li,
+.week-energy > li,
+.week-energy > li + li,
+.week-moves > li,
+.week-moves > li + li,
+.week-foods > li + li,
+.week-foods > li {
   padding: 0;
   border: 0;
 }
-.week-days {
+.week-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 12px;
+}
+.week-head h1 {
+  margin: 0;
+}
+.week-head p {
+  margin: 2px 0 0;
+}
+.week-head .icon-btn {
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+/* The days: energy bars against the target line, the day's log mark under each. */
+.week-energy {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 4px;
-  margin: 4px 0 8px;
+  gap: 6px;
 }
-.week-day {
+.week-energy-col {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
-  min-height: 60px;
-  padding: 4px 0;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
+  gap: 4px;
+  min-height: 44px;
   color: var(--text);
   text-decoration: none;
 }
-.week-day-future {
-  opacity: 0.45;
+.week-energy-col.is-future {
+  opacity: 0.4;
 }
-.week-day.day-logged svg,
-.week-day.day-fasted svg {
-  color: var(--ok);
+.week-energy-num {
+  color: var(--text-muted);
+  white-space: nowrap;
 }
-.week-day.day-partial svg,
-.week-day.day-unknown svg {
-  color: var(--warn);
+.week-energy-track {
+  position: relative;
+  width: 100%;
+  height: 84px;
 }
-.week-recap h2,
-.week-recap + .card h2,
-.card > h2:first-child {
-  margin-top: 0;
+.week-energy-bar {
+  position: absolute;
+  left: 18%;
+  right: 18%;
+  bottom: 0;
+  border-radius: 6px 6px 2px 2px;
+  background: var(--text-muted);
 }
-.week-recap-list {
-  display: grid;
-  gap: 6px;
-  margin-bottom: 4px;
+.week-energy-bar.is-today {
+  background: none;
+  border: 2px dashed var(--text-muted);
 }
-.week-recap-line {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
+.week-energy-target {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--text);
 }
-.week-recap-line svg {
-  flex: none;
-  margin-top: 2px;
-}
-.week-st-fine > svg {
-  color: var(--ok);
-}
-.week-st-gettingLow > svg {
-  color: var(--warn);
-}
-.week-st-low > svg {
-  color: var(--low);
-}
-.week-st-tooHigh > svg {
-  color: var(--high);
-}
-.week-st-unknown > svg,
-.week-st-info > svg {
+.week-energy-mark {
+  display: inline-flex;
   color: var(--text-muted);
 }
-.week-suggestion {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  margin-top: 10px;
-  padding-top: 10px;
+.week-energy-mark.day-logged,
+.week-energy-mark.day-fasted {
+  color: var(--ok);
+}
+.week-energy-mark.day-partial,
+.week-energy-mark.day-unknown {
+  color: var(--warn);
+}
+.week-energy-wd {
+  font-weight: 700;
+}
+/* Got better / Got worse */
+.week-move {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 48px;
+  padding: 0;
+  border: 0;
   border-top: 1px solid var(--border);
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.week-moves > li:first-child .week-move {
+  border-top: 0;
+}
+.week-move-name {
+  font-weight: 700;
+}
+.week-move-track {
+  position: relative;
+  height: 20px;
+}
+.week-move-track::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 9px;
+  height: 2px;
+  background: var(--surface-3);
+}
+.week-move-over {
+  position: absolute;
+  right: 0;
+  top: 3px;
+  bottom: 3px;
+  background: repeating-linear-gradient(135deg, var(--high-soft) 0 4px, transparent 4px 8px);
+}
+.week-move-span {
+  position: absolute;
+  top: 6px;
+  height: 8px;
+  border-radius: 4px;
+}
+.week-move.is-better .week-move-span {
+  background: var(--ok-soft);
+}
+.week-move.is-worse .week-move-span {
+  background: var(--low-soft);
+}
+.week-move-need {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--text);
+}
+.week-move-was {
+  position: absolute;
+  top: 6px;
+  width: 8px;
+  height: 8px;
+  margin-left: -4px;
+  border: 2px solid var(--text-muted);
+  border-radius: 50%;
+  background: var(--surface);
+}
+.week-move-now {
+  position: absolute;
+  top: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin-left: -10px;
+  border-radius: 50%;
+}
+.week-move.is-better .week-move-now {
+  background: var(--ok);
+  color: var(--bg);
+}
+.week-move.is-worse .week-move-now {
+  background: var(--low);
+  color: var(--bg);
+}
+.week-move-value {
+  white-space: nowrap;
+  font-size: 0.95rem;
+}
+.week-moves-note {
+  margin: 8px 0 0;
+}
+/* 8 weeks: small charts */
+.week-watch {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.week-spark {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 44px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.week-spark-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.week-spark-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 700;
+}
+.week-spark-svg {
+  width: 100%;
+  height: 34px;
+  overflow: visible;
+}
+.week-spark-need {
+  stroke: var(--text-muted);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+  vector-effect: non-scaling-stroke;
+}
+.week-spark-line {
+  fill: none;
+  stroke: var(--c, var(--tank));
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+.week-spark-dot {
+  fill: var(--c, var(--tank));
+}
+.week-spark.week-st-fine {
+  --c: var(--ok);
+}
+.week-spark.week-st-gettingLow {
+  --c: var(--warn);
+}
+.week-spark.week-st-low {
+  --c: var(--low);
+}
+.week-spark.week-st-tooHigh {
+  --c: var(--high);
+}
+/* For the next batch */
+.week-batch h2 {
+  margin: 2px 0 6px;
+  font-size: 1.3rem;
+}
+.week-batch > p {
+  margin: 0 0 4px;
+}
+.week-batch-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+.week-batch-actions .btn {
+  flex: 1;
+}
+.week-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
   color: var(--text);
   text-decoration: none;
 }
-a.week-suggestion {
-  min-height: 44px;
+.week-foods > li + li .week-link {
+  border-top: 1px solid var(--border);
 }
-.week-suggestion svg {
-  flex: none;
-  margin-top: 2px;
-  color: var(--accent);
-}
-.week-suggestion > span {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+.week-fold h3 {
+  margin: 8px 0 4px;
+  font-size: 1rem;
 }
 .week-chart {
   display: grid;
@@ -3118,8 +3306,21 @@ a.week-suggestion {
   color: var(--text-muted);
   white-space: nowrap;
 }
-.week-section {
-  margin-bottom: 2px;
+.week-st-fine > svg {
+  color: var(--ok);
+}
+.week-st-gettingLow > svg {
+  color: var(--warn);
+}
+.week-st-low > svg {
+  color: var(--low);
+}
+.week-st-tooHigh > svg {
+  color: var(--high);
+}
+.week-st-unknown > svg,
+.week-st-info > svg {
+  color: var(--text-muted);
 }
 .week-rows {
   margin: 6px 0 4px;
