@@ -5,7 +5,7 @@ import { href, navigate } from '../../app/router';
 import { t, type MessageKey } from '../../i18n';
 import { NON_SINGLE_FOOD_GROUPS } from '../../foods/foodDb';
 import { diverseTop } from '../../foods/variety';
-import { addDays, dayRange, formatDate, parseDay } from '../../lib/dates';
+import { addDays, dayRange, formatDate, parseDay, weekdayShort } from '../../lib/dates';
 import { fmtAmount, fmtNumber, fmtPercent } from '../../lib/format';
 import { weekStart } from '../../lib/periods';
 import { buildInsightData } from '../../logic/insights';
@@ -44,13 +44,8 @@ const DAY_KEY = /^\d{4}-\d{2}-\d{2}$/;
 const RECAP_NAMES = 4;
 const nutrientName = (id: string) => NUTRIENT_BY_ID.get(id)?.name ?? id;
 const shortMonday = (day: string) => formatDate(day, false);
-const weekday = (day: string) => parseDay(day).toLocaleDateString('en-GB', { weekday: 'short' });
-/** "Mon 13 – Sun 19 Oct", the month on the Monday too only when it differs. */
-function weekRange(monday: string, sunday: string): string {
-  const month = (day: string) => parseDay(day).toLocaleDateString('en-GB', { month: 'short' });
-  const from = `${weekday(monday)} ${parseDay(monday).getDate()}${month(monday) === month(sunday) ? '' : ` ${month(monday)}`}`;
-  return `${from} – ${weekday(sunday)} ${parseDay(sunday).getDate()} ${month(sunday)}`;
-}
+/** "Mon 19.10. – Sun 25.10." */
+const weekRange = (monday: string, sunday: string) => `${weekdayShort(monday)} ${formatDate(monday, false)} – ${weekdayShort(sunday)} ${formatDate(sunday, false)}`;
 
 /**
  * Weekly look-back (docs/SPEC.md, "Trends and weekly look-back"; design 2026-10-22, "A week"): the
@@ -279,7 +274,6 @@ function DaysCard({ monday }: { monday: string }) {
       <ol className="plain-list week-energy" aria-label={t('week.days')}>
         {days.map(({ day, status, kcal }) => {
           const date = parseDay(day);
-          const wd = date.toLocaleDateString('en-GB', { weekday: 'short' });
           const top10 = (v: number) => `${(v / top) * 100}%`;
           const label = status === 'fasted' ? t('week.fast') : kcal ? kcalShort(kcal) : status === 'future' ? '' : '–';
           const statusText = status === 'future' ? '' : t(`day.${status}` as MessageKey);
@@ -307,7 +301,7 @@ function DaysCard({ monday }: { monday: string }) {
               {status === 'future' ? (
                 <span className="week-energy-col is-future">{inner}</span>
               ) : (
-                <a className="week-energy-col" href={href('diary', day)} aria-label={`${wd} ${date.getDate()}: ${statusText}${kcal ? `, ${fmtAmount('ENERCC', kcal)}` : ''}`}>
+                <a className="week-energy-col" href={href('diary', day)} aria-label={`${weekdayShort(day)} ${formatDate(day, false)}: ${statusText}${kcal ? `, ${fmtAmount('ENERCC', kcal)}` : ''}`}>
                   {inner}
                 </a>
               )}

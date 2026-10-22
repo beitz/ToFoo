@@ -29,10 +29,11 @@ export function useHasApiKey(on: boolean): boolean | undefined {
 
 /**
  * Question shortcuts (design 2026-10-22, "Q1 How am I doing?"): small chips that open the assistant
- * with the question already typed. The user still presses Send, so a tap never costs anything.
- * Hidden without the assistant, its API key or the "Question shortcuts" setting.
+ * (or Patterns, for questions about what goes together) with the question already typed. The user
+ * still presses Send, so a tap never costs anything. Hidden without the assistant, its API key or
+ * the "Question shortcuts" setting.
  */
-export function AskChips({ questions }: { questions: string[] }) {
+export function AskChips({ questions, to = 'assistant' }: { questions: string[]; to?: 'assistant' | 'insights' }) {
   const d = useData();
   const on = isOn(d.settings.features, 'aiAssistant') && isOn(d.settings.features, 'questionShortcuts');
   const hasKey = useHasApiKey(on);
@@ -46,7 +47,7 @@ export function AskChips({ questions }: { questions: string[] }) {
           className="ask-chip"
           onClick={() => {
             setAsk(q);
-            navigate('assistant');
+            navigate(to);
           }}
         >
           <Icon name="chat" size={16} />

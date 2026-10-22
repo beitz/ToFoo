@@ -129,6 +129,6 @@ export function QuickActions() {
 /** Routes that fill the screen with one task, where the round button would cover its controls. */
 export function hidesQuickActions(route: readonly string[]): boolean {
   const [a, b, c] = route;
-  if (a === 'log' || a === 'assistant' || a === 'shopping' || a === 'fast' || a === 'sleep' || a === 'cook') return true;
+  if (a === 'log' || a === 'assistant' || a === 'insights' || a === 'shopping' || a === 'fast' || a === 'sleep' || a === 'cook') return true;
   return a === 'recipes' && (b === 'new' || c === 'edit');
 }

@@ -3,7 +3,7 @@ import { useData } from '../../app/data';
 import { useToast } from '../../app/toast';
 import { href, navigate } from '../../app/router';
 import { t, type MessageKey } from '../../i18n';
-import { addDays, formatDay, formatTime, parseDay } from '../../lib/dates';
+import { addDays, formatDate, formatDay, formatTime, parseDay } from '../../lib/dates';
 import { followOnSleep, NEW_SLEEP_MS } from '../../logic/sleep';
 import { fmtAmount } from '../../lib/format';
 import { groupMeals } from '../../model/simulate';
@@ -34,6 +34,11 @@ import { useWater } from '../water/useWater';
 import { waterText } from '../water/format';
 import { InsightsTabs } from '../review/InsightsTabs';
 import { waterTarget } from '../../logic/water';
+import { AskChips } from '../../ui/AskChips';
+import { DAY_ICON } from '../review/dayStatus';
+
+/** "Wednesday 21.10.2026". */
+const longDay = (day: string) => `${parseDay(day).toLocaleDateString('en-GB', { weekday: 'long' })} ${formatDate(day)}`;
 
 type StatusChoice = 'auto' | 'logged' | 'partial' | 'fasted' | 'filled' | 'excluded';
 
@@ -60,12 +65,18 @@ export function DiaryPage({ day: dayParam }: { day?: string }) {
   const waterOn = isOn(d.settings.features, 'water');
   const water = useWater(day) ?? [];
   const [waterSheet, setWaterSheet] = useState<WaterRecord | null>(null);
+  // The day status choices fold away; the status itself shows at the top of the day card.
+  const [statusOpen, setStatusOpen] = useState(false);
 
   const entries = d.log.filter((e) => e.day === day);
   const meals = groupMeals(entries, d.settings.mealWindowMinutes);
   // Meals, journal entries, sleeps and activities in one timeline, so "tired after lunch" sits after
   // the lunch; journal entries with no meal between them share a card. A sleep sits where it ended.
-  type Item = { kind: 'meal'; time: number; meal: LogEntry[] } | { kind: 'notes'; time: number; notes: JournalEntry[] } | { kind: 'sleep'; time: number; sleep: SleepRecord } | { kind: 'activity'; time: number; activity: ActivityRecord };
+  type Item =
+    | { kind: 'meal'; time: number; meal: LogEntry[] }
+    | { kind: 'notes'; time: number; notes: JournalEntry[] }
+    | { kind: 'sleep'; time: number; sleep: SleepRecord }
+    | { kind: 'activity'; time: number; activity: ActivityRecord };
   const timeline: Item[] = [];
   const sorted = [
     ...meals.map((meal) => ({ time: meal[0]!.time, meal })),
@@ -106,48 +117,66 @@ export function DiaryPage({ day: dayParam }: { day?: string }) {
   return (
     <section>
       <InsightsTabs view="diary" day={day} />
-      <header className="page-head row-between">
+      <header className="week-head">
+        <div className="grow">
+          <h1>{formatDay(day, d.today)}</h1>
+          <p className="muted small">{longDay(day)}</p>
+        </div>
         <button className="icon-btn" onClick={() => navigate('diary', addDays(day, -1))} aria-label={t('diary.prev')}>
           <Icon name="back" />
         </button>
-        <h1>{formatDay(day, d.today)}</h1>
         <button className="icon-btn" disabled={day >= d.today} onClick={() => navigate('diary', addDays(day, 1))} aria-label={t('diary.next')}>
           <Icon name="chevron" />
         </button>
       </header>
 
-      <div className="row diary-links">
-        <a className="btn btn-small btn-secondary" href={href('review', day, day)}>
-          <Icon name="bars" size={18} /> {t('diary.dayNutrients')}
-        </a>
-        {isOn(d.settings.features, 'aiAssistant') && isOn(d.settings.features, 'insights') && (
-          <a className="btn btn-small btn-secondary" href={href('insights')}>
-            <Icon name="insights" size={18} /> {t('diary.patterns')}
-          </a>
-        )}
-      </div>
-
-      <div className="card">
-        <div className="row-between">
-          <span className="muted small">{t('diary.status')}</span>
-          <strong>{t(`day.${effective}` as MessageKey)}</strong>
+      <div className="card diary-day">
+        <div className="card-head">
+          <h2>{t('diary.theDay')}</h2>
+          <span className={`diary-status day-${effective}`}>
+            <Icon name={DAY_ICON[effective]} size={14} /> {t(`day.${effective}` as MessageKey)}
+          </span>
         </div>
-        <Segmented<StatusChoice>
-          label={t('diary.status')}
-          className="segmented-grid"
-          value={choice}
-          onChange={(v) => void setStatus(v)}
-          options={[
-            { value: 'auto', label: t('diary.auto') },
-            { value: 'logged', label: t('diary.complete') },
-            { value: 'partial', label: t('diary.partial') },
-            { value: 'fasted', label: t('diary.fasted') },
-            { value: 'filled', label: t('diary.filled') },
-            { value: 'excluded', label: t('diary.excluded') },
-          ]}
-        />
-        <p className="muted small">{t(choice === 'auto' && isOn(d.settings.features, 'fillUnloggedDays') ? 'diary.hint.autoFilled' : (`diary.hint.${choice}` as MessageKey))}</p>
+        <DayEnergy kcal={totals.ENERCC} target={d.requirements.byNutrient.get('ENERCC')?.recommended} />
+        {mealSummary.length > 0 && (
+          <p className="small muted diary-macros">
+            {t('nutrient.protein')} <strong>{fmtAmount('PROT625', totals.PROT625 ?? 0)}</strong> · {t('nutrient.fat')} <strong>{fmtAmount('FAT', totals.FAT ?? 0)}</strong> · {t('diary.carbs')}{' '}
+            <strong>{fmtAmount('CHO', totals.CHO ?? 0)}</strong>
+          </p>
+        )}
+        <div className="row diary-links">
+          <a className="btn btn-small btn-secondary" href={href('review', day, day)}>
+            <Icon name="bars" size={18} /> {t('diary.dayNutrients')}
+          </a>
+          {isOn(d.settings.features, 'aiAssistant') && isOn(d.settings.features, 'insights') && (
+            <a className="btn btn-small btn-secondary" href={href('insights')}>
+              <Icon name="insights" size={18} /> {t('diary.patterns')}
+            </a>
+          )}
+        </div>
+        <details className="fold diary-status-fold" open={statusOpen} onToggle={(e) => setStatusOpen((e.target as HTMLDetailsElement).open)}>
+          <summary>
+            <span className="grow small">{t('diary.statusChange')}</span>
+            <Icon name="down" size={16} />
+          </summary>
+          <Segmented<StatusChoice>
+            label={t('diary.status')}
+            className="segmented-grid"
+            value={choice}
+            onChange={(v) => void setStatus(v)}
+            options={[
+              { value: 'auto', label: t('diary.auto') },
+              { value: 'logged', label: t('diary.complete') },
+              { value: 'partial', label: t('diary.partial') },
+              { value: 'fasted', label: t('diary.fasted') },
+              { value: 'filled', label: t('diary.filled') },
+              { value: 'excluded', label: t('diary.excluded') },
+            ]}
+          />
+          <p className="muted small">{t(choice === 'auto' && isOn(d.settings.features, 'fillUnloggedDays') ? 'diary.hint.autoFilled' : (`diary.hint.${choice}` as MessageKey))}</p>
+        </details>
       </div>
+      {day < d.today && mealSummary.length > 0 && <AskChips questions={[t('diary.ask', { day: longDay(day) })]} />}
 
       <div className={journalOn || sleepOn || activityOn ? 'diary-actions' : undefined}>
         <a className="btn btn-primary btn-block" href={href('log', day)}>
@@ -197,6 +226,11 @@ export function DiaryPage({ day: dayParam }: { day?: string }) {
                 <Icon name="edit" size={16} />
               </span>
             </button>
+            <a className="meal-foot" href={href('nights')}>
+              <Icon name="moon" size={16} />
+              <span className="grow">{t('diary.allNights')}</span>
+              <Icon name="chevron" size={16} />
+            </a>
           </div>
         ) : item.kind === 'notes' ? (
           <div className="card journal-card" key={item.notes[0]!.id}>
@@ -217,11 +251,6 @@ export function DiaryPage({ day: dayParam }: { day?: string }) {
       )}
 
       {meals.length > 0 && <p className="muted small">{t('diary.editHint')}</p>}
-      {mealSummary.length > 0 && (
-        <p className="muted small">
-          {t('diary.totals')}: {fmtAmount('ENERCC', totals.ENERCC ?? 0)} · {t('nutrient.protein')} {fmtAmount('PROT625', totals.PROT625 ?? 0)} · {t('nutrient.fat')} {fmtAmount('FAT', totals.FAT ?? 0)}
-        </p>
-      )}
 
       {waterOn && (
         <>
@@ -248,14 +277,14 @@ export function DiaryPage({ day: dayParam }: { day?: string }) {
         <Icon name="sun" /> {t('diary.outside')}
       </h2>
       <p className="muted small">
-        {routine.length ? t('diary.routine', { min: routine.reduce((a, s) => a + s.minutes, 0) }) : t('diary.noRoutine')}{' '}
-        <a href={href('settings', 'sun')}>{t('diary.editRoutine')}</a>
+        {routine.length ? t('diary.routine', { min: routine.reduce((a, s) => a + s.minutes, 0) }) : t('diary.noRoutine')} <a href={href('settings', 'sun')}>{t('diary.editRoutine')}</a>
       </p>
       <ul className="plain-list">
         {sunToday.map((s) => (
           <li key={s.id} className="row-between">
             <span>
-              {t('diary.sunEntry', { min: s.minutes, time: `${String(Math.floor(s.startHour)).padStart(2, '0')}:${String(Math.round((s.startHour % 1) * 60)).padStart(2, '0')}` })} · {t(`skin.${s.skin}` as MessageKey)}
+              {t('diary.sunEntry', { min: s.minutes, time: `${String(Math.floor(s.startHour)).padStart(2, '0')}:${String(Math.round((s.startHour % 1) * 60)).padStart(2, '0')}` })} ·{' '}
+              {t(`skin.${s.skin}` as MessageKey)}
             </span>
             <button className="icon-btn" onClick={() => void removeSun(s)} aria-label={t('common.delete')}>
               <Icon name="trash" size={18} />
@@ -287,16 +316,8 @@ export function DiaryPage({ day: dayParam }: { day?: string }) {
         />
       )}
       {waterSheet && <WaterSheet record={waterSheet} defaultTime={waterSheet.time} onClose={() => setWaterSheet(null)} />}
-      {activitySheet && (
-        <ActivitySheet
-          activity={activitySheet === 'new' ? undefined : activitySheet}
-          defaultTime={defaultTimeFor(day, d.today)}
-          onClose={() => setActivitySheet(null)}
-        />
-      )}
-      {journalSheet && (
-        <JournalSheet entry={journalSheet === 'new' ? undefined : journalSheet} defaultTime={defaultTimeFor(day, d.today)} onClose={() => setJournalSheet(null)} />
-      )}
+      {activitySheet && <ActivitySheet activity={activitySheet === 'new' ? undefined : activitySheet} defaultTime={defaultTimeFor(day, d.today)} onClose={() => setActivitySheet(null)} />}
+      {journalSheet && <JournalSheet entry={journalSheet === 'new' ? undefined : journalSheet} defaultTime={defaultTimeFor(day, d.today)} onClose={() => setJournalSheet(null)} />}
     </section>
   );
 }
@@ -372,4 +393,22 @@ function activitySummary(a: ActivityRecord): string {
     ...(a.intensity ? [t(`activity.intensity.${a.intensity}` as MessageKey)] : []),
     ...(a.outside ? [t('activity.outsideMark')] : []),
   ].join(' · ');
+}
+
+/** Energy eaten this day against the target, as one bar with the target as a line. */
+function DayEnergy({ kcal, target }: { kcal?: number; target?: number }) {
+  const eaten = kcal ?? 0;
+  const top = Math.max((target ?? eaten) * 1.25, eaten, 1);
+  return (
+    <div className="diary-energy">
+      <p className="diary-energy-text">
+        <strong>{fmtAmount('ENERCC', eaten)}</strong>
+        {target ? <span className="muted"> {t('diary.ofTarget', { kcal: fmtAmount('ENERCC', target) })}</span> : null}
+      </p>
+      <span className="diary-energy-track" aria-hidden>
+        <span className="diary-energy-bar" style={{ width: `${(eaten / top) * 100}%` }} />
+        {target ? <span className="diary-energy-target" style={{ left: `${(target / top) * 100}%` }} /> : null}
+      </span>
+    </div>
+  );
 }

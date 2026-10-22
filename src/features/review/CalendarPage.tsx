@@ -28,54 +28,65 @@ export function CalendarPage({ month: monthParam }: { month?: string }) {
   return (
     <section>
       <InsightsTabs view="calendar" day={month === d.today.slice(0, 7) ? d.today : `${month}-01`} />
-      <header className="page-head row-between">
+      <header className="week-head">
+        <div className="grow">
+          <h1>{formatMonth(month)}</h1>
+          <p className="muted small">{t('calendar.sub')}</p>
+        </div>
         <button className="icon-btn" onClick={() => navigate('calendar', addMonths(month, -1))} aria-label={t('calendar.prev')}>
           <Icon name="back" />
         </button>
-        <h1>{formatMonth(month)}</h1>
         <button className="icon-btn" disabled={month >= thisMonth} onClick={() => navigate('calendar', addMonths(month, 1))} aria-label={t('calendar.next')}>
           <Icon name="chevron" />
         </button>
       </header>
 
-      <div className="calendar" role="grid" aria-label={formatMonth(month)}>
-        <div className="calendar-row calendar-weekdays" role="row">
-          {weekdays.map((w, i) => (
-            <span key={i} role="columnheader" className="muted small">
-              {w}
-            </span>
+      <div className="card">
+        <div className="calendar" role="grid" aria-label={formatMonth(month)}>
+          <div className="calendar-row calendar-weekdays" role="row">
+            {weekdays.map((w, i) => (
+              <span key={i} role="columnheader" className="muted small">
+                {w}
+              </span>
+            ))}
+          </div>
+          {weeks.map((week, wi) => (
+            <div className="calendar-row" role="row" key={wi}>
+              {week.map((day, i) => {
+                if (!day) return <span key={i} role="gridcell" />;
+                const st = d.model.dayStatus[day];
+                const num = Number(day.slice(8));
+                if (!st || day > d.today)
+                  return (
+                    <span key={day} role="gridcell" className="calendar-day off" aria-label={String(num)}>
+                      <span className="calendar-num">{num}</span>
+                    </span>
+                  );
+                return (
+                  <a
+                    key={day}
+                    role="gridcell"
+                    className={`calendar-day day-${st}${day === d.today ? ' today' : ''}`}
+                    href={href('diary', day)}
+                    aria-label={`${parseDay(day).toLocaleDateString('en-GB', { day: 'numeric', month: 'long' })}: ${t(`day.${st}` as MessageKey)}`}
+                  >
+                    <span className="calendar-num">{num}</span>
+                    <Icon name={DAY_ICON[st]} size={16} />
+                  </a>
+                );
+              })}
+            </div>
           ))}
         </div>
-        {weeks.map((week, wi) => (
-          <div className="calendar-row" role="row" key={wi}>
-            {week.map((day, i) => {
-              if (!day) return <span key={i} role="gridcell" />;
-              const st = d.model.dayStatus[day];
-              const num = Number(day.slice(8));
-              if (!st || day > d.today)
-                return (
-                  <span key={day} role="gridcell" className="calendar-day off" aria-label={String(num)}>
-                    <span className="calendar-num">{num}</span>
-                  </span>
-                );
-              return (
-                <a key={day} role="gridcell" className={`calendar-day day-${st}${day === d.today ? ' today' : ''}`} href={href('diary', day)} aria-label={`${parseDay(day).toLocaleDateString('en-GB', { day: 'numeric', month: 'long' })}: ${t(`day.${st}` as MessageKey)}`}>
-                  <span className="calendar-num">{num}</span>
-                  <Icon name={DAY_ICON[st]} size={16} />
-                </a>
-              );
-            })}
-          </div>
-        ))}
-      </div>
 
-      <ul className="calendar-legend plain-list">
-        {STATUSES.filter((s) => (s !== 'filled' && s !== 'excluded') || counts[s]).map((s) => (
-          <li key={s} className={`day-${s}`}>
-            <Icon name={DAY_ICON[s]} size={16} /> {t(`day.${s}` as MessageKey)} · {counts[s] ?? 0}
-          </li>
-        ))}
-      </ul>
+        <ul className="calendar-legend plain-list">
+          {STATUSES.filter((s) => (s !== 'filled' && s !== 'excluded') || counts[s]).map((s) => (
+            <li key={s} className={`day-${s}`}>
+              <Icon name={DAY_ICON[s]} size={16} /> {t(`day.${s}` as MessageKey)} · {counts[s] ?? 0}
+            </li>
+          ))}
+        </ul>
+      </div>
       <p className="muted small">{t(isOn(d.settings.features, 'fillUnloggedDays') ? 'calendar.hintFilled' : 'calendar.hint')}</p>
 
       <a className="btn btn-secondary btn-block" href={href('review', range.from, range.to)}>
