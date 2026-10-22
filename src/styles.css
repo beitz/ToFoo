@@ -1308,6 +1308,16 @@ table.card {
   stroke: var(--border);
   stroke-dasharray: 4 3;
 }
+.chart-ahead {
+  stroke-dasharray: 5 4;
+}
+.chart-today {
+  stroke: var(--text-muted);
+  stroke-width: 1;
+}
+.chart-marker {
+  fill: var(--warn);
+}
 .chart-label {
   fill: var(--text-muted);
   font-size: 10px;
@@ -2715,6 +2725,10 @@ body:has(.fab-stack) .toast-area {
   color: var(--text-muted);
 }
 .group-row th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--surface);
   text-align: left;
   padding: 10px 4px 0;
   border-bottom: 1px solid var(--border);
@@ -4686,4 +4700,403 @@ a.contributor-link > span:first-child {
 .meal-time .field .muted {
   color: var(--text);
   font-weight: 600;
+}
+
+/* ── Nutrient page (design 2026-10-22) ── */
+.page-kicker {
+  margin: 0;
+}
+.page-head .page-kicker + h1 {
+  margin-top: 0;
+}
+.nut-hero-main {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+.nut-visual {
+  flex: none;
+  display: block;
+  border-radius: 14px;
+}
+.store-tank.nut-tank {
+  display: block;
+  width: 76px;
+  height: 128px;
+  border-width: 2px;
+  border-radius: 16px;
+}
+.ntile.nut-tile {
+  display: flex;
+  width: 76px;
+  height: 128px;
+  border-radius: 16px;
+  justify-content: center;
+  align-items: center;
+}
+.nut-tile .ntile-value {
+  position: relative;
+  font-size: 1.6rem;
+}
+.nut-sym {
+  flex: none;
+  width: 76px;
+  height: 76px;
+  display: grid;
+  place-items: center;
+  border: 1.5px solid var(--edge);
+  border-radius: 16px;
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+.nut-hero-text {
+  min-width: 0;
+}
+.nut-hero-text p {
+  margin: 0 0 4px;
+}
+.nut-hero-text .big-number {
+  margin: 2px 0;
+}
+.status-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.nut-hero-notes {
+  margin-top: 10px;
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
+.nut-hero-notes p {
+  margin: 4px 0;
+}
+.chart-tank .chart-line {
+  stroke: var(--tank);
+}
+.chart-tank .chart-band {
+  fill: var(--tank-soft);
+}
+
+/* Eaten → taken up */
+.uptake-days {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  grid-auto-flow: column;
+  gap: 4px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.uptake-day {
+  display: grid;
+  gap: 2px;
+  justify-items: center;
+}
+.uptake-eaten {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+.uptake-col {
+  position: relative;
+  width: 100%;
+  height: 96px;
+  border-bottom: 1px solid var(--border);
+}
+.uptake-bar {
+  position: absolute;
+  bottom: 0;
+  left: 18%;
+  right: 18%;
+  background: var(--tank);
+  border-radius: 4px 4px 0 0;
+}
+.uptake-need {
+  position: absolute;
+  left: -2px;
+  right: -2px;
+  height: 2px;
+  background: var(--text);
+}
+.uptake-up {
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+.uptake-wd {
+  font-size: 0.75rem;
+}
+.uptake-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin: 8px 0 0;
+}
+.uptake-legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.legend-bar {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--tank);
+}
+.legend-line {
+  width: 14px;
+  height: 2px;
+  background: var(--text);
+}
+.helper-tiles {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 12px 0 6px;
+}
+.helper-tiles > li.helper-tile {
+  border: 1px solid var(--border);
+}
+.helper-tile {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  line-height: 1.2;
+}
+.helper-tile strong {
+  display: block;
+  font-size: 0.9rem;
+}
+.helper-sign {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  border: 1.5px solid var(--c);
+  background: color-mix(in srgb, var(--c) 18%, transparent);
+}
+.helper-up {
+  --c: var(--ok);
+}
+.helper-down {
+  --c: var(--low);
+}
+
+/* Where it came from */
+.came-bar {
+  display: flex;
+  gap: 2px;
+  height: 14px;
+  border-radius: 7px;
+  overflow: hidden;
+  margin: 8px 0;
+}
+.came-seg-0 {
+  background: var(--tank);
+}
+.came-seg-1 {
+  background: color-mix(in srgb, var(--tank) 72%, var(--surface));
+}
+.came-seg-2 {
+  background: color-mix(in srgb, var(--tank) 50%, var(--surface));
+}
+.came-seg-3 {
+  background: color-mix(in srgb, var(--tank) 32%, var(--surface));
+}
+.came-seg-4 {
+  background: var(--border);
+}
+.came-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  color: inherit;
+  text-decoration: none;
+}
+.came-list > li,
+.fills-list > li,
+.why-sources > li,
+.helper-tiles > li {
+  padding: 0;
+}
+.came-dot {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+}
+.came-pct {
+  min-width: 3.2em;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Fills it best */
+.fills-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 52px;
+  padding: 4px 0;
+}
+.fills-name {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  color: inherit;
+  text-decoration: none;
+}
+.fills-share {
+  flex: none;
+  padding: 2px 8px;
+  border: 1px solid var(--tank);
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+.fills-line .btn {
+  flex: none;
+  min-height: 44px;
+}
+.fills-all {
+  display: inline-block;
+  margin-top: 8px;
+}
+
+/* Folded info */
+.fold > summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  cursor: pointer;
+  list-style: none;
+}
+.fold > summary::-webkit-details-marker {
+  display: none;
+}
+.fold[open] > summary svg:last-child {
+  transform: rotate(180deg);
+}
+.fold-body {
+  padding-top: 6px;
+}
+.why-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  color: inherit;
+  text-decoration: none;
+}
+
+/* Why 62 %? */
+.why-chain {
+  display: grid;
+  gap: 10px;
+}
+.why-chain .why-step {
+  padding: 12px 14px;
+}
+.why-step {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin: 0;
+  position: relative;
+}
+.why-step + .why-step::before {
+  content: '';
+  position: absolute;
+  top: -11px;
+  left: 31px;
+  width: 1.5px;
+  height: 10px;
+  background: var(--border);
+}
+.why-op {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--surface-2);
+  font-weight: 800;
+}
+.why-body {
+  flex: 1;
+  min-width: 0;
+}
+.why-head {
+  gap: 8px;
+}
+.why-value {
+  font-size: 1.25rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.why-body p {
+  margin: 4px 0 0;
+}
+.why-last {
+  border-color: var(--tank);
+  background: color-mix(in srgb, var(--tank) 10%, var(--surface));
+}
+.why-sure-bar {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  margin: 8px 0;
+}
+.why-sure-bar span {
+  height: 8px;
+  border-radius: 4px;
+  border: 1px solid var(--edge);
+}
+.why-sure-bar span.on {
+  background: var(--text);
+  border-color: var(--text);
+}
+.why-source {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  color: inherit;
+  text-decoration: none;
+}
+.why-source-what {
+  flex: none;
+  width: 4.6em;
+}
+.why-source-sub,
+.why-source-detail {
+  display: block;
+}
+.why-source-detail {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.why-source-main {
+  min-width: 0;
+  padding: 6px 0;
+}
+.why-sources {
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
+.portion-chips {
+  margin: 4px 0 6px;
+}
+.chip-gap {
+  border-color: var(--low);
 }
