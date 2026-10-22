@@ -60,6 +60,7 @@ const paths: Record<string, string> = {
   hourglass: 'M6 3h12M6 21h12M7 3c0 5 5 6 5 9s-5 4-5 9M17 3c0 5-5 6-5 9s5 4 5 9',
   leaf: 'M5 19C5 11 11 5 19 5c0 8-6 14-14 14zM5 19l7-7',
   basket: 'M3.5 9.5h17l-1.8 10H5.3zM8 9.5 11 4M16 9.5 13 4M9 13v3M15 13v3',
+  swap: 'M4 8h15M15 4l4 4-4 4M20 16H5M9 12l-4 4 4 4',
 };
 
 export function Icon({ name, size = 20, title, filled }: { name: keyof typeof paths | string; size?: number; title?: string; filled?: boolean }) {
