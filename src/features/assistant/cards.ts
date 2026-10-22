@@ -87,7 +87,7 @@ export function cardTitle(c: Card): string {
     case 'portion':
       return c.portion.name;
     case 'batch':
-      return t('ai.batchTitle', { name: c.batch.name });
+      return t(c.batch.batchId ? 'ai.potTitle' : 'ai.batchTitle', { name: c.batch.name });
   }
 }
 

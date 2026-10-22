@@ -776,12 +776,13 @@ describe('recipes in the main chat', () => {
       {
         id: 'bat1',
         cookedDay: '2026-10-10',
+        portions: 6,
         left: { fresh: 0, fridge: 1, freezer: 2 },
         cookedGrams: 900,
         ingredients: [{ ref: { source: 'BLS' as const, version: '4.0', code: 'D7A5400' }, name: 'Milk roll', grams: 600, preparation: 'baked' as const }],
         changed: false,
       },
-      { id: 'bat2', cookedDay: '2026-10-12', left: { fresh: 0, fridge: 0, freezer: 1 }, ingredients: [], changed: false },
+      { id: 'bat2', cookedDay: '2026-10-12', portions: 8, left: { fresh: 0, fridge: 0, freezer: 1 }, ingredients: [], changed: false },
     ],
   };
   const checked: Array<[number, number]> = [];
@@ -837,8 +838,8 @@ describe('recipes in the main chat', () => {
     expect(r.text).toContain('D7A5400 Milk roll 600 g, baked');
     expect(r.text).toContain('Steps:\nBake.');
     expect(r.text).toContain('Empty pot (remembered): 1200 g');
-    expect(r.text).toContain('- batch_id bat1 | cooked 2026-10-10 | 1 in the fridge, 2 in the freezer | cooked food 900 g, about 150 g a portion');
-    expect(r.text).toContain('- batch_id bat2 | cooked 2026-10-12 | 1 in the freezer | not weighed');
+    expect(r.text).toContain('- batch_id bat1 | cooked 2026-10-10 | 6 portions | 1 in the fridge, 2 in the freezer | cooked food 900 g, about 150 g a portion');
+    expect(r.text).toContain('- batch_id bat2 | cooked 2026-10-12 | 8 portions | 1 in the freezer | not weighed');
     expect(runListRecipes({ query: 'soup' }, { ...ctx, recipes: recipes(false) }).text).toContain('No recipe matches "soup". The book has: Nougat rolls.');
     expect(runListRecipes({ query: '' }, ctx).ok).toBe(false);
   });
@@ -923,6 +924,25 @@ describe('recipes in the main chat', () => {
     expect(!validateBatchProposal(cookAgain({ recipe_id: 'x' }), c).ok).toBe(true);
     const tofu = validateBatchProposal(cookAgain({ changes: [{ replaces: 'D7A5400', code: 'S450000', grams: 500, preparation: 'asListed', micros_from: '' }] }), c);
     expect(tofu.ok && tofu.proposal.changes[0]?.replaces).toBe('BLS:D7A5400');
+    // A bigger pot: more portions, and a plan and a serving within them.
+    const bigger = validateBatchProposal(cookAgain({ portions: 8, usual_plan: false, fresh: 1, fridge: 6, ate_portions: 7 }), c);
+    expect(bigger.ok && bigger.proposal.portions).toBe(8);
+    expect(validateBatchProposal(cookAgain({ portions: 6 }), c).ok && 'same as the recipe').toBe('same as the recipe');
+    expect(!validateBatchProposal(cookAgain({ portions: 2.5 }), c).ok).toBe(true);
+  });
+
+  it('changes a pot already cooked: a batch in stock, its weight, portions and ingredients, nothing eaten', () => {
+    const c = { ...ctx, recipes: recipes(false) };
+    const pot = validateBatchProposal(cookAgain({ batch_id: 'bat1', portions: 7, changes: [{ replaces: 'D7A5400', code: 'D7A5400', grams: 666, preparation: 'baked', micros_from: '' }] }), c);
+    expect(pot.ok && [pot.proposal.batchId, pot.proposal.recipeId, pot.proposal.portions, pot.proposal.changes[0]?.item?.grams]).toEqual(['bat1', 'rec1', 7, 666]);
+    expect(pot.ok && pot.proposal.plan).toBeUndefined();
+    const nothing = validateBatchProposal(cookAgain({ batch_id: 'bat1', portions: 6 }), c);
+    expect(!nothing.ok && nothing.error).toContain('Nothing to change');
+    const ate = validateBatchProposal(cookAgain({ batch_id: 'bat1', food_grams: 950, ate_portions: 1 }), c);
+    expect(!ate.ok && ate.error).toContain('call propose_portion');
+    expect(!validateBatchProposal(cookAgain({ batch_id: 'nope', food_grams: 950 }), c).ok).toBe(true);
+    const notInPot = validateBatchProposal(cookAgain({ batch_id: 'bat2', changes: [{ replaces: 'D7A5400', code: '', grams: 0, preparation: 'asListed', micros_from: '' }] }), c);
+    expect(!notInPot.ok && notInPot.error).toContain('not an ingredient of this pot');
   });
 
   it('shows a serving from stock and a cooked batch as P and B cards', async () => {

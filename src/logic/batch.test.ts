@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Batch, Ingredient } from '../storage/types';
-import { applyChanges, compareIngredients, cookedWeight, potShare, sameIngredients, stockPortionsFor, withPot } from './batch';
+import { applyChanges, compareIngredients, cookedWeight, potShare, sameIngredients, stockPortionsFor, withPortions, withPot } from './batch';
 
 const ing = (code: string, grams: number, preparation: Ingredient['preparation'] = 'boiled'): Ingredient => ({ ref: { source: 'BLS', version: '4.0', code }, name: code, grams, preparation });
 const beef = ing('U010000', 600);
@@ -74,5 +74,24 @@ describe('batch cooking', () => {
     expect(back.recipeIngredients).toBeUndefined();
     expect(back.cookedGrams).toBeUndefined();
     expect(back.recipe.ingredients).toEqual([beef, lentils]);
+  });
+
+  it('shares a pot into more or fewer portions: extra go to the freezer, fewer come off freezer, fridge, then fresh', () => {
+    const more = withPortions(batch, 5);
+    expect([more.recipe.portions, more.plan, more.remaining]).toEqual([5, { fresh: 1, fridge: 1, freezer: 3 }, { fresh: 1, fridge: 1, freezer: 3 }]);
+    expect(more.recipe.ingredients).toEqual(batch.recipe.ingredients);
+    const eaten = { ...batch, remaining: { fresh: 0, fridge: 1, freezer: 1 } };
+    const fewer = withPortions(eaten, 1);
+    expect([fewer.plan, fewer.remaining]).toEqual([{ fresh: 1, fridge: 0, freezer: 0 }, { fresh: 0, fridge: 0, freezer: 0 }]);
+    // A portion eaten by count is now a share of the bigger pot.
+    expect(potShare({ portions: 1 }, more)).toBeCloseTo(1 / 5);
+    expect(withPortions(batch, 0)).toBe(batch);
+    expect(withPortions(batch, 3)).toBe(batch);
+    expect(withPortions(batch, 500)).toBe(batch);
+  });
+
+  it('changes a pot\'s portions together with its ingredients', () => {
+    const b = withPot(batch, { ingredients: [beef, tofu], portions: 4 });
+    expect([b.recipe.portions, b.remaining.freezer, b.recipeIngredients]).toEqual([4, 2, [beef, lentils]]);
   });
 });

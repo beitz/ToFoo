@@ -114,23 +114,57 @@ export function applyChanges(list: readonly Ingredient[], changes: readonly Ingr
   return out;
 }
 
-/** What the user knows about one pot: what went in and, if weighed, the cooked food's weight. */
+/** What the user knows about one pot: what went in, if weighed the cooked food's weight, and the portions it made. */
 export interface PotDetails {
   ingredients: Ingredient[];
   cookedGrams?: number;
+  /** Portions this pot was shared into, when not the recipe's number. */
+  portions?: number;
+}
+
+/** Sanity limit for portions from one pot, not a physiological number: above it a typing slip is more likely. */
+export const MAX_POT_PORTIONS = 100;
+
+type Split = Batch['plan'];
+
+/** Add portions to the freezer, or take them away freezer first, then fridge, then fresh (never below zero). */
+function shiftSplit(split: Split, delta: number): Split {
+  if (delta >= 0) return { ...split, freezer: split.freezer + delta };
+  const out = { ...split };
+  let take = -delta;
+  for (const k of ['freezer', 'fridge', 'fresh'] as const) {
+    const n = Math.min(out[k], take);
+    out[k] -= n;
+    take -= n;
+  }
+  return out;
 }
 
 /**
- * A batch with its pot's ingredients and weight. The recipe's own list is kept beside the pot's
+ * The same pot shared into another number of portions (a bigger celeriac made five boxes, not
+ * four). The ingredients stay as they are, so each portion gets smaller or bigger, also portions
+ * already eaten by count. Extra portions go to the freezer, which is "the rest" in every plan;
+ * fewer come off the freezer first, then the fridge, then fresh, in the plan and in what is left.
+ */
+export function withPortions(b: Batch, portions: number): Batch {
+  const n = Math.round(portions);
+  if (!(n >= 1) || n > MAX_POT_PORTIONS || n === b.recipe.portions) return b;
+  const delta = n - b.recipe.portions;
+  return { ...b, recipe: { ...b.recipe, portions: n }, plan: shiftSplit(b.plan, delta), remaining: shiftSplit(b.remaining, delta) };
+}
+
+/**
+ * A batch with its pot's ingredients, weight and (when given) portions. The recipe's own list is kept beside the pot's
  * only while they differ, so the batch can show what this pot had instead.
  */
 export function withPot(b: Batch, pot: PotDetails): Batch {
   const original = b.recipeIngredients ?? b.recipe.ingredients;
   const { recipeIngredients: _was, cookedGrams: _weight, ...rest } = b;
-  return {
+  const potted: Batch = {
     ...rest,
     recipe: { ...b.recipe, ingredients: pot.ingredients.map((i) => ({ ...i })) },
     ...(sameIngredients(original, pot.ingredients) ? {} : { recipeIngredients: original }),
     ...(pot.cookedGrams && pot.cookedGrams > 0 ? { cookedGrams: Math.round(pot.cookedGrams) } : {}),
   };
+  return pot.portions === undefined ? potted : withPortions(potted, pot.portions);
 }
