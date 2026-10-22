@@ -8,6 +8,7 @@ import { newId } from '../../lib/id';
 import { repo } from '../../storage/repo';
 import { NumberInput } from '../../ui/controls';
 import { Icon } from '../../ui/Icon';
+import { DateInput } from '../../ui/DateInputs';
 
 /** Blood test markers that set this nutrient's store. */
 export const markersFor = (id: string) => Object.entries(labMarkers).filter(([, m]) => m.value.nutrient === id);
@@ -49,7 +50,7 @@ export function BloodTests({ id }: { id: string }) {
         )}
         <div className="prompt-row">
           <NumberInput value={value} onChange={setValue} placeholder={name} suffix={info.value.unit} min={0} />
-          <input type="date" value={day} max={d.today} onChange={(e) => setDay(e.target.value)} aria-label={t('lab.day')} />
+          <DateInput value={day} max={d.today} onChange={(e) => setDay(e.target.value)} aria-label={t('lab.day')} />
           <button className="btn btn-small btn-primary" disabled={value === undefined || !day} onClick={save}>
             {t('common.save')}
           </button>

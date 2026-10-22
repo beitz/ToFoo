@@ -39,12 +39,38 @@ export function utcOffsetHours(key: string): number {
   return -parseDay(key).getTimezoneOffset() / 60;
 }
 
+// Dates are shown the German way (22.10.2026, 24-hour clock) whatever the
+// phone's locale, since en-US formats (10/22/2026, 1:45 PM) were confusing.
+// Words (weekdays, months) stay in the UI language.
+const pad = (n: number) => String(n).padStart(2, '0');
+const toDate = (d: Date | string) => (typeof d === 'string' ? parseDay(d) : d);
+
+/** "Wed" */
+export function weekdayShort(d: Date | string): string {
+  return toDate(d).toLocaleDateString('en-GB', { weekday: 'short' });
+}
+
+/** "22.10.2026", or "22.10." without the year. */
+export function formatDate(d: Date | string, withYear = true): string {
+  const date = toDate(d);
+  return `${pad(date.getDate())}.${pad(date.getMonth() + 1)}.${withYear ? date.getFullYear() : ''}`;
+}
+
+/** "Today", "Yesterday", "Wed 22.10." (with the year when it is not this year's). */
 export function formatDay(key: string, today = todayKey()): string {
   if (key === today) return 'Today';
   if (key === addDays(today, -1)) return 'Yesterday';
-  return parseDay(key).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+  return `${weekdayShort(key)} ${formatDate(key, key.slice(0, 4) !== today.slice(0, 4))}`;
 }
 
+/** "13:45" */
 export function formatTime(t: number): string {
-  return new Date(t).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  const d = new Date(t);
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/** "Wed 22.10., 13:45" (with the year when it is not this year's). */
+export function formatDateTime(t: number, today = todayKey()): string {
+  const key = dayKey(new Date(t));
+  return `${weekdayShort(key)} ${formatDate(key, key.slice(0, 4) !== today.slice(0, 4))}, ${formatTime(t)}`;
 }

@@ -3,7 +3,7 @@ import { useData } from '../../app/data';
 import { useToast } from '../../app/toast';
 import { href, navigate } from '../../app/router';
 import { t, type MessageKey } from '../../i18n';
-import { addDays } from '../../lib/dates';
+import { addDays, formatDate } from '../../lib/dates';
 import { isOn } from '../../settings/features';
 import { repo } from '../../storage/repo';
 import { CompactGauge, GaugeRow, TankCard } from '../../ui/Gauge';
@@ -24,6 +24,7 @@ import { StockChips } from './StockChips';
 import { GroupInfoButton, hasGroupInfo } from '../info/GroupInfo';
 import { withStores } from '../../logic/stores';
 import { attentionCounts, COLLAPSED_BY_DEFAULT, groupNutrients, type HomeGrouping } from './grouping';
+import { DateInput } from '../../ui/DateInputs';
 
 /** Shown first, in one row: energy and the macronutrients. */
 const MACRO_ROW = ['ENERCC', 'PROT625', 'FAT', 'CHO', 'FIBT'];
@@ -101,7 +102,7 @@ export function HomePage() {
       <header className="page-head">
         <h1>{t('app.name')}</h1>
         <span className="muted">
-          {new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
+          {new Date().toLocaleDateString('en-GB', { weekday: 'long' })} {formatDate(new Date())}
           {!d.activeFast && ` · ${statusText}`}
         </span>
       </header>
@@ -249,7 +250,7 @@ export function HomePage() {
       {fastSheet && (
         <Sheet title={t('home.fasting')} onClose={() => setFastSheet(false)}>
           <Field label={t('home.fastSince')} hint={t('home.fastHint')}>
-            {(id) => <input id={id} type="date" value={fastStart} max={today} onChange={(e) => e.target.value && setFastStart(e.target.value)} />}
+            {(id) => <DateInput id={id} value={fastStart} max={today} onChange={(e) => e.target.value && setFastStart(e.target.value)} />}
           </Field>
           <div className="sheet-actions">
             <button className="btn btn-primary" onClick={() => void startFast()}>

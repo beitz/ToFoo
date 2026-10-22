@@ -6,7 +6,7 @@ import { href, navigate } from '../../app/router';
 import { useBackCloses } from '../../app/history';
 import { SourceTag } from '../recipes/SourceTag';
 import { t, type MessageKey } from '../../i18n';
-import { dayKey, formatDay, formatTime } from '../../lib/dates';
+import { dayKey, formatDateTime, formatDay, formatTime } from '../../lib/dates';
 import { fmtNumber } from '../../lib/format';
 import {
   appNote,
@@ -1187,7 +1187,7 @@ function NoteCard({ card, day, toast, onLogged, register }: CardProps<Extract<Ca
       <div className="card proposal-done row">
         <Icon name="check" size={18} />
         <span>
-          {t('ai.noteSaved', { when: `${new Date(time).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}, ${formatTime(time)}` })}{' '}
+          {t('ai.noteSaved', { when: formatDateTime(time) })}{' '}
           <a href={href('diary', dayKey(new Date(time)))}>{t('edit.inDiary')}</a>
         </span>
       </div>
@@ -1275,7 +1275,7 @@ function ProposalCard({ card, day, toast, onLogged, register }: CardProps<Extrac
       <div className="card proposal-done row">
         <Icon name="check" size={18} />
         <span>
-          {t('ai.cardLogged', { name: title, when: `${new Date(time).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}, ${formatTime(time)}` })}{' '}
+          {t('ai.cardLogged', { name: title, when: formatDateTime(time) })}{' '}
           <a href={href('diary', dayKey(new Date(time)))}>{t('edit.inDiary')}</a>
         </span>
       </div>

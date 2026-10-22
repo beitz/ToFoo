@@ -6,7 +6,7 @@ import { useToast } from '../../app/toast';
 import { t, type MessageKey } from '../../i18n';
 import { search } from '../../foods/search';
 import { fmtBytes, fmtPercent } from '../../lib/format';
-import { dayKey, formatDay, formatTime } from '../../lib/dates';
+import { dayKey, formatDateTime, formatDay, formatTime } from '../../lib/dates';
 import { shareOrDownload } from '../../lib/shareFile';
 import { NUTRIENT_GROUPS, NUTRIENTS, type NutrientDef } from '../../model/nutrients';
 import { storage } from '../../../model/parameters';
@@ -452,7 +452,7 @@ export function BackupPage() {
       {pending && (
         <Sheet title={t('backup.previewTitle')} onClose={() => setPending(null)}>
           <p>
-            <strong>{t('backup.preview', { date: new Date(pending.exportedAt).toLocaleString('en-GB') })}</strong>
+            <strong>{t('backup.preview', { date: formatDateTime(new Date(pending.exportedAt).getTime()) })}</strong>
           </p>
           <ul className="plain-list small">
             {COUNTED.map((k) => (

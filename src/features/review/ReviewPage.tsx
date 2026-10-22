@@ -13,6 +13,7 @@ import { Icon } from '../../ui/Icon';
 import { Field, Segmented } from '../../ui/controls';
 import { urgencyRank } from '../../ui/status';
 import { DAY_ICON } from './dayStatus';
+import { DateInput } from '../../ui/DateInputs';
 
 const MACRO_ROW = ['ENERCC', 'PROT625', 'FAT', 'CHO', 'FIBT'];
 const DAY_KEY = /^\d{4}-\d{2}-\d{2}$/;
@@ -87,8 +88,8 @@ export function ReviewPage({ from: fromParam, to: toParam }: { from?: string; to
       />
       {custom && (
         <div className="row review-dates">
-          <Field label={t('review.from')}>{(id) => <input id={id} type="date" value={from} max={to} onChange={(e) => e.target.value && go(e.target.value, to)} />}</Field>
-          <Field label={t('review.to')}>{(id) => <input id={id} type="date" value={to} min={from} max={d.today} onChange={(e) => e.target.value && go(from, e.target.value)} />}</Field>
+          <Field label={t('review.from')}>{(id) => <DateInput id={id} value={from} max={to} onChange={(e) => e.target.value && go(e.target.value, to)} />}</Field>
+          <Field label={t('review.to')}>{(id) => <DateInput id={id} value={to} min={from} max={d.today} onChange={(e) => e.target.value && go(from, e.target.value)} />}</Field>
         </div>
       )}
 

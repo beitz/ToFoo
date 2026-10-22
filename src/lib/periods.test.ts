@@ -22,7 +22,7 @@ describe('periods', () => {
     expect(monthEnd('2028-02-03')).toBe('2028-02-29');
     expect(addMonths('2026-01', -1)).toBe('2025-12');
     expect(formatRange('2026-09-01', '2026-09-30', today)).toBe('September 2026');
-    expect(formatRange('2026-10-10', today, today)).toBe('10 Oct – 16 Oct');
+    expect(formatRange('2026-10-10', today, today)).toBe('10.10. – 16.10.');
   });
 
   it('lays out a month Monday first', () => {
