@@ -18,9 +18,19 @@ const PASSING: TranscribeError[] = ['overloaded', 'rateLimit', 'network'];
  * later parts of one recording. Parts are typed up one after another, in order; if one fails even
  * after retries, the rest wait until the user tries again or drops it, so the text never comes out
  * of order. Used by the assistant chat and the journal; `prompt` tells the speech model what it will
- * hear.
+ * hear. `onAudio`, if given, gets each whole recording when it stops (the chat keeps it).
  */
-export function useDictation({ onText, onError, prompt = TRANSCRIBE_PROMPT }: { onText: (text: string, continued: boolean) => void; onError: (key: MessageKey) => void; prompt?: string }) {
+export function useDictation({
+  onText,
+  onError,
+  onAudio,
+  prompt = TRANSCRIBE_PROMPT,
+}: {
+  onText: (text: string, continued: boolean) => void;
+  onError: (key: MessageKey) => void;
+  onAudio?: (audio: Blob, ms: number) => void;
+  prompt?: string;
+}) {
   const d = useData();
   const voiceOn = isOn(d.settings.features, 'voiceInput');
   const [voiceKey, setVoiceKey] = useState('');
@@ -28,8 +38,8 @@ export function useDictation({ onText, onError, prompt = TRANSCRIBE_PROMPT }: { 
     if (voiceOn) void getOpenAiKey().then(setVoiceKey);
   }, [voiceOn]);
   // The callbacks change on every render; the queue reads the latest ones.
-  const latest = useRef({ onText, onError, prompt, voiceKey });
-  latest.current = { onText, onError, prompt, voiceKey };
+  const latest = useRef({ onText, onError, onAudio, prompt, voiceKey });
+  latest.current = { onText, onError, onAudio, prompt, voiceKey };
 
   /** Parts recorded and not typed up yet, oldest first; `continued` marks later parts of one recording. */
   const queue = useRef<Array<{ audio: Blob; continued: boolean }>>([]);
@@ -46,7 +56,7 @@ export function useDictation({ onText, onError, prompt = TRANSCRIBE_PROMPT }: { 
     partsThisRecording.current++;
     setWaiting(queue.current.length);
     void pump();
-  });
+  }, onAudio && ((audio, ms) => latest.current.onAudio?.(audio, ms)));
 
   useEffect(() => {
     if (recorder.state.kind === 'denied') latest.current.onError('voice.error.denied');

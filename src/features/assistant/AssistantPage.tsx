@@ -20,7 +20,7 @@ import {
 } from '../../ai/assistant';
 import { describeAiError, getAiSettings, logAiError, makeCreate, saveUsage } from '../../ai/client';
 import { errorText } from '../../lib/shareFile';
-import { cardSummary, itemSummary, localTimes, type ChatPhoto, type ChatRecord } from '../../ai/chatRecord';
+import { cardSummary, itemSummary, localTimes, type AudioClip, type ChatRecord } from '../../ai/chatRecord';
 import { ChatRecorder } from '../../ai/chatStore';
 import { ChatExport } from './ChatExport';
 import { mergeModelTokens, type ModelTokens } from '../../ai/pricing';
@@ -28,6 +28,7 @@ import { prepareImage, type PreparedImage } from '../../ai/image';
 import { photoLabel, readPhotoTime, type PhotoTime } from '../../ai/photoTime';
 import { appendText, useDictation } from './useDictation';
 import { RecordingTime } from './RecordingTime';
+import { clipTime, VoiceClip } from './VoiceClip';
 import { UsageLine } from './UsageLine';
 import { VoiceFailed } from './VoiceFailed';
 import type { ProposedItem, ProductTools, RecipeTools } from '../../ai/tools';
@@ -155,8 +156,8 @@ function ReopenedChat({ id, ai }: { id: string; ai: { apiKey: string; model: AiM
       const record = await repo.db.chats.get(id);
       // Only meal chats come back here: a recipe chat's cards belong to its recipe editor.
       if (!record || record.kind !== 'log') return live && setLoaded(null);
-      const photos: ChatPhoto[] = await repo.chatPhotos(id);
-      const state = reopenChat(record, photos, { db: d.foods, saved: d.productsById });
+      const [photos, audio] = await Promise.all([repo.chatPhotos(id), repo.chatAudio(id)]);
+      const state = reopenChat(record, photos, { db: d.foods, saved: d.productsById }, audio);
       if (live) setLoaded({ record, state });
     })();
     return () => {
@@ -254,6 +255,8 @@ function Chat({ apiKey, model, day, recipe, reopened }: { apiKey: string; model:
   /** Billed tokens: the whole chat, and the user's latest message (all requests it caused). */
   const [chatTokens, setChatTokens] = useState<ModelTokens>(() => reopened?.record.tokens ?? {});
   const [turnTokens, setTurnTokens] = useState<ModelTokens>({});
+  /** Recordings of the text in the box, kept with the message when it is sent (saved chats only). */
+  const [voice, setVoice] = useState<AudioClip[]>([]);
   // Voice input (opt-in, OpenAI key): record, then the transcript lands in the text box.
   const dictation = useDictation({
     onText: (added, continued) => {
@@ -261,6 +264,9 @@ function Chat({ apiKey, model, day, recipe, reopened }: { apiKey: string; model:
       setDictated(true);
     },
     onError: showError,
+    ...(recorder.enabled
+      ? { onAudio: (audio: Blob, ms: number) => void audio.arrayBuffer().then((data) => setVoice((v) => [...v, { data, mediaType: audio.type || 'audio/webm', ms }])) }
+      : {}),
   });
   const { recording, transcribing } = dictation;
   /** Index of the photo shown large, for looking at photos while talking about them. */
@@ -324,6 +330,7 @@ function Chat({ apiKey, model, day, recipe, reopened }: { apiKey: string; model:
   async function send(reply?: { text: string; dictated: boolean }) {
     const text_ = reply ? reply.text : text;
     const images_ = reply ? [] : images;
+    const voice_ = reply ? [] : voice;
     const dictated_ = reply ? reply.dictated : dictated;
     if (busy || (!text_.trim() && images_.length === 0)) return;
     const all = [...cards.values()];
@@ -341,11 +348,12 @@ function Chat({ apiKey, model, day, recipe, reopened }: { apiKey: string; model:
     const msg = { text: text_, images: labelled, appNote: note };
     setBusy(true);
     setError(undefined);
-    recorder.event({ type: 'user', text: msg.text.trim(), photos: labelled.map((i) => i.label), ...(dictated_ && msg.text.trim() ? { dictated: true } : {}) });
-    setBubbles((b) => [...b, { role: 'user', text: msg.text.trim(), previews: msg.images.map((i) => i.preview) }]);
+    recorder.user({ text: msg.text.trim(), photos: labelled.map((i) => i.label), ...(dictated_ && msg.text.trim() ? { dictated: true } : {}) }, voice_);
+    setBubbles((b) => [...b, { role: 'user', text: msg.text.trim(), previews: msg.images.map((i) => i.preview), ...(voice_.length ? { audio: voice_ } : {}) }]);
     if (!reply) {
       setText('');
       setImages([]);
+      setVoice([]);
       setDictated(false);
     }
     setTurnTokens({});
@@ -406,7 +414,10 @@ function Chat({ apiKey, model, day, recipe, reopened }: { apiKey: string; model:
         setText(msg.text);
         setDictated(dictated_);
       }
-      if (!reply) setImages(images);
+      if (!reply) {
+        setImages(images);
+        setVoice(voice);
+      }
       const failure = await describeAiError(e);
       recorder.event({ type: 'error', reason: failure.kind, detail: failure.detail });
       logAiError(recipe ? 'recipe' : 'assistant', model, failure, e);
@@ -662,6 +673,7 @@ function Chat({ apiKey, model, day, recipe, reopened }: { apiKey: string; model:
                 </div>
               )}
               {b.text && <p>{b.text}</p>}
+              {b.audio?.map((a, j) => <VoiceClip key={j} clip={a} />)}
             </div>
           ) : (
             <div key={i} className="bubble bubble-assistant">
@@ -711,6 +723,19 @@ function Chat({ apiKey, model, day, recipe, reopened }: { apiKey: string; model:
         {timedOut > 0 && <p className="composer-note muted small">{t('ai.photoTimesMissing', { n: timedOut })}</p>}
         {micButton && images.length > 0 && !voiceStatus && <p className="composer-note muted small">{t('viewer.hint')}</p>}
         {voiceStatus}
+        {voice.length > 0 && (
+          <div className="composer-note voice-pending small">
+            <Icon name="mic" size={16} />
+            <span className="grow">
+              {voice.length === 1
+                ? t('voice.pending', { time: clipTime(voice[0]!.ms) })
+                : t('voice.pendingMany', { n: voice.length, time: clipTime(voice.reduce((n, v) => n + v.ms, 0)) })}
+            </span>
+            <button className="icon-btn" aria-label={t('voice.dropClip')} onClick={() => setVoice([])}>
+              <Icon name="close" size={16} />
+            </button>
+          </div>
+        )}
         <div className="composer-row">
           <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={(e) => void addPhotos(e.target.files).then(() => (e.target.value = ''))} />
           <button className="icon-btn composer-btn" aria-label={t('ai.addPhoto')} onClick={() => fileRef.current?.click()} disabled={busy}>

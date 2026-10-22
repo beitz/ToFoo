@@ -21,7 +21,7 @@ export function SavedChatsPage() {
   const d = useData();
   const toast = useToast();
   const chats = useLiveQuery(() => repo.db.chats.orderBy('updatedAt').reverse().toArray(), []);
-  const photoSizes = useLiveQuery(() => repo.chatPhotoSizes(), [chats?.length]);
+  const mediaSizes = useLiveQuery(() => repo.chatMediaSizes(), [chats?.length]);
   const [photos, setPhotos] = useState(false);
   const on = isOn(d.settings.features, 'saveChats');
 
@@ -30,7 +30,7 @@ export function SavedChatsPage() {
     toast(message, () => void repo.restoreChats(old));
   }
 
-  const total = chats?.reduce((n, c) => n + chatSize(c, photoSizes?.get(c.id)), 0) ?? 0;
+  const total = chats?.reduce((n, c) => n + chatSize(c, mediaSizes?.get(c.id)), 0) ?? 0;
 
   return (
     <SubPage title={t('chats.title')} back={href('settings', 'assistant')}>
@@ -52,7 +52,7 @@ export function SavedChatsPage() {
           </div>
           <ul className="chat-list">
             {chats.map((c) => (
-              <ChatRow key={c.id} chat={c} today={d.today} size={chatSize(c, photoSizes?.get(c.id))} onShare={() => void shareChat(c.id, photos, toast)} onDelete={() => void remove([c.id], t('chats.deleted'))} />
+              <ChatRow key={c.id} chat={c} today={d.today} size={chatSize(c, mediaSizes?.get(c.id))} onShare={() => void shareChat(c.id, photos, toast)} onDelete={() => void remove([c.id], t('chats.deleted'))} />
             ))}
           </ul>
           <button className="btn btn-danger-ghost btn-block" onClick={() => void remove(chats.map((c) => c.id), t('chats.deletedAll', { n: chats.length }))}>
@@ -75,6 +75,7 @@ function ChatRow({ chat, today, size, onShare, onDelete }: { chat: ChatRecord; t
     t('chats.messages', { n: counts.messages }),
     ...(counts.cards ? [t('chats.cards', { n: counts.cards, saved: Math.max(0, counts.saved) })] : []),
     ...(chat.photos ? [t('chats.photos', { n: chat.photos })] : []),
+    ...(chat.audio ? [t('chats.recordings', { n: chat.audio })] : []),
     ...(counts.errors ? [t('chats.errors', { n: counts.errors })] : []),
     fmtBytes(size),
   ];

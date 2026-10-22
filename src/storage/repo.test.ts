@@ -205,20 +205,24 @@ describe('repository', () => {
     expect((await b.getSettings())!.favouriteMeals).toEqual([meal('a'), meal('b'), meal('c')]);
   });
 
-  it('keeps saved chats out of backups, and deletes them with their photos (undoable)', async () => {
+  it('keeps saved chats out of backups, and deletes them with their photos and recordings (undoable)', async () => {
     const repo = await fresh();
-    const chat = { id: 'c1', schemaVersion: 1, kind: 'log' as const, startedAt: 1, updatedAt: 2, model: 'm', title: 'lunch', features: {}, messages: [], events: [], photos: 2, tokens: {} };
+    const chat = { id: 'c1', schemaVersion: 1, kind: 'log' as const, startedAt: 1, updatedAt: 2, model: 'm', title: 'lunch', features: {}, messages: [], events: [], photos: 2, audio: 1, tokens: {} };
     const photos = [1, 2].map((n) => ({ id: `c1:${n}`, chatId: 'c1', n, mediaType: 'image/jpeg', data: 'AAAA' }));
-    await repo.saveChat(chat, photos);
+    const audio = [{ id: 'c1:a1', chatId: 'c1', n: 1, mediaType: 'audio/webm', ms: 4000, data: new Uint8Array([1, 2, 3]).buffer }];
+    await repo.saveChat(chat, photos, audio);
     await repo.saveChat({ ...chat, id: 'c2' }, [{ ...photos[0]!, id: 'c2:1', chatId: 'c2' }]);
     expect((await repo.chatPhotos('c1')).map((p) => p.n)).toEqual([1, 2]);
-    expect((await repo.chatPhotoSizes()).get('c1')).toBe(8);
+    expect((await repo.chatAudio('c1')).map((a) => [a.n, a.ms, a.data.byteLength])).toEqual([[1, 4000, 3]]);
+    expect((await repo.chatMediaSizes()).get('c1')).toBe(11);
     expect(JSON.stringify(await repo.snapshot())).not.toContain('lunch');
     const old = await repo.deleteChats(['c1']);
     expect(await repo.db.chats.count()).toBe(1);
     expect(await repo.db.chatPhotos.count()).toBe(1);
+    expect(await repo.db.chatAudio.count()).toBe(0);
     await repo.restoreChats(old);
     expect(await repo.chatPhotos('c1')).toHaveLength(2);
+    expect(await repo.chatAudio('c1')).toHaveLength(1);
   });
 
   it('adds to the shopping list, clears it after shopping, undoes both, and backs it up', async () => {
