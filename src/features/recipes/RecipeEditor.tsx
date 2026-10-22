@@ -22,7 +22,7 @@ import { SourceTag } from './SourceTag';
 import { IngredientSearch } from './IngredientSearch';
 import { PortionNutrients } from './PortionNutrients';
 import { PlanEditor } from './PlanEditor';
-import { IngredientSheet, type IngredientDraft, type SavedIngredient } from './IngredientSheet';
+import { IngredientSheet, draftOf, type IngredientDraft, type SavedIngredient } from './IngredientSheet';
 import { IngredientSwapLine, SwapLine, SwapPreview, usePortionMove } from './SwapPreview';
 
 /** Create or edit a recipe. Route: #/recipes/new or #/recipes/<id>/edit. */
@@ -86,13 +86,6 @@ export function RecipeEditor({ id }: { id?: string }) {
 
   function openProduct(product: Product) {
     setSheet({ initial: { food: productFood(product, d.foods), product, preparation: 'asListed' } });
-  }
-
-  /** The sheet's starting point for an ingredient in the list. */
-  function draftOf(ing: Ingredient): IngredientDraft {
-    if (ing.ref.source === 'BLS') return { food: d.foods.byCode.get(ing.ref.code), grams: ing.grams || undefined, preparation: ing.preparation };
-    const product = d.productsById.get(refKey(ing.ref));
-    return { ...(product ? { food: productFood(product, d.foods), product } : {}), grams: ing.grams || undefined, preparation: ing.preparation };
   }
 
   function saveSheet(saved: SavedIngredient) {
@@ -274,7 +267,7 @@ export function RecipeEditor({ id }: { id?: string }) {
             return (
               <li key={`${refKey(ing.ref)}-${i}`} className="card ingredient">
                 <div className="row-between">
-                  <button className="ingredient-name" onClick={() => setSheet({ index: i, initial: draftOf(ing), label: ing.name })} aria-label={t('recipes.changeIngredient', { name: ingName })}>
+                  <button className="ingredient-name" onClick={() => setSheet({ index: i, initial: draftOf(d, ing), label: ing.name })} aria-label={t('recipes.changeIngredient', { name: ingName })}>
                     <strong>
                       {ingName} <Icon name="edit" size={14} />
                     </strong>

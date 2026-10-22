@@ -1,10 +1,11 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import { useData } from '../../app/data';
+import { useData, type AppData } from '../../app/data';
 import { t } from '../../i18n';
 import type { Food } from '../../foods/foodDb';
 import { productFood, productLabel } from '../../foods/products';
 import type { Preparation } from '../../model/paramTypes';
-import type { Product } from '../../storage/types';
+import type { Ingredient, Product } from '../../storage/types';
+import { refKey } from '../../lib/refs';
 import { Field, NumberInput, Sheet } from '../../ui/controls';
 import { Icon } from '../../ui/Icon';
 import { BarcodeSheet } from '../log/BarcodeSheet';
@@ -19,6 +20,13 @@ export interface IngredientDraft {
   product?: Product;
   grams?: number;
   preparation: Preparation;
+}
+
+/** The sheet's starting point for an ingredient of a recipe. */
+export function draftOf(d: Pick<AppData, 'foods' | 'productsById'>, ing: Ingredient): IngredientDraft {
+  if (ing.ref.source === 'BLS') return { food: d.foods.byCode.get(ing.ref.code), grams: ing.grams || undefined, preparation: ing.preparation };
+  const product = d.productsById.get(refKey(ing.ref));
+  return { ...(product ? { food: productFood(product, d.foods), product } : {}), grams: ing.grams || undefined, preparation: ing.preparation };
 }
 
 export type SavedIngredient = { food: Food; product?: Product; grams: number; preparation: Preparation };
@@ -36,6 +44,7 @@ export function IngredientSheet({
   gramsLabel,
   addLabel,
   preview,
+  actions,
   onSave,
   onRemove,
   onClose,
@@ -50,6 +59,8 @@ export function IngredientSheet({
   addLabel?: string;
   /** What saving the ingredient as it stands would change (the recipe editor's swap preview); `undefined` while it is incomplete. */
   preview?: (item: SavedIngredient | undefined) => ReactNode;
+  /** More ways to change the ingredient, under "Change food" (the recipe page's Swap). */
+  actions?: ReactNode;
   onSave: (i: SavedIngredient) => void;
   onRemove?: () => void;
   onClose: () => void;
@@ -118,6 +129,7 @@ export function IngredientSheet({
           <button className="btn btn-secondary btn-block" onClick={() => setMode('pick')}>
             <Icon name="search" /> {t('edit.changeFood')}
           </button>
+          {actions}
           <Field label={gramsLabel ?? t('recipes.gramsInRecipe')}>
             {(id) => <NumberInput id={id} value={grams} onChange={setGrams} placeholder="0" suffix={productDraft?.perMl ? 'ml' : 'g'} min={0} autoFocus={!grams} />}
           </Field>

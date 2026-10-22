@@ -15,7 +15,7 @@ import type { Recipe } from '../../storage/types';
  * opens which ingredient gives how much of it: a saved recipe's on the nutrient page, a recipe being
  * edited (not saved yet, so not leaving the editor) in a sheet.
  */
-export function PortionNutrients({ recipe, storage = 'fresh', saved = false }: { recipe: Recipe; storage?: Storage; saved?: boolean }) {
+export function PortionNutrients({ recipe, storage = 'fresh', saved = false, bare = false }: { recipe: Recipe; storage?: Storage; saved?: boolean; bare?: boolean }) {
   const d = useData();
   const [all, setAll] = useState(false);
   const [split, setSplit] = useState<string | null>(null);
@@ -33,7 +33,7 @@ export function PortionNutrients({ recipe, storage = 'fresh', saved = false }: {
   const shown = all ? rows : sorted.filter((r) => r.pct !== undefined).slice(0, 10);
   const energy = rows.find((r) => r.id === 'ENERCC');
   return (
-    <div className="card">
+    <div className={bare ? 'portion-all' : 'card'}>
       {energy && <p className="small">{t('recipes.energyPerPortion', { kcal: fmtAmount('ENERCC', energy.amount) })}</p>}
       <table className="nutrient-table">
         <tbody>

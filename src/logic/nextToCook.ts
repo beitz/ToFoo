@@ -24,7 +24,8 @@ export interface CookOption<T> {
   score: number;
 }
 
-const GAP_WEIGHT = { low: 2, gettingLow: 1 } as const;
+/** How much a gap counts when ranking: low counts double (display order, not physiology). */
+export const GAP_WEIGHT = { low: 2, gettingLow: 1 } as const;
 
 /** Points a portion adds to a window average: its share of one day spread over the window, in percent. */
 export const liftPoints = (share: number, windowDays: number) => (share * 100) / Math.max(1, windowDays);
