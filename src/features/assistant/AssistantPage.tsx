@@ -56,13 +56,15 @@ import { ShoppingCard } from './ShoppingCard';
 import { HomeCard } from './HomeCard';
 import { leftOf, usageOf } from '../../logic/pantry';
 import { BatchCard, PortionCard } from './BatchCards';
-import { Pages, type DictationTarget } from './Pages';
+import { ProposalGroup, cardAnchor } from './ProposalGroup';
+import { CardFrame, useCardIntake } from './CardFrame';
 import { refKey } from '../../lib/refs';
 import { itemIngredient } from '../../logic/ingredients';
 import { checkPortion, describeCheck, describeStatus, gapFoods, oftenEaten, portionIntake, recipeInfos } from '../../logic/recipeIdeas';
 import type { AppData } from '../../app/data';
 import { takeAsk } from '../../app/ask';
 import { openCardIds, reopenChat, type Reopened } from './reopen';
+import { ChangeButton, DoneRow } from './CardFrame';
 
 export type { RecipeChat } from './cards';
 
@@ -199,11 +201,32 @@ function Chat({ apiKey, model, day, recipe, reopened }: { apiKey: string; model:
     else savers.current.delete(id);
   }, []);
   const [savingAll, setSavingAll] = useState(false);
-  /** The answer shown as pages right now (its bubble key), if any. */
-  const [pagesOpen, setPagesOpen] = useState<number>();
+  /** The undo of each card saved in this visit, for its folded row. */
+  const [undos, setUndos] = useState<ReadonlyMap<string, Undo>>(new Map());
+  const keepUndo = useCallback((id: string, undo: Undo | undefined) => setUndos((all) => {
+    const next = new Map(all);
+    if (undo) next.set(id, undo);
+    else next.delete(id);
+    return next;
+  }), []);
+  /** What each open meal card would add, for "If you keep all". */
+  const [intakes, setIntakes] = useState<ReadonlyMap<string, Record<string, number>>>(new Map());
+  const setIntakeOf = useCallback((id: string, intake: Record<string, number> | undefined) => setIntakes((all) => {
+    if (!intake && !all.has(id)) return all;
+    const next = new Map(all);
+    if (intake) next.set(id, intake);
+    else next.delete(id);
+    return next;
+  }), []);
+  /** One setter per card, kept, so a card's effect does not run again on every render. */
+  const intakeSetters = useRef(new Map<string, (intake: Record<string, number> | undefined) => void>());
+  const intakeSetter = (id: string) => {
+    let set = intakeSetters.current.get(id);
+    if (!set) intakeSetters.current.set(id, (set = (intake) => setIntakeOf(id, intake)));
+    return set;
+  };
   const pagesKey = useRef(was?.pages ?? 0);
-  /** While pages are open, the microphone fills the comment box of the page shown. */
-  const dictationTarget: DictationTarget = useRef(null);
+  const textRef = useRef<HTMLTextAreaElement>(null);
   // A question shortcut's question starts in the box, for the user to send or change.
   const [text, setText] = useState(() => takeAsk() ?? '');
   const [images, setImages] = useState<ComposerPhoto[]>([]);
@@ -234,7 +257,6 @@ function Chat({ apiKey, model, day, recipe, reopened }: { apiKey: string; model:
   // Voice input (opt-in, OpenAI key): record, then the transcript lands in the text box.
   const dictation = useDictation({
     onText: (added, continued) => {
-      if (dictationTarget.current) return dictationTarget.current(added, continued);
       setText((old) => appendText(old, added, continued));
       setDictated(true);
     },
@@ -428,12 +450,11 @@ function Chat({ apiKey, model, day, recipe, reopened }: { apiKey: string; model:
         for (const c of shown) next.set(cardId(c), c);
         return next;
       });
-      // Several cards are one answer in pages (the text on the first page); one card stays in the chat.
+      // Several cards are one answer, shown as one group with a time strip; one card stays on its own.
       const paged = shown.length >= 2 && !recipe;
       const key = ++pagesKey.current;
       const next: Bubble[] = paged ? [{ role: 'pages', key, text: outcome.text, ids: shown.map(cardId) }] : [...added, ...shown.map((c): Bubble => ({ role: 'card', id: cardId(c) }))];
       setBubbles((b) => [...b.filter((x) => !(x.role === 'card' && replaced.has(x.id))), ...next]);
-      if (paged) setPagesOpen(key);
     } else {
       recorder.event({ type: 'assistant', text: outcome.text });
       setBubbles((b) => [...b, ...added]);
@@ -490,19 +511,22 @@ function Chat({ apiKey, model, day, recipe, reopened }: { apiKey: string; model:
   async function logAll(ids: readonly string[] = openCards) {
     if (savingAll) return;
     setSavingAll(true);
-    const undos: Undo[] = [];
+    const done: Undo[] = [];
     try {
       for (const id of ids) {
         const undo = await savers.current.get(id)?.();
-        if (undo) undos.push(undo);
+        if (undo) {
+          done.push(undo);
+          keepUndo(id, undo);
+        }
       }
     } finally {
       setSavingAll(false);
     }
-    if (undos.length === 0) return;
-    const skipped = ids.length - undos.length;
-    toast(skipped ? t('ai.loggedSome', { n: undos.length, total: ids.length }) : t('ai.loggedAll', { n: undos.length }), async () => {
-      for (const undo of undos) await undo();
+    if (done.length === 0) return;
+    const skipped = ids.length - done.length;
+    toast(skipped ? t('ai.loggedSome', { n: done.length, total: ids.length }) : t('ai.loggedAll', { n: done.length }), async () => {
+      for (const undo of done) await undo();
     });
   }
 
@@ -536,31 +560,73 @@ function Chat({ apiKey, model, day, recipe, reopened }: { apiKey: string; model:
       <VoiceFailed onRetry={dictation.retry} onDrop={dictation.drop} />
     ) : null;
 
-  const renderCard = (id: string) => <CardView key={id} card={cards.get(id)!} day={day} toast={toast} onLogged={(v, saved) => setLogged(id, v, saved)} register={register} recipe={recipe} />;
+  /** Start a message about this card in the chat box ("Correct"), for the user to finish and send. */
+  function changeCard(id: string) {
+    const card = cards.get(id);
+    if (!card) return;
+    setText((old) => appendText(old, t('ai.changePrefix', { id, title: cardTitle(card) }), false));
+    textRef.current?.focus();
+  }
+
+  const renderCard = (id: string) => (
+    <CardFrame.Provider key={id} value={{ id, undo: undos.get(id), ...(recipe ? {} : { onChange: () => changeCard(id) }), setIntake: intakeSetter(id) }}>
+      <div id={cardAnchor(id)} className="card-slot">
+        <CardView
+          card={cards.get(id)!}
+          day={day}
+          toast={(m, undo) => {
+            if (undo) keepUndo(id, undo as Undo);
+            toast(m, undo);
+          }}
+          onLogged={(v, saved) => {
+            if (!v) keepUndo(id, undefined);
+            setLogged(id, v, saved);
+          }}
+          register={register}
+          recipe={recipe}
+        />
+      </div>
+    </CardFrame.Provider>
+  );
+  // Cards from more than one answer are open: one Keep all for all of them (a group has its own).
+  const openBubbles = new Set(bubbles.flatMap((b, i) => (b.role === 'card' && cards.get(b.id)?.logged === false ? [i] : b.role === 'pages' && b.ids.some((id) => cards.get(id)?.logged === false) ? [i] : [])));
 
   return (
     <>
       {/* While a photo is open, everything behind it is out of reach for touch and screen readers. */}
-      <div className="chat" aria-live="polite" inert={viewing !== undefined || pagesOpen !== undefined}>
+      <div className="chat" aria-live="polite" inert={viewing !== undefined}>
         {recipe ? (
           <div className="bubble bubble-assistant">{t('ai.recipeIntro')}</div>
         ) : (
-          <div className="bubble bubble-assistant">
-            {t('ai.intro')} {t('ai.introAlso')}{' '}
-            {[
-              isOn(d.settings.features, 'journal') && t('ai.introJournal'),
-              isOn(d.settings.features, 'sleep') && t('ai.introSleep'),
-              isOn(d.settings.features, 'activity') && t('ai.introActivity'),
-              isOn(d.settings.features, 'water') && t('ai.introWater'),
-              isOn(d.settings.features, 'ketosis') && isOn(d.settings.features, 'ketoneReadings') && t('ai.introKetones'),
-              isOn(d.settings.features, 'shoppingList') && t('ai.introShopping'),
-              isOn(d.settings.features, 'atHome') && t('ai.introPantry'),
-              t('ai.introRecipes'),
-            ]
-              .filter(Boolean)
-              .join(', ')}
-            .{isOn(d.settings.features, 'recipeIdeas') && ` ${t('ai.introIdeas')}`}
-          </div>
+          // A clean start (owner's pick, 2026-10-22): one line, and what is possible behind ⓘ.
+          bubbles.length === 0 &&
+          !reopened && (
+            <div className="chat-start">
+              <h2>{t('ai.startTitle')}</h2>
+              <p className="muted">{t('ai.startLine')}</p>
+              <details className="chat-start-info">
+                <summary>
+                  <Icon name="info" size={16} /> {t('ai.startInfo')}
+                </summary>
+                <p>
+                  {t('ai.intro')} {t('ai.introAlso')}{' '}
+                  {[
+                    isOn(d.settings.features, 'journal') && t('ai.introJournal'),
+                    isOn(d.settings.features, 'sleep') && t('ai.introSleep'),
+                    isOn(d.settings.features, 'activity') && t('ai.introActivity'),
+                    isOn(d.settings.features, 'water') && t('ai.introWater'),
+                    isOn(d.settings.features, 'ketosis') && isOn(d.settings.features, 'ketoneReadings') && t('ai.introKetones'),
+                    isOn(d.settings.features, 'shoppingList') && t('ai.introShopping'),
+                    isOn(d.settings.features, 'atHome') && t('ai.introPantry'),
+                    t('ai.introRecipes'),
+                  ]
+                    .filter(Boolean)
+                    .join(', ')}
+                  .{isOn(d.settings.features, 'recipeIdeas') && ` ${t('ai.introIdeas')}`}
+                </p>
+              </details>
+            </div>
+          )
         )}
         {reopened ? (
           <p className="chat-reopened muted small">
@@ -574,7 +640,18 @@ function Chat({ apiKey, model, day, recipe, reopened }: { apiKey: string; model:
           b.role === 'card' ? (
             cards.has(b.id) && renderCard(b.id)
           ) : b.role === 'pages' ? (
-            <PagesBubble key={`p${b.key}`} text={b.text} ids={b.ids} cards={cards} onOpen={() => setPagesOpen(b.key)} />
+            <ProposalGroup
+              key={`p${b.key}`}
+              text={b.text}
+              ids={b.ids}
+              cards={cards}
+              intakes={intakes}
+              fallbackTime={defaultTimeFor(day, d.today)}
+              renderCard={renderCard}
+              onKeepAll={(ids) => void logAll(ids)}
+              savingAll={savingAll}
+              busy={busy}
+            />
           ) : b.role === 'user' ? (
             <div key={i} className="bubble bubble-user">
               {b.previews.length > 0 && (
@@ -592,7 +669,7 @@ function Chat({ apiKey, model, day, recipe, reopened }: { apiKey: string; model:
             </div>
           ),
         )}
-        {openCards.length >= 2 && !busy && !recipe && (
+        {openCards.length >= 2 && openBubbles.size >= 2 && !busy && !recipe && (
           <div className="log-all">
             <button className="btn btn-primary" disabled={savingAll} onClick={() => void logAll()}>
               {t('ai.logAll', { n: openCards.length })}
@@ -615,7 +692,7 @@ function Chat({ apiKey, model, day, recipe, reopened }: { apiKey: string; model:
         <div ref={endRef} />
       </div>
 
-      <div className="composer" inert={viewing !== undefined || pagesOpen !== undefined}>
+      <div className="composer" inert={viewing !== undefined}>
         {images.length > 0 && (
           <div className="composer-photos">
             {images.map((img, i) => (
@@ -641,6 +718,7 @@ function Chat({ apiKey, model, day, recipe, reopened }: { apiKey: string; model:
           </button>
           {micButton}
           <textarea
+            ref={textRef}
             rows={1}
             value={text}
             placeholder={t(recipe ? 'ai.recipePlaceholder' : 'ai.placeholderAll')}
@@ -666,30 +744,6 @@ function Chat({ apiKey, model, day, recipe, reopened }: { apiKey: string; model:
           </button>
         </div>
       </div>
-      {bubbles.map(
-        (b) =>
-          b.role === 'pages' && (
-            <Pages
-              key={`pages${b.key}`}
-              text={b.text}
-              ids={b.ids}
-              cards={cards}
-              open={pagesOpen === b.key && viewing === undefined}
-              onClose={() => setPagesOpen((k) => (k === b.key ? undefined : k))}
-              renderCard={renderCard}
-              onReply={(reply, spoken) => {
-                setPagesOpen(undefined);
-                void send({ text: reply, dictated: spoken });
-              }}
-              onAcceptAll={(ids) => logAll(ids)}
-              savingAll={savingAll}
-              busy={busy}
-              mic={micButton}
-              voiceStatus={voiceStatus}
-              dictationTarget={dictationTarget}
-            />
-          ),
-      )}
       {viewing !== undefined && images[viewing] && (
         <PhotoViewer images={images} index={viewing} onIndex={setViewing} onClose={() => setViewing(undefined)} controls={micButton} status={voiceStatus} />
       )}
@@ -731,33 +785,6 @@ function LastChat({ today }: { today: string }) {
         <span className="muted small">{[when, ...(open ? [t('ai.lastChatOpen', { n: open })] : [])].join(' · ')}</span>
       </span>
     </a>
-  );
-}
-
-/** An answer in pages, as it sits in the chat: the start of its text, its cards with their state, and a way back into the pages. */
-function PagesBubble({ text, ids, cards, onOpen }: { text: string; ids: readonly string[]; cards: ReadonlyMap<string, Card>; onOpen: () => void }) {
-  const shown = ids.filter((id) => cards.has(id));
-  if (shown.length === 0 && !text) return null;
-  return (
-    <div className="bubble bubble-assistant pages-bubble">
-      {text && <p className="pages-preview">{text}</p>}
-      <ul className="pages-parts small">
-        {shown.map((id) => {
-          const c = cards.get(id)!;
-          return (
-            <li key={id} className={c.logged ? 'done' : undefined}>
-              {c.logged ? <Icon name="check" size={14} /> : <span className="pages-bullet" aria-hidden="true" />} <span className="muted">{id}</span> {cardTitle(c)}
-              {c.logged && <span className="visually-hidden"> ({t('pages.saved')})</span>}
-            </li>
-          );
-        })}
-      </ul>
-      {shown.length > 0 && (
-        <button className="btn btn-small btn-primary" onClick={onOpen}>
-          {t('pages.openPages', { n: shown.length })}
-        </button>
-      )}
-    </div>
   );
 }
 
@@ -886,12 +913,11 @@ function SleepCard({ card, toast, onLogged, register }: CardProps<Extract<Card, 
 
   if (card.logged) {
     return (
-      <div className="card proposal-done row">
-        <Icon name="check" size={18} />
+      <DoneRow>
         <span>
           {t('ai.sleepSaved', { span: spanText({ start, end }) })} <a href={href('diary', dayKey(new Date(end)))}>{t('edit.inDiary')}</a>
         </span>
-      </div>
+      </DoneRow>
     );
   }
 
@@ -912,6 +938,7 @@ function SleepCard({ card, toast, onLogged, register }: CardProps<Extract<Card, 
         <span className={problem ? 'notice small' : 'muted'} role={problem ? 'alert' : undefined}>
           {problem ?? durationText(end - start)}
         </span>
+        <ChangeButton />
         <button className="btn btn-primary" disabled={!!problem || saving} onClick={() => void saveOne()}>
           {t('ai.saveSleep')}
         </button>
@@ -952,12 +979,11 @@ function WaterProposalCard({ card, day, toast, onLogged, register }: CardProps<E
 
   if (card.logged) {
     return (
-      <div className="card proposal-done row">
-        <Icon name="check" size={18} />
+      <DoneRow>
         <span>
           {t('ai.waterSaved', { amount: waterText(ml ?? 0), when: `${formatDay(dayKey(new Date(time)))}, ${formatTime(time)}` })} <a href={href('diary', dayKey(new Date(time)))}>{t('edit.inDiary')}</a>
         </span>
-      </div>
+      </DoneRow>
     );
   }
 
@@ -979,6 +1005,7 @@ function WaterProposalCard({ card, day, toast, onLogged, register }: CardProps<E
             {problem}
           </span>
         )}
+        <ChangeButton />
         <button className="btn btn-primary" disabled={!!problem || saving} onClick={() => void saveOne()}>
           {t('ai.saveWater')}
         </button>
@@ -1020,8 +1047,7 @@ function KetoneProposalCard({ card, day, toast, onLogged, register }: CardProps<
 
   if (card.logged) {
     return (
-      <div className="card proposal-done row">
-        <Icon name="check" size={18} />
+      <DoneRow>
         <span>
           {t('ai.ketoneSaved', { value: ketoneValueText({ type, value: value ?? 0 }), when: `${formatDay(dayKey(new Date(time)))}, ${formatTime(time)}` })}
           {d.activeFast && (
@@ -1031,7 +1057,7 @@ function KetoneProposalCard({ card, day, toast, onLogged, register }: CardProps<
             </>
           )}
         </span>
-      </div>
+      </DoneRow>
     );
   }
 
@@ -1054,6 +1080,7 @@ function KetoneProposalCard({ card, day, toast, onLogged, register }: CardProps<
             {problem}
           </span>
         )}
+        <ChangeButton />
         <button className="btn btn-primary" disabled={!!problem || saving} onClick={() => void saveOne()}>
           {t('ai.saveKetone')}
         </button>
@@ -1109,12 +1136,11 @@ function ActivityCard({ card, toast, onLogged, register }: CardProps<Extract<Car
 
   if (card.logged) {
     return (
-      <div className="card proposal-done row">
-        <Icon name="check" size={18} />
+      <DoneRow>
         <span>
           {t('ai.activitySaved', { name: activityName(draft), summary })} <a href={href('diary', dayKey(new Date(draft.time)))}>{t('edit.inDiary')}</a>
         </span>
-      </div>
+      </DoneRow>
     );
   }
 
@@ -1147,6 +1173,7 @@ function ActivityCard({ card, toast, onLogged, register }: CardProps<Extract<Car
             {t('ai.change')}
           </button>
         )}
+        <ChangeButton />
         <button className="btn btn-primary" disabled={!r.ok || saving} onClick={() => void saveOne()}>
           {t('ai.saveActivity')}
         </button>
@@ -1186,13 +1213,12 @@ function NoteCard({ card, day, toast, onLogged, register }: CardProps<Extract<Ca
 
   if (card.logged) {
     return (
-      <div className="card proposal-done row">
-        <Icon name="check" size={18} />
+      <DoneRow>
         <span>
           {t('ai.noteSaved', { when: formatDateTime(time) })}{' '}
           <a href={href('diary', dayKey(new Date(time)))}>{t('edit.inDiary')}</a>
         </span>
-      </div>
+      </DoneRow>
     );
   }
 
@@ -1209,6 +1235,7 @@ function NoteCard({ card, day, toast, onLogged, register }: CardProps<Extract<Ca
       <textarea className="note-text" rows={3} value={text} aria-label={t('ai.noteTitle')} onChange={(e) => setText(e.target.value)} />
       <TimeField value={time} onChange={setTime} />
       <div className="sheet-actions">
+        <ChangeButton />
         <button className="btn btn-primary" disabled={!text.trim() || saving} onClick={() => void saveOne()}>
           {t('ai.saveNote')}
         </button>
@@ -1230,6 +1257,13 @@ function ProposalCard({ card, day, toast, onLogged, register }: CardProps<Extrac
     const v = i.food.per100.ENERCC;
     return typeof v === 'number' && i.grams ? sum + (v * i.grams) / 100 : sum;
   }, 0);
+  // What it adds as shown (raw amounts, before cooking losses), for "If you keep all".
+  const intake: Record<string, number> = {};
+  for (const it of items) {
+    if (!it.grams) continue;
+    for (const [id, v] of Object.entries(it.food.per100)) if (typeof v === 'number') intake[id] = (intake[id] ?? 0) + (v * it.grams) / 100;
+  }
+  useCardIntake(intake, !card.logged);
 
   async function save(): Promise<Undo | undefined> {
     if (!valid || saving) return;
@@ -1274,13 +1308,12 @@ function ProposalCard({ card, day, toast, onLogged, register }: CardProps<Extrac
   const title = proposal.summary || t('ai.proposal');
   if (card.logged) {
     return (
-      <div className="card proposal-done row">
-        <Icon name="check" size={18} />
+      <DoneRow>
         <span>
           {t('ai.cardLogged', { name: title, when: formatDateTime(time) })}{' '}
           <a href={href('diary', dayKey(new Date(time)))}>{t('edit.inDiary')}</a>
         </span>
-      </div>
+      </DoneRow>
     );
   }
 
@@ -1330,6 +1363,7 @@ function ProposalCard({ card, day, toast, onLogged, register }: CardProps<Extrac
       <p className="muted small">{t('ai.correctHint')}</p>
       <div className="sheet-actions">
         <span className="muted">{fmtNumber(kcal)} kcal</span>
+        <ChangeButton />
         <button className="btn btn-primary" disabled={!valid || saving} onClick={() => void log()}>
           {t('ai.log')}
         </button>
@@ -1385,10 +1419,9 @@ function IngredientsCard({ card, toast, onLogged, register, recipe }: CardProps<
   const title = proposal.name || t('ai.ingredientsTitle');
   if (card.logged) {
     return (
-      <div className="card proposal-done row">
-        <Icon name="check" size={18} />
+      <DoneRow>
         <span>{count ? t('ai.ingredientsDone', { n: count }) : t('ai.stepsDone')}</span>
-      </div>
+      </DoneRow>
     );
   }
 
@@ -1467,6 +1500,7 @@ function IngredientsCard({ card, toast, onLogged, register, recipe }: CardProps<
       <p className="muted small">{t('ai.correctHintRecipe')}</p>
       <div className="sheet-actions">
         {items.length > 0 && <span className="muted">{t('ai.kcalInAll', { kcal: fmtNumber(kcal) })}</span>}
+        <ChangeButton />
         <button className="btn btn-primary" disabled={!valid || saving} onClick={() => void add()}>
           {items.length ? t('ai.addIngredients', { n: items.length }) : t('ai.addSteps')}
         </button>

@@ -130,3 +130,36 @@ export function useRegister(id: string, save: Saver | undefined, register: CardP
   });
   useEffect(() => () => register(id, undefined), [id, register]);
 }
+
+/** When a card happened, for the time strip: a moment, or a span (sleep, activity); undefined for untimed cards. */
+export function cardSpan(c: Card, fallback: number): { start: number; end: number } | undefined {
+  switch (c.kind) {
+    case 'meal':
+      return at(c.proposal.time ?? fallback);
+    case 'note':
+      return at(c.note.time ?? fallback);
+    case 'water':
+      return at(c.water.time ?? fallback);
+    case 'ketone':
+      return at(c.ketone.time ?? fallback);
+    case 'portion':
+      return at(c.portion.time ?? fallback);
+    case 'sleep':
+      return { start: c.sleep.start, end: Math.max(c.sleep.start, c.sleep.end) };
+    case 'activity':
+      return { start: c.activity.start, end: c.activity.start + c.activity.minutes * 60_000 };
+    default:
+      return undefined;
+  }
+}
+const at = (time: number) => ({ start: time, end: time });
+
+/** The time strip's range: the first to the last card, padded so blocks never sit on the edge. */
+export function stripRange(spans: ReadonlyArray<{ start: number; end: number }>): { from: number; to: number } | undefined {
+  if (spans.length === 0) return undefined;
+  const from = Math.min(...spans.map((s) => s.start));
+  const to = Math.max(...spans.map((s) => s.end));
+  // At least an hour wide; a tenth of the range on each side.
+  const pad = Math.max(30 * 60_000, (to - from) / 10);
+  return { from: from - pad, to: to + pad };
+}
