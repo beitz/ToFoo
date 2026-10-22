@@ -132,6 +132,15 @@ export interface Settings extends Versioned {
   cookingPreferences?: string;
   /** Weight of the empty pot last weighed (g), offered when the next pot is weighed. */
   potGrams?: number;
+  /** Empty pots remembered by name ("Big red pot"), so weighing a batch is one number. */
+  pots?: Pot[];
+}
+
+/** An empty pot, weighed once and remembered by name. */
+export interface Pot {
+  id: string;
+  name: string;
+  grams: number;
 }
 
 /**
@@ -175,6 +184,8 @@ export interface Recipe extends Versioned {
   saltOverride?: { iodised: boolean; fluoridated: boolean };
   /** Weight of the empty pot this recipe was last cooked in (g), offered when its next pot is weighed. */
   potGrams?: number;
+  /** The named pot (Settings.pots) this recipe was last cooked in. */
+  potId?: string;
   createdAt: number;
   updatedAt: number;
   archived?: boolean;

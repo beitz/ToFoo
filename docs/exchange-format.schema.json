@@ -940,6 +940,31 @@
                     "potGrams": {
                       "type": "number",
                       "exclusiveMinimum": 0
+                    },
+                    "pots": {
+                      "description": "Empty pots remembered by name",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "grams": {
+                            "type": "number",
+                            "exclusiveMinimum": 0
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "grams"
+                        ]
+                      }
                     }
                   },
                   "required": [
@@ -1154,6 +1179,10 @@
                   "potGrams": {
                     "type": "number",
                     "exclusiveMinimum": 0
+                  },
+                  "potId": {
+                    "description": "The named pot (settings.pots) this recipe was last cooked in",
+                    "type": "string"
                   },
                   "createdAt": {
                     "type": "number"

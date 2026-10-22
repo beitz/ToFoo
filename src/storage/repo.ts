@@ -214,7 +214,7 @@ export function createRepo(db: ToFooDB) {
      * the recipe's ingredients, its cooked weight, the portions it made (the plan is for those) and
      * the empty pot's weight (remembered for next time).
      */
-    async cookBatch(recipe: Recipe, plan: { fresh: number; fridge: number; freezer: number }, day: string, rememberPlan?: StoragePlan, pot?: Partial<PotDetails> & { emptyPotGrams?: number }): Promise<Batch> {
+    async cookBatch(recipe: Recipe, plan: { fresh: number; fridge: number; freezer: number }, day: string, rememberPlan?: StoragePlan, pot?: Partial<PotDetails> & { emptyPotGrams?: number; potId?: string }): Promise<Batch> {
       const cooked: Batch = {
         id: newId(),
         recipeId: recipe.id,
@@ -230,7 +230,7 @@ export function createRepo(db: ToFooDB) {
       await db.transaction('rw', db.batches, db.recipes, db.settings, async () => {
         await db.batches.put(batch);
         if (rememberPlan) await db.recipes.update(recipe.id, { defaultPlan: rememberPlan });
-        await rememberPot(recipe.id, pot?.emptyPotGrams);
+        await rememberPot(recipe.id, pot?.emptyPotGrams, pot?.potId);
       });
       return batch;
     },
@@ -616,10 +616,13 @@ export function createRepo(db: ToFooDB) {
     },
   };
 
-  /** Remember the empty pot's weight for the recipe and as the general default. */
-  async function rememberPot(recipeId: string, emptyPotGrams: number | undefined) {
+  /**
+   * Remember the empty pot's weight for the recipe and as the general default, and which named pot
+   * it was: `potId` '' means an unnamed pot this time, undefined leaves the recipe's pot as it was.
+   */
+  async function rememberPot(recipeId: string, emptyPotGrams: number | undefined, potId?: string) {
     if (!emptyPotGrams || !(emptyPotGrams > 0)) return;
-    await db.recipes.update(recipeId, { potGrams: emptyPotGrams });
+    await db.recipes.update(recipeId, { potGrams: emptyPotGrams, ...(potId !== undefined ? { potId: potId || undefined } : {}) });
     const s = (await db.settings.get('settings')) ?? defaultSettings();
     await db.settings.put({ ...s, potGrams: emptyPotGrams, id: 'settings', schemaVersion: v });
   }

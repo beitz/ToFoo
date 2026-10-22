@@ -5,17 +5,11 @@ import { href, navigate } from '../../app/router';
 import { t } from '../../i18n';
 import { formatDay } from '../../lib/dates';
 import { fmtGrams } from '../../lib/format';
-import { resolvePlan } from '../../storage/defaults';
 import { repo } from '../../storage/repo';
-import type { Batch, Ingredient, Recipe, StoragePlan } from '../../storage/types';
-import { cookedWeight, sameIngredients } from '../../logic/batch';
-import { BatchSheet, initialPot } from './BatchSheet';
-import { IngredientChanges } from './IngredientChanges';
-import { PotWeight, type PotScale } from './PotWeight';
-import { PotPortions, potPortionsValid } from './PotPortions';
-import { Field, Sheet, Toggle } from '../../ui/controls';
+import type { Batch, Ingredient } from '../../storage/types';
+import { sameIngredients } from '../../logic/batch';
+import { BatchSheet } from './BatchSheet';
 import { Icon } from '../../ui/Icon';
-import { PlanEditor } from './PlanEditor';
 import { PortionNutrients } from './PortionNutrients';
 import { PortionGives } from './PortionGives';
 import { WhoGivesWhat } from './WhoGivesWhat';
@@ -31,13 +25,11 @@ import { refKey } from '../../lib/refs';
 import { isOn } from '../../settings/features';
 import { RecipeToListSheet } from '../shopping/RecipeToListSheet';
 import { BackButton } from '../../ui/BackButton';
-import { DateInput } from '../../ui/DateInputs';
 
 export function RecipeView({ id }: { id: string }) {
   const d = useData();
   const toast = useToast();
   const recipe = d.recipes.find((r) => r.id === id);
-  const [cooking, setCooking] = useState(false);
   const [openBatch, setOpenBatch] = useState<Batch | null>(null);
   const [toList, setToList] = useState(false);
   const [sheet, setSheet] = useState<{ index: number; mode: 'edit' | 'pick' } | null>(null);
@@ -160,7 +152,7 @@ export function RecipeView({ id }: { id: string }) {
             <Icon name="cart" size={16} /> {t('shopping.toList')}
           </button>
         )}
-        <button className="btn btn-primary btn-block btn-big" onClick={() => setCooking(true)}>
+        <button className="btn btn-primary btn-block btn-big" onClick={() => navigate('cook', recipe.id)}>
           <Icon name="pot" /> {t('recipes.cook')}
         </button>
       </div>
@@ -241,7 +233,6 @@ export function RecipeView({ id }: { id: string }) {
         />
       )}
       {toList && <RecipeToListSheet recipe={recipe} onClose={() => setToList(false)} />}
-      {cooking && <CookSheet recipe={recipe} onClose={() => setCooking(false)} />}
       {openBatch && <BatchSheet batch={d.batchesById.get(openBatch.id) ?? openBatch} onClose={() => setOpenBatch(null)} />}
     </section>
   );
@@ -252,50 +243,4 @@ function batchLine(b: Batch): string {
   const parts = [b.cookedGrams ? t('batch.weighed', { grams: fmtGrams(b.cookedGrams) }) : t('batch.notWeighed')];
   if (b.recipeIngredients && !sameIngredients(b.recipeIngredients, b.recipe.ingredients)) parts.push(t('batch.potChanged'));
   return parts.join(' · ');
-}
-
-/**
- * Cooking a batch: what actually went into the pot (the recipe's amounts to start with, every one
- * editable, foods swapped, taken out or added), how many portions it made, its weight and where the
- * portions go. All of it is this pot's own; the recipe stays as it is.
- */
-function CookSheet({ recipe, onClose }: { recipe: Recipe; onClose: () => void }) {
-  const d = useData();
-  const toast = useToast();
-  const [plan, setPlan] = useState<StoragePlan>(recipe.defaultPlan ?? d.settings.defaultPlan);
-  const [day, setDay] = useState(d.today);
-  const [remember, setRemember] = useState(false);
-  const [pot, setPot] = useState<PotScale>(() => initialPot(undefined, recipe.potGrams ?? d.settings.potGrams));
-  const [ingredients, setIngredients] = useState<Ingredient[]>(recipe.ingredients);
-  const [portions, setPortions] = useState<number | undefined>(recipe.portions);
-  const cooked = cookedWeight(pot.full, pot.empty);
-  const valid = ingredients.length > 0 && ingredients.every((i) => i.grams > 0) && (!pot.full || cooked !== undefined) && potPortionsValid(portions);
-  const n = potPortionsValid(portions) ? portions : recipe.portions;
-  async function cook() {
-    if (!valid) return;
-    const resolved = resolvePlan(plan, n);
-    const batch = await repo.cookBatch(recipe, resolved, day, remember ? plan : undefined, { ingredients, portions: n, ...(cooked ? { cookedGrams: cooked, emptyPotGrams: pot.empty } : {}) });
-    toast(t('recipes.cooked', { n }), () => void repo.deleteBatch(batch.id));
-    onClose();
-    navigate('recipes');
-  }
-  return (
-    <Sheet title={t('recipes.cookTitle', { name: recipe.name })} onClose={onClose}>
-      <Field label={t('recipes.cookDay')}>{(id) => <DateInput id={id} value={day} max={d.today} onChange={(e) => e.target.value && setDay(e.target.value)} />}</Field>
-      <h3 className="section-title">{t('batch.whatGoesIn')}</h3>
-      <p className="muted small">{t('batch.cookChangesHint')}</p>
-      <IngredientChanges original={recipe.ingredients} value={ingredients} scale={1} gramsLabel={t('batch.gramsInPot')} onChange={setIngredients} />
-      <h3 className="section-title">{t('batch.weighTitleOptional')}</h3>
-      <PotWeight value={pot} portions={n} onChange={setPot} />
-      <h3 className="section-title">{t('batch.portionsTitle')}</h3>
-      <PotPortions value={portions} recipePortions={recipe.portions} onChange={setPortions} />
-      <PlanEditor plan={plan} portions={n} onChange={setPlan} />
-      <Toggle checked={remember} onChange={setRemember} label={t('recipes.rememberPlan')} />
-      <div className="sheet-actions">
-        <button className="btn btn-primary" disabled={!valid} onClick={() => void cook()}>
-          {t('recipes.cookConfirm')}
-        </button>
-      </div>
-    </Sheet>
-  );
 }

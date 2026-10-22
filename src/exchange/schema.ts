@@ -112,6 +112,7 @@ export const settingsSchema = z.object({
   logCollapsed: z.record(z.string(), z.boolean()).optional(),
   cookingPreferences: z.string().optional(),
   potGrams: z.number().positive().optional(),
+  pots: z.array(z.object({ id: z.string(), name: z.string().min(1), grams: z.number().positive() })).optional().describe('Empty pots remembered by name'),
 });
 
 export const recipeRecordSchema = z.object({
@@ -126,6 +127,7 @@ export const recipeRecordSchema = z.object({
   defaultPlan: plan.optional(),
   saltOverride: z.object({ iodised: z.boolean(), fluoridated: z.boolean() }).optional(),
   potGrams: z.number().positive().optional(),
+  potId: z.string().optional().describe('The named pot (settings.pots) this recipe was last cooked in'),
   createdAt: z.number(),
   updatedAt: z.number(),
   archived: z.boolean().optional(),

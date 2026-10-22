@@ -196,7 +196,7 @@ export function FillsBest({ id, recommended }: { id: string; recommended: number
                   {t('home.eatOne')}
                 </button>
               ) : o.kind === 'recipe' ? (
-                <button type="button" className="btn btn-small" onClick={() => navigate('recipes', o.recipe.id)}>
+                <button type="button" className="btn btn-small" onClick={() => navigate('cook', o.recipe.id)}>
                   {t('home.cookIt')}
                 </button>
               ) : o.kind === 'home' || !shoppingOn ? (
