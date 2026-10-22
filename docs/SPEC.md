@@ -495,6 +495,8 @@ One versioned JSON format ("ToFoo exchange format") is used for QR codes, pasted
 
 The home screen answers "how am I doing, and what do I eat next?" at a glance, with logging one tap away; everything deeper sits behind a tap (progressive disclosure).
 
+**Dates and times** (decided 2026-10-22, owner's ask: the phone's American formats were confusing): every date and time is shown the German way whatever the phone's locale: 22.10.2026, "Thu 22.10." (the year only when it is not this year's), 24-hour clock (13:45). Weekday and month names stay in the UI language. Date and time fields keep the phone's own picker but show their value in the same format (the picker dialog itself follows the phone's settings). Files and the exchange format keep ISO dates (2026-10-22), which sort and parse reliably.
+
 **Home screen, top to bottom**:
 
 1. **Today** (compact since 2026-10-17): the header shows the date and how many entries were logged today. A round button bottom right holds the quick actions (since 2026-10-18, to save space and leave room for more): closed it shows a grid icon, with the assistant's own button right above it (since 2026-10-18, owner's ask: the assistant is one tap away); the first tap turns it into **+** and fans out the other actions above them, each with its name (Write in journal, Log activity, Going to sleep / I'm up, Start or End fast; trackers only when turned on, the bed one in the evening or while asleep); a second tap on + opens Log meal. Tapping outside, or the phone's back gesture, closes it. The fast action starts a fast (or ends the running one, with undo). A running fast shows as one line under the header. Freezer-stock chips for one-tap logging sit under the header once batches exist.

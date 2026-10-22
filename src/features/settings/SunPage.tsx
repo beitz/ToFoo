@@ -10,6 +10,7 @@ import { Field, NumberInput } from '../../ui/controls';
 import { Icon } from '../../ui/Icon';
 import { SubPage } from './ProfilePage';
 import { SkinSelect } from './SkinSelect';
+import { TimeInput } from '../../ui/DateInputs';
 
 const WEEKDAYS = [1, 2, 3, 4, 5, 6, 0];
 const toTime = (h: number) => `${String(Math.floor(h)).padStart(2, '0')}:${String(Math.round((h % 1) * 60)).padStart(2, '0')}`;
@@ -65,7 +66,7 @@ export function SunPage() {
             ))}
           </div>
           <div className="grid-2">
-            <Field label={t('sun.start')}>{(id) => <input id={id} type="time" value={toTime(s.startHour)} onChange={(e) => e.target.value && update(i, { startHour: fromTime(e.target.value) })} />}</Field>
+            <Field label={t('sun.start')}>{(id) => <TimeInput id={id} value={toTime(s.startHour)} onChange={(e) => e.target.value && update(i, { startHour: fromTime(e.target.value) })} />}</Field>
             <Field label={t('sun.minutes')}>{(id) => <NumberInput id={id} value={s.minutes} onChange={(v) => update(i, { minutes: v ?? 0 })} suffix="min" min={0} />}</Field>
           </div>
           <SkinSelect id={`skin-${i}`} value={s.skin} onChange={(skin) => update(i, { skin })} />

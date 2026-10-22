@@ -23,6 +23,7 @@ import { refKey } from '../../lib/refs';
 import { isOn } from '../../settings/features';
 import { RecipeToListSheet } from '../shopping/RecipeToListSheet';
 import { BackButton } from '../../ui/BackButton';
+import { DateInput } from '../../ui/DateInputs';
 
 export function RecipeView({ id }: { id: string }) {
   const d = useData();
@@ -179,7 +180,7 @@ function CookSheet({ recipe, onClose }: { recipe: Recipe; onClose: () => void })
   }
   return (
     <Sheet title={t('recipes.cookTitle', { name: recipe.name })} onClose={onClose}>
-      <Field label={t('recipes.cookDay')}>{(id) => <input id={id} type="date" value={day} max={d.today} onChange={(e) => e.target.value && setDay(e.target.value)} />}</Field>
+      <Field label={t('recipes.cookDay')}>{(id) => <DateInput id={id} value={day} max={d.today} onChange={(e) => e.target.value && setDay(e.target.value)} />}</Field>
       <PlanEditor plan={plan} portions={recipe.portions} onChange={setPlan} />
       <Toggle checked={remember} onChange={setRemember} label={t('recipes.rememberPlan')} />
       <h3 className="section-title">{t('batch.weighTitleOptional')}</h3>

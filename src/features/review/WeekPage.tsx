@@ -5,7 +5,7 @@ import { href, navigate } from '../../app/router';
 import { t, type MessageKey } from '../../i18n';
 import { NON_SINGLE_FOOD_GROUPS } from '../../foods/foodDb';
 import { diverseTop } from '../../foods/variety';
-import { addDays, dayRange, parseDay } from '../../lib/dates';
+import { addDays, dayRange, formatDate, parseDay } from '../../lib/dates';
 import { fmtAmount, fmtNumber, fmtPercent } from '../../lib/format';
 import { weekStart } from '../../lib/periods';
 import { buildInsightData } from '../../logic/insights';
@@ -23,7 +23,7 @@ import { DAY_ICON } from './dayStatus';
 const DAY_KEY = /^\d{4}-\d{2}-\d{2}$/;
 const RECAP_NAMES = 4;
 const nutrientName = (id: string) => NUTRIENT_BY_ID.get(id)?.name ?? id;
-const shortMonday = (day: string) => parseDay(day).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+const shortMonday = (day: string) => formatDate(day, false);
 
 /**
  * Weekly look-back (docs/SPEC.md, "Trends and weekly look-back"): one calendar week, what changed

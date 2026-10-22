@@ -1,4 +1,5 @@
 import type { HistoryPoint } from '../model/simulate';
+import { formatDate } from '../lib/dates';
 
 interface Props {
   points: HistoryPoint[];
@@ -23,8 +24,8 @@ export function LineChart({ points, guides = [], maxY, showRange, format }: Prop
     points.map((p, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(p.high).toFixed(1)}`).join('') +
     [...points].reverse().map((p, j) => `L${x(points.length - 1 - j).toFixed(1)},${y(p.low).toFixed(1)}`).join('') +
     'Z';
-  const first = points[0]!.day.slice(5);
-  const last = points[points.length - 1]!.day.slice(5);
+  const first = formatDate(points[0]!.day, false);
+  const last = formatDate(points[points.length - 1]!.day, false);
   return (
     <svg className="chart" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="History">
       {guides.map((g) => (

@@ -4,7 +4,7 @@ import { href } from '../../app/router';
 import { localTimes } from '../../ai/chatRecord';
 import type { ProposedChange } from '../../ai/tools';
 import { t } from '../../i18n';
-import { dayKey, formatDay, formatTime } from '../../lib/dates';
+import { dayKey, formatDateTime, formatDay } from '../../lib/dates';
 import { fmtGrams, fmtNumber } from '../../lib/format';
 import { applyChanges, cookedWeight, potShare, stockPortionsFor, type IngredientChange } from '../../logic/batch';
 import { itemIngredient } from '../../logic/ingredients';
@@ -22,6 +22,7 @@ import { IngredientChanges } from '../recipes/IngredientChanges';
 import { PlanEditor } from '../recipes/PlanEditor';
 import { PotWeight, type PotScale } from '../recipes/PotWeight';
 import { useRegister, type Card, type CardProps, type Undo } from './cards';
+import { DateInput } from '../../ui/DateInputs';
 
 /** The assistant's changes as ingredient changes (salt becomes the kitchen's salt, as everywhere). */
 function asChanges(changes: readonly ProposedChange[], version: string, salt: Profile['salt']): IngredientChange[] {
@@ -39,7 +40,7 @@ async function saveChangedProducts(changes: readonly ProposedChange[], used: rea
   }
 }
 
-const when = (time: number) => `${new Date(time).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}, ${formatTime(time)}`;
+const when = (time: number) => formatDateTime(time);
 
 function Assumptions({ list }: { list: string[] }) {
   if (list.length === 0) return null;
@@ -246,7 +247,7 @@ export function BatchCard({ card, day, toast, onLogged, register }: CardProps<Ex
         <>
           <div className="field">
             <label htmlFor={`cook-${proposal.id}`}>{t('recipes.cookDay')}</label>
-            <input id={`cook-${proposal.id}`} type="date" value={cookDay} max={d.today} onChange={(e) => e.target.value && setCookDay(e.target.value)} />
+            <DateInput id={`cook-${proposal.id}`} value={cookDay} max={d.today} onChange={(e) => e.target.value && setCookDay(e.target.value)} />
           </div>
           <PlanEditor plan={plan} portions={recipe.portions} onChange={setPlan} />
           <h3 className="section-title">{t('batch.weighTitleOptional')}</h3>
