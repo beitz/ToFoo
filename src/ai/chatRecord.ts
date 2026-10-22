@@ -23,7 +23,7 @@ export type ChatKind = 'log' | 'recipe' | 'insights';
 
 /** Something the user saw or did in the chat, in order, alongside the API messages. */
 export type ChatEvent =
-  | { at: number; type: 'user'; text: string; photos: string[]; dictated?: boolean }
+  | { at: number; type: 'user'; text: string; photos: string[]; dictated?: boolean; audio?: number[] }
   | { at: number; type: 'assistant'; text: string; checks?: unknown[] }
   | { at: number; type: 'cards'; text: string; cards: unknown[] }
   | { at: number; type: 'saved'; card: string; saved: unknown }
@@ -53,6 +53,8 @@ export interface ChatRecord {
   events: ChatEvent[];
   /** Photos stored for this chat. */
   photos: number;
+  /** Voice recordings stored for this chat (from 2026-10-22). */
+  audio?: number;
   /** Billed tokens per model, as in the usage line. */
   tokens: ModelTokens;
   /** What reopening the chat needs besides the messages and events (meal chats, from version 2). */
@@ -73,6 +75,22 @@ export interface ChatPhoto {
   mediaType: string;
   /** Base64 without the data-URL prefix. */
   data: string;
+}
+
+/** A voice recording the user spoke a message in, kept with the chat so it can be played again. */
+export interface AudioClip {
+  /** The audio file (Chrome records Opus in WebM); an ArrayBuffer, which IndexedDB stores everywhere. */
+  data: ArrayBuffer;
+  mediaType: string;
+  /** Length in milliseconds. */
+  ms: number;
+}
+
+export interface ChatAudio extends AudioClip {
+  /** `${chatId}:a${n}`. */
+  id: string;
+  chatId: string;
+  n: number;
 }
 
 type Block = Record<string, unknown>;
@@ -195,8 +213,8 @@ export function chatTitle(events: readonly ChatEvent[]): string {
 }
 
 /** Rough size of a saved chat in bytes (JSON text), for the list. */
-export function chatSize(rec: ChatRecord, photoChars = 0): number {
-  return JSON.stringify(rec).length + photoChars;
+export function chatSize(rec: ChatRecord, mediaBytes = 0): number {
+  return JSON.stringify(rec).length + mediaBytes;
 }
 
 /** The export file: one JSON object a person or Claude can read, and that can be replayed against the API. */

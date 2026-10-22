@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type * as Beta from '@anthropic-ai/sdk/resources/beta/messages/messages';
 import { emptyConversation, retirePhotos, sendMessage, type CreateMessage, type ShownProposal } from '../../ai/assistant';
-import { cardSummary, type ChatEvent, type ChatPhoto, type ChatRecord, type NewChatEvent } from '../../ai/chatRecord';
+import { cardSummary, type ChatAudio, type ChatEvent, type ChatPhoto, type ChatRecord, type NewChatEvent } from '../../ai/chatRecord';
 import { ChatRecorder } from '../../ai/chatStore';
 import type { ToolContext } from '../../ai/tools';
 import type { Food } from '../../foods/foodDb';
@@ -25,8 +25,8 @@ const meal = (summary: string, time: string, grams = 60) => ({ summary, time, it
 const at = (e: NewChatEvent, i = 0) => ({ ...e, at: 1000 + i }) as ChatEvent;
 
 function store() {
-  const writes: Array<{ chat: ChatRecord; photos: ChatPhoto[] }> = [];
-  return { writes, saveChat: async (chat: ChatRecord, photos: ChatPhoto[] = []) => void writes.push({ chat: structuredClone(chat), photos }) };
+  const writes: Array<{ chat: ChatRecord; photos: ChatPhoto[]; audio: ChatAudio[] }> = [];
+  return { writes, saveChat: async (chat: ChatRecord, photos: ChatPhoto[] = [], audio: ChatAudio[] = []) => void writes.push({ chat: structuredClone(chat), photos, audio }) };
 }
 
 /** One turn as the chat screen records it: the user's message, the conversation, the cards shown. */
@@ -41,6 +41,26 @@ async function turn(recorder: ChatRecorder, conversation: ReturnType<typeof empt
 }
 
 describe('reopening a saved chat', () => {
+  it('keeps the recordings a message was spoken in, numbered across the chat, and plays them back in their bubbles', async () => {
+    const s = store();
+    const recorder = new ChatRecorder({ kind: 'log', model: 'm', day: '2026-10-20', features: {} }, true, s);
+    const clip = (n: number) => ({ data: new Uint8Array([n]).buffer, mediaType: 'audio/webm', ms: n * 1000 });
+    recorder.user({ text: 'breakfast', photos: [], dictated: true }, [clip(1), clip(2)], 1000);
+    recorder.event({ type: 'assistant', text: 'Noted.' }, 1001);
+    recorder.user({ text: 'and tea', photos: [] }, [], 1002);
+    recorder.user({ text: 'lunch', photos: [] }, [clip(3)], 1003);
+    await recorder.saved();
+    const chat = s.writes.at(-1)!.chat;
+    const audio = s.writes.flatMap((w) => w.audio);
+    expect(chat.audio).toBe(3);
+    expect(audio.map((a) => [a.id, a.n, a.ms])).toEqual([[`${chat.id}:a1`, 1, 1000], [`${chat.id}:a2`, 2, 2000], [`${chat.id}:a3`, 3, 3000]]);
+    expect(chat.events.filter((e) => e.type === 'user').map((e) => (e.type === 'user' ? e.audio : undefined))).toEqual([[1, 2], undefined, [3]]);
+
+    // A recording that is gone (or a chat saved before recordings were kept) just leaves its bubble without a player.
+    const back = reopenChat(chat, [], { db, saved: new Map() }, audio.slice(1));
+    expect(back.bubbles.map((b) => (b.role === 'user' ? (b.audio ?? []).map((a) => a.ms) : b.role))).toEqual([[2000], 'assistant', [], [3000]]);
+  });
+
   it('comes back as it was left: messages, photos, open cards and the tool results still owed', async () => {
     const s = store();
     const recorder = new ChatRecorder({ kind: 'log', model: 'claude-opus-5-5', day: '2026-10-20', features: {} }, true, s);
@@ -95,9 +115,9 @@ describe('reopening a saved chat', () => {
     ];
     const r = replayEvents(events);
     expect(r.bubbles).toEqual([
-      { role: 'user', text: 'day', photos: [1, 2] },
+      { role: 'user', text: 'day', photos: [1, 2], audio: [] },
       { role: 'pages', key: 1, text: 'Two meals', ids: ['M1', 'M2'] },
-      { role: 'user', text: 'M2 was 80 g', photos: [] },
+      { role: 'user', text: 'M2 was 80 g', photos: [], audio: [] },
       { role: 'card', id: 'M3' },
     ]);
     expect([...r.cards].map(([id, x]) => [id, x.logged])).toEqual([

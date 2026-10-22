@@ -9,7 +9,7 @@
  */
 import type * as Beta from '@anthropic-ai/sdk/resources/beta/messages/messages';
 import { cardVerb, emptyConversation, shownText, type Conversation } from '../../ai/assistant';
-import { joinPhotos, photoNumber, type ChatEvent, type ChatPhoto, type ChatRecord } from '../../ai/chatRecord';
+import { joinPhotos, photoNumber, type ChatAudio, type ChatEvent, type ChatPhoto, type ChatRecord } from '../../ai/chatRecord';
 import { parseLocalDateTime } from '../../ai/photoTime';
 import type { ProposedItem } from '../../ai/tools';
 import type { FoodDb } from '../../foods/foodDb';
@@ -21,8 +21,8 @@ import type { Bubble, Card } from './cards';
 type Summary = Record<string, unknown>;
 const isObj = (x: unknown): x is Summary => typeof x === 'object' && x !== null && !Array.isArray(x);
 
-/** A replayed bubble: a user message keeps its photos' numbers until the photos are read. */
-export type ReplayedBubble = Exclude<Bubble, { role: 'user' }> | { role: 'user'; text: string; photos: number[] };
+/** A replayed bubble: a user message keeps its photos' and recordings' numbers until they are read. */
+export type ReplayedBubble = Exclude<Bubble, { role: 'user' }> | { role: 'user'; text: string; photos: number[]; audio: number[] };
 
 export interface Replayed {
   bubbles: ReplayedBubble[];
@@ -43,7 +43,7 @@ export function replayEvents(events: readonly ChatEvent[], recipe = false): Repl
   let prev: ChatEvent | undefined;
   for (const e of events) {
     if (e.type === 'user') {
-      bubbles.push({ role: 'user', text: e.text, photos: e.photos.map(photoNumber).filter((n): n is number => n !== undefined) });
+      bubbles.push({ role: 'user', text: e.text, photos: e.photos.map(photoNumber).filter((n): n is number => n !== undefined), audio: e.audio ?? [] });
     } else if (e.type === 'assistant') {
       if (e.text) bubbles.push({ role: 'assistant', text: e.text });
     } else if (e.type === 'error') {
@@ -208,7 +208,12 @@ export interface Reopened {
 }
 
 /** A saved meal chat, ready to carry on with. */
-export function reopenChat(rec: ChatRecord, photos: readonly ChatPhoto[], ctx: Omit<RestoreContext, 'products' | 'recipe'> & { saved: ReadonlyMap<string, Product> }): Reopened {
+export function reopenChat(
+  rec: ChatRecord,
+  photos: readonly ChatPhoto[],
+  ctx: Omit<RestoreContext, 'products' | 'recipe'> & { saved: ReadonlyMap<string, Product> },
+  audio: readonly ChatAudio[] = [],
+): Reopened {
   const seen = rec.resume?.products ?? [];
   const products = new Map([...ctx.saved, ...seen.map((p) => [p.id, p] as const)]);
   const messages = joinPhotos(rec.messages, photos, PHOTO_GONE) as Beta.BetaMessageParam[];
@@ -223,13 +228,18 @@ export function reopenChat(rec: ChatRecord, photos: readonly ChatPhoto[], ctx: O
     else if (!c.logged) lost.push(id);
   }
   const byN = new Map(photos.map((p) => [p.n, p]));
+  const clipByN = new Map(audio.map((a) => [a.n, a]));
   const bubbles = replayed.bubbles.map((b): Bubble => {
     if (b.role !== 'user') return b;
     const previews = b.photos.flatMap((n) => {
       const p = byN.get(n);
       return p ? [`data:${p.mediaType};base64,${p.data}`] : [];
     });
-    return { role: 'user', text: b.text, previews };
+    const clips = b.audio.flatMap((n) => {
+      const a = clipByN.get(n);
+      return a ? [{ data: a.data, mediaType: a.mediaType, ms: a.ms }] : [];
+    });
+    return { role: 'user', text: b.text, previews, ...(clips.length ? { audio: clips } : {}) };
   });
   return {
     conversation,

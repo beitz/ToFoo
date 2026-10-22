@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import type { useToast } from '../../app/toast';
 import type { RecipeSoFar, ShownActivity, ShownBatch, ShownIngredients, ShownNote, ShownPortion, ShownProposal, ShownHome, ShownRecipe, ShownShopping, ShownSleep, ShownWater, ShownKetone } from '../../ai/assistant';
 import type { ProposedItem } from '../../ai/tools';
+import type { AudioClip } from '../../ai/chatRecord';
 import { t } from '../../i18n';
 import { formatTime } from '../../lib/dates';
 import { activityName } from '../activity/ActivityForm';
@@ -93,7 +94,7 @@ export function cardTitle(c: Card): string {
 
 /** A chat bubble; an answer with several cards is one 'pages' bubble, its cards shown as pages. */
 export type Bubble =
-  | { role: 'user'; text: string; previews: string[] }
+  | { role: 'user'; text: string; previews: string[]; audio?: AudioClip[] }
   | { role: 'assistant'; text: string }
   | { role: 'card'; id: string }
   | { role: 'pages'; key: number; text: string; ids: string[] };

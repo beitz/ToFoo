@@ -36,7 +36,7 @@ import {
   type SunEntry,
 } from './types';
 import type { Storage } from '../model/paramTypes';
-import type { ChatPhoto, ChatRecord } from '../ai/chatRecord';
+import type { ChatAudio, ChatPhoto, ChatRecord } from '../ai/chatRecord';
 
 /** All personal data, as stored. Used for backups. */
 export interface Snapshot {
@@ -510,36 +510,44 @@ export function createRepo(db: ToFooDB) {
     },
 
     // ── Saved assistant chats ──
-    /** Save a chat and the photos it does not have yet. */
-    async saveChat(chat: ChatRecord, photos: ChatPhoto[] = []): Promise<void> {
-      await db.transaction('rw', db.chats, db.chatPhotos, async () => {
+    /** Save a chat and the photos and recordings it does not have yet. */
+    async saveChat(chat: ChatRecord, photos: ChatPhoto[] = [], audio: ChatAudio[] = []): Promise<void> {
+      await db.transaction('rw', db.chats, db.chatPhotos, db.chatAudio, async () => {
         await db.chats.put(chat);
         if (photos.length) await db.chatPhotos.bulkPut(photos);
+        if (audio.length) await db.chatAudio.bulkPut(audio);
       });
     },
     async chatPhotos(chatId: string): Promise<ChatPhoto[]> {
       return (await db.chatPhotos.where('chatId').equals(chatId).toArray()).sort((a, b) => a.n - b.n);
     },
-    /** Characters of photo data per chat, for the sizes in the list. */
-    async chatPhotoSizes(): Promise<Map<string, number>> {
+    async chatAudio(chatId: string): Promise<ChatAudio[]> {
+      return (await db.chatAudio.where('chatId').equals(chatId).toArray()).sort((a, b) => a.n - b.n);
+    },
+    /** Bytes of photo data (base64 characters) and recordings per chat, for the sizes in the list. */
+    async chatMediaSizes(): Promise<Map<string, number>> {
       const sizes = new Map<string, number>();
       await db.chatPhotos.each((p) => void sizes.set(p.chatId, (sizes.get(p.chatId) ?? 0) + p.data.length));
+      await db.chatAudio.each((a) => void sizes.set(a.chatId, (sizes.get(a.chatId) ?? 0) + a.data.byteLength));
       return sizes;
     },
-    /** Delete chats with their photos; returns them so the UI can offer undo via restoreChats. */
-    async deleteChats(ids: string[]): Promise<{ chats: ChatRecord[]; photos: ChatPhoto[] }> {
-      return db.transaction('rw', db.chats, db.chatPhotos, async () => {
+    /** Delete chats with their photos and recordings; returns them so the UI can offer undo via restoreChats. */
+    async deleteChats(ids: string[]): Promise<{ chats: ChatRecord[]; photos: ChatPhoto[]; audio: ChatAudio[] }> {
+      return db.transaction('rw', db.chats, db.chatPhotos, db.chatAudio, async () => {
         const chats = (await db.chats.bulkGet(ids)).filter((c): c is ChatRecord => !!c);
         const photos = await db.chatPhotos.where('chatId').anyOf(ids).toArray();
+        const audio = await db.chatAudio.where('chatId').anyOf(ids).toArray();
         await db.chats.bulkDelete(ids);
         await db.chatPhotos.bulkDelete(photos.map((p) => p.id));
-        return { chats, photos };
+        await db.chatAudio.bulkDelete(audio.map((a) => a.id));
+        return { chats, photos, audio };
       });
     },
-    async restoreChats(old: { chats: ChatRecord[]; photos: ChatPhoto[] }): Promise<void> {
-      await db.transaction('rw', db.chats, db.chatPhotos, async () => {
+    async restoreChats(old: { chats: ChatRecord[]; photos: ChatPhoto[]; audio: ChatAudio[] }): Promise<void> {
+      await db.transaction('rw', db.chats, db.chatPhotos, db.chatAudio, async () => {
         await db.chats.bulkPut(old.chats);
         await db.chatPhotos.bulkPut(old.photos);
+        await db.chatAudio.bulkPut(old.audio);
       });
     },
 

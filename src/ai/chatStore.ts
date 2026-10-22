@@ -6,10 +6,10 @@ import { diag, diagEntries } from '../app/diagnostics';
 import { newId } from '../lib/id';
 import { shareOrDownload } from '../lib/shareFile';
 import { repo } from '../storage/repo';
-import { buildChatExport, CHAT_SCHEMA_VERSION, chatFileName, chatTitle, splitPhotos, type ChatEvent, type ChatKind, type ChatPhoto, type ChatRecord, type ChatResume, type NewChatEvent } from './chatRecord';
+import { buildChatExport, CHAT_SCHEMA_VERSION, chatFileName, chatTitle, splitPhotos, type AudioClip, type ChatAudio, type ChatEvent, type ChatKind, type ChatPhoto, type ChatRecord, type ChatResume, type NewChatEvent } from './chatRecord';
 import { mergeModelTokens, type ModelTokens } from './pricing';
 
-type Store = { saveChat: (chat: ChatRecord, photos?: ChatPhoto[]) => Promise<void> };
+type Store = { saveChat: (chat: ChatRecord, photos?: ChatPhoto[], audio?: ChatAudio[]) => Promise<void> };
 
 /**
  * Writes one chat to the phone as it goes: the first event starts the record, every later event
@@ -48,12 +48,26 @@ export class ChatRecorder {
   }
 
   event(e: NewChatEvent, now = Date.now()): void {
+    this.record(e, [], now);
+  }
+
+  /** The user's message, with the recordings it was spoken in, saved alongside under the next numbers. */
+  user(e: Omit<Extract<NewChatEvent, { type: 'user' }>, 'type' | 'audio'>, audio: readonly AudioClip[], now = Date.now()): void {
+    if (!this.enabled) return;
+    const rec = this.ensure(now);
+    const first = (rec.audio ?? 0) + 1;
+    const clips = audio.map((a, i): ChatAudio => ({ ...a, id: `${rec.id}:a${first + i}`, chatId: rec.id, n: first + i }));
+    if (clips.length) rec.audio = first + clips.length - 1;
+    this.record({ type: 'user', ...e, ...(clips.length ? { audio: clips.map((c) => c.n) } : {}) }, clips, now);
+  }
+
+  private record(e: NewChatEvent, audio: ChatAudio[], now: number): void {
     if (!this.enabled) return;
     const rec = this.ensure(now);
     rec.events.push({ ...e, at: now } as ChatEvent);
     rec.title ||= chatTitle(rec.events);
     rec.updatedAt = now;
-    this.flush([]);
+    this.flush([], audio);
   }
 
   /** Billed tokens of one API response; saved with the next event or turn. */
@@ -72,7 +86,7 @@ export class ChatRecorder {
     rec.photos = this.photosSaved;
     if (setup) rec.setup = setup;
     rec.updatedAt = now;
-    this.flush(fresh);
+    this.flush(fresh, []);
   }
 
   /** What reopening the chat needs besides messages and events; saved with the next turn. */
@@ -86,13 +100,13 @@ export class ChatRecorder {
     return this.queue;
   }
 
-  private flush(photos: ChatPhoto[]): void {
+  private flush(photos: ChatPhoto[], audio: ChatAudio[]): void {
     const rec = this.rec;
     if (!rec) return;
     // A copy as it is now: the record keeps changing while the write waits its turn.
     const copy = { ...rec, events: [...rec.events] };
     this.queue = this.queue
-      .then(() => this.store.saveChat(copy, photos))
+      .then(() => this.store.saveChat(copy, photos, audio))
       .catch((e: unknown) => diag('chat.save', { msg: e instanceof Error ? e.message : String(e) }));
   }
 }
