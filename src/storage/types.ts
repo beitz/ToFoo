@@ -55,6 +55,8 @@ export interface Profile extends Versioned {
   energyTargetKcal?: number;
   /** Own daily targets by nutrient id (only OWN_TARGETS: a protein need, a carbohydrate maximum); not set: the DGE value, or no limit. */
   nutrientTargets?: Record<string, OwnTarget>;
+  /** Own sleep need in minutes a night; not set: the recommendation (model/parameters.ts `sleepNeed`). */
+  sleepNeedMinutes?: number;
   phytate?: PhytateIntake;
   /** Women only, for the iron reference value. */
   menstruation?: Menstruation;

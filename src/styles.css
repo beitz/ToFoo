@@ -5792,3 +5792,282 @@ a.contributor-link > span:first-child {
 .cook-taken > li + li {
   border-top: none;
 }
+
+/* Sleep page (features/sleep/SleepPage.tsx) */
+.nights-hero .nights-big {
+  margin: 0;
+  font-size: 2.6rem;
+  font-weight: 800;
+  line-height: 1.1;
+}
+.nights-hero > p {
+  margin: 4px 0;
+}
+.nights-change {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 600;
+}
+.nights-chart {
+  margin: 10px 0 6px;
+}
+.nights-chart svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.nights-chart-grid {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+.nights-chart-zero {
+  stroke: var(--text-muted);
+  stroke-width: 1;
+  stroke-dasharray: 4 3;
+}
+.nights-chart-tick {
+  fill: var(--text-muted);
+  font-size: 11px;
+}
+.nights-chart-area {
+  fill: var(--warn-soft);
+}
+.nights-chart-line {
+  fill: none;
+  stroke: var(--warn);
+  stroke-width: 2.5;
+  stroke-linejoin: round;
+}
+.nights-chart-dot {
+  fill: var(--warn);
+}
+.nights-chart-unknown {
+  fill: var(--surface);
+  stroke: var(--text-muted);
+  stroke-width: 1.5;
+  stroke-dasharray: 2 2;
+}
+.nights-tiles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.nights-tiles .card {
+  margin: 0;
+}
+.nights-tiles + .card {
+  margin-top: 12px;
+}
+.nights-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.nights-stat strong {
+  font-size: 1.5rem;
+  line-height: 1.2;
+}
+.nights-axis,
+.nights-row {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) 62px;
+  align-items: center;
+  gap: 8px;
+}
+.nights-axis-ticks {
+  position: relative;
+  height: 18px;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+.nights-axis-ticks > span {
+  position: absolute;
+  transform: translateX(-50%);
+}
+.nights-rows > li,
+.nights-rows > li + li,
+.nights-weeks > li,
+.nights-weeks > li + li {
+  padding: 0;
+  border: 0;
+}
+.nights-row {
+  min-height: 44px;
+  color: var(--text);
+  text-decoration: none;
+}
+.nights-day {
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.nights-track {
+  position: relative;
+  height: 26px;
+  border-radius: 6px;
+  background: var(--surface-2);
+}
+.nights-usual {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: var(--surface-3);
+}
+.nights-sleep {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  border-radius: 5px;
+  background: var(--tank);
+}
+.nights-unknown {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  border: 1.5px dashed var(--text-muted);
+  border-radius: 5px;
+}
+.nights-meal {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 0.75rem;
+  color: var(--text);
+}
+.nights-total {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.nights-diff.is-short {
+  color: var(--low);
+}
+.nights-diff.is-over {
+  color: var(--ok);
+}
+.nights-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  margin: 10px 0 0;
+}
+.nights-legend > span {
+  white-space: nowrap;
+}
+.nights-key {
+  display: inline-block;
+  width: 14px;
+  height: 10px;
+  border-radius: 3px;
+  vertical-align: middle;
+}
+.nights-key-sleep {
+  background: var(--tank);
+}
+.nights-key-usual {
+  background: var(--surface-3);
+}
+.nights-key-unknown {
+  border: 1.5px dashed var(--text-muted);
+}
+.nights-spread {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) 70px;
+  align-items: center;
+  gap: 8px;
+  min-height: 56px;
+}
+.nights-spread-label {
+  font-weight: 600;
+}
+.nights-spread-track {
+  position: relative;
+  height: 36px;
+}
+.nights-spread-range,
+.nights-spread-mid {
+  position: absolute;
+  top: 6px;
+  height: 10px;
+  border-radius: 5px;
+}
+.nights-spread-range {
+  background: var(--tank-soft);
+}
+.nights-spread-mid {
+  background: var(--tank);
+}
+.nights-spread-tick {
+  position: absolute;
+  top: 1px;
+  width: 3px;
+  height: 20px;
+  margin-left: -1.5px;
+  border-radius: 2px;
+  background: var(--text);
+}
+.nights-spread-ends {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.7rem;
+}
+.nights-spread-value {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.2;
+}
+.nights-weeks {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 6px;
+}
+.nights-week {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+.nights-week-value {
+  white-space: nowrap;
+}
+.nights-week-track {
+  position: relative;
+  width: 100%;
+  height: 90px;
+}
+.nights-week-need {
+  position: absolute;
+  left: -3px;
+  right: -3px;
+  border-top: 1.5px dashed var(--text-muted);
+}
+.nights-week-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: 5px 5px 2px 2px;
+  background: var(--text-muted);
+}
+.nights-week-bar.is-short {
+  background: repeating-linear-gradient(135deg, var(--warn) 0 4px, color-mix(in srgb, var(--warn) 55%, transparent) 4px 8px);
+}
+.nights-week-bar.is-now {
+  outline: 2px solid var(--text);
+  outline-offset: 1px;
+}

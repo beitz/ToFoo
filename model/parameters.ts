@@ -1037,3 +1037,26 @@ export const ketosis = {
     note: 'Not a diagnosis. Diabetic ketoacidosis needs diabetes, BHB ≥ 3.0 and acidosis together (Umpierrez et al. 2024).',
   } satisfies Valued<{ light: number; moderate: number; deep: number }>,
 };
+
+// ── Sleep (docs/SPEC.md, "Sleep page") ──────────────────────────────────────────────
+
+export const sleepNeed = {
+  /** Hours of sleep a night an adult needs; the user can set their own in Profile. */
+  hours: {
+    value: 7,
+    source:
+      'Watson NF et al. (2015): Recommended Amount of Sleep for a Healthy Adult: A Joint Consensus Statement of the American Academy of Sleep Medicine and Sleep Research Society. Sleep 38(6):843–844',
+    url: 'https://doi.org/10.5665/sleep.4716',
+    confidence: 'high',
+    note:
+      'Adults (18–60) "should sleep 7 or more hours per night on a regular basis"; more than 9 hours may suit young adults, people recovering from sleep debt and people who are ill. The National Sleep Foundation recommends 7–9 hours for adults and 7–8 hours from 65 (Hirshkowitz M et al. 2015, Sleep Health 1(1):40–43, https://doi.org/10.1016/j.sleh.2014.12.010). 7 hours is the lower end both agree on, so the default never calls a night short that the consensus does not.',
+  } satisfies Valued<number>,
+  /** Nights the sleep page looks at unless the user picks another window. */
+  windowNights: {
+    value: 14,
+    source: 'Display choice',
+    confidence: 'assumption',
+    note:
+      'Two weeks: long enough that one bad night does not dominate, short enough to follow a change. Debt is plain arithmetic over the window (each night minus the need, added up); whether a long night pays back an earlier short one in the body is open (docs/OPEN_QUESTIONS.md), so the page never calls it repaid or healthy.',
+  } satisfies Valued<number>,
+};
