@@ -47,6 +47,19 @@ describe('labelPiece', () => {
     expect(labelPiece({})).toBeUndefined();
   });
 
+  it('reads the count in the name, with the weight from the pack or the name', () => {
+    // Wrigley's Extra in Germany: "50 Stk" only in the name, the weight in the pack size.
+    expect(labelPiece({ name: 'Extra Peppermint 50 Stk', quantity: '70 g' })).toEqual({ grams: 1.4, from: 'name', text: 'Extra Peppermint 50 Stk · 70 g' });
+    expect(labelPiece({ name: 'Kaugummi 10 Stück 14 g' })?.grams).toBe(1.4);
+    expect(labelPiece({ name: 'Müsliriegel 5 x 25 g' })).toMatchObject({ grams: 25, from: 'name' });
+    // A count alone is not a weight.
+    expect(labelPiece({ name: 'Extra Peppermint 50 Stk' })).toBeUndefined();
+    expect(labelPiece({ name: 'Extra Peppermint 50 Stk', quantity: '60 pieces' })).toBeUndefined();
+    expect(labelPiece({ name: 'Kaugummi 70 g', quantity: '50 pieces' })).toMatchObject({ grams: 1.4, from: 'name' });
+    // The pack's own text wins.
+    expect(labelPiece({ name: 'Gum 50 Stk', quantity: '10 Dragees (14 g)' })?.from).toBe('pack');
+  });
+
   it('prefers the serving to the pack', () => {
     expect(labelPiece({ quantity: '10 x 20 g', serving: { label: '2 pieces (3 g)', grams: 3 } })?.from).toBe('serving');
   });
@@ -59,6 +72,9 @@ describe('packHints', () => {
     expect(packHints({ quantity: '1,1 kg' })).toEqual({ grams: 1100 });
     expect(packHints({ quantity: '10 x 1.5 g' })).toEqual({});
     expect(packHints(undefined)).toEqual({});
+    expect(packHints({ name: 'Extra Peppermint 50 Stk', quantity: '70 g' })).toEqual({ grams: 70, count: 50 });
+    expect(packHints({ name: 'Extra Peppermint 50 Stk' })).toEqual({ count: 50 });
+    expect(packHints({ name: 'Kaugummi 70 g', quantity: '60 pieces' })).toEqual({ grams: 70, count: 60 });
   });
 });
 

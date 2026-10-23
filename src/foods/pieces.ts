@@ -98,16 +98,19 @@ const rounded = (g: number) => Math.round(g * 100) / 100;
 /** One piece as the label text gives it: where it was read and the text it came from. */
 export interface LabelPiece {
   grams: number;
-  from: 'serving' | 'pack';
+  from: 'serving' | 'pack' | 'name';
   text: string;
 }
 
+type LabelText = Pick<ProductData, 'quantity' | 'serving'> & { name?: string };
+
 /**
  * The weight of one piece from the product's own text, when it gives a count and a weight: the
- * serving ("2 pieces (2.8 g)"), a multipack ("10 x 1.5 g"), or a pack that says both ("10 Dragees,
- * 14 g"). Undefined when it does not (most packs: "60 pieces" or "42 g" alone).
+ * serving ("2 pieces (2.8 g)"), a multipack ("10 x 1.5 g"), a pack that says both ("10 Dragees,
+ * 14 g"), or the name's count with the pack's weight (name "Extra Peppermint 50 Stk", pack "70 g";
+ * owner's find, 2026-10-23). Undefined when none does (most packs: "60 pieces" or "42 g" alone).
  */
-export function labelPiece(p: Pick<ProductData, 'quantity' | 'serving'>): LabelPiece | undefined {
+export function labelPiece(p: LabelText): LabelPiece | undefined {
   const serving = p.serving?.label;
   if (serving) {
     const n = pieceCount(serving);
@@ -126,15 +129,28 @@ export function labelPiece(p: Pick<ProductData, 'quantity' | 'serving'>): LabelP
     const g = weightIn(pack);
     if (n && g && g / n <= MAX_PIECE_GRAMS) return { grams: rounded(g / n), from: 'pack', text: pack };
   }
+  // The count or the weight in the name: "Extra Peppermint 50 Stk", "Riegel 5 x 25 g".
+  const name = p.name;
+  if (name) {
+    const multi = MULTI.exec(name);
+    if (multi) {
+      const g = num(multi[2]!) * (UNIT_FACTOR[multi[3]!.toLowerCase()] ?? NaN);
+      if (g > 0 && g <= MAX_PIECE_GRAMS) return { grams: rounded(g), from: 'name', text: name };
+    }
+    // One of the two from the name, the other from the pack, or both from the name.
+    const n = pieceCount(name) ?? pieceCount(pack);
+    const g = (pack ? weightIn(pack) : undefined) ?? weightIn(name);
+    if (n && g && g / n <= MAX_PIECE_GRAMS) return { grams: rounded(g / n), from: 'name', text: pack ? `${name} · ${pack}` : name };
+  }
   return undefined;
 }
 
-/** What the pack says to start the user off with: its weight and how many pieces, each if known. */
-export function packHints(p: Pick<ProductData, 'quantity'> | undefined): { grams?: number; count?: number } {
-  const pack = p?.quantity;
-  if (!pack || MULTI.test(pack)) return {};
-  const grams = weightIn(pack);
-  const count = pieceCount(pack);
+/** What the pack (or the name) says to start the user off with: its weight and how many pieces, each if known. */
+export function packHints(p: (Pick<ProductData, 'quantity'> & { name?: string }) | undefined): { grams?: number; count?: number } {
+  const pack = p?.quantity && !MULTI.test(p.quantity) ? p.quantity : undefined;
+  const name = p?.name && !MULTI.test(p.name) ? p.name : undefined;
+  const grams = (pack ? weightIn(pack) : undefined) ?? (name ? weightIn(name) : undefined);
+  const count = (pack ? pieceCount(pack) : undefined) ?? (name ? pieceCount(name) : undefined);
   return { ...(grams ? { grams } : {}), ...(count ? { count } : {}) };
 }
 
@@ -155,7 +171,7 @@ export interface PieceWeight {
   text?: string;
 }
 
-export function pieceWeight(sizes: readonly PortionSize[] | undefined, product: Pick<ProductData, 'quantity' | 'serving'> | undefined): PieceWeight | undefined {
+export function pieceWeight(sizes: readonly PortionSize[] | undefined, product: LabelText | undefined): PieceWeight | undefined {
   const own = savedPiece(sizes);
   if (own) return { grams: own, from: 'yours' };
   const label = product ? labelPiece(product) : undefined;

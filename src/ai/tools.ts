@@ -320,7 +320,7 @@ export interface ProposedItem {
   preparation: Preparation;
   note: string;
   /** Counted in pieces: how many, and the weight of one (the user's, the label's, or the assistant's estimate). */
-  pieces?: { n: number; grams: number; from: 'yours' | 'serving' | 'pack' | 'estimate' };
+  pieces?: { n: number; grams: number; from: 'yours' | 'serving' | 'pack' | 'name' | 'estimate' };
   /** For packaged products: the product with its BLS match, to save when the meal is logged. */
   product?: Product;
 }
@@ -516,7 +516,7 @@ export function pieceNote(code: string, product: Product | undefined, pieces: Re
   const own = pieces?.get(code);
   if (own) return ` | 1 piece = ${fmtNumber(own, 2)} g (the user's own weight)`;
   const label = product ? labelPiece(product) : undefined;
-  if (label) return ` | 1 piece = ${fmtNumber(label.grams, 2)} g (label ${label.from === 'serving' ? 'serving' : 'pack'} "${label.text}")`;
+  if (label) return ` | 1 piece = ${fmtNumber(label.grams, 2)} g (${label.from === 'name' ? 'count in the product name' : `label ${label.from}`} "${label.text}")`;
   return product ? ' | weight of one piece unknown' : '';
 }
 
