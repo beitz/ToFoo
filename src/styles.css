@@ -1,7 +1,8 @@
 /* ToFoo styles: mobile-first, light and dark. Colours are tokens; never encode status by colour alone. */
 :root {
   /* Design system 2026-10-22 (Claude Design, "Quiet surfaces. Colour only where it means something"):
-     neutral ground, one cream/ink action colour, four status colours, one store blue. */
+     neutral ground, one action colour, four status colours, one store blue. The action colour is the
+     user's pick (Settings → Appearance → Accent colour, 2026-10-23): green by default, as before the new look. */
   color-scheme: light;
   --bg: #f3f2ee;
   --surface: #ffffff;
@@ -12,7 +13,7 @@
   --text-faint: #5f676e;
   --border: #d6d3cb;
   --edge: #857f73;
-  --accent: #15181b;
+  --accent: #2f6f4e;
   --accent-text: #ffffff;
   --accent-soft: color-mix(in srgb, var(--accent) 9%, transparent);
   --ok: #0b7656;
@@ -50,8 +51,8 @@
     --text-faint: #8e99a1;
     --border: #2c3338;
     --edge: #6b777f;
-    --accent: #f3eedf;
-    --accent-text: #121517;
+    --accent: #6cc396;
+    --accent-text: #0e1a13;
     --accent-soft: color-mix(in srgb, var(--accent) 12%, transparent);
     --ok: #4cc79f;
     --ok-soft: color-mix(in srgb, var(--ok) 16%, transparent);
@@ -79,8 +80,8 @@
   --text-faint: #8e99a1;
   --border: #2c3338;
   --edge: #6b777f;
-  --accent: #f3eedf;
-  --accent-text: #121517;
+  --accent: #6cc396;
+  --accent-text: #0e1a13;
   --accent-soft: color-mix(in srgb, var(--accent) 12%, transparent);
   --ok: #4cc79f;
   --ok-soft: color-mix(in srgb, var(--ok) 16%, transparent);
@@ -95,6 +96,46 @@
   --tank-soft: color-mix(in srgb, var(--tank) 26%, transparent);
   --range: rgba(238, 241, 243, 0.2);
   --shadow: none;
+}
+
+/* Accent colours other than the default green (data-accent on <html>); each pair keeps 4.5:1 for text on it. */
+:root[data-accent='teal'] {
+  --accent: #0f6a6a;
+  --accent-text: #ffffff;
+}
+:root[data-accent='rose'] {
+  --accent: #a3305b;
+  --accent-text: #ffffff;
+}
+:root[data-accent='ink'] {
+  --accent: #15181b;
+  --accent-text: #ffffff;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-accent='teal']:not([data-theme='light']) {
+    --accent: #5cc8c2;
+    --accent-text: #0b1a19;
+  }
+  :root[data-accent='rose']:not([data-theme='light']) {
+    --accent: #f08cb4;
+    --accent-text: #1d0d14;
+  }
+  :root[data-accent='ink']:not([data-theme='light']) {
+    --accent: #f3eedf;
+    --accent-text: #121517;
+  }
+}
+:root[data-theme='dark'][data-accent='teal'] {
+  --accent: #5cc8c2;
+  --accent-text: #0b1a19;
+}
+:root[data-theme='dark'][data-accent='rose'] {
+  --accent: #f08cb4;
+  --accent-text: #1d0d14;
+}
+:root[data-theme='dark'][data-accent='ink'] {
+  --accent: #f3eedf;
+  --accent-text: #121517;
 }
 
 * {
@@ -621,6 +662,8 @@ textarea:focus-visible,
 }
 .switch:checked::after {
   transform: translateX(20px);
+  /* The knob takes the text colour on the accent, so it stands out on a light accent in dark mode too. */
+  background: var(--accent-text);
 }
 .search-box {
   position: relative;
@@ -6427,4 +6470,44 @@ a.contributor-link > span:first-child {
     width: 12px;
     height: 12px;
   }
+}
+
+/* Accent colour picker in Settings: a swatch and the colour's name, so it never relies on colour alone. */
+.accent-picker {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+.accent-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-height: 64px;
+  padding: 8px 4px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.accent-option[aria-checked='true'] {
+  border-color: var(--text);
+  font-weight: 700;
+}
+.accent-swatch {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+}
+.accent-swatch .icon {
+  color: #fff;
+  filter: drop-shadow(0 0 1.5px rgba(0, 0, 0, 0.8));
+}
+.settings-label-first {
+  margin-top: 0;
 }

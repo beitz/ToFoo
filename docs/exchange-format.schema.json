@@ -348,6 +348,15 @@
                         "dark"
                       ]
                     },
+                    "accent": {
+                      "type": "string",
+                      "enum": [
+                        "green",
+                        "teal",
+                        "rose",
+                        "ink"
+                      ]
+                    },
                     "backupReminderDays": {
                       "type": "integer",
                       "exclusiveMinimum": 0,
