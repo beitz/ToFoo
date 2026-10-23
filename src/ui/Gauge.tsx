@@ -52,16 +52,16 @@ export function CompactGauge({ result: r, onClick, defaultBased, variant = 'row'
   // Cells are narrow: no "of max" / "/day" suffixes or units there. A limit cell shows the amount against
   // the maximum ("42/50"), so it can't be mistaken for a percent of a need next to it.
   const cellValue =
-    r.kind === 'info'
-      ? fmtAmount(r.id, r.averageIntake)
-      : r.kind === 'limit' && r.limit !== undefined
-        ? (
-          <>
-            {fmtNumber(r.averageIntake)}
-            <small className="cgauge-max">/{fmtNumber(r.limit)}</small>
-          </>
-        )
-        : fmtPercent(r.value.central);
+    r.kind === 'info' ? (
+      fmtAmount(r.id, r.averageIntake)
+    ) : r.kind === 'limit' && r.limit !== undefined ? (
+      <>
+        {fmtNumber(r.averageIntake)}
+        <small className="cgauge-max">/{fmtNumber(r.limit)}</small>
+      </>
+    ) : (
+      fmtPercent(r.value.central)
+    );
   const noData = r.status === 'unknown' || hasNoData(r);
   const value = noData ? '–' : variant === 'cell' ? cellValue : gaugeLabel(r);
   const icon = <Icon name={STATUS_ICON[r.status]} size={14} />;
@@ -94,6 +94,35 @@ export function CompactGauge({ result: r, onClick, defaultBased, variant = 'row'
           <span className="cgauge-target" style={{ left: `${(1 / 1.5) * 100}%` }} />
         </span>
       )}
+    </button>
+  );
+}
+
+/**
+ * A body store as a compact row (Home's list layout, owner's ask 2026-10-23): status icon (⚠ when low and not
+ * filling), name, % full with the filling / draining arrow, and a bar that is the store itself: full bar = full store.
+ */
+export function StoreCompactGauge({ result: r, onClick }: { result: NutrientResult & { store: StoreResult }; onClick: () => void }) {
+  const def = NUTRIENT_BY_ID.get(r.id);
+  const st = r.store;
+  const warn = storeNeedsAttention(st);
+  const tr = storeTrendOf(st);
+  const full = t('gauge.full', { pct: fmtFill(st.fill.central) });
+  const spoken = [`${def?.name ?? r.id}: ${full}`, statusLabel(st.status), tr ? storeTrendLabel(tr) : '', warn ? t('store.warnSpoken') : ''].filter(Boolean).join(', ');
+  return (
+    <button className={`cgauge cgauge-row gauge-store gauge-${st.status}`} onClick={onClick} aria-label={spoken}>
+      <span className="cgauge-line">
+        <Icon name={warn ? 'warning' : STATUS_ICON[st.status]} size={14} />
+        <span className="cgauge-name">{def?.short ?? r.id}</span>
+        <span className="cgauge-value">
+          {/* The card's heading says "how full", so the narrow row shows only the percent. */}
+          {fmtFill(st.fill.central)}
+          {tr && <span className="cgauge-arrow"> {trendArrows(tr)}</span>}
+        </span>
+      </span>
+      <span className="cgauge-bar" aria-hidden>
+        <span className="cgauge-fill" style={{ width: `${clamp01(st.fill.central) * 100}%` }} />
+      </span>
     </button>
   );
 }

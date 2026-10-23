@@ -118,7 +118,7 @@ export interface Settings extends Versioned {
   autoBackupKeep?: number;
   /** Default storage plan for new recipes. */
   defaultPlan: StoragePlan;
-  /** Home screen nutrient layout; unset = compact. */
+  /** Home layout (2026-10-23): compact = lists by averaging window (unset), detailed = today's rings and the comet list. */
   homeView?: 'compact' | 'detailed';
   /** Home nutrient list grouping; unset = by status. */
   homeGrouping?: 'status' | 'type' | 'none';

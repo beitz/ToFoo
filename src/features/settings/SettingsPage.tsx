@@ -94,6 +94,16 @@ export function SettingsPage() {
             { value: 'dark', label: t('settings.themeDark') },
           ]}
         />
+        <p className="muted small settings-label">{t('settings.homeLayout')}</p>
+        <Segmented
+          label={t('settings.homeLayout')}
+          value={s.homeView === 'detailed' ? 'detailed' : 'compact'}
+          onChange={(v) => repo.updateSettings({ homeView: v })}
+          options={[
+            { value: 'compact', label: t('settings.homeLists') },
+            { value: 'detailed', label: t('settings.homeRings') },
+          ]}
+        />
       </div>
 
       <ul className="link-list card">

@@ -6384,3 +6384,47 @@ a.contributor-link > span:first-child {
   border-top: 1px solid var(--border);
   margin-top: 8px;
 }
+
+/* Home, list layout (owner's pick to try, 2026-10-23): the diary's nutrient view in three cards. */
+.list-card .macro-row {
+  margin-bottom: 4px;
+}
+.list-info {
+  margin: 0 0 8px;
+}
+.cgauge.gauge-progress .cgauge-fill {
+  color: var(--text-muted);
+}
+.cgauge-arrow {
+  color: var(--text-muted);
+}
+.settings-label {
+  margin: 12px 0 4px;
+}
+/* Inside its card the row of five needs no box of its own. */
+.list-card .macro-row {
+  padding: 0;
+  border: none;
+  background: none;
+}
+.list-card > .muted.small:last-child {
+  margin: 4px 0 0;
+}
+.list-today {
+  gap: 2px;
+}
+.list-today .cgauge-cell {
+  padding: 6px 2px;
+}
+.list-today .cgauge-line {
+  gap: 3px;
+}
+@media (max-width: 380px) {
+  .list-today .cgauge-value {
+    font-size: 0.85rem;
+  }
+  .list-today .cgauge-line svg {
+    width: 12px;
+    height: 12px;
+  }
+}

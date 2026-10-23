@@ -9,11 +9,31 @@ import { StatusMark } from '../../ui/Tile';
 /** The four donuts beside the energy ring (owner's pick, 2026-10-22): protein, fat, carbs, fibre. */
 const SMALL = ['PROT625', 'FAT', 'CHO', 'FIBT'];
 
-/** What one ring compares today's amount with. Fat and carbs have no sourced target unless the user set a maximum. */
-interface Goal {
+/** What today's amount is compared with. Fat and carbs have no sourced target unless the user set a maximum. */
+export interface Goal {
   amount: number;
   /** A maximum (own carb limit) rather than a need. */
   max: boolean;
+}
+
+/** Today's intake so far, shared by Home's two layouts: amounts, missing data, targets. */
+export function useToday() {
+  const d = useData();
+  const i = d.modelDays.indexOf(d.today);
+  const day = i >= 0 ? d.model.daily[i] : undefined;
+  return {
+    amountOf: (id: string) => day?.intake[id] ?? 0,
+    // Some eaten food had no data for it: the sum is a lower bound, never read as complete.
+    partOf: (id: string) => day?.missing.has(id) ?? false,
+    goalOf: (id: string): Goal | undefined => {
+      const r = d.model.nutrients.get(id);
+      if (!r || r.kind === 'info') return undefined;
+      if (r.kind === 'limit') return r.limit ? { amount: r.limit, max: true } : undefined;
+      const rec = d.requirements.byNutrient.get(id)?.recommended;
+      return rec ? { amount: rec, max: false } : undefined;
+    },
+    own: (id: string) => d.model.nutrients.get(id)?.ownTarget === true,
+  };
 }
 
 /**
@@ -24,19 +44,7 @@ interface Goal {
  */
 export function TodayRings({ defaultBased }: { defaultBased: (id: string) => boolean }) {
   const d = useData();
-  const i = d.modelDays.indexOf(d.today);
-  const day = i >= 0 ? d.model.daily[i] : undefined;
-  const amountOf = (id: string) => day?.intake[id] ?? 0;
-  // Some eaten food had no data for it: the sum is a lower bound, never read as complete.
-  const partOf = (id: string) => day?.missing.has(id) ?? false;
-  const goalOf = (id: string): Goal | undefined => {
-    const r = d.model.nutrients.get(id);
-    if (!r || r.kind === 'info') return undefined;
-    if (r.kind === 'limit') return r.limit ? { amount: r.limit, max: true } : undefined;
-    const rec = d.requirements.byNutrient.get(id)?.recommended;
-    return rec ? { amount: rec, max: false } : undefined;
-  };
-  const own = (id: string) => d.model.nutrients.get(id)?.ownTarget === true;
+  const { amountOf, partOf, goalOf, own } = useToday();
 
   const kcal = amountOf('ENERCC');
   const kcalGoal = goalOf('ENERCC');
