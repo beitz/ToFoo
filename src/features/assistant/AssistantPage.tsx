@@ -63,6 +63,7 @@ import { BatchCard, PortionCard } from './BatchCards';
 import { ProposalGroup, cardAnchor } from './ProposalGroup';
 import { CardFrame, useCardIntake } from './CardFrame';
 import { ForgottenAsk } from './ForgottenAsk';
+import { WeightProposalCard } from './WeightCard';
 import { addAnswer } from '../../ai/segments';
 import { refKey } from '../../lib/refs';
 import { itemIngredient } from '../../logic/ingredients';
@@ -402,6 +403,7 @@ function Chat({ apiKey, model, day, recipe, reopened }: { apiKey: string; model:
               activity: isOn(d.settings.features, 'activity'),
               water: isOn(d.settings.features, 'water'),
               ketones: isOn(d.settings.features, 'ketosis') && isOn(d.settings.features, 'ketoneReadings'),
+              weight: isOn(d.settings.features, 'weight'),
               shopping: isOn(d.settings.features, 'shoppingList'),
               forgotten: isOn(d.settings.features, 'forgottenCheck'),
               ...(atHome ? { pantry: atHome } : {}),
@@ -457,6 +459,7 @@ function Chat({ apiKey, model, day, recipe, reopened }: { apiKey: string; model:
         ...outcome.activities.map((a): Card => ({ kind: 'activity', activity: a, logged: false })),
         ...outcome.waters.map((w): Card => ({ kind: 'water', water: w, logged: false })),
         ...outcome.ketones.map((k): Card => ({ kind: 'ketone', ketone: k, logged: false })),
+        ...outcome.weights.map((w): Card => ({ kind: 'weight', weight: w, logged: false })),
         ...outcome.shopping.map((l): Card => ({ kind: 'shopping', shopping: l, logged: false })),
         ...outcome.homes.map((h): Card => ({ kind: 'home', home: h, logged: false })),
         ...outcome.ingredients.map((r): Card => ({ kind: 'ingredients', ingredients: r, logged: false })),
@@ -648,6 +651,7 @@ function Chat({ apiKey, model, day, recipe, reopened }: { apiKey: string; model:
                     isOn(d.settings.features, 'activity') && t('ai.introActivity'),
                     isOn(d.settings.features, 'water') && t('ai.introWater'),
                     isOn(d.settings.features, 'ketosis') && isOn(d.settings.features, 'ketoneReadings') && t('ai.introKetones'),
+                    isOn(d.settings.features, 'weight') && t('ai.introWeight'),
                     isOn(d.settings.features, 'shoppingList') && t('ai.introShopping'),
                     isOn(d.settings.features, 'atHome') && t('ai.introPantry'),
                     t('ai.introRecipes'),
@@ -921,6 +925,7 @@ function CardView({ card, ...rest }: CardProps<Card>) {
   if (card.kind === 'activity') return <ActivityCard card={card} {...rest} />;
   if (card.kind === 'water') return <WaterProposalCard card={card} {...rest} />;
   if (card.kind === 'ketone') return <KetoneProposalCard card={card} {...rest} />;
+  if (card.kind === 'weight') return <WeightProposalCard card={card} {...rest} />;
   if (card.kind === 'shopping') return <ShoppingCard card={card} {...rest} />;
   if (card.kind === 'home') return <HomeCard card={card} {...rest} />;
   if (card.kind === 'ingredients') return <IngredientsCard card={card} {...rest} />;

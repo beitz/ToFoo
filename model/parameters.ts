@@ -1070,3 +1070,40 @@ export const sleepNeed = {
       'Two weeks: long enough that one bad night does not dominate, short enough to follow a change. Debt is plain arithmetic over the window (each night minus the need, added up); whether a long night pays back an earlier short one in the body is open (docs/OPEN_QUESTIONS.md), so the page never calls it repaid or healthy.',
   } satisfies Valued<number>,
 };
+
+// ── Weight and the log check (docs/SPEC.md, "Weight") ────────────────────────────────
+
+export const weightCheck = {
+  /** Share of each day's difference the trend line moves toward a new weight (an exponentially smoothed average). */
+  trendSmoothing: {
+    value: 0.1,
+    source: 'Walker J, The Hacker’s Diet (1991, online edition 2005), ch. "Signal and Noise": a 10 % exponentially smoothed moving average of daily weights',
+    url: 'https://www.fourmilab.ch/hackdiet/e4/signalnoise.html',
+    confidence: 'medium',
+    note: 'A display choice with a well-known precedent: water and gut content move the scale by a kilogram or more from day to day, the trend shows the direction under that. Gaps between weigh-ins count as that many days.',
+  } satisfies Valued<number>,
+  /** Energy stored or lost per kg of body weight change (kcal/kg), for the intake a weight change implies. */
+  energyPerKg: {
+    value: { low: 8390, central: 8840, high: 9290 },
+    source:
+      'Sanghvi A, Redman LM, Martin CK, Ravussin E, Hall KD (2015): Validation of an inexpensive and accurate mathematical method to measure long-term changes in free-living energy intake. Am J Clin Nutr 102(2):353–358: ρ = 8,840 ± 450 kcal/kg (mean ± SD over 140 adults)',
+    url: 'https://doi.org/10.3945/ajcn.115.111070',
+    confidence: 'medium',
+    note: 'Low and high are ± 1 SD. Validated over 6-month periods against doubly labelled water: group bias under 40 kcal/day, but about 215 kcal/day (root mean square) for one person, so only a large gap says something.',
+  } satisfies Valued<{ low: number; central: number; high: number }>,
+  /** How far one person’s resting energy can be from the Müller equation (kcal/day, either way). */
+  reeSpreadKcal: {
+    value: 200,
+    source: 'Müller MJ et al. (2004) Am J Clin Nutr 80(5):1379–90, as noted under energyNeed.ree: individual resting energy differs from the estimate by about ± 200 kcal',
+    url: 'https://doi.org/10.1093/ajcn/80.5.1379',
+    confidence: 'medium',
+    note: 'Multiplied by the PAL for the daily burn. Sport is not in the PAL, so a very active week reads as a log above the estimate.',
+  } satisfies Valued<number>,
+  /** The check looks at the last this-many finished days, and needs this much of them. */
+  window: {
+    value: { days: 28, minLoggedDays: 14, minWeighIns: 3, minSpanDays: 21 },
+    source: 'Modelling choice',
+    confidence: 'assumption',
+    note: 'Four weeks is about the shortest period over which weekly weigh-ins show a direction; Sanghvi et al. validated 6 months. The slope’s own uncertainty (from the scatter of the weigh-ins) widens the range, so few or noisy weigh-ins give a wide range rather than a false verdict. See docs/OPEN_QUESTIONS.md.',
+  } satisfies Valued<{ days: number; minLoggedDays: number; minWeighIns: number; minSpanDays: number }>,
+};

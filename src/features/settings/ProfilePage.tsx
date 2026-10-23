@@ -116,6 +116,11 @@ export function ProfilePage() {
       <div className="card">
         <p>{weight ? t('profile.currentWeight', { kg: weight }) : t('profile.noWeight')}</p>
         <p className="muted small">{t('profile.weightWhy')}</p>
+        {isOn(d.settings.features, 'weight') && (
+          <p className="small">
+            <a href={href('weight')}>{t('profile.weightPage')}</a>
+          </p>
+        )}
         <div className="row">
           <NumberInput value={newWeight} onChange={setNewWeight} suffix="kg" min={20} placeholder={String(weight ?? 70)} />
           <button

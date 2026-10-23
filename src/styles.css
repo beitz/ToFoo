@@ -7053,6 +7053,97 @@ a.contributor-link > span:first-child {
   align-items: center;
 }
 
+/* Weight (#/weight): weigh-ins as dots, the trend as a line; the log check as a verdict and three rows. */
+.weight-add-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px 12px;
+}
+.weight-add-row .field {
+  flex: 1 1 130px;
+  margin: 0;
+}
+.weight-add-row .btn {
+  flex: 1 1 100%;
+}
+.weight-chart {
+  margin: 12px 0 0;
+}
+.weight-chart svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.weight-grid {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+.weight-axis {
+  fill: var(--text-muted);
+  font-size: 11px;
+}
+.weight-trend {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2.5;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.weight-dot {
+  fill: var(--text-muted);
+}
+.weight-key {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+.weight-key-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-muted);
+}
+.weight-key-line {
+  width: 16px;
+  height: 3px;
+  margin-left: 8px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+.log-check-verdict {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 4px 0 10px;
+  font-weight: 600;
+}
+.log-check-low svg {
+  color: var(--warn);
+}
+.log-check-verdict svg {
+  flex: none;
+  margin-top: 1px;
+}
+.log-check-rows {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 12px;
+  margin: 0 0 8px;
+}
+.log-check-rows dt {
+  color: var(--text-muted);
+}
+.log-check-rows dt {
+  align-self: start;
+}
+.log-check-rows dd {
+  margin: 0;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
 /* Insights overview (#/overview): one row per thing tracked, its last 7 days as dots. */
 .ov-card {
   padding-block: 4px;
