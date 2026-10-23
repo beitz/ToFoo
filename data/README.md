@@ -87,7 +87,7 @@ The documentation says the leading letter marks the main food group but does not
 
 ### Notable gaps (relevant to the nutrient model)
 
-- **No selenium.** BLS 4.0 has no selenium column. Not tracked in v1 (see `docs/OPEN_QUESTIONS.md`).
+- **No selenium.** BLS 4.0 has no selenium column. ToFoo estimates it from the UK table CoFID (below).
 - **No heme / non-heme iron split** and **no phytate**. Both are estimated from the food group.
 - Cooked forms are often separate foods (e.g. "Grüne Bohnen gedünstet"); composite dishes (X, Y) are recipe calculations that already include cooking losses.
 - Salt: `R111000` Speisesalz (plain), `R114000` Speisesalz jodiert, `R113000` Speisesalz jodiert mit Fluorid. There is no fluoridated, non-iodised salt.
@@ -112,3 +112,34 @@ Produced by `scripts/build-bls.ts`; type definition in `src/foods/blsTypes.ts`. 
 ```
 
 Only the nutrients listed in `KEPT_NUTRIENTS` in the script are included (63 of 138: energy, macronutrients, all vitamins and minerals, the main fatty acids, essential amino acids plus cysteine and tyrosine). Units are BLS units per 100 g (note: vitamin B6 is in **µg**, copper and manganese in **µg**).
+
+A 64th column, `SE` (selenium, µg), is added from CoFID (next section), with provenance code `C` and an entry in `extraSources` (attribution and licence).
+
+## `raw/CoFID_2021.xlsx`: selenium
+
+McCance and Widdowson's The Composition of Foods Integrated Dataset 2021 (CoFID), the UK national food composition table, as downloaded from [gov.uk](https://www.gov.uk/government/publications/composition-of-foods-integrated-dataset-cofid) (file `McCance_Widdowsons_Composition_of_Foods_Integrated_Dataset_2021..xlsx`, renamed). Never edited.
+
+> Public Health England (2021): McCance and Widdowson's The Composition of Foods Integrated Dataset 2021. Contains public sector information licensed under the [Open Government Licence v3.0](https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/).
+
+**Why CoFID.** BLS 4.0 has no selenium. Of the open European tables, CoFID has selenium for about 2,000 foods and a licence that allows adapting the data (OGL v3.0, with attribution). The Dutch NEVO may only be used unchanged (RIVM copyright notice), so it can't be matched to BLS foods. NCCDB (used by Cronometer) is licensed and paid. UK soils, like German ones, are low in selenium, unlike much of North America, so a UK table fits better than USDA. EFSA's own selenium intake estimate for Germany (DRVs for selenium, 2014) also had to borrow 100 % of its German food values from other tables.
+
+**Layout.** One sheet per nutrient group (`1.3 Proximates`, `1.4 Inorganics`, `1.5 Vitamins`, …); row 1 names, row 2 codes (`SE`, `PROT`, …), row 3 descriptions, then one food per row (`Food Code` like `16-001`, `Food Name`, `Group` like `JA`). Values per 100 g edible portion; `Tr` = trace (→ `"t"`), `N` = present but not measured (→ `null`). Copper and manganese in mg, vitamin B6 in mg (BLS: µg). Entries "weighed with bones/stones/skin" are as-bought weights and are never used.
+
+**Method** (`scripts/selenium.ts`, run by `npm run data`):
+
+1. For each BLS food, every CoFID food with a selenium value in a matching main group (fish only with fish, meat with meat, composite dishes with anything but drinks) is scored: how alike the two are in 22 nutrients both tables have (water, protein, fat, carbohydrate, fibre, 9 minerals, 8 B vitamins and vitamin C; mean absolute log ratio), minus a bonus for shared name words (the BLS food word first, preparation words count less).
+2. The best one gives its selenium, scaled by the protein ratio (selenium sits in protein as selenomethionine and selenocysteine, EFSA 2014), or by dry matter when either food has under 1 g protein; the scale is kept within ×0.5…×2.
+3. Pairs that are too unlike get nothing (`null`, shown as no data): 7 of 7,140 foods.
+
+**How good is it?** Selenium can't be checked against BLS, so `npx tsx scripts/selenium-check.ts` predicts nutrients both tables have the same way, each left out of the comparison, and compares with the BLS value (all BLS foods with a value, 2026-10-23):
+
+| Nutrient | Typical error (median) | 1 in 10 off by more than | Within ±25 % | Within ±50 % |
+| --- | --- | --- | --- | --- |
+| Zinc | ×1.19 | ×1.71 | 60 % | 82 % |
+| Phosphorus | ×1.18 | ×1.71 | 61 % | 83 % |
+| Magnesium | ×1.20 | ×1.74 | 58 % | 81 % |
+| Potassium | ×1.24 | ×2.05 | 51 % | 74 % |
+| Iron | ×1.33 | ×2.43 | 42 % | 62 % |
+| Copper | ×1.38 | ×3.00 | 37 % | 59 % |
+
+Zinc and phosphorus are the closest stand-ins (both follow protein, like selenium). On top of this method error, UK and German foods of the same kind can differ in selenium (soil, animal feed, where wheat comes from); that part is not measured. Spot checks: Brazil nut 300, tuna 83, pork kidney 148, cod 23, egg 24, beef 7, whole milk 1 µg/100 g, apple trace. Known weak spot: mushrooms (BLS and CoFID count mushroom protein differently, so the protein scale overstates them).

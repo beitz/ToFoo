@@ -30,9 +30,17 @@ export interface BlsFile {
   version: string;
   attribution: string;
   licence: string;
-  /** Single-letter provenance code → BLS "Datenherkunft" category. */
+  /** Single-letter provenance code → BLS "Datenherkunft" category (plus "C", see COFID_PROVENANCE). */
   provenanceCodes: Record<string, string>;
+  /** Nutrients that come from another dataset than the BLS (selenium from CoFID). */
+  extraSources?: Array<{ nutrients: string[]; attribution: string; licence: string }>;
   groups: Record<string, BlsGroupMeta>;
   nutrients: BlsNutrientMeta[];
   foods: BlsFoodRow[];
 }
+
+/**
+ * Provenance code for values ToFoo estimated from the UK table CoFID 2021 (selenium, which BLS 4.0
+ * lacks). Not a BLS category; the letter is free in the BLS list.
+ */
+export const COFID_PROVENANCE = 'C';

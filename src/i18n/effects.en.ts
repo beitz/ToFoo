@@ -113,6 +113,9 @@ export const effectsEn = {
   'effect.ID.low': 'Enlarged or underactive thyroid, with tiredness and weight gain.',
   'effect.ID.lowMore': 'Iodised salt is the main source in Germany, and salt you add counts only if you log it.',
   'effect.ID.lowHelp': 'Use iodised salt at home, eat sea fish once or twice a week, and dairy.',
+  'effect.SE.low': 'Weaker defence against cell damage and infections; thyroid hormones work less well.',
+  'effect.SE.lowMore': 'BLS has no selenium, so ToFoo estimates it from the UK food table (CoFID): treat it as rough.',
+  'effect.SE.lowHelp': 'Fish, seafood, eggs, meat and offal; lentils and mushrooms. A Brazil nut adds a lot (DGE advises at most two a day).',
 
   'effect.CU.low': 'Rare: anaemia and low white blood cells; can follow high doses of zinc supplements.',
   'effect.CU.lowHelp': 'Nuts, seeds, whole grains, legumes, cocoa.',
@@ -160,6 +163,8 @@ export const effectsEn = {
 
   'effect.ID.high': 'Can upset the thyroid.',
   'effect.ID.highHelp': 'Usually from seaweed or supplements; dried seaweed can hold very much.',
+  'effect.SE.high': 'Over time, brittle hair and nails, garlic breath, skin rash and tiredness.',
+  'effect.SE.highHelp': 'Usually from supplements or many Brazil nuts; check the dose.',
 
   'effect.CU.high': 'High doses over time can harm the liver.',
   'effect.CU.highHelp': 'Usually from supplements; check the dose.',

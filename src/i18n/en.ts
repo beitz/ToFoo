@@ -1447,8 +1447,9 @@ export const en = {
   'mealNutrients.ofReferenceServing': '{pct} of your daily reference intake',
   'mealNutrients.fromSources': 'from {list}',
   'mealNutrients.legendServing': 'What you ate, after cooking losses. %: its share of your daily reference intake, as on a label or the recipe page (not after absorption). Limits (salt, sugar…) show the share of the most you should have, "of max". ≥ some food has no data for this nutrient, so it may be more. Nutrients no food has data for are hidden. "Per 100 g" shows the same for 100 g of it; "Your day" its share of your day after absorption, as on Home.',
-  'mealNutrients.legendSources': 'Letters next to a name: where the value comes from. B BLS, O Open Food Facts, U USDA, E entered by you.',
+  'mealNutrients.legendSources': 'Letters next to a name: where the value comes from. B BLS, C estimated from the UK food table CoFID (selenium), O Open Food Facts, U USDA, E entered by you.',
   'source.letter.B': 'BLS',
+  'source.letter.C': 'CoFID (UK), estimated',
   'source.letter.O': 'Open Food Facts',
   'source.letter.U': 'USDA',
   'source.letter.E': 'entered by you',
@@ -1898,8 +1899,8 @@ export const en = {
   'food.noData': 'no data',
   'food.trace': 'trace',
   'food.someMissing': 'Some ingredients lack data',
-  'food.legendProduct': '% = share of your daily reference intake. Letters show where the value comes from: O the Open Food Facts label, U USDA, B the similar BLS food.',
-  'food.legend': '% = share of your daily reference intake. Letters show where BLS took the value from (A analysis, R recipe calculation, L literature, D other database, U taken from a similar food, …).',
+  'food.legendProduct': '% = share of your daily reference intake. Letters show where the value comes from: O the Open Food Facts label, U USDA, B the similar BLS food, C estimated from the UK food table CoFID (selenium).',
+  'food.legend': '% = share of your daily reference intake. Letters show where BLS took the value from (A analysis, R recipe calculation, L literature, D other database, U taken from a similar food, …). C: selenium, which BLS lacks, estimated from the most alike food in the UK table CoFID.',
 
   // Settings
   'settings.title': 'Settings',
@@ -2158,6 +2159,9 @@ export const en = {
   'about.offHeading': 'Packaged products: Open Food Facts',
   'about.off':
     'Product data (barcodes, label values) comes from Open Food Facts, a free, collaborative database, used under the Open Database Licence (ODbL). Vitamins and minerals a label does not list are taken from the most similar BLS food.',
+  'about.cofidHeading': 'Selenium: CoFID (UK)',
+  'about.cofid':
+    'BLS has no selenium. For each BLS food, ToFoo takes the selenium of the most alike food in McCance and Widdowson\'s Composition of Foods Integrated Dataset 2021 (Public Health England), scaled by protein, so treat selenium as a rough estimate. Contains public sector information licensed under the',
   'about.usdaHeading': 'More foods: USDA FoodData Central',
   'about.usda':
     'Foods the BLS lacks can come from FoodData Central by the U.S. Department of Agriculture, Agricultural Research Service, which is in the public domain (CC0). Values a USDA food lacks can be taken from the most similar BLS food.',

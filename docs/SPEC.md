@@ -48,6 +48,7 @@ The BLS 4.0 is the primary food database, bundled with the app; Open Food Facts 
 | Source | Role | Access | Version |
 | --- | --- | --- | --- |
 | BLS 4.0 (Max Rubner-Institut) | Primary: \~7,140 foods incl. composite dishes, 138 nutrients | Bundled in the app, offline | v1 |
+| CoFID 2021 (UK, Public Health England) | Selenium only, which BLS 4.0 lacks: each BLS food gets the selenium of the most alike UK food, scaled by protein (`data/README.md`) | Bundled at build time into the BLS file, offline | Built 2026-10-23 |
 | Manual entry | Special products, label values, supplements | User input | v1 |
 | USDA FoodData Central | Foods missing in BLS: generic foods with full nutrient data, US packaged products with label values | Opt-in online search by name (sends only the search words), shared demo key or a free own key; fetched foods saved locally and in backups | Built 2026-10-17 |
 | Open Food Facts | Packaged products by barcode: label values, the rest borrowed from the nearest BLS food | Opt-in online lookup (sends only the barcode); fetched products saved locally and in backups | Built 2026-10-16 (barcode only) |
@@ -65,6 +66,8 @@ The BLS 4.0 is the primary food database, bundled with the app; Open Food Facts 
 - *Generic foods* (Foundation, SR Legacy, Survey (FNDDS)): analysed or recipe-calculated values for most vitamins and minerals, used as they are, with the BLS provenance "taken from another database" (D), as BLS marks its own USDA-derived values. A similar BLS food can be chosen to fill the gaps (often iodine; niacin equivalents), optional; USDA values always win.
 - *Branded foods* (US packaged products): label values only, which work like Open Food Facts products: label values win, the rest comes from the similar BLS food.
 USDA nutrient numbers are mapped to BLS ids and units in `src/foods/usda.ts` (choices in docs/OPEN_QUESTIONS.md). Logged USDA foods are stored like products (`USDA:<fdcId>`) and found by name in the normal search afterwards without a request. Data: public domain (CC0), credited on the About page.
+
+**Selenium from CoFID** (decided 2026-10-23, owner's ask: "a purely backend change that just quietly provides a bit more data"). BLS 4.0 has no selenium. At build time, each BLS food is paired with the most alike food in the UK table CoFID 2021 (same kind of food, similar make-up across 22 nutrients both tables have, similar name), and its selenium is scaled by the protein ratio. The result is one more column in the BLS file with its own provenance code `C` ("estimated from CoFID"), so selenium shows up everywhere other nutrients do: Home, nutrient page, meal nutrients (source letter C), food page. Its data uncertainty is wider than "taken over from a similar food" (`model/parameters.ts`). Products borrowing from a BLS food keep the C mark; USDA generic foods and Open Food Facts labels use their own selenium where they have one. Method, why CoFID, and how well the method predicts zinc and other nutrients: `data/README.md`. CoFID is under the Open Government Licence v3.0, credited on the About page.
 
 **Licence and attribution.** BLS is CC BY 4.0. The app has an About / Data sources page and the README has a line, both containing: Max Rubner-Institut (2025): Bundeslebensmittelschlüssel (BLS), Version 4.0 — Deutsche Nährstoffdatenbank. Karlsruhe. DOI: [10.25826/Data20251217-134202-0](https://doi.org/10.25826/Data20251217-134202-0), a link to [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), and a note that the data was converted and abridged.
 
@@ -651,7 +654,7 @@ Owner's request (2026-10-20, not built yet): trust comes from being able to look
 2. **The calculation for this number**: each entry that contributed, from amount eaten → after cooking and storage losses → absorbed, the sum, the need it is compared with, and the result, with the low and high run next to the central one. Missing values are listed as missing, not hidden.
 3. **Where the data comes from**: per food, the database, version and code (e.g. BLS 4.0 C131000) and the BLS provenance of the value (analysed, calculated, taken from another table, estimated).
 4. **What the research says**: every parameter used (absorption, retention, store size, requirement, upper limit, sun) with its source, link, low/central/high range and confidence (high, medium, low, assumption), and the open question when it is an assumption.
-5. **How exact this can be**: per nutrient, how far a food log can be trusted (good, rough, or a blind spot the log cannot see, such as iodine from bakery salt, vitamin D from sun, selenium missing from the BLS, iron and B12 status), what drives the error, and which blood test helps where one exists. Based on the accuracy review of 2026-10-20; its proposals are still with the owner, so this layer explains and does not change any status.
+5. **How exact this can be**: per nutrient, how far a food log can be trusted (good, rough, or a blind spot the log cannot see, such as iodine from bakery salt, vitamin D from sun, selenium estimated from a UK table, iron and B12 status), what drives the error, and which blood test helps where one exists. Based on the accuracy review of 2026-10-20; its proposals are still with the owner, so this layer explains and does not change any status.
 
 **Rules for the content**:
 
@@ -842,7 +845,7 @@ None of these block starting v1; they get answered while building. The living li
 
 - [x] UI framework: React.
 - [ ] Exact list of tank vs rolling-average nutrients, and which nutrients appear on the dashboard by default. *Proposal in place (see docs/OPEN_QUESTIONS.md); all nutrients visible by default.*
-- [x] Does BLS 4.0 split heme and non-heme iron, and does it contain phytate? *No to both: estimated from the food group.* BLS 4.0 also has no selenium (not tracked in v1).
+- [x] Does BLS 4.0 split heme and non-heme iron, and does it contain phytate? *No to both: estimated from the food group.* BLS 4.0 also has no selenium (estimated from the UK table CoFID since 2026-10-23).
 - [ ] Fat threshold per meal for fat-soluble vitamin absorption: find a citable value. *5 g used as an assumption (Roodenburg 2000: 3 g enough for carotenes).*
 - [x] Retention factors: USDA Table of Nutrient Retention Factors, Release 6, as class averages.
 - [x] Vitamin D synthesis model: clear-sky UV index from solar elevation (Madronich 2007), MED-based yield (Holick 2004), elevation ramp for the "vitamin D winter" (Webb 1988). Several factors are assumptions.

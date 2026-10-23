@@ -57,6 +57,7 @@ export const effectSeverity: Record<string, EffectSeverity> = {
   'FE.low': s('moderate'),
   'ZN.low': s('moderate'),
   'ID.low': s('moderate'),
+  'SE.low': s('moderate'),
   'CU.low': s('moderate'),
   'FD.low': s('mild'),
 
@@ -72,6 +73,7 @@ export const effectSeverity: Record<string, EffectSeverity> = {
   'FE.high': s('moderate'),
   'ZN.high': s('moderate'),
   'ID.high': s('moderate'),
+  'SE.high': s('moderate'),
   'CU.high': s('moderate'),
   'FD.high': s('mild'),
   'MO.high': s('mild'),
