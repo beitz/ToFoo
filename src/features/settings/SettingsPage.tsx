@@ -6,6 +6,7 @@ import { FEATURES, isOn } from '../../settings/features';
 import { repo } from '../../storage/repo';
 import { Field, NumberInput, Segmented, Toggle } from '../../ui/controls';
 import { AccentPicker } from './AccentPicker';
+import { viewsOf } from '../../settings/views';
 import { Icon } from '../../ui/Icon';
 
 function LinkRow({ to, label, detail }: { to: string[]; label: string; detail?: string }) {
@@ -25,6 +26,7 @@ function LinkRow({ to, label, detail }: { to: string[]; label: string; detail?: 
 export function SettingsPage() {
   const d = useData();
   const s = d.settings;
+  const views = viewsOf(s);
   const p = d.profile;
   const hiddenCount = s.hiddenNutrients.length;
   const toCheck = d.products.filter(needsCheck).length;
@@ -96,16 +98,27 @@ export function SettingsPage() {
             { value: 'dark', label: t('settings.themeDark') },
           ]}
         />
-        <p className="muted small settings-label">{t('settings.homeLayout')}</p>
+        <p className="muted small settings-label">{t('settings.macroView')}</p>
         <Segmented
-          label={t('settings.homeLayout')}
-          value={s.homeView === 'compact' ? 'compact' : 'detailed'}
-          onChange={(v) => repo.updateSettings({ homeView: v })}
+          label={t('settings.macroView')}
+          value={views.macros}
+          onChange={(v) => repo.updateSettings({ macroView: v })}
           options={[
-            { value: 'detailed', label: t('settings.homeRings') },
-            { value: 'compact', label: t('settings.homeLists') },
+            { value: 'rings', label: t('settings.viewRings') },
+            { value: 'bars', label: t('settings.viewBars') },
           ]}
         />
+        <p className="muted small settings-label">{t('settings.nutrientView')}</p>
+        <Segmented
+          label={t('settings.nutrientView')}
+          value={views.nutrients}
+          onChange={(v) => repo.updateSettings({ nutrientView: v })}
+          options={[
+            { value: 'comets', label: t('settings.viewComets') },
+            { value: 'bars', label: t('settings.viewBars') },
+          ]}
+        />
+        <p className="muted small">{t('settings.viewsHint')}</p>
         <p className="muted small settings-label" id="accent-label">
           {t('settings.accent')}
         </p>

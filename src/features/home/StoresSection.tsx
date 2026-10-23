@@ -1,5 +1,5 @@
 import { navigate } from '../../app/router';
-import { t, type MessageKey } from '../../i18n';
+import { t } from '../../i18n';
 import { fmtFill } from '../../lib/format';
 import { NUTRIENT_BY_ID } from '../../model/nutrients';
 import type { NutrientResult, StoreResult } from '../../model/simulate';
@@ -10,37 +10,22 @@ import { fmtDurationShort, storeLastsDays, storeTrendLabel, trendArrows } from '
 import { Icon } from '../../ui/Icon';
 import { statusLabel } from '../../ui/status';
 import { StatusMark, symbolOf } from '../../ui/Tile';
-import { useState } from 'react';
 
 const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
 
 /**
- * The six body stores on Home (design 2026-10-22), at the top of the "Last 7 days" card: a blue tank
+ * The six body stores on Home (design 2026-10-22), in the Stores card when nutrients show as comets: a blue tank
  * each, used for stores only, with its status mark, % full, the filling / draining arrow and how long
  * it would last with none.
  */
-export function StoresSection({ stores, showRange, startLevel }: { stores: Array<NutrientResult & { store: StoreResult }>; showRange: boolean; startLevel: string }) {
-  const [legend, setLegend] = useState(false);
+export function StoresSection({ stores, showRange }: { stores: Array<NutrientResult & { store: StoreResult }>; showRange: boolean }) {
   if (stores.length === 0) return null;
   return (
-    <section className="home-sub" aria-labelledby="stores-head">
-      <div className="home-sub-head">
-        <h3 id="stores-head">{t('home.stores')}</h3>
-        <button className="card-note card-note-btn" aria-expanded={legend} aria-controls="stores-legend" onClick={() => setLegend((o) => !o)}>
-          {t('home.storesNote')} <Icon name="info" size={14} />
-        </button>
-      </div>
-      {legend && (
-        <p className="muted small" id="stores-legend">
-          {t('home.storesLegend', { start: t(`start.${startLevel}` as MessageKey) })}
-        </p>
-      )}
-      <div className="store-row" role="group" aria-label={t('home.stores')}>
-        {stores.map((r) => (
-          <StoreTank key={r.id} result={r} showRange={showRange} />
-        ))}
-      </div>
-    </section>
+    <div className="store-row" role="group" aria-label={t('home.stores')}>
+      {stores.map((r) => (
+        <StoreTank key={r.id} result={r} showRange={showRange} />
+      ))}
+    </div>
   );
 }
 

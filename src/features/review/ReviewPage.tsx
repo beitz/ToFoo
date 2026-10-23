@@ -14,6 +14,9 @@ import { Field, Segmented } from '../../ui/controls';
 import { urgencyRank } from '../../ui/status';
 import { DAY_ICON } from './dayStatus';
 import { DateInput } from '../../ui/DateInputs';
+import { viewsOf } from '../../settings/views';
+import { MacroRings, useToday, type MacroValues } from '../home/TodayRings';
+import { CometView } from '../home/NutrientsSection';
 
 const MACRO_ROW = ['ENERCC', 'PROT625', 'FAT', 'CHO', 'FIBT'];
 const DAY_KEY = /^\d{4}-\d{2}-\d{2}$/;
@@ -41,6 +44,14 @@ export function ReviewPage({ from: fromParam, to: toParam }: { from?: string; to
     .filter((r): r is NutrientResult => !!r)
     .sort((a, b) => urgencyRank(a.status) - urgencyRank(b.status) || a.value.central - b.value.central);
 
+  // Energy, macros and the list look as on Home (Settings → Appearance); rings show the average per day.
+  const views = viewsOf(d.settings);
+  const todayValues = useToday();
+  const periodValues: MacroValues = {
+    ...todayValues,
+    amountOf: (id) => period.nutrients.get(id)?.averageIntake ?? 0,
+    partOf: (id) => (period.nutrients.get(id)?.missingDataDays ?? 0) > 0,
+  };
   const go = (f: string, to2: string) => navigate('review', f, to2);
   function pick(p: PeriodPreset) {
     if (p === 'range') return setCustom(true);
@@ -118,18 +129,29 @@ export function ReviewPage({ from: fromParam, to: toParam }: { from?: string; to
         </div>
       </div>
 
-      {macros.length > 0 && (
-        <div className="macro-row" role="group" aria-label={t('home.macros')}>
-          {macros.map((r) => (
-            <CompactGauge key={r.id} variant="cell" result={r} onClick={() => navigate('nutrient', r.id)} />
+      {macros.length > 0 &&
+        (views.macros === 'rings' ? (
+          <div className="card home-card">
+            <MacroRings values={periodValues} defaultBased={() => false} today={false} />
+          </div>
+        ) : (
+          <div className="macro-row" role="group" aria-label={t('home.macros')}>
+            {macros.map((r) => (
+              <CompactGauge key={r.id} variant="cell" result={r} onClick={() => navigate('nutrient', r.id)} />
+            ))}
+          </div>
+        ))}
+      {views.nutrients === 'comets' ? (
+        <div className="card home-card">
+          <CometView results={gauges} showRange={isOn(d.settings.features, 'uncertaintyRanges')} />
+        </div>
+      ) : (
+        <div className="cgauge-grid">
+          {gauges.map((r) => (
+            <CompactGauge key={r.id} result={r} onClick={() => navigate('nutrient', r.id)} />
           ))}
         </div>
       )}
-      <div className="cgauge-grid">
-        {gauges.map((r) => (
-          <CompactGauge key={r.id} result={r} onClick={() => navigate('nutrient', r.id)} />
-        ))}
-      </div>
       <p className="muted small disclaimer">{t('review.explain')}</p>
     </section>
   );

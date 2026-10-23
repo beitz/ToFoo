@@ -17,11 +17,8 @@ import { withStores } from '../../logic/stores';
 import { DayStrip } from './DayStrip';
 import { FastCard, FastChip } from './FastCard';
 import { NextToCook } from './NextToCook';
-import { NutrientsSection } from './NutrientsSection';
 import { RecentDays } from './RecentDays';
-import { StoresSection } from './StoresSection';
-import { TodayRings } from './TodayRings';
-import { ListLayout } from './ListLayout';
+import { HomeCards } from './HomeCards';
 import { formatDate, parseDay } from '../../lib/dates';
 
 /** Energy and the macronutrients: today's rings at the top, not in the 7-day list; fibre too (owner's ask). */
@@ -42,8 +39,6 @@ export function HomePage() {
   const showRange = isOn(settings.features, 'uncertaintyRanges');
   const hidden = new Set(settings.hiddenNutrients);
   const windowDays = settings.shortWindowDays;
-  // Two layouts (owner, 2026-10-23): rings and comets (default), or lists by averaging window.
-  const rings = settings.homeView !== 'compact';
 
   const shown = NUTRIENTS.filter((n) => !hidden.has(n.id))
     .map((n) => model.nutrients.get(n.id))
@@ -66,28 +61,17 @@ export function HomePage() {
   return (
     <section className="home">
       <header className="page-head row-between home-head">
-        <h1 className="grow">{rings ? t('home.today') : `${parseDay(today).toLocaleDateString('en-GB', { weekday: 'long' })} ${formatDate(today, false)}`}</h1>
+        <h1 className="grow">{`${parseDay(today).toLocaleDateString('en-GB', { weekday: 'long' })} ${formatDate(today, false)}`}</h1>
         <FastChip />
         <SettingsButton />
       </header>
       <DayStrip days={windowDays} />
-      {rings && <TodayRings defaultBased={perKgOnDefault} />}
       <FastCard />
 
       {isOn(d.settings.features, 'sleep') && <SleepQuestion />}
       <Prompts />
 
-      {rings ? (
-        <div className="card home-card">
-          <div className="card-head">
-            <h2>{t('home.lastDays', { n: windowDays })}</h2>
-          </div>
-          <StoresSection stores={stores} showRange={showRange} startLevel={d.profile.startingLevel} />
-          <NutrientsSection results={rest} showRange={showRange} windowDays={windowDays} />
-        </div>
-      ) : (
-        <ListLayout rest={rest} stores={stores} windowDays={windowDays} startLevel={d.profile.startingLevel} defaultBased={perKgOnDefault} />
-      )}
+      <HomeCards rest={rest} stores={stores} windowDays={windowDays} startLevel={d.profile.startingLevel} showRange={showRange} defaultBased={perKgOnDefault} />
       {isOn(d.settings.features, 'water') && <WaterCard day={today} compact />}
       <NextToCook />
 
