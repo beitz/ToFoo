@@ -309,10 +309,11 @@ header.page-head:not(.row):not(.row-between) {
 
 /* ── Cards, lists ────────────────────────────────────────────── */
 .card {
+  --card-pad-x: 14px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 12px 14px;
+  padding: 12px var(--card-pad-x);
   margin: 12px 0;
   box-shadow: var(--shadow);
 }
@@ -324,7 +325,9 @@ header.page-head:not(.row):not(.row-between) {
   position: sticky;
   top: 0;
   z-index: 5;
-  padding: 6px 0;
+  /* Edge to edge, so what scrolls under the heading doesn't show at its sides. */
+  margin-inline: calc(-1 * var(--card-pad-x));
+  padding: 6px var(--card-pad-x);
   background: var(--surface);
 }
 .card-head {
@@ -4257,7 +4260,8 @@ a.contributor-link > span:first-child {
   font-size: 1.5rem;
 }
 .home-card {
-  padding: 10px 12px 12px;
+  --card-pad-x: 12px;
+  padding: 10px var(--card-pad-x) 12px;
 }
 .card-note-btn {
   display: inline-flex;
