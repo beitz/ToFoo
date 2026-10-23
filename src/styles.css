@@ -355,6 +355,11 @@ header.page-head:not(.row):not(.row-between) {
 .card-head h3 {
   margin: 0;
 }
+/* ⓘ in a card heading: centred on the title, its 44 px target reaching into the card padding. */
+.card-head > .info-btn {
+  align-self: center;
+  margin: -10px -10px -10px auto;
+}
 .card-head .card-note {
   color: var(--text-faint);
   font-size: 0.8rem;
@@ -5371,13 +5376,177 @@ a.contributor-link > span:first-child {
   align-items: center;
   gap: 6px;
 }
-.nut-hero-notes {
-  margin-top: 10px;
-  border-top: 1px solid var(--border);
-  padding-top: 8px;
+/* ⓘ in the hero's top right corner; the 44 px target reaches into the card padding. */
+.nut-hero-main > .info-btn {
+  margin: -10px -10px 0 auto;
 }
-.nut-hero-notes p {
-  margin: 4px 0;
+.nut-hero-text.grow {
+  flex: 1;
+}
+/* Need tile over 100 %: the scale's top, and a dashed line at 100 %. */
+.nut-tile-level {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--text);
+  opacity: 0.6;
+}
+.nut-tile-scale {
+  position: absolute;
+  top: 3px;
+  left: 6px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+.nut-tile-need {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 2px dashed var(--text);
+}
+.nut-tile-need > span {
+  position: absolute;
+  right: 5px;
+  bottom: 2px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--text);
+}
+.nut-tile-over {
+  border-top-style: dashed;
+}
+.nut-tile-over .nut-tile-scale {
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 1rem;
+  color: var(--text);
+}
+/* One dot per day behind the average. */
+.day-dots {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px;
+  margin-top: 4px !important;
+}
+.day-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  box-sizing: border-box;
+}
+.day-dot-estimated {
+  background: color-mix(in srgb, var(--text-muted) 35%, transparent);
+}
+.day-dot-leftOut {
+  background: none;
+  border: 1.5px dashed var(--text-faint);
+}
+.day-dot-missing {
+  background: none;
+  border: 2px solid var(--warn);
+}
+.day-dots .small {
+  margin-left: 4px;
+}
+/* An amount against its reference: bar to scale, reference as a mark. */
+.amount-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  font-variant-numeric: tabular-nums;
+}
+.amount-bar > span:first-child,
+.amount-bar > span:last-child {
+  flex: none;
+  white-space: nowrap;
+}
+.amount-track {
+  position: relative;
+  flex: 1;
+  min-width: 40px;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--surface-2);
+}
+.amount-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--c) 70%, transparent);
+}
+.amount-today .amount-fill {
+  background: var(--accent);
+}
+.amount-mark {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 2px;
+  background: var(--text);
+}
+.nut-chips {
+  margin: 8px 0 0;
+}
+.nut-chips:empty {
+  display: none;
+}
+.nut-chips .chip {
+  min-height: 32px;
+  padding: 0 10px;
+  font-size: 0.85rem;
+  cursor: default;
+  background: var(--surface-2);
+}
+.nut-chips .chip-link {
+  min-height: 44px;
+  color: var(--accent);
+  text-decoration: none;
+  cursor: pointer;
+}
+.nut-chips .chip-warn {
+  border-color: var(--warn);
+  color: var(--warn);
+  background: none;
+}
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 6px 0 0;
+}
+.chart-legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.legend-sample {
+  display: inline-block;
+  width: auto;
+  overflow: visible;
+}
+.info-sheet p {
+  margin: 0 0 10px;
+}
+/* What it does, signs, too much and "How is it worked out?" as rows of one card. */
+.fold-group {
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+.fold-group > .fold + .fold,
+.fold-group > .fold-row {
+  border-top: 1px solid var(--border);
+}
+.fold-group .fold-body {
+  padding-bottom: 10px;
+}
+.fold-group > .why-link {
+  min-height: 48px;
 }
 .chart-tank .chart-line {
   stroke: var(--tank);
@@ -5399,10 +5568,26 @@ a.contributor-link > span:first-child {
   display: grid;
   gap: 2px;
   justify-items: center;
+  min-width: 0;
+  padding: 4px 0 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
 }
-.uptake-eaten {
-  font-size: 0.8rem;
-  color: var(--text-muted);
+.uptake-day.picked .uptake-col {
+  background: var(--surface-2);
+  border-radius: 4px 4px 0 0;
+}
+.uptake-day.picked .uptake-wd {
+  color: var(--text);
+  font-weight: 700;
+}
+.uptake-readout {
+  margin: 0 0 6px;
+  font-variant-numeric: tabular-nums;
 }
 .uptake-col {
   position: relative;
@@ -5425,23 +5610,10 @@ a.contributor-link > span:first-child {
   height: 2px;
   background: var(--text);
 }
-.uptake-up {
-  font-weight: 700;
-  font-size: 0.85rem;
-}
 .uptake-wd {
   font-size: 0.75rem;
-}
-.uptake-legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 12px;
-  margin: 8px 0 0;
-}
-.uptake-legend > span {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
+  min-height: 1.2em;
+  white-space: nowrap;
 }
 .legend-bar {
   width: 10px;
