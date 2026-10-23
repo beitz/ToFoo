@@ -1,7 +1,9 @@
 import { useId } from 'react';
+import { useData } from '../../app/data';
 import { t, type MessageKey } from '../../i18n';
 import { MAX_ACTIVITY_MINUTES } from '../../logic/activity';
 import type { SkinExposure } from '../../model/sun';
+import { isOn } from '../../settings/features';
 import { ACTIVITY_KINDS, INTENSITIES, type ActivityKind, type ActivityRecord, type Intensity } from '../../storage/types';
 import { Field, NumberInput, Segmented, Toggle } from '../../ui/controls';
 import { TimeField } from '../log/TimeField';
@@ -55,6 +57,8 @@ export function activityName(a: { kind: ActivityKind; name?: string }): string {
 /** What, when, how long, how hard, outside: the fields shared by the diary sheet and the assistant's card. */
 export function ActivityForm({ draft, onChange }: { draft: ActivityDraft; onChange: (d: ActivityDraft) => void }) {
   const skinId = useId();
+  // Skin and sun questions only matter while the sun estimate is on (owner's ask, 2026-10-23).
+  const sunOn = isOn(useData().settings.features, 'sunVitaminD');
   const set = (patch: Partial<ActivityDraft>) => onChange({ ...draft, ...patch });
   return (
     <>
@@ -77,7 +81,7 @@ export function ActivityForm({ draft, onChange }: { draft: ActivityDraft; onChan
         options={INTENSITIES.map((i) => ({ value: i, label: t(`activity.intensity.${i}` as MessageKey) }))}
       />
       <Toggle checked={draft.outside} onChange={(outside) => set({ outside })} label={t('activity.outside')} />
-      {draft.outside && (
+      {draft.outside && sunOn && (
         <>
           <Toggle checked={draft.sun} onChange={(sun) => set({ sun })} label={t('activity.sun')} description={t('activity.sunHint')} />
           {draft.sun && <SkinSelect id={skinId} value={draft.skin} onChange={(skin) => set({ skin })} />}

@@ -155,7 +155,7 @@ function OnePrompt() {
       </div>
     );
   }
-  if (!p.outdoorRoutine && !dismissed('sun')) {
+  if (isOn(d.settings.features, 'sunVitaminD') && !p.outdoorRoutine && !dismissed('sun')) {
     return (
       <div className="card prompt">
         <p>{t('prompt.sun')}</p>

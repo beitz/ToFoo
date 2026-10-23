@@ -6,6 +6,7 @@ describe('features', () => {
     expect(isOn({}, 'fasting')).toBe(true);
     expect(isOn(DEFAULT_FEATURES, 'fasting')).toBe(false);
     expect(isOn({ fasting: true }, 'fasting')).toBe(true);
+    expect(isOn(DEFAULT_FEATURES, 'sunVitaminD')).toBe(false);
   });
 
   it('puts every feature in a section, and a needed feature before the ones that need it', () => {

@@ -60,6 +60,7 @@ export function DiaryPage({ day: dayParam }: { day?: string }) {
   // A sleep being edited, or 'new' for one being added.
   const [sleepSheet, setSleepSheet] = useState<SleepRecord | 'new' | null>(null);
   const activityOn = isOn(d.settings.features, 'activity');
+  const sunOn = isOn(d.settings.features, 'sunVitaminD');
   const activities = useActivities(day) ?? [];
   // An activity being edited, or 'new' for one being added.
   const [activitySheet, setActivitySheet] = useState<ActivityRecord | 'new' | null>(null);
@@ -275,38 +276,42 @@ export function DiaryPage({ day: dayParam }: { day?: string }) {
         </>
       )}
 
-      <h2 className="section-title">
-        <Icon name="sun" /> {t('diary.outside')}
-      </h2>
-      <p className="muted small">
-        {routine.length ? t('diary.routine', { min: routine.reduce((a, s) => a + s.minutes, 0) }) : t('diary.noRoutine')} <a href={href('settings', 'sun')}>{t('diary.editRoutine')}</a>
-      </p>
-      <ul className="plain-list">
-        {sunToday.map((s) => (
-          <li key={s.id} className="row-between">
-            <span>
-              {t('diary.sunEntry', { min: s.minutes, time: `${String(Math.floor(s.startHour)).padStart(2, '0')}:${String(Math.round((s.startHour % 1) * 60)).padStart(2, '0')}` })} ·{' '}
-              {t(`skin.${s.skin}` as MessageKey)}
-            </span>
-            <button className="icon-btn" onClick={() => void removeSun(s)} aria-label={t('common.delete')}>
-              <Icon name="trash" size={18} />
-            </button>
-          </li>
-        ))}
-        {activityOn &&
-          activities
-            .filter((a) => a.outside && a.sunSkin)
-            .map((a) => (
-              <li key={a.id} className="row-between">
+      {sunOn && (
+        <>
+          <h2 className="section-title">
+            <Icon name="sun" /> {t('diary.outside')}
+          </h2>
+          <p className="muted small">
+            {routine.length ? t('diary.routine', { min: routine.reduce((a, s) => a + s.minutes, 0) }) : t('diary.noRoutine')} <a href={href('settings', 'sun')}>{t('diary.editRoutine')}</a>
+          </p>
+          <ul className="plain-list">
+            {sunToday.map((s) => (
+              <li key={s.id} className="row-between">
                 <span>
-                  {activityName(a)}: {t('diary.sunEntry', { min: a.minutes, time: formatTime(a.time) })} · {t(`skin.${a.sunSkin}` as MessageKey)}
+                  {t('diary.sunEntry', { min: s.minutes, time: `${String(Math.floor(s.startHour)).padStart(2, '0')}:${String(Math.round((s.startHour % 1) * 60)).padStart(2, '0')}` })} ·{' '}
+                  {t(`skin.${s.skin}` as MessageKey)}
                 </span>
+                <button className="icon-btn" onClick={() => void removeSun(s)} aria-label={t('common.delete')}>
+                  <Icon name="trash" size={18} />
+                </button>
               </li>
             ))}
-      </ul>
-      <button className="btn btn-secondary" onClick={() => setAddingSun(true)}>
-        <Icon name="plus" /> {t('diary.addOutside')}
-      </button>
+            {activityOn &&
+              activities
+                .filter((a) => a.outside && a.sunSkin)
+                .map((a) => (
+                  <li key={a.id} className="row-between">
+                    <span>
+                      {activityName(a)}: {t('diary.sunEntry', { min: a.minutes, time: formatTime(a.time) })} · {t(`skin.${a.sunSkin}` as MessageKey)}
+                    </span>
+                  </li>
+                ))}
+          </ul>
+          <button className="btn btn-secondary" onClick={() => setAddingSun(true)}>
+            <Icon name="plus" /> {t('diary.addOutside')}
+          </button>
+        </>
+      )}
 
       {editing && <EditEntrySheet entry={editing} onClose={() => setEditing(null)} />}
       {addingSun && <SunEntrySheet day={day} onClose={() => setAddingSun(false)} />}
