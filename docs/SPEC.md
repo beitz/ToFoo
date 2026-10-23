@@ -612,7 +612,7 @@ New users (owner's request 2026-10-23, before sharing the app with others) get a
 | Activity | How active you are sets your energy target. |
 | Body stores start | How full your stores of iron, B12, vitamin A, folate, iodine and vitamin D are today. **Average (recommended)** is preselected; Empty for someone who suspects poor intake. |
 
-Left empty, a field uses the defaults the app uses today, still marked as defaults on the numbers they affect, and Settings → Profile changes everything later. The questions about periods (iron) appear in Profile only, not here.
+Left empty, a field uses the defaults the app uses today, still marked as defaults on the numbers they affect, and Settings → Profile changes everything later. The questions about periods (iron) appear in Profile only, not here. The why lines and "Average (recommended)" are the same strings as in Settings → Profile and Starting levels, so each is written once.
 
 **How a tour looks**: the screen dims, one element gets a clear outline, and a bubble beside it shows one line (about 90 characters at most) with **Next** and **Skip**, plus "2 of 9" so it's clear how long it is. Tapping outside the bubble does nothing, so nobody leaves a tour by accident. Respects `prefers-reduced-motion` (no sliding, the outline just jumps), works in light and dark mode, buttons are 44 px.
 
