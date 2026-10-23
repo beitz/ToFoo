@@ -10,6 +10,7 @@ import { z } from 'zod';
 import type { Food, FoodDb } from '../foods/foodDb';
 import type { FindResult, UsdaFindResult } from '../foods/findProduct';
 import { normalizeBarcode } from '../foods/openFoodFacts';
+import { labelPiece, piecesToGrams } from '../foods/pieces';
 import { hasOwnMicros, isProductCode, productFood, productId, productLabel, productRef } from '../foods/products';
 import { normalize, search, type SearchIndex } from '../foods/search';
 import { parseLocalDateTime } from './photoTime';
@@ -45,6 +46,8 @@ const PRODUCTS_PER_QUERY = 4;
 export const MAX_ITEM_GRAMS = 3000;
 /** The same for one recipe ingredient: a big pot, not a meal (10 kg of potatoes is still a pot). */
 export const MAX_INGREDIENT_GRAMS = 10000;
+/** Sanity limit for pieces of one food in one meal, not a nutritional number (a bag of sweets is still under it). */
+const MAX_PIECES = 200;
 /** Sanity limit for a recipe's portions (a party pot), not a physiological number. */
 const MAX_PORTIONS = 100;
 /** Longest proposed preparation steps: a long recipe, not a transcript of the whole chat. */
@@ -69,6 +72,8 @@ export const proposalInput = z.object({
         note: z.string().default(''),
         /** Products and USDA foods only: BLS code of the most similar food, for what the source lacks. */
         micros_from: z.string().optional(),
+        /** Meals only: a count of pieces ("one piece of gum"); the app sets grams from the piece weight when it knows one. 0 or missing: by grams. */
+        pieces: z.number().optional(),
       }),
     )
     .min(1),
@@ -301,6 +306,8 @@ export interface ProposedItem {
   grams: number;
   preparation: Preparation;
   note: string;
+  /** Counted in pieces: how many, and the weight of one (the user's, the label's, or the assistant's estimate). */
+  pieces?: { n: number; grams: number; from: 'yours' | 'serving' | 'pack' | 'estimate' };
   /** For packaged products: the product with its BLS match, to save when the meal is logged. */
   product?: Product;
 }
@@ -355,6 +362,8 @@ export interface ToolContext {
   boost?: (code: string) => number;
   /** Absent when both the Open Food Facts lookup and USDA are off. */
   products?: ProductTools;
+  /** Piece weights the user saved, by food code (BLS code or product id). */
+  pieces?: ReadonlyMap<string, number>;
   /** Current time, for checking proposed meal times (injected to keep this pure). */
   now?: number;
   /** The journal is on: the assistant may propose journal entries. */
@@ -464,6 +473,19 @@ export function describeProduct(p: Product, db: Pick<FoodDb, 'byCode'>): string 
   ].join(' | ');
 }
 
+/**
+ * The weight of one piece, as the assistant reads it: the user's own, or the label's. Products
+ * without one say so (the assistant then estimates from the pack and says it); BLS foods only
+ * when the user saved one.
+ */
+export function pieceNote(code: string, product: Product | undefined, pieces: ReadonlyMap<string, number> | undefined): string {
+  const own = pieces?.get(code);
+  if (own) return ` | 1 piece = ${fmtNumber(own, 2)} g (the user's own weight)`;
+  const label = product ? labelPiece(product) : undefined;
+  if (label) return ` | 1 piece = ${fmtNumber(label.grams, 2)} g (label ${label.from === 'serving' ? 'serving' : 'pack'} "${label.text}")`;
+  return product ? ' | weight of one piece unknown' : '';
+}
+
 function savedProductHits(q: string, products: ProductTools | undefined): Product[] {
   if (!products) return [];
   const words = normalize(q).split(' ').filter(Boolean);
@@ -482,7 +504,10 @@ export function runSearchFoods(input: unknown, ctx: ToolContext): { ok: boolean;
     const products = savedProductHits(q, ctx.products);
     // What is at home is marked, so the model picks the exact product the user has.
     const home = (key: string) => (ctx.pantry?.has(key) ? ' [at home]' : '');
-    const lines = [...products.map((p) => describeProduct(p, ctx.db) + home(p.id)), ...hits.map((f) => describeFood(f, ctx.db) + home(`BLS:${f.code}`))];
+    const lines = [
+      ...products.map((p) => describeProduct(p, ctx.db) + pieceNote(p.id, p, ctx.pieces) + home(p.id)),
+      ...hits.map((f) => describeFood(f, ctx.db) + pieceNote(f.code, undefined, ctx.pieces) + home(`BLS:${f.code}`)),
+    ];
     return `Results for "${q}":\n${lines.length ? lines.join('\n') : 'No matches. Try a shorter or more generic word, in English or German.'}`;
   });
   return { ok: true, text: blocks.join('\n\n') };
@@ -506,7 +531,7 @@ export async function runLookupBarcode(input: unknown, ctx: ToolContext): Promis
     const r: FindResult = seen ? { kind: 'found', product: seen } : await find(code);
     if (r.kind === 'found') {
       ctx.products.seen.set(r.product.id, r.product);
-      lines.push(describeProduct(r.product, ctx.db));
+      lines.push(describeProduct(r.product, ctx.db) + pieceNote(r.product.id, r.product, ctx.pieces));
     } else if (r.kind === 'notFound') lines.push(`${code}: not in Open Food Facts. Use the closest generic BLS food instead.`);
     else lines.push(`${code}: could not be looked up. Error: ${r.detail} Tell the user this error word for word (it helps them trace the problem), then use the closest generic BLS food instead.`);
   }
@@ -537,7 +562,7 @@ export async function runSearchUsda(input: unknown, ctx: ToolContext): Promise<{
     }
     const found = r.products.slice(0, USDA_RESULTS_PER_QUERY);
     for (const p of found) ctx.products.seen.set(p.id, p);
-    blocks.push(`Results for "${q}":\n${found.length ? found.map((p) => describeProduct(p, ctx.db)).join('\n') : 'No matches. Try other English words.'}`);
+    blocks.push(`Results for "${q}":\n${found.length ? found.map((p) => describeProduct(p, ctx.db) + pieceNote(p.id, p, ctx.pieces)).join('\n') : 'No matches. Try other English words.'}`);
   }
   return { ok: true, text: blocks.join('\n\n') };
 }
@@ -731,6 +756,7 @@ function validateItems(
   db: Pick<FoodDb, 'byCode'> & { version?: string },
   products: ProductTools | undefined,
   maxGrams: number,
+  pieceWeights?: ReadonlyMap<string, number>,
 ): { items: ProposedItem[]; problems: string[] } {
   const problems: string[] = [];
   const items: ProposedItem[] = [];
@@ -756,8 +782,25 @@ function validateItems(
       food = db.byCode.get(code);
       if (!food) problems.push(`Unknown code ${it.code}: use only codes returned by search_foods.`);
     }
-    if (!(it.grams > 0) || it.grams > maxGrams) problems.push(`${it.code}: ${it.grams} g is not plausible (expected more than 0 and at most ${maxGrams} g).`);
-    if (food && it.grams > 0 && it.grams <= maxGrams) items.push({ food, grams: Math.round(it.grams * 10) / 10, preparation: it.preparation, note: it.note.trim(), ...(product ? { product } : {}) });
+    // Pieces: the app's weight of one (the user's, else the label's) sets the grams; without one, the
+    // assistant's grams stand as its estimate.
+    const n = it.pieces && it.pieces > 0 ? it.pieces : 0;
+    if (n > MAX_PIECES) problems.push(`${it.code}: ${n} pieces is not plausible (at most ${MAX_PIECES}); give grams instead.`);
+    const own = n && food ? pieceWeights?.get(food.code) : undefined;
+    const label = n && !own && product ? labelPiece(product) : undefined;
+    const known = own ?? label?.grams;
+    const from = own ? 'yours' : (label?.from ?? 'estimate');
+    const grams = known ? piecesToGrams(n, known) : it.grams;
+    if (!(grams > 0) || grams > maxGrams) problems.push(`${it.code}: ${grams} g is not plausible (expected more than 0 and at most ${maxGrams} g).`);
+    else if (food && n <= MAX_PIECES)
+      items.push({
+        food,
+        grams: Math.round(grams * 10) / 10,
+        preparation: it.preparation,
+        note: it.note.trim(),
+        ...(product ? { product } : {}),
+        ...(n ? { pieces: { n, grams: known ?? Math.round((grams / n) * 100) / 100, from } } : {}),
+      });
   }
   return { items, problems };
 }
@@ -768,10 +811,11 @@ export function validateProposal(
   db: Pick<FoodDb, 'byCode'> & { version?: string },
   products?: ProductTools,
   now?: number,
+  pieces?: ReadonlyMap<string, number>,
 ): { ok: true; proposal: Proposal } | { ok: false; error: string } {
   const parsed = proposalInput.safeParse(input);
   if (!parsed.success) return { ok: false, error: `Invalid input: ${parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}` };
-  const { items, problems } = validateItems(parsed.data.items, db, products, MAX_ITEM_GRAMS);
+  const { items, problems } = validateItems(parsed.data.items, db, products, MAX_ITEM_GRAMS, pieces);
   const { time, problem } = checkTime(parsed.data.time, now);
   if (problem) problems.push(problem);
   if (problems.length) return { ok: false, error: `${problems.join('\n')}\nFix these and call propose_meal again.` };

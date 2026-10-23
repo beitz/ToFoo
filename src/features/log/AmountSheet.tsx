@@ -11,7 +11,8 @@ import type { Preparation } from '../../model/paramTypes';
 import type { EntryConfidence } from '../../model/types';
 import { repo } from '../../storage/repo';
 import type { FoodRef, LogEntry, PortionSize, Product } from '../../storage/types';
-import { Field, NumberInput, Sheet } from '../../ui/controls';
+import { Sheet } from '../../ui/controls';
+import { AmountField, type Amount } from './AmountField';
 import { ConfidenceField } from './ConfidenceField';
 import { PreparationSelect } from './PreparationSelect';
 import { MatchPicker, ProductInfo, saveProductChoice, useMatchChoice } from './ProductParts';
@@ -32,7 +33,9 @@ export function AmountSheet({ day, time: initialTime, onClose, onAdded, ...targe
 
   const helpers = useLiveQuery(() => repo.getMeta<PortionHelper[]>(`portions:${food.code}`), [food.code]) ?? [];
   const last = useLiveQuery(() => repo.getMeta<number>(`lastGrams:${food.code}`), [food.code]);
-  const [grams, setGrams] = useState<number>();
+  const [amount, setAmount] = useState<Amount>({ grams: undefined });
+  const { grams, pieces } = amount;
+  const setGrams = (g: number | undefined) => setAmount({ grams: g });
   const [prep, setPrep] = useState<Preparation>('asListed');
   const [confidence, setConfidence] = useState<EntryConfidence>('A');
   // The meal's time is set once, at the top of the Log screen (owner's ask, 2026-10-22).
@@ -43,7 +46,7 @@ export function AmountSheet({ day, time: initialTime, onClose, onAdded, ...targe
   // The pack size as printed ("400 g"), for a ready meal or a bar eaten whole.
   const packGrams = draft?.quantity && !draft.perMl ? parseAmount(draft.quantity).grams : undefined;
   const pack = packGrams && packGrams !== draft?.serving?.grams ? [{ label: t('log.wholePack'), grams: packGrams }] : [];
-  const chips: PortionHelper[] = [...helpers, ...serving, ...pack, ...(last ? [{ label: t('log.lastTime'), grams: last }] : []), { label: '50 g', grams: 50 }, { label: '100 g', grams: 100 }, { label: '200 g', grams: 200 }];
+  const chips: PortionHelper[] = [...helpers.filter((h) => !h.piece), ...serving, ...pack, ...(last ? [{ label: t('log.lastTime'), grams: last }] : []), { label: '50 g', grams: 50 }, { label: '100 g', grams: 100 }, { label: '200 g', grams: 200 }];
   // A product with no label values and no matched food would log nothing but a name.
   const hasValues = !draft || Object.keys(draft.per100).length > 0 || !!choice.food;
 
@@ -54,7 +57,7 @@ export function AmountSheet({ day, time: initialTime, onClose, onAdded, ...targe
       await saveProductChoice(draft);
       ref = productRef(draft);
     }
-    const entry = await repo.addLog({ kind: 'food', ref, grams, preparation: prep, time, day: time ? dayKey(new Date(time)) : day, confidence, label: name });
+    const entry = await repo.addLog({ kind: 'food', ref, grams, preparation: prep, ...(pieces ? { pieces } : {}), time, day: time ? dayKey(new Date(time)) : day, confidence, label: name });
     await repo.setMeta(`lastGrams:${food.code}`, grams);
     onAdded(entry);
   }
@@ -82,24 +85,23 @@ export function AmountSheet({ day, time: initialTime, onClose, onAdded, ...targe
           {food.nameDe} · <a href={`#/food/${food.code}`}>{t('log.details')}</a>
         </p>
       )}
-      <Field label={t('log.amount')}>
-        {(id) => <NumberInput id={id} value={grams} onChange={setGrams} placeholder="0" suffix={draft?.perMl ? 'ml' : 'g'} min={0} autoFocus />}
-      </Field>
-      <div className="chips">
-        {chips.map((c) => (
-          <button key={`${c.label}-${c.grams}`} className={`chip${grams === c.grams ? ' on' : ''}`} onClick={() => setGrams(c.grams)}>
-            {c.label === `${c.grams} g` || c.label.includes(`${c.grams} g`) ? c.label : `${c.label} (${fmtNumber(c.grams, 1)} g)`}
-          </button>
-        ))}
-      </div>
-      {grams ? (
-        <div className="row helper-row">
-          <input className="small-input" placeholder={t('log.portionName')} value={helperName} onChange={(e) => setHelperName(e.target.value)} aria-label={t('log.portionName')} />
-          <button className="btn btn-small btn-ghost" disabled={!helperName.trim()} onClick={() => void saveHelper()}>
-            {t('log.savePortion')}
-          </button>
+      <AmountField code={food.code} product={draft} value={amount} onChange={setAmount} autoFocus>
+        <div className="chips">
+          {chips.map((c) => (
+            <button key={`${c.label}-${c.grams}`} className={`chip${grams === c.grams ? ' on' : ''}`} onClick={() => setGrams(c.grams)}>
+              {c.label === `${c.grams} g` || c.label.includes(`${c.grams} g`) ? c.label : `${c.label} (${fmtNumber(c.grams, 1)} g)`}
+            </button>
+          ))}
         </div>
-      ) : null}
+        {grams ? (
+          <div className="row helper-row">
+            <input className="small-input" placeholder={t('log.portionName')} value={helperName} onChange={(e) => setHelperName(e.target.value)} aria-label={t('log.portionName')} />
+            <button className="btn btn-small btn-ghost" disabled={!helperName.trim()} onClick={() => void saveHelper()}>
+              {t('log.savePortion')}
+            </button>
+          </div>
+        ) : null}
+      </AmountField>
       {draft && <MatchPicker product={draft} choice={choice} onChange={setChoice} />}
       <PreparationSelect value={prep} onChange={setPrep} />
       <ConfidenceField value={confidence} onChange={setConfidence} />

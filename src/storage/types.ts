@@ -235,7 +235,14 @@ interface LogBase extends Versioned {
 }
 
 export type LogEntry =
-  | (LogBase & { kind: 'food'; ref: FoodRef; grams: number; preparation: Preparation })
+  | (LogBase & {
+      kind: 'food';
+      ref: FoodRef;
+      grams: number;
+      preparation: Preparation;
+      /** Logged as a count of pieces ("1 piece of chewing gum"): how many. `grams` is what counts. */
+      pieces?: number;
+    })
   | (LogBase & {
       kind: 'portion';
       batchId: string;
@@ -395,10 +402,15 @@ export interface ActivityRecord extends Versioned {
   sunSkin?: SkinExposure;
 }
 
-/** A portion size the user saved for a food ("My bowl", 60 g); stored in meta under `portions:<food code>`. */
+/**
+ * A portion size the user saved for a food ("My bowl", 60 g); stored in meta under `portions:<food code>`.
+ * `piece` marks the weight of one piece (at most one per food), so amounts can be given as a count
+ * (src/foods/pieces.ts).
+ */
 export interface PortionSize {
   label: string;
   grams: number;
+  piece?: true;
 }
 
 /** Saved portion sizes of one food, as they go into backups. */

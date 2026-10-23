@@ -12,6 +12,7 @@ export { FORMAT_VERSION };
 
 const confidence = z.enum(['A', 'B', 'C']);
 const preparation = z.enum(['asListed', 'raw', 'boiled', 'steamed', 'baked', 'fried']);
+const pieces = z.number().positive().optional().describe('Logged as a count of pieces: how many (grams is what counts)');
 const storageKind = z.enum(['fresh', 'fridge', 'freezer']);
 const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'expected a date like 2026-10-15');
 const nutrients = z.record(z.string(), z.number().finite().nonnegative()).describe('Amounts by BLS component code, in BLS units (e.g. {"VITC": 12.5} mg)');
@@ -55,7 +56,7 @@ const favouriteMeal = z.object({
   items: z
     .array(
       z.discriminatedUnion('kind', [
-        z.object({ ...mealItemBase, kind: z.literal('food'), ref: foodRef, grams: z.number().positive(), preparation }),
+        z.object({ ...mealItemBase, kind: z.literal('food'), ref: foodRef, grams: z.number().positive(), preparation, pieces }),
         z.object({ ...mealItemBase, kind: z.literal('portion'), ...portionFields }),
         z.object({ ...mealItemBase, kind: z.literal('custom'), customFoodId: z.string(), servings: z.number().positive() }),
         z.object({ ...mealItemBase, kind: z.literal('manual'), nutrients, isSupplement: z.boolean() }),
@@ -155,7 +156,7 @@ export const batchSchema = z.object({
 
 const logBase = { id: z.string(), ...versioned, time: z.number(), day, confidence, label: z.string() };
 export const logEntrySchema = z.discriminatedUnion('kind', [
-  z.object({ ...logBase, kind: z.literal('food'), ref: foodRef, grams: z.number().positive(), preparation }),
+  z.object({ ...logBase, kind: z.literal('food'), ref: foodRef, grams: z.number().positive(), preparation, pieces }),
   z.object({ ...logBase, kind: z.literal('portion'), ...portionFields }),
   z.object({ ...logBase, kind: z.literal('custom'), customFoodId: z.string(), servings: z.number().positive() }),
   z.object({ ...logBase, kind: z.literal('manual'), nutrients, isSupplement: z.boolean() }),
@@ -263,7 +264,16 @@ export const ketoneSchema = z
   .describe('A ketone measurement: when (epoch ms), how (blood: β-hydroxybutyrate in mmol/L from a finger-prick meter; breath: acetone in ppm, device-specific; urine: acetoacetate in mmol/L as the strip reads) and the value in that unit');
 
 export const portionSizesSchema = z
-  .object({ food: z.string().min(1), sizes: z.array(z.object({ label: z.string(), grams: z.number().positive() })) })
+  .object({
+    food: z.string().min(1),
+    sizes: z.array(
+      z.object({
+        label: z.string(),
+        grams: z.number().positive(),
+        piece: z.literal(true).optional().describe('The weight of one piece of this food (at most one per food), so amounts can be given as a count'),
+      }),
+    ),
+  })
   .describe('Portion sizes the user saved for one food ("My bowl", 60 g), by the food code they were saved under');
 
 const header = {

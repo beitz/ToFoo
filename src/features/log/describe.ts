@@ -7,7 +7,7 @@ import type { LogEntry } from '../../storage/types';
 export function entryAmount(e: LogEntry, d: Pick<AppData, 'customFoodsById'>): string {
   switch (e.kind) {
     case 'food':
-      return fmtGrams(e.grams);
+      return e.pieces ? `${t(e.pieces === 1 ? 'piece.one' : 'piece.many', { n: fmtNumber(e.pieces, 2) })} · ${fmtGrams(e.grams)}` : fmtGrams(e.grams);
     case 'portion':
       return [e.grams ? fmtGrams(e.grams) : t('entry.portions', { n: fmtNumber(e.portions, 2) }), t(`storage.${e.storage}`), ...(e.ingredients ? [t('entry.changed')] : [])].join(' · ');
     case 'custom': {

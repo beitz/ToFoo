@@ -327,6 +327,30 @@ describe('packaged products (Open Food Facts lookup on)', () => {
     expect(labelOnly.ok && labelOnly.proposal.items[0]!.product?.match).toBeUndefined();
   });
 
+  it('weighs counted pieces with the user\'s or the label\'s piece weight, else keeps the estimate', async () => {
+    const p = products();
+    p.seen.set(giotto.id, giotto);
+    const meal = (code: string, pieces: number, grams: number) => ({ summary: 'Snack', items: [{ code, grams, preparation: 'asListed', note: '', micros_from: 'S450000', pieces }], assumptions: [], confidence: 'B' });
+    // "3 balls (13 g)" on the label: one ball weighs 4.33 g, whatever grams the assistant wrote.
+    const label = validateProposal(meal('OFF:4008400121925', 2, 0), db, p);
+    expect(label.ok && label.proposal.items[0]).toMatchObject({ grams: 8.7, pieces: { n: 2, grams: 4.33, from: 'serving' } });
+    // The user's own weight wins.
+    const own = validateProposal(meal('OFF:4008400121925', 2, 0), db, p, undefined, new Map([['OFF:4008400121925', 4.5]]));
+    expect(own.ok && own.proposal.items[0]).toMatchObject({ grams: 9, pieces: { n: 2, grams: 4.5, from: 'yours' } });
+    // No weight known (a BLS food without one): the assistant's grams stand, marked as its estimate.
+    const guess = validateProposal(meal('S450000', 2, 10), db, p);
+    expect(guess.ok && guess.proposal.items[0]).toMatchObject({ grams: 10, pieces: { n: 2, grams: 5, from: 'estimate' } });
+    const none = validateProposal(meal('S450000', 2, 0), db, p);
+    expect(!none.ok && none.error).toContain('0 g is not plausible');
+    // Not counted: grams as given, no pieces.
+    const grams = validateProposal(meal('S450000', 0, 12), db, p);
+    expect(grams.ok && grams.proposal.items[0]!.pieces).toBeUndefined();
+    // The tools tell the assistant what one piece weighs.
+    expect((await runLookupBarcode({ barcodes: ['4008400121925'] }, { ...ctx, products: p })).text).toContain('1 piece = 4.33 g (label serving "3 balls (13 g)")');
+    expect(runSearchFoods({ queries: ['nougat'] }, { ...ctx, pieces: new Map([['S450000', 5]]) }).text).toContain("1 piece = 5 g (the user's own weight)");
+    expect(runSearchFoods({ queries: ['nougat'] }, ctx).text).not.toContain('piece');
+  });
+
   it('offers lookup_barcode only when the lookup is on, and passes barcodes read from photos', async () => {
     const api = scripted(
       reply([toolUse('t1', 'lookup_barcode', { barcodes: ['4008400121925'] })], 'tool_use'),
