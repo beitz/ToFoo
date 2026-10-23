@@ -37,9 +37,15 @@ test('a packaged product is found by name and logged after its barcode lookup', 
   }
 
   await page.goto('./#/log');
-  await page.getByPlaceholder('Search foods').pressSequentially('pick up', { delay: 50 });
+  // A search typed, cleared and typed again, as the owner did: only the new results show.
+  const box = page.getByPlaceholder('Search foods');
+  await box.pressSequentially('wrigley', { delay: 50 });
+  await expect(page.locator('.off-results')).toContainText(/wrigley/i);
+  await box.clear();
+  await box.pressSequentially('pick up', { delay: 50 });
   await expect(page.getByRole('heading', { name: 'Packaged products · Open Food Facts' })).toBeVisible();
   await expect(page.locator('.off-results')).toHaveCount(1);
+  await expect(page.locator('.off-results')).not.toContainText(/wrigley/i);
   expect(lookups).toEqual([]);
 
   // The most-scanned Pick Up comes first; whichever it is, the fake answer above is the Choco minis.
