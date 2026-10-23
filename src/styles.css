@@ -7018,6 +7018,27 @@ a.contributor-link > span:first-child {
   margin: 10px 0 2px;
   font-size: 0.9rem;
 }
+.level-severity {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.sev-dots {
+  display: inline-flex;
+  gap: 3px;
+  flex: none;
+  margin-top: 5px;
+}
+.sev-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 1.5px solid var(--text-muted);
+}
+.sev-dot.on {
+  background: var(--text);
+  border-color: var(--text);
+}
 .level-link {
   display: inline-flex;
   align-items: center;

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { effectFindings, effectSeverity } from '../../model/effects';
 import { infoOnly, referenceValues } from '../../model/reference-values';
+import { findingVars } from '../features/nutrient/EffectCard';
 import { EFFECT_SOURCES, effectsEn } from './effects.en';
 import { infoId, NUTRIENT_INFO_SOURCES } from './nutrientInfo.en';
 
@@ -38,6 +40,25 @@ describe('what your levels mean: texts', () => {
     for (const [k, list] of Object.entries(EFFECT_SOURCES)) {
       expect(has(`effect.${k}`), k).toBe(true);
       for (const s of list) expect(s.url).toMatch(/^https:\/\//);
+    }
+  });
+
+  it('say how serious every effect is, and fill every number in a finding from model/effects.ts', () => {
+    const lines = keys.filter((k) => /\.(low|high)$/.test(k)).map((k) => k.slice('effect.'.length));
+    expect(Object.keys(effectSeverity).sort()).toEqual(lines.sort());
+    for (const [k, list] of Object.entries(effectFindings)) {
+      expect(has(`effect.${k}`), k).toBe(true);
+      list.forEach((x, i) => {
+        const text = (effectsEn as Record<string, string>)[`effect.${k}Size${i + 1}`];
+        expect(text, `${k} finding ${i + 1}`).toBeDefined();
+        const vars = findingVars(x);
+        for (const [, name] of text!.matchAll(/\{(\w+)\}/g)) expect(vars, `${k}Size${i + 1} {${name}}`).toHaveProperty([name!]);
+        expect(x.url).toMatch(/^https:\/\//);
+      });
+    }
+    for (const k of keys.filter((x) => /Size\d+$/.test(x))) {
+      const m = /^effect\.(.+)Size(\d+)$/.exec(k)!;
+      expect(effectFindings[m[1]!]?.[Number(m[2]) - 1], k).toBeDefined();
     }
   });
 });
