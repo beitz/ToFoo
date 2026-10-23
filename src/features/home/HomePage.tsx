@@ -17,6 +17,7 @@ import { withStores } from '../../logic/stores';
 import { DayStrip } from './DayStrip';
 import { CatchUpLine } from '../catchup/CatchUpLine';
 import { InstallHint } from './InstallHint';
+import { AppVersion, UpdateLine } from './AppVersion';
 import { FastCard, FastChip } from './FastCard';
 import { NextToCook } from './NextToCook';
 import { RecentDays } from './RecentDays';
@@ -63,10 +64,14 @@ export function HomePage() {
   return (
     <section className="home">
       <header className="page-head row-between home-head">
-        <h1 className="grow">{`${parseDay(today).toLocaleDateString('en-GB', { weekday: 'long' })} ${formatDate(today, false)}`}</h1>
+        <div className="grow home-title">
+          <AppVersion />
+          <h1>{`${parseDay(today).toLocaleDateString('en-GB', { weekday: 'long' })} ${formatDate(today, false)}`}</h1>
+        </div>
         <FastChip />
         <SettingsButton />
       </header>
+      <UpdateLine />
       <InstallHint />
       <DayStrip days={windowDays} />
       <CatchUpLine />

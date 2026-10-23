@@ -58,3 +58,15 @@ test('the round button fans out, and a second tap opens Log meal and stays there
   expect(new URL(page.url()).hash).toBe('#/log');
   expect(errors).toEqual([]);
 });
+
+test('Home shows the app version, and About can check for a newer one', async ({ page }) => {
+  const errors = watchErrors(page);
+  await firstLaunch(page);
+  const version = page.getByRole('link', { name: /^ToFoo \d+\.\d+\.(\d+|dev)$/ });
+  await expect(version).toBeVisible();
+  await version.click();
+  await expect(page.getByText(/^App version:/)).toBeVisible();
+  await page.getByRole('button', { name: 'Check for updates' }).click();
+  await expect(page.getByRole('status')).toHaveText(/newest version|only be checked/);
+  expect(errors).toEqual([]);
+});

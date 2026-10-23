@@ -3,15 +3,29 @@ import { readFileSync } from 'node:fs';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+import { buildInfo, runGit } from './scripts/app-version';
 
 // Served from https://beitz.github.io/ToFoo/
 const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as { version: string };
+const build = buildInfo(pkg.version, runGit, new Date());
 
 export default defineConfig({
-  define: { __APP_VERSION__: JSON.stringify(pkg.version) },
+  define: {
+    __APP_VERSION__: JSON.stringify(build.version),
+    __APP_COMMIT__: JSON.stringify(build.commit),
+    __APP_BUILT_AT__: JSON.stringify(build.builtAt),
+  },
   base: '/ToFoo/',
   plugins: [
     react(),
+    // The same build info as a file next to the app, so a running old version can read the number of
+    // the new one the service worker just fetched (src/app/update.ts). Precached like the rest.
+    {
+      name: 'tofoo-version-json',
+      generateBundle() {
+        this.emitFile({ type: 'asset', fileName: 'version.json', source: JSON.stringify(build) });
+      },
+    },
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['icon.svg', 'apple-touch-icon.png'],
