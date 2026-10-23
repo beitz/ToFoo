@@ -37,6 +37,8 @@ describe('catch up', () => {
   it('leaves out trackers that are off or skipped, and asks about one never used yet', () => {
     expect(missingOn({ ...base, on: { sleep: false, activity: true, water: true } })).toEqual(['activity', 'water']);
     expect(missingOn({ ...base, activities: [] })).toEqual(['sleep', 'activity', 'water']);
+    // First used only after the day: not asked about.
+    expect(missingOn({ ...base, water: [{ day: key(23) }] })).toEqual(['sleep', 'activity']);
     expect(missingOn({ ...base, skipped: new Set(['sleep', 'water'] as const) })).toEqual(['activity']);
   });
 

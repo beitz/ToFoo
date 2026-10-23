@@ -25,6 +25,11 @@
   --high: #6a45d6;
   --high-soft: color-mix(in srgb, var(--high) 14%, transparent);
   --unknown: #5f676e;
+  --t-meals: #c2410c;
+  --t-sleep: #6d28d9;
+  --t-activity: #be185d;
+  --t-water: #1d6fd6;
+  --t-journal: #8a6d1a;
   --tank: #1a66ae;
   --tank-soft: color-mix(in srgb, var(--tank) 26%, transparent);
   --range: rgba(21, 24, 27, 0.16);
@@ -63,6 +68,16 @@
     --high: #b69cff;
     --high-soft: color-mix(in srgb, var(--high) 16%, transparent);
     --unknown: #8e99a1;
+  --t-meals: #fb923c;
+  --t-sleep: #a78bfa;
+  --t-activity: #f472b6;
+  --t-water: #60a5fa;
+  --t-journal: #d6b45a;
+    --t-meals: #fb923c;
+    --t-sleep: #a78bfa;
+    --t-activity: #f472b6;
+    --t-water: #60a5fa;
+    --t-journal: #d6b45a;
     --tank: #5baef2;
     --tank-soft: color-mix(in srgb, var(--tank) 26%, transparent);
     --range: rgba(238, 241, 243, 0.2);
@@ -1883,7 +1898,7 @@ body:has(.composer) .toast-area {
 }
 .calendar-row {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 4px;
 }
 .calendar-weekdays span {
@@ -6570,4 +6585,76 @@ a.contributor-link > span:first-child {
 }
 .catchup-done p {
   margin-top: 0;
+}
+
+/* Calendar layers: one colour and one fixed spot per tracker; filled = logged, ring = not logged,
+   dash = skipped. The fill, not the colour, says whether it was logged. */
+.cal-layers {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  margin: 0 calc(-1 * var(--gutter)) 4px;
+  padding: 2px var(--gutter);
+  scrollbar-width: none;
+}
+.cal-layers .chip {
+  flex: none;
+  min-height: 44px;
+}
+.cal-meals { --c: var(--t-meals); }
+.cal-sleep { --c: var(--t-sleep); }
+.cal-activity { --c: var(--t-activity); }
+.cal-water { --c: var(--t-water); }
+.cal-journal { --c: var(--t-journal); }
+.cal-dots {
+  display: flex;
+  gap: 1.5px;
+  min-height: 6px;
+}
+.cal-dot {
+  display: inline-block;
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  vertical-align: middle;
+  box-sizing: border-box;
+}
+.cal-dot.mark-logged {
+  background: var(--c, var(--text-muted));
+}
+.cal-dot.mark-missing {
+  border: 1.5px solid var(--c, var(--text-muted));
+}
+.cal-dot.mark-skipped {
+  height: 2px;
+  margin: 2px 0;
+  border-radius: 1px;
+  background: var(--c, var(--text-muted));
+  opacity: 0.6;
+}
+.cal-dot.mark-none {
+  visibility: hidden;
+}
+.chip.on .cal-dot.mark-logged {
+  box-shadow: 0 0 0 1.5px var(--accent-text);
+}
+.cal-value {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--c);
+  white-space: nowrap;
+}
+.calendar-day > .cal-dot {
+  width: 9px;
+  height: 9px;
+}
+.cal-key {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  margin: 0;
+}
+.cal-key .cal-dot:not(:first-child) {
+  margin-left: 8px;
 }

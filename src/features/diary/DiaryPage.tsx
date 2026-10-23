@@ -1,3 +1,4 @@
+import { CatchUpLine } from '../catchup/CatchUpLine';
 import { useState } from 'react';
 import { useData } from '../../app/data';
 import { useToast } from '../../app/toast';
@@ -129,6 +130,7 @@ export function DiaryPage({ day: dayParam }: { day?: string }) {
           <Icon name="chevron" />
         </button>
       </header>
+      <CatchUpLine day={day} />
 
       <div className="card diary-day">
         <div className="card-head">
