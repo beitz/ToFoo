@@ -66,7 +66,7 @@ export function NutrientRangePage({ id, from: fromParam, to: toParam }: { id: st
   const single = from === to;
 
   return (
-    <section className="nutrient-page">
+    <section className="nutrient-page nutrient-range">
       <div className="range-banner" role="note">
         <Icon name="calendar" size={18} />
         <span className="grow">

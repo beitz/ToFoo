@@ -126,7 +126,8 @@ export function ReviewPage({ from: fromParam, to: toParam }: { from?: string; to
             </a>
           )}
           <a className="icon-btn" href={href('week', weekStart(to))} aria-label={t('review.weekByWeek')} title={t('review.weekByWeek')}>
-            <Icon name="bars" size={20} />
+            {/* The week look-back's icon, as on Overview: bars would read as "nutrients of this day". */}
+            <Icon name="history" size={20} />
           </a>
           <a className="icon-btn" href={href('calendar', to.slice(0, 7))} aria-label={t('review.calendar')} title={t('review.calendar')}>
             <Icon name="calendar" size={20} />
