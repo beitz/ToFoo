@@ -50,7 +50,7 @@ export function JournalPage() {
   return (
     <section>
       <header className="page-head row">
-        <BackButton to={['diary']} />
+        <BackButton to={['overview']} />
         <h1>{t('journal.title')}</h1>
       </header>
 

@@ -85,7 +85,7 @@ export function InsightsPage() {
   return (
     <section className="assistant-page">
       <header className="page-head row-between">
-        <BackButton to={['diary']} />
+        <BackButton to={['overview']} />
         <h1>{t('insights.title')}</h1>
         <button
           className="btn btn-small btn-ghost"

@@ -1,18 +1,17 @@
 import { href } from '../../app/router';
 import { t } from '../../i18n';
-import { weekStart } from '../../lib/periods';
 import { SettingsButton } from '../../ui/SettingsButton';
 
-export type InsightsView = 'diary' | 'week' | 'calendar';
+export type InsightsView = 'overview' | 'diary' | 'calendar';
 
 /**
- * The top of the Insights tab: Diary · Week · Calendar, each for the day being looked at, and
- * Settings at the right as on the other tabs.
+ * The top of the Insights tab: Overview · Days · Calendar (owner's pick, 2026-10-23), the last two for
+ * the day being looked at, and Settings at the right as on the other tabs.
  */
 export function InsightsTabs({ view, day }: { view: InsightsView; day: string }) {
   const links: Array<{ view: InsightsView; to: string; label: string }> = [
+    { view: 'overview', to: href('overview'), label: t('insightsTab.overview') },
     { view: 'diary', to: href('diary', day), label: t('insightsTab.diary') },
-    { view: 'week', to: href('week', weekStart(day)), label: t('insightsTab.week') },
     { view: 'calendar', to: href('calendar', day.slice(0, 7)), label: t('insightsTab.calendar') },
   ];
   return (

@@ -13,6 +13,7 @@ import { SleepShortcut } from '../features/sleep/SleepShortcut';
 import { CalendarPage } from '../features/review/CalendarPage';
 import { ReviewPage } from '../features/review/ReviewPage';
 import { WeekPage } from '../features/review/WeekPage';
+import { OverviewPage } from '../features/review/OverviewPage';
 import { LogPage } from '../features/log/LogPage';
 import { AssistantPage } from '../features/assistant/AssistantPage';
 import { AssistantSettingsPage } from '../features/settings/AssistantSettingsPage';
@@ -122,6 +123,8 @@ function Page({ route }: { route: string[] }) {
       return <ReviewPage from={b} to={c} />;
     case 'week':
       return <WeekPage week={b} />;
+    case 'overview':
+      return <OverviewPage />;
     case 'fast':
       return <FastShortcut />;
     case 'fasting':
@@ -149,7 +152,7 @@ function Onboarded({ children }: { children: ReactNode }) {
 
 const NAV = [
   { key: 'home', to: [] as string[], icon: 'home', label: 'nav.home' },
-  { key: 'insights', to: ['diary'], icon: 'chart', label: 'nav.insights' },
+  { key: 'insights', to: ['overview'], icon: 'chart', label: 'nav.insights' },
   { key: 'kitchen', to: ['kitchen'], icon: 'kitchen', label: 'nav.kitchen' },
 ] as const;
 
@@ -157,6 +160,7 @@ const NAV = [
 const TAB_OF: Record<string, (typeof NAV)[number]['key'] | null> = {
   diary: 'insights',
   insights: 'insights',
+  overview: 'insights',
   week: 'insights',
   calendar: 'insights',
   review: 'insights',
