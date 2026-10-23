@@ -70,7 +70,7 @@ export function NutrientsSection({ results, showRange }: { results: NutrientResu
  * The comet list with its sort switch, "Most important" or "By type" (remembered in settings.homeGrouping).
  * Used on Home and on the nutrients page when Settings → Appearance → Nutrients is "Comets".
  */
-export function CometView({ results, showRange }: { results: NutrientResult[]; showRange: boolean }) {
+export function CometView({ results, showRange, open }: { results: NutrientResult[]; showRange: boolean; open?: (id: string) => void }) {
   const d = useData();
   const byType = d.settings.homeGrouping === 'type';
   return (
@@ -92,22 +92,22 @@ export function CometView({ results, showRange }: { results: NutrientResult[]; s
               <h4>{t(`home.group.type.${g.id}` as MessageKey)}</h4>
               {hasGroupInfo(g.id) && <GroupInfoButton group={g.id} />}
             </div>
-            <CometList items={g.items} showRange={showRange} />
+            <CometList items={g.items} showRange={showRange} open={open} />
           </div>
         ))
       ) : (
-        <CometList items={[...results].sort(byUrgency)} showRange={showRange} />
+        <CometList items={[...results].sort(byUrgency)} showRange={showRange} open={open} />
       )}
     </>
   );
 }
 
-function CometList({ items, showRange }: { items: NutrientResult[]; showRange: boolean }) {
+function CometList({ items, showRange, open }: { items: NutrientResult[]; showRange: boolean; open?: (id: string) => void }) {
   return (
     <ul className="comet-list">
       {items.map((r) => (
         <li key={r.id}>
-          <CometRow result={r} showRange={showRange} />
+          <CometRow result={r} showRange={showRange} open={open} />
         </li>
       ))}
     </ul>
@@ -119,13 +119,13 @@ function CometList({ items, showRange }: { items: NutrientResult[]; showRange: b
  * limit), the head is the status mark at the current average and the tail fades back to where the
  * average was a week ago at the current rate. Unknown: a dashed track and no head.
  */
-function CometRow({ result: r, showRange }: { result: NutrientResult; showRange: boolean }) {
+function CometRow({ result: r, showRange, open = (id) => navigate('nutrient', id) }: { result: NutrientResult; showRange: boolean; open?: (id: string) => void }) {
   const def = NUTRIENT_BY_ID.get(r.id);
   // No need or limit to measure against (e.g. sugars): the amount per day only, no track.
   if (r.kind === 'info') {
     const amount = hasNoData(r) ? '–' : `${fmtAmount(r.id, r.averageIntake)}/${t('review.dayShort')}`;
     return (
-      <button type="button" className="comet comet-info" onClick={() => navigate('nutrient', r.id)} aria-label={`${def?.name ?? r.id}: ${amount}`}>
+      <button type="button" className="comet comet-info" onClick={() => open(r.id)} aria-label={`${def?.name ?? r.id}: ${amount}`}>
         <span className="comet-name" aria-hidden>
           {def?.name ?? r.id}
         </span>
@@ -149,7 +149,7 @@ function CometRow({ result: r, showRange }: { result: NutrientResult; showRange:
       (tr ? `, ${trendLabel(tr)}` : '') +
       (r.ownTarget ? `, ${t('gauge.ownTarget')}` : '');
   return (
-    <button type="button" className={`comet comet-${r.kind} comet-${status}`} onClick={() => navigate('nutrient', r.id)} aria-label={spoken}>
+    <button type="button" className={`comet comet-${r.kind} comet-${status}`} onClick={() => open(r.id)} aria-label={spoken}>
       <span className="comet-name" aria-hidden>
         {def?.name ?? r.id}
         {r.ownTarget && <Icon name="target" size={11} />}

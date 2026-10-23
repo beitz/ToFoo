@@ -13,7 +13,6 @@ import { weekStart } from '../lib/periods';
 import { periodBreakdown, type PeriodInput, type PeriodResult } from '../model/period';
 import type { GaugeKind, GaugeStatus } from '../model/simulate';
 import type { InsightData } from './insights';
-import { checkPortion, topGaps, type PortionShare } from './recipeIdeas';
 
 /** Weeks in the charts, the shown week included. */
 export const WEEKS_SHOWN = 8;
@@ -238,40 +237,4 @@ export function trackerWeeks(data: InsightData, weeks: readonly Week[], defs: re
     });
   }
   return out;
-}
-
-/** Weight of a gap in the suggestion: low counts double, as in "Foods that fill your gaps". */
-const GAP_WEIGHT = { low: 2, gettingLow: 1 } as const;
-/** A portion giving more than this share of a nutrient that is already too high is pushed down (as in model/ranking.ts). */
-const HIGH_SHARE = 0.2;
-const HIGH_PENALTY = 0.3;
-
-export interface BatchSuggestion<R> {
-  recipe: R;
-  /** The gaps one portion helps with most. */
-  helps: PortionShare[];
-  score: number;
-}
-
-/**
- * "One suggestion for the next batch": the recipe whose portion covers most of this week's gaps,
- * low ones counting double, without adding much of what is already too high. Undefined when no
- * recipe helps (or nothing is low).
- */
-export function suggestBatch<R>(
-  recipes: readonly R[],
-  portion: (r: R) => { intake: Readonly<Record<string, number>>; missing: readonly string[] },
-  week: ReadonlyMap<string, { status: GaugeStatus }>,
-  req: Parameters<typeof checkPortion>[2],
-): BatchSuggestion<R> | undefined {
-  let best: BatchSuggestion<R> | undefined;
-  for (const recipe of recipes) {
-    const check = checkPortion(portion(recipe), week, req);
-    let score = check.gaps.reduce((s, g) => s + GAP_WEIGHT[g.status] * Math.min(1, g.share), 0);
-    if (check.high.some((h) => h.share > HIGH_SHARE)) score *= HIGH_PENALTY;
-    const helps = topGaps(check);
-    if (helps.length === 0 || score <= (best?.score ?? 0)) continue;
-    best = { recipe, helps, score };
-  }
-  return best;
 }

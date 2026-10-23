@@ -45,7 +45,18 @@ export type MacroValues = ReturnType<typeof useToday>;
  * maximum the extra laps on in the "too much" colour with ▲, and a nutrient without a target shows its
  * grams in a dashed ring. Each one taps through to its nutrient page.
  */
-export function MacroRings({ values, defaultBased, today }: { values: MacroValues; defaultBased: (id: string) => boolean; today: boolean }) {
+export function MacroRings({
+  values,
+  defaultBased,
+  today,
+  open = (id) => navigate('nutrient', id),
+}: {
+  values: MacroValues;
+  defaultBased: (id: string) => boolean;
+  today: boolean;
+  /** Where a tap goes: the nutrient's page, or (a past period) that period's view of it. */
+  open?: (id: string) => void;
+}) {
   const d = useData();
   const { amountOf, partOf, goalOf, own } = values;
   const spokenKey = today ? 'home.ringSpoken' : 'review.ringSpoken';
@@ -65,7 +76,7 @@ export function MacroRings({ values, defaultBased, today }: { values: MacroValue
 
   return (
     <div className="today-rings" role="group" aria-label={t(today ? 'home.todayLabel' : 'review.macrosLabel')}>
-      <button type="button" className="today-big" onClick={() => navigate('nutrient', 'ENERCC')} aria-label={energySpoken}>
+      <button type="button" className="today-big" onClick={() => open('ENERCC')} aria-label={energySpoken}>
         <Ring size={132} stroke={11} share={kcalGoal ? kcal / kcalGoal.amount : undefined} over={diff > 0} />
         <span className="today-big-text" aria-hidden>
           <strong>{kcalText}</strong>
@@ -96,7 +107,7 @@ export function MacroRings({ values, defaultBased, today }: { values: MacroValue
             .filter(Boolean)
             .join(', ');
           return (
-            <button key={id} type="button" className="today-cell" onClick={() => navigate('nutrient', id)} aria-label={spoken}>
+            <button key={id} type="button" className="today-cell" onClick={() => open(id)} aria-label={spoken}>
               <span className="today-ring" aria-hidden>
                 <Ring size={48} stroke={5} share={goal ? amount / goal.amount : undefined} over={over} />
                 <span className="today-ring-value">{value}</span>

@@ -29,6 +29,7 @@ import { RecipeEditor } from '../features/recipes/RecipeEditor';
 import { RecipeView } from '../features/recipes/RecipeView';
 import { splitContext } from '../features/nutrient/NutrientSplit';
 import { NutrientPage } from '../features/nutrient/NutrientPage';
+import { NutrientRangePage } from '../features/nutrient/NutrientRangePage';
 import { NutrientFoodsPage } from '../features/nutrient/NutrientFoodsPage';
 import { WhyPage } from '../features/nutrient/WhyPage';
 import { FoodPage } from '../features/food/FoodPage';
@@ -51,7 +52,7 @@ import { WaterPage } from '../features/trackers/WaterPage';
 
 function Page({ route }: { route: string[] }) {
   const d = useData();
-  const [a, b, c, e] = route;
+  const [a, b, c, e, f] = route;
   if (!d.profile.onboarded) return <Onboarding />;
   switch (a) {
     case 'log':
@@ -62,7 +63,7 @@ function Page({ route }: { route: string[] }) {
     case 'diary':
       return <DiaryPage day={b} />;
     case 'journal':
-      return <JournalPage />;
+      return <JournalPage key={b ?? ''} write={b === 'new'} />;
     case 'insights':
       return <InsightsPage />;
     case 'shopping':
@@ -80,6 +81,7 @@ function Page({ route }: { route: string[] }) {
     case 'nutrient':
       if (c === 'foods') return <NutrientFoodsPage key={b} id={b ?? ''} />;
       if (c === 'why') return <WhyPage key={b} id={b ?? ''} />;
+      if (c === 'range') return <NutrientRangePage key={route.join('/')} id={b ?? ''} from={e} to={f} />;
       return <NutrientPage key={route.join('/')} id={b ?? ''} context={splitContext(c, e)} />;
     case 'food':
       return <FoodPage code={b ?? ''} />;
@@ -186,7 +188,8 @@ const TAB_OF: Record<string, (typeof NAV)[number]['key'] | null> = {
 export function App() {
   const route = useRoute();
   const section = route[0] ?? 'home';
-  const active = section in TAB_OF ? TAB_OF[section] : 'home';
+  // A nutrient over a past period is opened from Insights and belongs there.
+  const active = section === 'nutrient' && route[2] === 'range' ? 'insights' : section in TAB_OF ? TAB_OF[section] : 'home';
   const path = route.join('/');
   // Braces matter: an effect's return value is its cleanup, and newer Chrome returns a Promise
   // from scrollTo. React then called that Promise on the next screen change ("is not a function")

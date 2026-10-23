@@ -5,7 +5,7 @@ import { resolveRequirements } from '../model/requirements';
 import { simulate } from '../model/simulate';
 import { DEFAULT_MODEL_SETTINGS, type ModelEntry } from '../model/types';
 import type { InsightData } from './insights';
-import { defaultWeek, isoWeek, nutrientWeeks, suggestBatch, trackerWeek, trackerWeeks, weekMoves, weekPeriods, weekRecap, weeksEndingAt, weekWatch, type NutrientWeeks } from './weekly';
+import { defaultWeek, isoWeek, nutrientWeeks, trackerWeek, trackerWeeks, weekMoves, weekPeriods, weekRecap, weeksEndingAt, weekWatch, type NutrientWeeks } from './weekly';
 
 const req = resolveRequirements({ sex: 'male', birthYear: 1996, weightKg: 80, activity: 'medium' }, 2026);
 // Mon 28 Sep to Sun 18 Oct 2026, with today on Wednesday 14 Oct.
@@ -106,36 +106,6 @@ describe('trackers', () => {
     expect(out.map((t) => t.id)).toEqual(['sleep_hours', 'activity_minutes', 'plain_water']);
     expect(out[0]!.series).toEqual([null, 6.5, 8]);
     expect(out[0]!.prev).toBe(6.5);
-  });
-});
-
-describe('suggestBatch', () => {
-  const byNutrient = new Map([
-    ['FE', { recommended: 10 }],
-    ['FOL', { recommended: 300 }],
-    ['NA', { recommended: 1500, limitOnly: true }],
-  ]) as never;
-  const week = new Map([
-    ['FE', { status: 'low' as const }],
-    ['FOL', { status: 'gettingLow' as const }],
-    ['NA', { status: 'tooHigh' as const }],
-  ]);
-  const recipes: Array<{ name: string; intake: Record<string, number> }> = [
-    { name: 'Lentil soup', intake: { FE: 5, FOL: 90, NA: 600 } },
-    { name: 'Spinach curry', intake: { FE: 4, FOL: 150, NA: 100 } },
-    { name: 'Rice', intake: { FE: 0.1, FOL: 3 } },
-  ];
-  const portion = (r: (typeof recipes)[number]) => ({ intake: r.intake, missing: [] });
-
-  it('picks the recipe that covers the gaps best without adding to what is too high', () => {
-    const s = suggestBatch(recipes, portion, week, { byNutrient })!;
-    expect(s.recipe.name).toBe('Spinach curry');
-    expect(s.helps.map((h) => h.id)).toEqual(['FOL', 'FE']);
-  });
-
-  it('suggests nothing when no recipe helps or nothing is low', () => {
-    expect(suggestBatch([recipes[2]!], portion, week, { byNutrient })).toBeUndefined();
-    expect(suggestBatch(recipes, portion, new Map(), { byNutrient })).toBeUndefined();
   });
 });
 
