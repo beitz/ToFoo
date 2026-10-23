@@ -119,6 +119,18 @@ export function activeFast(fasts: readonly Fast[], log: readonly LogEntry[], cus
   return fasts.find((f) => !f.endDay && f.startDay <= today && !log.some((e) => e.day >= f.startDay && breaksFast(e, customFoods)));
 }
 
+/**
+ * First day the model runs from: the first day with an entry or a day status (a fast, "Leave out"…),
+ * today when there is none. Not the day the profile was set up: days before the first log would count
+ * as "nothing eaten" and pull every average down (owner's report, 2026-10-23, EPA + DHA after a week).
+ */
+export function firstModelDay(log: readonly LogEntry[], explicit: Readonly<Record<string, DayStatus>>, today: string): string {
+  let first = today;
+  for (const e of log) if (e.day < first) first = e.day;
+  for (const d of Object.keys(explicit)) if (d < first) first = d;
+  return first;
+}
+
 export function explicitDayStatus(records: readonly DayStatusRecord[], fasts: readonly Fast[], log: readonly LogEntry[], customFoods: ReadonlyMap<string, CustomFood>, today: string): Record<string, DayStatus> {
   const out: Record<string, DayStatus> = {};
   for (const f of fasts) for (const d of fastDays(f, log, customFoods, today)) out[d] = 'fasted';

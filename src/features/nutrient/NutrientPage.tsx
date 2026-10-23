@@ -4,7 +4,7 @@ import { href } from '../../app/router';
 import { t, type MessageKey } from '../../i18n';
 import { fmtAmount, fmtFill, fmtNumber, fmtPercent } from '../../lib/format';
 import { NUTRIENT_BY_ID } from '../../model/nutrients';
-import { tankTrend, type GaugeStatus, type HistoryPoint, type NutrientResult, type StoreResult } from '../../model/simulate';
+import { earlyReading, tankTrend, type GaugeStatus, type HistoryPoint, type NutrientResult, type StoreResult } from '../../model/simulate';
 import type { Range } from '../../model/paramTypes';
 import { statusThresholds, trendDisplay } from '../../../model/parameters';
 import { storeTrendOf, trendOf, type Trend } from '../../model/trend';
@@ -193,6 +193,7 @@ function Hero({ r, noData, showRange, whyLabel }: { r: NutrientResult; noData: b
   const store = r.store;
   const status: GaugeStatus = noData ? 'unknown' : (store?.status ?? r.status);
   const trend = noData ? null : store ? storeTrendOf(store) : r.status === 'unknown' ? null : trendOf(r);
+  const early = noData ? null : earlyReading(r);
   const value = noData
     ? '–'
     : store
@@ -260,7 +261,7 @@ function Hero({ r, noData, showRange, whyLabel }: { r: NutrientResult; noData: b
               {weekText ? ` · ${weekText}` : ''}
             </p>
           )}
-          <DayDots days={days} />
+          <DayDots days={days} early={early} />
         </div>
         <InfoButton title={def.name} label={t('nutrient.heroInfo', { name: def.name })}>
           <HeroNotes r={r} noData={noData} trend={trend} weekText={weekText} />
@@ -409,8 +410,11 @@ function HeroNotes({ r, noData, trend, weekText }: { r: NutrientResult; noData: 
   );
 }
 
-/** One dot per day behind the average: filled = logged, faint = filled in, dashed = left out, ringed = a food had no data. */
-function DayDots({ days }: { days: WindowDay[] }) {
+/**
+ * One dot per day behind the average: filled = logged, faint = filled in, dashed = left out, ringed = a food had
+ * no data. An early reading says how many of its window's days there are so far ("5 of 14 days so far").
+ */
+function DayDots({ days, early }: { days: WindowDay[]; early?: { days: number; of: number } | null }) {
   if (!days.length) return null;
   const known = days.filter((x) => x.dot === 'known').length;
   return (
@@ -418,7 +422,7 @@ function DayDots({ days }: { days: WindowDay[] }) {
       {days.map((x) => (
         <span key={x.day} className={`day-dot day-dot-${x.dot}${x.missing ? ' day-dot-missing' : ''}`} />
       ))}
-      <span className="small muted">{t('nutrient.dotsDays', { n: days.length })}</span>
+      <span className="small muted">{early ? t('nutrient.earlySoFar', early) : t('nutrient.dotsDays', { n: days.length })}</span>
     </p>
   );
 }

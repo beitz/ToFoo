@@ -5,7 +5,7 @@ import { nutrientParams, startingLevels, statusThresholds } from '../../model/pa
 import { estimateEnergyNeed, resolveRequirements } from './requirements';
 import { referenceValues } from '../../model/reference-values';
 import { retentionFactor } from './retention';
-import { drinkKind, effectiveDayStatus, groupMeals, simulate, tankTrend, type SimulationInput } from './simulate';
+import { drinkKind, earlyReading, effectiveDayStatus, groupMeals, simulate, tankTrend, type SimulationInput } from './simulate';
 import { clearSkyUvIndex, solarElevation, sunVitaminD } from './sun';
 import { DEFAULT_MODEL_SETTINGS, type ModelEntry } from './types';
 
@@ -543,6 +543,18 @@ describe('simulation', () => {
     const fe = (dayStatus: SimulationInput['dayStatus']) => simulate(baseInput(d, entries, { dayStatus })).nutrients.get('FE')!;
     expect(fe({ [d[3]!]: 'excluded' }).store).toEqual(fe({ [d[3]!]: 'filled' }).store);
     expect(fe({ [d[3]!]: 'excluded' }).store!.fill.central).toBeGreaterThan(fe({}).store!.fill.central);
+  });
+
+  it('marks a line whose window is not full yet as an early reading', () => {
+    // Five finished days and today: EPA + DHA averages over 14 days, thiamin over 7.
+    const d = days('2026-01-01', 6);
+    const entries = d.map((day, i) => manual(`e${i}`, day, 12, { 'F20:5CN3': 0.1, THIA: 1000, FE: 10 }));
+    const res = simulate(baseInput(d, entries)).nutrients;
+    expect(earlyReading(res.get('EPADHA')!)).toEqual({ days: 5, of: 14 });
+    expect(earlyReading(res.get('THIA')!)).toEqual({ days: 5, of: 7 });
+    expect(earlyReading(res.get('FE')!)).toBeNull(); // a store reads its fill level instead
+    const full = simulate(baseInput(days('2026-01-01', 15), [])).nutrients.get('EPADHA')!;
+    expect(earlyReading(full)).toBeNull();
   });
 
   it('without imputation: today alone, still empty, has no data yet', () => {

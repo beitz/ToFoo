@@ -6,7 +6,7 @@ import { storeSources, todaySources, weekSources, type HomeSource } from '../../
 import { fmtNumber, fmtPercent } from '../../lib/format';
 import { NUTRIENT_BY_ID } from '../../model/nutrients';
 import type { NutrientResult, StoreResult } from '../../model/simulate';
-import { CompactGauge, StoreCompactGauge } from '../../ui/Gauge';
+import { CompactGauge, StoreCompactGauge, windowTag } from '../../ui/Gauge';
 import { Icon } from '../../ui/Icon';
 import { urgencyRank } from '../../ui/status';
 import { viewsOf } from '../../settings/views';
@@ -42,8 +42,12 @@ export function HomeCards({
   showRange: boolean;
   defaultBased: (id: string) => boolean;
 }) {
-  const { settings } = useData();
+  const { settings, modelDays } = useData();
   const views = viewsOf(settings);
+  // Finished days so far (today joins once it is over): while fewer than the window, the heading says so.
+  const daysSoFar = modelDays.length - 1;
+  const tagged = rest.some((r) => windowTag(r, windowDays));
+  const title = daysSoFar > 0 && daysSoFar < windowDays ? t('home.firstDays', { n: daysSoFar }) : t('home.lastDays', { n: windowDays });
   const today = useToday();
   const go = (id: string) => () => navigate('nutrient', id);
   const sortedStores = [...stores].sort((a, b) => urgencyRank(a.store.status) - urgencyRank(b.store.status) || a.store.fill.central - b.store.fill.central);
@@ -54,13 +58,13 @@ export function HomeCards({
         {views.macros === 'rings' ? <MacroRings values={today} defaultBased={defaultBased} today /> : <TodayCells defaultBased={defaultBased} />}
       </ListCard>
       {rest.length > 0 && (
-        <ListCard id="week" tour="home.week" title={t('home.lastDays', { n: windowDays })} note={t('home.weekNote')} info={`${t('home.weekInfo', { n: windowDays })}${comets ? ` ${t('home.cometLegend')}` : ''}`} sources={weekSources(t)}>
+        <ListCard id="week" tour="home.week" title={title} note={t('home.weekNote')} info={`${t('home.weekInfo', { n: windowDays })}${comets ? ` ${t('home.cometLegend')}` : ''}`} sources={weekSources(t)}>
           {comets ? (
             <NutrientsSection results={rest} showRange={showRange} />
           ) : (
             <div className="cgauge-grid">
               {[...rest].sort(byUrgency).map((r) => (
-                <CompactGauge key={r.id} result={r} onClick={go(r.id)} />
+                <CompactGauge key={r.id} result={r} onClick={go(r.id)} usualWindow={windowDays} reserveWindow={tagged} />
               ))}
             </div>
           )}

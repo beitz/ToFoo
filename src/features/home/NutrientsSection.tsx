@@ -8,7 +8,7 @@ import type { GaugeStatus, NutrientResult } from '../../model/simulate';
 import { trendOf } from '../../model/trend';
 import { repo } from '../../storage/repo';
 import { Segmented } from '../../ui/controls';
-import { hasNoData, trendArrows, trendLabel } from '../../ui/Gauge';
+import { hasNoData, trendArrows, trendLabel, windowTag } from '../../ui/Gauge';
 import { Icon } from '../../ui/Icon';
 import { StatusMark } from '../../ui/Tile';
 import { GroupInfoButton, hasGroupInfo } from '../info/GroupInfo';
@@ -121,6 +121,7 @@ function CometList({ items, showRange, open }: { items: NutrientResult[]; showRa
  */
 function CometRow({ result: r, showRange, open = (id) => navigate('nutrient', id) }: { result: NutrientResult; showRange: boolean; open?: (id: string) => void }) {
   const def = NUTRIENT_BY_ID.get(r.id);
+  const tag = windowTag(r, useData().settings.shortWindowDays);
   // No need or limit to measure against (e.g. sugars): the amount per day only, no track.
   if (r.kind === 'info') {
     const amount = hasNoData(r) ? '–' : `${fmtAmount(r.id, r.averageIntake)}/${t('review.dayShort')}`;
@@ -147,12 +148,14 @@ function CometRow({ result: r, showRange, open = (id) => navigate('nutrient', id
     ? t('tile.unknownSpoken', { name: def?.name ?? r.id })
     : t(r.kind === 'limit' ? 'tile.limitSpoken' : 'tile.needSpoken', { name: def?.name ?? r.id, pct, status: t(`statusWord.${status}` as MessageKey) }) +
       (tr ? `, ${trendLabel(tr)}` : '') +
-      (r.ownTarget ? `, ${t('gauge.ownTarget')}` : '');
+      (r.ownTarget ? `, ${t('gauge.ownTarget')}` : '') +
+      (tag ? `, ${tag.spoken}` : '');
   return (
     <button type="button" className={`comet comet-${r.kind} comet-${status}`} onClick={() => open(r.id)} aria-label={spoken}>
       <span className="comet-name" aria-hidden>
         {def?.name ?? r.id}
         {r.ownTarget && <Icon name="target" size={11} />}
+        {tag && <span className="gauge-window">{tag.short}</span>}
       </span>
       <span className="comet-track" aria-hidden>
         <span className="comet-line" />

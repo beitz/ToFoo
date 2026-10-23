@@ -1,5 +1,5 @@
 import type { Requirement } from '../model/requirements';
-import { classify, type GaugeStatus, type NutrientResult } from '../model/simulate';
+import { classify, earlyReading, type GaugeStatus, type NutrientResult } from '../model/simulate';
 import { storeNeedsAttention } from './stores';
 
 /**
@@ -33,6 +33,11 @@ export interface Finding {
   basis: EffectBasis;
   /** Store low but filling at the current intake: Home shows no warning, so neither does this. */
   filling: boolean;
+  /**
+   * Low on an early reading (fewer days logged than the average needs): too early to say what it can
+   * do, so no effect line. Too much still shows at once.
+   */
+  early?: boolean;
   /** There is an effect worth mentioning (a text for this direction, and not only an own goal missed). */
   effect: boolean;
 }
@@ -63,8 +68,9 @@ export function findingOf(r: NutrientResult, req: Requirement | undefined, hasEf
       basis = classify('rolling', ofReference, undefined, true) === 'fine' ? 'ownTarget' : 'need';
     } else basis = 'need';
   } else return undefined;
-  const effect = !filling && basis !== 'ownTarget' && basis !== 'ownMax' && hasEffect(r.id, direction);
-  return { id: r.id, status, direction, basis, filling, effect };
+  const early = direction === 'low' && !!earlyReading(r);
+  const effect = !filling && !early && basis !== 'ownTarget' && basis !== 'ownMax' && hasEffect(r.id, direction);
+  return { id: r.id, status, direction, basis, filling, ...(early ? { early } : {}), effect };
 }
 
 export interface EffectSummary {
@@ -74,6 +80,8 @@ export interface EffectSummary {
   aBitLow: Finding[];
   /** Stores low but filling. */
   filling: Finding[];
+  /** Low on an early reading: too early to tell. */
+  early: Finding[];
   /** Only an own target missed or an own maximum passed. */
   ownOnly: Finding[];
   /** Out of range, with no known effect at that level. */
@@ -86,7 +94,7 @@ export interface EffectSummary {
 
 /** Sorts every nutrient shown on Home into the summary's groups. */
 export function summarise(results: Iterable<NutrientResult>, requirements: ReadonlyMap<string, Requirement>, hasEffect: HasEffect, hidden: ReadonlySet<string> = new Set()): EffectSummary {
-  const out: EffectSummary = { effects: [], aBitLow: [], filling: [], ownOnly: [], noEffect: [], fine: [], noData: [] };
+  const out: EffectSummary = { effects: [], aBitLow: [], filling: [], early: [], ownOnly: [], noEffect: [], fine: [], noData: [] };
   const far = new Map<string, number>();
   for (const r of results) {
     if (hidden.has(r.id) || r.kind === 'info') continue;
@@ -102,6 +110,7 @@ export function summarise(results: Iterable<NutrientResult>, requirements: Reado
     // How far out: the share over the limit, or the share missing (fill for stores).
     far.set(r.id, f.direction === 'high' ? (r.ulRatio !== undefined && r.ulRatio > 1 ? r.ulRatio : r.value.central) : 1 - (r.store ? r.store.fill.central : r.value.central));
     if (f.filling) out.filling.push(f);
+    else if (f.early) out.early.push(f);
     else if (f.basis === 'ownTarget' || f.basis === 'ownMax') out.ownOnly.push(f);
     else if (!f.effect) out.noEffect.push(f);
     else if (f.status === 'gettingLow') out.aBitLow.push(f);

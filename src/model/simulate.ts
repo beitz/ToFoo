@@ -99,6 +99,8 @@ export interface NutrientResult {
   /** Upper-limit check: average intake of the UL basis ÷ UL (central). */
   ulRatio?: number;
   windowDays: number;
+  /** The nutrient's own averaging window (7 or 14 days); `windowDays` is shorter while fewer days exist. */
+  windowLength?: number;
   /** Days in the window with a known status (logged / fasted). */
   knownDays: number;
   /** Days in the window marked "Leave out": they count in no average. */
@@ -261,6 +263,16 @@ export function tankCapacityRange(id: string, weightKg: number, sex: Sex | undef
   }
   if (model.kind === 'tankDays') return times(model.capacityDays.value, physiological * scale);
   return undefined;
+}
+
+/**
+ * An early reading: a line (not a store, not info) whose window is not full yet because the log is
+ * younger than it, e.g. 5 of 14 days. Its average rests on fewer days, so it is shown with the days
+ * so far and gets no health warning (owner's decision, 2026-10-23); its trend arrow stays.
+ */
+export function earlyReading(r: Pick<NutrientResult, 'kind' | 'store' | 'windowDays' | 'windowLength'>): { days: number; of: number } | null {
+  if (r.kind === 'info' || r.store || r.windowLength === undefined || r.windowDays <= 0 || r.windowDays >= r.windowLength) return null;
+  return { days: r.windowDays, of: r.windowLength };
 }
 
 export function classify(kind: GaugeKind | 'tank', value: number, ulRatio: number | undefined, known: boolean): GaugeStatus {
@@ -446,6 +458,7 @@ export function simulate(input: SimulationInput): SimulationResult {
       averageIntake,
       ulRatio,
       windowDays: end >= 0 ? windowIdx(end).length : 0,
+      windowLength: windowDays,
       knownDays: knownInWindow,
       leftOutDays: end >= 0 ? windowIdx(end).length - win.length : 0,
       missingDataDays,

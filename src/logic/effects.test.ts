@@ -83,6 +83,16 @@ describe('what a level means', () => {
     expect(short).toMatchObject({ basis: 'need', effect: true });
   });
 
+  it('holds back the effect of a low early reading, but not of too much', () => {
+    const early = { windowDays: 5, windowLength: 14 };
+    expect(findingOf(result('EPADHA', { status: 'low', value: range(0.3), ...early }), req('EPADHA'), hasEffectText)).toMatchObject({ early: true, effect: false });
+    expect(findingOf(result('EPADHA', { status: 'low', value: range(0.3), windowDays: 14, windowLength: 14 }), req('EPADHA'), hasEffectText)?.early).toBeUndefined();
+    expect(findingOf(result('FASAT', { kind: 'limit', status: 'tooHigh', value: range(1.3), ...early }), req('FASAT', { limitOnly: true }), hasEffectText)).toMatchObject({ direction: 'high', effect: true });
+    const s = summarise([result('EPADHA', { status: 'low', value: range(0.3), ...early })], new Map([['EPADHA', req('EPADHA')]]), hasEffectText);
+    expect(s.early.map((f) => f.id)).toEqual(['EPADHA']);
+    expect(s.effects).toEqual([]);
+  });
+
   it('treats an own maximum as a goal, not a health effect', () => {
     const f = findingOf(result('CHO', { kind: 'limit', status: 'tooHigh', value: range(1.3), ownTarget: true }), req('CHO', { limitOnly: true, own: { target: { amount: 50, per: 'day' } } }), hasEffectText);
     expect(f).toMatchObject({ basis: 'ownMax', effect: false });

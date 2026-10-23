@@ -3,7 +3,7 @@ import { buildFoodDb } from '../foods/foodDb';
 import type { BlsFile } from '../foods/blsTypes';
 import { defaultProfile } from '../storage/defaults';
 import type { Batch, LogEntry } from '../storage/types';
-import { activeFast, explicitDayStatus, fastDays, resolveEntry, type ResolveContext } from './resolve';
+import { activeFast, explicitDayStatus, fastDays, firstModelDay, resolveEntry, type ResolveContext } from './resolve';
 
 const bls: BlsFile = {
   format: 'tofoo-bls',
@@ -86,6 +86,12 @@ describe('resolve', () => {
     const st = explicitDayStatus([{ day: '2026-10-02', status: 'partial', schemaVersion: 1 }], [fast], entries, new Map(), '2026-10-10');
     expect(st['2026-10-01']).toBe('fasted');
     expect(st['2026-10-02']).toBe('partial');
+  });
+
+  it('starts the model on the first logged or marked day, not when the profile was set up', () => {
+    expect(firstModelDay([log({ kind: 'drink', drink: 'coffee', day: '2026-10-05' }), log({ kind: 'drink', drink: 'coffee', day: '2026-10-03' })], {}, '2026-10-10')).toBe('2026-10-03');
+    expect(firstModelDay([log({ kind: 'drink', drink: 'coffee', day: '2026-10-05' })], { '2026-10-01': 'fasted' }, '2026-10-10')).toBe('2026-10-01');
+    expect(firstModelDay([], {}, '2026-10-10')).toBe('2026-10-10');
   });
 
   it('has a default profile without routine', () => {
