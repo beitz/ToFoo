@@ -1966,15 +1966,33 @@ body:has(.composer) .toast-area {
   padding: 0;
   border: 0;
 }
-.review-summary p {
-  margin: 0 0 8px;
+/* One line: how the days were logged, then the links as icons and ⓘ (owner's ask, 2026-10-23: less room). */
+.review-summary {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 4px 6px;
+  padding: 6px 6px 6px 12px;
 }
-.review-summary .row.wrap {
-  gap: 4px 14px;
-  margin-bottom: 8px;
+.review-summary > p {
+  margin: 0;
 }
-.review-summary .btn {
-  min-height: 44px;
+.review-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  font-size: 0.85rem;
+  flex: 1 1 0;
+  min-width: 0;
+}
+.review-links {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  margin-left: auto;
+}
+.review-links .icon-btn {
+  color: var(--text-muted);
 }
 .review-dates {
   gap: 12px;
@@ -2790,9 +2808,6 @@ body:has(.fab-stack) .toast-area {
 .notice-card p {
   margin: 0;
 }
-.journal-patterns {
-  margin: 0 0 12px;
-}
 
 /* ── Nutrient group info pages (ⓘ on Home "By type", food and nutrient pages) ── */
 .home-group-row {
@@ -3057,9 +3072,7 @@ body:has(.fab-stack) .toast-area {
 .week-energy > li,
 .week-energy > li + li,
 .week-moves > li,
-.week-moves > li + li,
-.week-foods > li + li,
-.week-foods > li {
+.week-moves > li + li {
   padding: 0;
   border: 0;
 }
@@ -3304,22 +3317,6 @@ body:has(.fab-stack) .toast-area {
 .week-spark.week-st-tooHigh {
   --c: var(--high);
 }
-/* For the next batch */
-.week-batch h2 {
-  margin: 2px 0 6px;
-  font-size: 1.3rem;
-}
-.week-batch > p {
-  margin: 0 0 4px;
-}
-.week-batch-actions {
-  display: flex;
-  gap: 8px;
-  margin-top: 12px;
-}
-.week-batch-actions .btn {
-  flex: 1;
-}
 .week-link {
   display: flex;
   align-items: center;
@@ -3327,9 +3324,6 @@ body:has(.fab-stack) .toast-area {
   min-height: 48px;
   color: var(--text);
   text-decoration: none;
-}
-.week-foods > li + li .week-link {
-  border-top: 1px solid var(--border);
 }
 .week-fold h3 {
   margin: 8px 0 4px;
@@ -7150,4 +7144,134 @@ a.contributor-link > span:first-child {
 }
 .sent-note a {
   white-space: nowrap;
+}
+
+/* ── A nutrient over a past period (#/nutrient/<id>/range/<from>/<to>) ── */
+.range-banner {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 8px;
+  padding: 2px 4px 2px 14px;
+  border: 1.5px solid var(--accent);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--accent) 14%, var(--bg));
+  color: var(--text);
+}
+.range-banner > svg {
+  flex: none;
+  color: var(--accent);
+}
+.range-banner-sub {
+  display: block;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+.range-banner-x {
+  flex: none;
+}
+.rday-bars {
+  display: flex;
+  align-items: stretch;
+  gap: 3px;
+  height: 96px;
+  margin: 6px 0 4px;
+}
+.rday-bars.is-dense {
+  gap: 1px;
+}
+.rday-bars > li {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+}
+.rday {
+  display: block;
+  height: 100%;
+  text-decoration: none;
+}
+.rday-track {
+  position: relative;
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  background: var(--surface-2);
+}
+.rday-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: 4px;
+  background: var(--accent);
+}
+.rday.is-missing .rday-bar {
+  background: repeating-linear-gradient(135deg, var(--accent) 0 4px, color-mix(in srgb, var(--accent) 55%, transparent) 4px 7px);
+}
+/* A day the average leaves out: an empty, dashed track. */
+.rday.is-out .rday-track {
+  background: none;
+  border: 1px dashed var(--edge);
+}
+.rday-ref {
+  position: absolute;
+  left: -1px;
+  right: -1px;
+  border-top: 1.5px dashed var(--text-muted);
+}
+.rday-axis {
+  display: flex;
+  justify-content: space-between;
+  margin: 0;
+}
+
+/* ── Journal folds (#/journal) ── */
+.journal-month > summary,
+.journal-year > summary {
+  gap: 10px;
+}
+.journal-fold-title {
+  font-weight: 700;
+}
+.journal-year {
+  margin: 16px 0 8px;
+}
+.journal-year > summary {
+  padding: 0 4px;
+  font-size: 1.1rem;
+}
+.journal-day + .journal-day {
+  border-top: 1px solid var(--border);
+}
+.journal-day-title {
+  margin: 10px 0 0;
+  font-weight: 600;
+}
+.journal-day-title a {
+  color: var(--text-muted);
+}
+
+/* An AI way in that fills the width, drawn as the question chips are. */
+.ask-link {
+  display: flex;
+  width: 100%;
+  max-width: 100%;
+  margin: 8px 0 12px;
+  padding: 8px 14px;
+  gap: 10px;
+  border-radius: 22px;
+  color: var(--text);
+  text-decoration: none;
+}
+.ask-link-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.week-show-all {
+  margin-top: 6px;
 }

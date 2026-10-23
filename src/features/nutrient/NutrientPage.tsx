@@ -424,7 +424,7 @@ function DayDots({ days }: { days: WindowDay[] }) {
 }
 
 /** An amount against its reference on one line: the bar to scale, the reference as a mark. */
-function AmountBar({
+export function AmountBar({
   id,
   amount,
   ref,
@@ -477,7 +477,7 @@ function BigTank({ fill, showRange }: { fill: Range; showRange: boolean }) {
  * store, a share of the need can pass 100 %: then the tile's top becomes 150, 200 or 300 % and a
  * dashed line marks 100 %, so "140 %, likely 94–187 %" looks like that (owner's ask, 2026-10-23).
  */
-function BigTile({ r, noData, showRange }: { r: NutrientResult; noData: boolean; showRange: boolean }) {
+export function BigTile({ r, noData, showRange }: { r: NutrientResult; noData: boolean; showRange: boolean }) {
   const lowV = showRange ? r.value.low : r.value.central;
   const highV = showRange ? r.value.high : r.value.central;
   const { top, over } = noData ? { top: 1, over: false } : tileTop(Math.max(highV, r.value.central));

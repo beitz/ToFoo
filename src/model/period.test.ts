@@ -33,12 +33,14 @@ describe('periodBreakdown', () => {
     const p = run(false, entries);
     expect(p.statusCounts).toEqual({ logged: 2, partial: 0, fasted: 1, unknown: 1, filled: 0, excluded: 0, pending: 1 });
     expect(p.countedDays).toBe(4);
+    expect(p.counted).toEqual(['2026-10-01', '2026-10-02', '2026-10-03', '2026-10-04']);
     expect(p.nutrients.get('VITC')!.averageIntake).toBeCloseTo(50);
   });
 
   it('leaves unlogged days out when they are filled in by the model', () => {
     const p = run(true, entries);
     expect(p.countedDays).toBe(3);
+    expect(p.counted).toEqual(['2026-10-01', '2026-10-02', '2026-10-03']);
     expect(p.nutrients.get('VITC')!.averageIntake).toBeCloseTo(200 / 3);
   });
 

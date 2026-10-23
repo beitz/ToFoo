@@ -1,9 +1,12 @@
-import { useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { useData } from '../../app/data';
 import { useToast } from '../../app/toast';
 import { href } from '../../app/router';
 import { t } from '../../i18n';
 import { dayKey, formatDay, formatTime } from '../../lib/dates';
+import { formatMonth } from '../../lib/periods';
+import { journalSections, type JournalMonth } from '../../logic/journalSections';
+import { AskLink } from '../../ui/AskChips';
 import { isOn } from '../../settings/features';
 import { repo } from '../../storage/repo';
 import type { JournalEntry } from '../../storage/types';
@@ -13,14 +16,12 @@ import { JournalSheet } from './JournalSheet';
 import { useJournal } from './useJournal';
 import { BackButton } from '../../ui/BackButton';
 
-/** Days shown at first; older ones one tap away, so the page stays quick with a long journal. */
-const DAYS_SHOWN = 30;
-
 /**
- * Route #/journal (pen button on Home, home-screen shortcut): write straight away, and read back
- * what was written, newest first.
+ * Route #/journal (Insights): what was written, newest first, in month folds (earlier years one fold
+ * each), and + to write. #/journal/new (pen button, home-screen shortcut) opens with the writing box
+ * on top, so writing still takes no extra tap (owner's ask, 2026-10-23: Insights shows just the journal).
  */
-export function JournalPage() {
+export function JournalPage({ write = false }: { write?: boolean }) {
   const d = useData();
   const toast = useToast();
   const entries = useJournal();
@@ -29,8 +30,7 @@ export function JournalPage() {
   // The time follows the clock until the user changes it.
   const [timeSet, setTimeSet] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [editing, setEditing] = useState<JournalEntry | null>(null);
-  const [allDays, setAllDays] = useState(false);
+  const [editing, setEditing] = useState<JournalEntry | 'new' | null>(null);
 
   async function save() {
     if (!text.trim() || busy) return;
@@ -42,50 +42,18 @@ export function JournalPage() {
     setTime(Date.now());
   }
 
-  const byDay = new Map<string, JournalEntry[]>();
-  for (const e of [...(entries ?? [])].reverse()) byDay.set(e.day, [...(byDay.get(e.day) ?? []), e]);
-  const days = [...byDay.keys()];
-  const shown = allDays ? days : days.slice(0, DAYS_SHOWN);
-
-  return (
-    <section>
-      <header className="page-head row">
-        <BackButton to={['overview']} />
-        <h1>{t('journal.title')}</h1>
-      </header>
-
-      <div className="card">
-        <JournalEditor
-          text={text}
-          onText={setText}
-          time={timeSet ? time : Date.now()}
-          onTime={(v) => {
-            setTime(v);
-            setTimeSet(true);
-          }}
-          autoFocus
-          onBusy={setBusy}
-        />
-        <div className="sheet-actions">
-          <button className="btn btn-primary" disabled={!text.trim() || busy} onClick={() => void save()}>
-            {t('common.save')}
-          </button>
-        </div>
-      </div>
-
-      {isOn(d.settings.features, 'aiAssistant') && isOn(d.settings.features, 'insights') && (entries?.length ?? 0) > 0 && (
-        <a className="btn btn-small btn-ghost journal-patterns" href={href('insights')}>
-          <Icon name="insights" size={18} /> {t('insights.open')}
-        </a>
-      )}
-      {entries && entries.length === 0 && <p className="muted small">{t('journal.empty')}</p>}
-      {shown.map((day) => (
-        <div key={day}>
-          <h2 className="section-title">
+  const sections = useMemo(() => journalSections(entries ?? [], d.today), [entries, d.today]);
+  // The newest month opens; the rest stay folded until tapped.
+  const newest = sections.months[0]?.month ?? sections.years[0]?.months[0]?.month;
+  const month = (m: JournalMonth<JournalEntry>) => (
+    <MonthFold key={m.month} month={m} open={m.month === newest}>
+      {m.days.map(({ day, entries: list }) => (
+        <div key={day} className="journal-day">
+          <h3 className="journal-day-title small">
             <a href={href('diary', day)}>{formatDay(day, d.today)}</a>
-          </h2>
+          </h3>
           <ul className="plain-list">
-            {byDay.get(day)!.map((e) => (
+            {list.map((e) => (
               <li key={e.id}>
                 <JournalRow entry={e} onEdit={() => setEditing(e)} />
               </li>
@@ -93,14 +61,85 @@ export function JournalPage() {
           </ul>
         </div>
       ))}
-      {!allDays && days.length > DAYS_SHOWN && (
-        <button className="btn btn-secondary" onClick={() => setAllDays(true)}>
-          {t('journal.showOlder', { n: days.length - DAYS_SHOWN })}
-        </button>
+    </MonthFold>
+  );
+
+  return (
+    <section>
+      <header className="page-head row">
+        <BackButton to={['overview']} />
+        <h1 className="grow">{t('journal.title')}</h1>
+        {!write && (
+          <button type="button" className="icon-btn" onClick={() => setEditing('new')} aria-label={t('journal.write')} title={t('journal.write')}>
+            <Icon name="plus" />
+          </button>
+        )}
+      </header>
+
+      {write && (
+        <div className="card">
+          <JournalEditor
+            text={text}
+            onText={setText}
+            time={timeSet ? time : Date.now()}
+            onTime={(v) => {
+              setTime(v);
+              setTimeSet(true);
+            }}
+            autoFocus
+            onBusy={setBusy}
+          />
+          <div className="sheet-actions">
+            <button className="btn btn-primary" disabled={!text.trim() || busy} onClick={() => void save()}>
+              {t('common.save')}
+            </button>
+          </div>
+        </div>
       )}
 
-      {editing && <JournalSheet entry={editing} onClose={() => setEditing(null)} />}
+      {isOn(d.settings.features, 'aiAssistant') && isOn(d.settings.features, 'insights') && (entries?.length ?? 0) > 0 && (
+        <AskLink to={href('insights')} icon="insights" title={t('insights.open')} />
+      )}
+      {entries && entries.length === 0 && <p className="muted small">{t('journal.empty')}</p>}
+      {sections.months.map(month)}
+      {sections.years.map((y) => (
+        <YearFold key={y.year} year={y.year} count={y.count}>
+          {y.months.map(month)}
+        </YearFold>
+      ))}
+
+      {editing && <JournalSheet entry={editing === 'new' ? undefined : editing} onClose={() => setEditing(null)} />}
     </section>
+  );
+}
+
+/** A month as a fold: its name and how many entries; the days are only drawn once it is open. */
+function MonthFold({ month, open: initial, children }: { month: JournalMonth<JournalEntry>; open: boolean; children: ReactNode }) {
+  const [open, setOpen] = useState(initial);
+  return (
+    <details className="card fold journal-month" open={open} onToggle={(e) => setOpen(e.currentTarget.open)}>
+      <summary>
+        <span className="grow journal-fold-title">{formatMonth(month.month)}</span>
+        <span className="muted small">{t(month.count === 1 ? 'journal.countOne' : 'journal.count', { n: month.count })}</span>
+        <Icon name="down" size={18} />
+      </summary>
+      {open && children}
+    </details>
+  );
+}
+
+/** An earlier year: one line until opened, then its months. */
+function YearFold({ year, count, children }: { year: string; count: number; children: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <details className="fold journal-year" open={open} onToggle={(e) => setOpen(e.currentTarget.open)}>
+      <summary>
+        <span className="grow journal-fold-title">{year}</span>
+        <span className="muted small">{t(count === 1 ? 'journal.countOne' : 'journal.count', { n: count })}</span>
+        <Icon name="down" size={18} />
+      </summary>
+      {open && children}
+    </details>
   );
 }
 

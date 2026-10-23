@@ -15,6 +15,7 @@ import { periodBreakdown } from '../../model/period';
 import type { GaugeStatus } from '../../model/simulate';
 import { isOn } from '../../settings/features';
 import { repo } from '../../storage/repo';
+import { AskLink } from '../../ui/AskChips';
 import { Icon } from '../../ui/Icon';
 import { STATUS_ICON, statusLabel } from '../../ui/status';
 import { activityName } from '../activity/ActivityForm';
@@ -160,11 +161,7 @@ export function OverviewPage() {
       <LevelsSummary reviewHref={href('review', finished[0]!, finished[finished.length - 1]!)} />
 
       {isOn(f, 'aiAssistant') && isOn(f, 'insights') && (
-        <div className="card ov-card">
-          <Row to={href('insights')} icon="insights" title={t('insights.open')}>
-            {t('overview.patterns')}
-          </Row>
-        </div>
+        <AskLink to={href('insights')} icon="insights" title={t('insights.open')} sub={t('overview.patterns')} />
       )}
 
       {offNames.length > 0 && (

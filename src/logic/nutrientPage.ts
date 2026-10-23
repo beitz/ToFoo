@@ -3,8 +3,9 @@
  * came from in total or per time eaten, and where a store is heading at the recent rate. Pure
  * arithmetic on the model's output (tested in nutrientPage.test.ts); no physiological numbers.
  */
-import type { DayStatus } from '../model/types';
-import type { Contributor, DailyTotals, HistoryPoint, StoreResult } from '../model/simulate';
+import type { DayStatus, ModelEntry } from '../model/types';
+import type { Contributor, DailyTotals, HistoryPoint, MealSummary, StoreResult } from '../model/simulate';
+import { entryIntake } from '../model/intake';
 import { addDays } from '../lib/dates';
 
 /** One day of "Eaten → taken up". Amounts are undefined on days the food log does not tell. */
@@ -162,4 +163,68 @@ const TILE_MAX = 3;
 export function tileTop(high: number): { top: number; over: boolean } {
   const top = TILE_TOPS.find((x) => high <= x + 1e-9);
   return top === undefined ? { top: TILE_MAX, over: true } : { top, over: false };
+}
+
+/**
+ * "Where it came from" for any set of days (the nutrient page opened from a past day, week or range):
+ * as the model does for its window, each meal's absorbed amount is split over its entries by their
+ * share of the intake and summed by name. Amounts are per day over `days`, biggest first.
+ */
+export function contributorsOver(
+  days: readonly string[],
+  entries: readonly ModelEntry[],
+  meals: readonly MealSummary[],
+  id: string,
+  opts: { retention: boolean },
+): Contributor[] {
+  if (days.length === 0) return [];
+  const inDays = new Set(days);
+  const mealOf = new Map<string, MealSummary>();
+  for (const m of meals) if (inDays.has(m.day)) for (const e of m.entryIds) mealOf.set(e, m);
+  const byLabel = new Map<string, number>();
+  for (const e of entries) {
+    const meal = inDays.has(e.dayKey) ? mealOf.get(e.id) : undefined;
+    if (!meal) continue;
+    const v = entryIntake(e, 'central', opts).intake[id] ?? 0;
+    const total = meal.intake[id] ?? 0;
+    if (v <= 0 || total <= 0) continue;
+    byLabel.set(e.label, (byLabel.get(e.label) ?? 0) + (meal.absorbed[id] ?? 0) * (v / total));
+  }
+  const all = [...byLabel.values()].reduce((a, b) => a + b, 0);
+  return [...byLabel.entries()]
+    .filter(([, v]) => v > 0)
+    .sort((a, b) => b[1] - a[1])
+    .map(([label, amount]) => ({ label, amount: amount / days.length, share: all > 0 ? amount / all : 0 }));
+}
+
+/** One day of a past period on the nutrient page: its number as the page's average counts it, or none. */
+export interface PeriodDay {
+  day: string;
+  /** Share of the need or maximum (1 = 100 %), or the plain amount for nutrients without one; undefined: not counted. */
+  value?: number;
+  missing: boolean;
+}
+
+/**
+ * The days of a past period for one nutrient, as the period's average counts them (model/period.ts):
+ * absorbed ÷ physiological need, intake ÷ maximum, or plain intake. Days the average leaves out
+ * (partly logged, filled in, left out) have no value.
+ */
+export function periodDays(
+  range: readonly string[],
+  counted: readonly string[],
+  days: readonly string[],
+  daily: readonly DailyTotals[],
+  id: string,
+  basis: { kind: 'rolling' | 'limit' | 'info'; ref?: number },
+): PeriodDay[] {
+  const idx = new Map(days.map((d, i) => [d, i]));
+  const isCounted = new Set(counted);
+  return range.map((day) => {
+    const totals = daily[idx.get(day) ?? -1];
+    if (!totals || !isCounted.has(day)) return { day, missing: false };
+    const amount = basis.kind === 'rolling' ? (totals.absorbed.central[id] ?? 0) : (totals.intake[id] ?? 0);
+    const value = basis.kind === 'info' || !basis.ref ? amount : amount / basis.ref;
+    return { day, value, missing: totals.missing.has(id) };
+  });
 }
