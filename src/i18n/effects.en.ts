@@ -33,9 +33,11 @@ export const effectsEn = {
 
   'effect.EPADHA.low': 'Low intake is linked to a higher risk of heart disease.',
   'effect.EPADHA.lowMore': 'The body makes only small amounts from plant omega-3, so food is the main source.',
+  'effect.EPADHA.lowSize1': 'Trials with over 100,000 people: extra EPA and DHA made little or no difference to deaths overall. It may slightly lower deaths from heart disease: about {people} people had to take it for one to be spared.',
   'effect.EPADHA.lowHelp': 'Oily fish such as herring, mackerel or salmon once or twice a week; algae oil is the plant source.',
 
   'effect.FIBT.low': 'Linked to constipation and a higher risk of heart disease, type 2 diabetes and bowel cancer.',
+  'effect.FIBT.lowSize1': 'Long-term studies: people eating the most fibre had {lowerRange} fewer deaths, heart disease, strokes, type 2 diabetes and bowel cancer than those eating the least; the benefit was greatest at about {from}–{to} g a day.',
   'effect.FIBT.lowHelp': 'Whole-grain bread, pasta and rice instead of white; legumes a few times a week; vegetables, fruit and nuts every day. Raise it step by step and drink enough.',
 
   'effect.VITAA.low': 'A long shortage: poor sight in dim light, dry eyes, more infections.',
@@ -77,6 +79,7 @@ export const effectsEn = {
   'effect.VITB12.lowHelp': 'Only animal foods (meat, fish, eggs, dairy) contain useful amounts; vegans need a supplement.',
 
   'effect.VITC.low': 'Tiredness, bleeding gums, slow wound healing; scurvy if severe.',
+  'effect.VITC.lowSize1': 'Scurvy appears after about {months} months with no vitamin C at all, and treatment cures it in about {days} days. Lasting low levels short of scurvy may raise the risk of heart disease, cancer and cataract; that is less certain.',
   'effect.VITC.lowHelp': 'Peppers, citrus fruit, berries, kiwi, broccoli, cabbage, potatoes. Heat and storage destroy it, so fresh and raw count most.',
 
   'effect.NA.low': 'Usually not a real shortage: salt added while cooking or at the table counts only if you log it.',
@@ -87,9 +90,11 @@ export const effectsEn = {
   'effect.CLD.lowHelp': 'Log the salt you add, or read this line as a gap in the log rather than in your diet.',
 
   'effect.K.low': 'Linked to higher blood pressure; a real shortage causes muscle weakness and cramps.',
+  'effect.K.lowSize1': 'Long-term studies: people eating more potassium had {fewer} fewer strokes (likely {fewerRange}). In trials, more potassium lowered blood pressure by about {mmHg} mmHg in people with high blood pressure.',
   'effect.K.lowHelp': 'Vegetables, fruit, potatoes, legumes, nuts. Some goes into cooking water.',
 
   'effect.CA.low': 'Over years the body takes calcium from the bones, raising the risk of osteoporosis.',
+  'effect.CA.lowSize1': 'In {none} of {studies} long-term studies, how much calcium people ate from food was not linked to broken bones. It does not tell what a severe shortage over many years does.',
   'effect.CA.lowHelp': 'Milk, yoghurt, cheese; calcium-rich mineral water; kale, broccoli, tofu made with calcium, almonds.',
 
   'effect.MG.low': 'Muscle cramps, tiredness, heart rhythm problems.',
@@ -118,6 +123,7 @@ export const effectsEn = {
 
   'effect.FASAT.high': 'Raises LDL cholesterol and with it the risk of heart disease.',
   'effect.FASAT.highMore': 'The benefit comes from replacing it with unsaturated fats (vegetable oils, nuts, fish) or whole grains, not with sugar or white flour.',
+  'effect.FASAT.highSize1': 'Trials of two years or more: people who ate less saturated fat had {fewer} fewer heart and circulation events such as heart attacks and strokes (likely {fewerRange}). About {people} people had to cut it for {years} years for one of them to be spared one; deaths overall did not clearly change.',
   'effect.FASAT.highHelp': 'Rapeseed or olive oil instead of butter, lard or coconut fat; leaner meat and less sausage, cheese and cream; nuts instead of pastries and chocolate.',
 
   'effect.VITAA.high': 'Over time preformed vitamin A can harm the liver and bones, and an unborn baby.',
@@ -136,6 +142,8 @@ export const effectsEn = {
   'effect.FOL.highHelp': 'It comes from supplements and fortified foods; folate in ordinary food does not count here.',
 
   'effect.NA.high': 'Raises blood pressure and with it the risk of stroke and heart disease.',
+  'effect.NA.highSize1': 'Studies following people for {fromYears} to {toYears} years: those eating more salt had {more} more strokes (likely {moreRange}).',
+  'effect.NA.highSize2': 'Trials: about {less} g less salt a day lowered blood pressure by about {mmHg} mmHg (likely {mmHgRange}) within weeks, more in people with high blood pressure.',
   'effect.NA.highHelp': 'Most salt comes from bread, cheese, sausage, ready meals and snacks. Season with herbs and spices, salt less at the table, pick lower-salt versions.',
 
   'effect.CA.high': 'Kidney stones and constipation are possible.',
@@ -145,7 +153,6 @@ export const effectsEn = {
   'effect.MG.highHelp': 'Lower the supplement dose; magnesium in ordinary food does not count here.',
 
   'effect.FE.high': 'Stomach upset, and over time too much iron in the body.',
-  'effect.FE.highMore': 'EFSA found too little data for a strict upper limit and set a level known to be safe instead.',
   'effect.FE.highHelp': 'Usually from supplements; take them only after a ferritin test and with your doctor.',
 
   'effect.ZN.high': 'Over time it lowers copper and can weaken immune defence.',
@@ -158,7 +165,6 @@ export const effectsEn = {
   'effect.CU.highHelp': 'Usually from supplements; check the dose.',
 
   'effect.FD.high': 'Very high amounts over years affect the bones.',
-  'effect.FD.highMore': 'EFSA set a level known to be safe from all sources together; some way above it, harm is not proven but can’t be ruled out.',
   'effect.FD.highHelp': 'Black tea and some mineral waters can hold a lot; fluoridated salt adds more.',
 
   'effect.MO.high': 'Very high amounts may get in the way of copper.',

@@ -3,9 +3,11 @@ import { href } from '../../app/router';
 import { t, type MessageKey } from '../../i18n';
 import { EFFECT_SOURCES, hasEffectText } from '../../i18n/effects.en';
 import { infoId, NUTRIENT_INFO_SOURCES, type InfoSource } from '../../i18n/nutrientInfo.en';
-import { fmtFill, fmtPercent } from '../../lib/format';
+import { fmtFill, fmtNumber, fmtPercent } from '../../lib/format';
 import { findingOf, type Finding } from '../../logic/effects';
+import { effectFindings, effectSeverity, referenceMargin, upperLimitMeaning, type EffectFinding, type EffectSeverity } from '../../../model/effects';
 import { referenceValues } from '../../../model/reference-values';
+import type { Requirement } from '../../model/requirements';
 import type { NutrientResult } from '../../model/simulate';
 import { isOn } from '../../settings/features';
 import { Icon } from '../../ui/Icon';
@@ -37,7 +39,7 @@ export function EffectCard({ r }: { r: NutrientResult }) {
   // No effect worth a line of its own: what is known about this direction, from the general texts.
   const known = !f.effect && f.basis !== 'ownTarget' && f.basis !== 'ownMax' ? t(`info.${key}.${f.direction}` as MessageKey) : undefined;
   const top = f.direction === 'high' ? r.contributors.slice(0, TOP_SOURCES).filter((c) => c.share > 0) : [];
-  const sources = sourcesFor(r.id, f);
+  const sources = sourcesFor(r.id, f, req);
 
   return (
     <details className={`card fold level-card level-${f.status}`}>
@@ -56,6 +58,7 @@ export function EffectCard({ r }: { r: NutrientResult }) {
             <strong>{t('levels.known')}:</strong> {known}
           </p>
         )}
+        {f.effect && <Seriousness id={r.id} f={f} req={req} />}
         {help && (
           <>
             <h3 className="level-sub">{t('levels.helps')}</h3>
@@ -110,7 +113,8 @@ function whyText(r: NutrientResult, f: Finding): string {
     case 'limit':
       return t('levels.limit', { days, pct: fmtPercent(r.value.central) });
     case 'upperLimit':
-      return t('levels.upperLimit', { days, pct: fmtPercent(r.ulRatio ?? 0) });
+      // The salt guide is DGE's, not a toxicological upper limit: call it a limit.
+      return t(efsaLimit(r.id) ? 'levels.upperLimit' : 'levels.limit', { days, pct: fmtPercent(r.ulRatio ?? 0) });
     case 'safeLevel':
       return t('levels.safeLevel', { days, pct: fmtPercent(r.ulRatio ?? 0) });
     case 'ownTarget':
@@ -122,16 +126,83 @@ function whyText(r: NutrientResult, f: Finding): string {
   }
 }
 
-/** The nutrient's own source, any for this direction, and above an upper limit the limit's source; each once. */
-export function sourcesFor(id: string, f: Finding): InfoSource[] {
+const SEVERITY_STEPS: EffectSeverity[] = ['mild', 'moderate', 'serious'];
+
+/**
+ * "How serious is it" (owner's ask, 2026-10-23: "is it 1 % more risk over 40 years, or will I die next
+ * week?"): how bad the outcome is at worst, how big and likely from a systematic review where one exists,
+ * and how much room the reference value or upper limit leaves.
+ */
+function Seriousness({ id, f, req }: { id: string; f: Finding; req: Requirement | undefined }) {
+  const key = `${infoId(id)}.${f.direction}`;
+  const severity = effectSeverity[key];
+  const findings = effectFindings[key] ?? [];
+  const margin = marginText(id, f, req);
+  if (!severity && !findings.length && !margin) return null;
+  return (
+    <>
+      <h3 className="level-sub">{t('levels.serious')}</h3>
+      {severity && (
+        <p className="level-severity">
+          <span className="sev-dots" role="img" aria-label={t('levels.severitySpoken', { n: SEVERITY_STEPS.indexOf(severity) + 1 })}>
+            {SEVERITY_STEPS.map((step, i) => (
+              <span key={step} className={i <= SEVERITY_STEPS.indexOf(severity) ? 'sev-dot on' : 'sev-dot'} />
+            ))}
+          </span>
+          <span>
+            {t('levels.severityLead')} <strong>{t(`levels.severity.${severity}` as MessageKey)}</strong>, {t(`levels.severityText.${severity}` as MessageKey)}
+          </span>
+        </p>
+      )}
+      {findings.map((x, i) => (
+        <p key={i}>{t(`effect.${key}Size${i + 1}` as MessageKey, findingVars(x))}</p>
+      ))}
+      {!findings.length && <p className="muted">{t('levels.noNumbers')}</p>}
+      {margin && <p className="muted">{margin}</p>}
+    </>
+  );
+}
+
+/** Each number as `{name}` (the central value) and `{nameRange}` (low–high). */
+export function findingVars(x: EffectFinding): Record<string, string> {
+  const vars: Record<string, string> = {};
+  for (const [name, { value, unit }] of Object.entries(x.numbers)) {
+    if (unit === 'share') {
+      vars[name] = fmtPercent(value.central);
+      vars[`${name}Range`] = `${Math.round(value.low * 100)}–${fmtPercent(value.high)}`;
+    } else {
+      vars[name] = fmtNumber(value.central, 1);
+      vars[`${name}Range`] = `${fmtNumber(value.low, 1)}–${fmtNumber(value.high, 1)}`;
+    }
+  }
+  return vars;
+}
+
+/** EFSA's upper limit (not the DGE salt guide, which is no toxicological limit). */
+const efsaLimit = (id: string) => referenceValues.find((x) => x.nutrient === id)?.upperLimit?.source.startsWith('EFSA') ?? false;
+
+/** How much room the reference or the limit leaves: only where its derivation is sourced. */
+function marginText(id: string, f: Finding, req: Requirement | undefined): string | undefined {
+  const m = referenceMargin.value;
+  if (f.basis === 'need' && req?.kind === 'recommended' && !req.own) return t('levels.marginNeed', { margin: `${Math.round(m.low * 100)}–${fmtPercent(m.high)}` });
+  if (f.basis === 'upperLimit' && efsaLimit(id)) return t('levels.marginUpper');
+  if (f.basis === 'safeLevel') return t('levels.marginSafe');
+  return undefined;
+}
+
+/** The nutrient's own source, any for this direction, the findings', and what the margin line rests on; each once. */
+export function sourcesFor(id: string, f: Finding, req?: Requirement): InfoSource[] {
   const key = infoId(id);
   const list: InfoSource[] = [];
   const own = NUTRIENT_INFO_SOURCES[key];
   if (own) list.push(own);
   list.push(...(EFFECT_SOURCES[`${key}.${f.direction}`] ?? []));
+  if (f.effect) for (const x of effectFindings[`${key}.${f.direction}`] ?? []) if (x.url) list.push({ label: x.source, url: x.url });
   if (f.basis === 'upperLimit' || f.basis === 'safeLevel') {
     const ul = referenceValues.find((x) => x.nutrient === id)?.upperLimit;
     if (ul?.url) list.push({ label: ul.source, url: ul.url });
+    if (f.effect && (f.basis === 'safeLevel' || efsaLimit(id)) && upperLimitMeaning.url) list.push({ label: upperLimitMeaning.source, url: upperLimitMeaning.url });
   }
+  if (f.effect && f.basis === 'need' && req?.kind === 'recommended' && !req.own && referenceMargin.url) list.push({ label: referenceMargin.source, url: referenceMargin.url });
   return list.filter((s, i) => list.findIndex((x) => x.url === s.url) === i);
 }

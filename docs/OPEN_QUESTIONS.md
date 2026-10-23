@@ -76,6 +76,7 @@ Still open:
 - [ ] **Ketosis band width:** ± 1 SD in timing plus ± 1 SD in level is a modelling choice; revisit once the owner's own meter readings exist.
 - [ ] **Personal ketosis timing** (`ketosis.personal`): the median shift from at least 3 blood readings, each within ± 24 h, is a modelling choice; whether and how much readings should narrow the band has no source. The high-value note at 6 mmol/L (just above Owen 1969's weeks-long water fasts) is an assumption.
 - [ ] **Sleep debt** (`sleepNeed` in model/parameters.ts, 2026-10-22): the debt is plain arithmetic, each night's sleep minus the need added up over the window (14 nights by default, a display choice). Whether a long night pays back an earlier short one, and over how long, has no settled source, so the page shows the sum without calling it repaid or harmful. Unlogged nights are left out, never counted as zero.
+- [ ] **How serious is it** (`effectSeverity` in model/effects.ts, 2026-10-23): the three steps (mild / moderate / serious) are the app's reading of what each nutrient's source describes at a clear, lasting shortage or excess, not a graded score from a source. Numbers ("how likely") are shown only where a systematic review exists (saturated fat, salt, fibre, potassium, EPA + DHA, calcium, vitamin C); for the other nutrients a sourced size or time to onset is still missing. The NIH ODS fact sheets could not be fetched from the build environment (HTTP 403), so the onset times they give were not re-checked and are not shown.
 
 ## Engineering
 
