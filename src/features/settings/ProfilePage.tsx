@@ -88,7 +88,10 @@ export function ProfilePage() {
               { value: 'high', label: t('profile.activityHigh') },
             ]}
           />
-          {!p.activity && <div className="field-hint">{t('profile.defaultUsed')}</div>}
+          <div className="field-hint">
+            {t('profile.activityHint')}
+            {!p.activity && ` ${t('profile.defaultUsed')}`}
+          </div>
         </div>
         <div className="field">
           <span className="field-label">{t('profile.phytate')}</span>
@@ -112,6 +115,7 @@ export function ProfilePage() {
       <h2 className="section-title">{t('profile.weight')}</h2>
       <div className="card">
         <p>{weight ? t('profile.currentWeight', { kg: weight }) : t('profile.noWeight')}</p>
+        <p className="muted small">{t('profile.weightWhy')}</p>
         <div className="row">
           <NumberInput value={newWeight} onChange={setNewWeight} suffix="kg" min={20} placeholder={String(weight ?? 70)} />
           <button

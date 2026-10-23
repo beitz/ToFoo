@@ -35,6 +35,8 @@ export interface PeriodResult {
   days: number;
   /** Days the averages are taken over. */
   countedDays: number;
+  /** Those days, oldest first: what a page splits by source or draws day by day. */
+  counted: string[];
   statusCounts: Record<DayStatus | 'pending', number>;
   nutrients: Map<string, NutrientResult>;
 }
@@ -91,5 +93,5 @@ export function periodBreakdown(input: PeriodInput): PeriodResult {
       limit: kind === 'limit' ? r!.recommended : undefined,
     });
   }
-  return { from, to, days: inRange, countedDays: n, statusCounts, nutrients };
+  return { from, to, days: inRange, countedDays: n, counted: idx.map((i) => days[i]!), statusCounts, nutrients };
 }

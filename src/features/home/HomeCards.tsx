@@ -2,15 +2,19 @@ import { useState, type ReactNode } from 'react';
 import { useData } from '../../app/data';
 import { href, navigate } from '../../app/router';
 import { t, type MessageKey } from '../../i18n';
+import { storeSources, todaySources, weekSources, type HomeSource } from '../../i18n/homeInfo.en';
 import { fmtNumber, fmtPercent } from '../../lib/format';
 import { NUTRIENT_BY_ID } from '../../model/nutrients';
 import type { NutrientResult, StoreResult } from '../../model/simulate';
 import { CompactGauge, StoreCompactGauge } from '../../ui/Gauge';
 import { Icon } from '../../ui/Icon';
 import { urgencyRank } from '../../ui/status';
-import { useToday } from './TodayRings';
+import { viewsOf } from '../../settings/views';
+import { NutrientsSection } from './NutrientsSection';
+import { StoresSection } from './StoresSection';
+import { MacroRings, useToday } from './TodayRings';
 
-/** Energy and the macronutrients, today's amounts in five cells at the top. */
+/** Energy and the macronutrients, today's amounts in five cells at the top (the bars view). */
 const TODAY_CELLS = ['ENERCC', 'PROT625', 'FAT', 'CHO', 'FIBT'];
 /** The cells' bars run to 150 %, so the target sits two thirds along, as in every list bar. */
 const SCALE = 1.5;
@@ -18,54 +22,69 @@ const SCALE = 1.5;
 const byUrgency = (a: NutrientResult, b: NutrientResult) => urgencyRank(a.status) - urgencyRank(b.status) || a.value.central - b.value.central;
 
 /**
- * Home's list layout (owner's pick to try, 2026-10-23): the nutrient view from the diary's "Nutrients"
- * page, in three cards by how long each number is averaged over: today, the last 7 days, and the body
- * stores. Each heading has an ⓘ that says why.
+ * Home's three cards, named by how long each number is averaged over (owner, 2026-10-23), each heading
+ * with an ⓘ that says why: today so far, the last 7 days, and the body stores. How they look follows
+ * Settings → Appearance: energy and macros as rings or bars, nutrients as comets or bars (the stores
+ * then as tanks or rows).
  */
-export function ListLayout({
+export function HomeCards({
   rest,
   stores,
   windowDays,
   startLevel,
+  showRange,
   defaultBased,
 }: {
   rest: NutrientResult[];
   stores: Array<NutrientResult & { store: StoreResult }>;
   windowDays: number;
   startLevel: string;
+  showRange: boolean;
   defaultBased: (id: string) => boolean;
 }) {
+  const { settings } = useData();
+  const views = viewsOf(settings);
+  const today = useToday();
   const go = (id: string) => () => navigate('nutrient', id);
   const sortedStores = [...stores].sort((a, b) => urgencyRank(a.store.status) - urgencyRank(b.store.status) || a.store.fill.central - b.store.fill.central);
+  const comets = views.nutrients === 'comets';
   return (
     <>
-      <ListCard id="today" title={t('home.today')} note={t('home.todayNote')} info={t('home.todayInfo')}>
-        <TodayCells defaultBased={defaultBased} />
+      <ListCard id="today" title={t('home.today')} note={t('home.todayNote')} info={t('home.todayInfo')} sources={todaySources(t)}>
+        {views.macros === 'rings' ? <MacroRings values={today} defaultBased={defaultBased} today /> : <TodayCells defaultBased={defaultBased} />}
       </ListCard>
       {rest.length > 0 && (
-        <ListCard id="week" title={t('home.lastDays', { n: windowDays })} note={t('home.weekNote')} info={t('home.weekInfo', { n: windowDays })}>
-          <div className="cgauge-grid">
-            {[...rest].sort(byUrgency).map((r) => (
-              <CompactGauge key={r.id} result={r} onClick={go(r.id)} />
-            ))}
-          </div>
+        <ListCard id="week" title={t('home.lastDays', { n: windowDays })} note={t('home.weekNote')} info={`${t('home.weekInfo', { n: windowDays })}${comets ? ` ${t('home.cometLegend')}` : ''}`} sources={weekSources(t)}>
+          {comets ? (
+            <NutrientsSection results={rest} showRange={showRange} />
+          ) : (
+            <div className="cgauge-grid">
+              {[...rest].sort(byUrgency).map((r) => (
+                <CompactGauge key={r.id} result={r} onClick={go(r.id)} />
+              ))}
+            </div>
+          )}
         </ListCard>
       )}
       {stores.length > 0 && (
-        <ListCard id="stores" title={t('home.stores')} note={t('home.storesListNote')} info={t('home.storesInfo', { start: t(`start.${startLevel}` as MessageKey) })}>
-          <div className="cgauge-grid">
-            {sortedStores.map((r) => (
-              <StoreCompactGauge key={r.id} result={r} onClick={go(r.id)} />
-            ))}
-          </div>
+        <ListCard id="stores" title={t('home.stores')} note={t('home.storesListNote')} info={t('home.storesInfo', { start: t(`start.${startLevel}` as MessageKey) })} sources={storeSources(t)}>
+          {comets ? (
+            <StoresSection stores={stores} showRange={showRange} />
+          ) : (
+            <div className="cgauge-grid">
+              {sortedStores.map((r) => (
+                <StoreCompactGauge key={r.id} result={r} onClick={go(r.id)} />
+              ))}
+            </div>
+          )}
         </ListCard>
       )}
     </>
   );
 }
 
-/** A card with its heading, a short note on what the numbers are, and an ⓘ that opens why. */
-function ListCard({ id, title, note, info, children }: { id: string; title: string; note: string; info: string; children: ReactNode }) {
+/** A card with its heading, a short note on what the numbers are, and an ⓘ that opens why, with the sources to check it. */
+function ListCard({ id, title, note, info, sources, children }: { id: string; title: string; note: string; info: string; sources: HomeSource[]; children: ReactNode }) {
   const [open, setOpen] = useState(false);
   return (
     <div className="card home-card list-card">
@@ -76,9 +95,21 @@ function ListCard({ id, title, note, info, children }: { id: string; title: stri
         </button>
       </div>
       {open && (
-        <p className="muted small list-info" id={`${id}-info`}>
-          {info}
-        </p>
+        <div className="muted small list-info" id={`${id}-info`}>
+          <p>{info}</p>
+          <h3 className="list-sources-head">{t('home.sources')}</h3>
+          <ul className="list-sources">
+            {sources.map((s) => (
+              <li key={s.url}>
+                <a href={s.url} target="_blank" rel="noreferrer">
+                  {s.label}
+                </a>
+                {s.about && ` · ${s.about}`}
+              </li>
+            ))}
+          </ul>
+          <p>{t('home.src.more')}</p>
+        </div>
       )}
       {children}
     </div>

@@ -136,6 +136,10 @@ export const nutrientInfoEn = {
   'info.ID.low': 'Enlarged thyroid (goitre), underactive thyroid with tiredness and weight gain; in pregnancy, harm to the baby\'s development.',
   'info.ID.high': 'Large amounts (seaweed, supplements) can also upset the thyroid.',
 
+  'info.SE.role': 'Selenium is part of enzymes that protect cells from damage and that make thyroid hormones work; it also helps the immune system. Found in fish, seafood, meat, offal and eggs; in plant foods it depends on the soil. Brazil nuts hold very much.',
+  'info.SE.low': 'Deficiency is rare in Europe. Low intake can weaken immune defence and thyroid function. Vegans eat less of it.',
+  'info.SE.high': 'Too much over time (from supplements or many Brazil nuts) causes brittle hair and nails, a garlic smell on the breath, skin rash and tiredness.',
+
   'info.CU.role': 'Copper helps enzymes that make energy, connective tissue and red blood cells, and helps use iron. Found in nuts, seeds, whole grains, legumes, offal.',
   'info.CU.low': 'Deficiency is rare: anaemia, low white blood cells; can follow very high zinc supplement doses.',
   'info.CU.high': 'From food, no harm; high supplement doses can harm the liver.',
@@ -204,6 +208,7 @@ export const NUTRIENT_INFO_SOURCES: Record<string, InfoSource> = {
   FE: ods('Iron', 'Iron'),
   ZN: ods('Zinc', 'Zinc'),
   ID: ods('Iodine', 'Iodine'),
+  SE: ods('Selenium', 'Selenium'),
   CU: ods('Copper', 'Copper'),
   MN: ods('Manganese', 'Manganese'),
   FD: ods('Fluoride', 'Fluoride'),

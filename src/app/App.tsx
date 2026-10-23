@@ -7,12 +7,14 @@ import { ErrorBoundary } from './ErrorBoundary';
 import { diag, layoutSnapshot } from './diagnostics';
 import { Icon } from '../ui/Icon';
 import { AboutPage } from '../features/about/AboutPage';
+import { SentPage } from '../features/about/SentPage';
 import { HomePage } from '../features/home/HomePage';
 import { FastShortcut } from '../features/home/FastShortcut';
 import { SleepShortcut } from '../features/sleep/SleepShortcut';
 import { CalendarPage } from '../features/review/CalendarPage';
 import { ReviewPage } from '../features/review/ReviewPage';
 import { WeekPage } from '../features/review/WeekPage';
+import { OverviewPage } from '../features/review/OverviewPage';
 import { LogPage } from '../features/log/LogPage';
 import { AssistantPage } from '../features/assistant/AssistantPage';
 import { AssistantSettingsPage } from '../features/settings/AssistantSettingsPage';
@@ -27,6 +29,7 @@ import { RecipeEditor } from '../features/recipes/RecipeEditor';
 import { RecipeView } from '../features/recipes/RecipeView';
 import { splitContext } from '../features/nutrient/NutrientSplit';
 import { NutrientPage } from '../features/nutrient/NutrientPage';
+import { NutrientRangePage } from '../features/nutrient/NutrientRangePage';
 import { NutrientFoodsPage } from '../features/nutrient/NutrientFoodsPage';
 import { WhyPage } from '../features/nutrient/WhyPage';
 import { FoodPage } from '../features/food/FoodPage';
@@ -43,10 +46,13 @@ import { Onboarding } from '../features/onboarding/Onboarding';
 import { FastPage } from '../features/fast/FastPage';
 import { CookPage } from '../features/recipes/CookPage';
 import { SleepPage } from '../features/sleep/SleepPage';
+import { CatchUpPage } from '../features/catchup/CatchUpPage';
+import { ActivityPage } from '../features/trackers/ActivityPage';
+import { WaterPage } from '../features/trackers/WaterPage';
 
 function Page({ route }: { route: string[] }) {
   const d = useData();
-  const [a, b, c, e] = route;
+  const [a, b, c, e, f] = route;
   if (!d.profile.onboarded) return <Onboarding />;
   switch (a) {
     case 'log':
@@ -57,7 +63,7 @@ function Page({ route }: { route: string[] }) {
     case 'diary':
       return <DiaryPage day={b} />;
     case 'journal':
-      return <JournalPage />;
+      return <JournalPage key={b ?? ''} write={b === 'new'} />;
     case 'insights':
       return <InsightsPage />;
     case 'shopping':
@@ -75,6 +81,7 @@ function Page({ route }: { route: string[] }) {
     case 'nutrient':
       if (c === 'foods') return <NutrientFoodsPage key={b} id={b ?? ''} />;
       if (c === 'why') return <WhyPage key={b} id={b ?? ''} />;
+      if (c === 'range') return <NutrientRangePage key={route.join('/')} id={b ?? ''} from={e} to={f} />;
       return <NutrientPage key={route.join('/')} id={b ?? ''} context={splitContext(c, e)} />;
     case 'food':
       return <FoodPage code={b ?? ''} />;
@@ -112,6 +119,7 @@ function Page({ route }: { route: string[] }) {
           return <SettingsPage />;
       }
     case 'about':
+      if (b === 'sent') return <SentPage />;
       return <AboutPage />;
     case 'calendar':
       return <CalendarPage month={b} />;
@@ -119,6 +127,8 @@ function Page({ route }: { route: string[] }) {
       return <ReviewPage from={b} to={c} />;
     case 'week':
       return <WeekPage week={b} />;
+    case 'overview':
+      return <OverviewPage />;
     case 'fast':
       return <FastShortcut />;
     case 'fasting':
@@ -127,6 +137,12 @@ function Page({ route }: { route: string[] }) {
       return <SleepShortcut />;
     case 'nights':
       return <SleepPage />;
+    case 'activity':
+      return <ActivityPage />;
+    case 'water':
+      return <WaterPage />;
+    case 'catchup':
+      return <CatchUpPage key={b} day={b ?? d.today} />;
     default:
       return <HomePage />;
   }
@@ -140,7 +156,7 @@ function Onboarded({ children }: { children: ReactNode }) {
 
 const NAV = [
   { key: 'home', to: [] as string[], icon: 'home', label: 'nav.home' },
-  { key: 'insights', to: ['diary'], icon: 'chart', label: 'nav.insights' },
+  { key: 'insights', to: ['overview'], icon: 'chart', label: 'nav.insights' },
   { key: 'kitchen', to: ['kitchen'], icon: 'kitchen', label: 'nav.kitchen' },
 ] as const;
 
@@ -148,6 +164,7 @@ const NAV = [
 const TAB_OF: Record<string, (typeof NAV)[number]['key'] | null> = {
   diary: 'insights',
   insights: 'insights',
+  overview: 'insights',
   week: 'insights',
   calendar: 'insights',
   review: 'insights',
@@ -155,6 +172,10 @@ const TAB_OF: Record<string, (typeof NAV)[number]['key'] | null> = {
   entry: 'insights',
   journal: 'insights',
   nights: 'insights',
+  activity: 'insights',
+  water: 'insights',
+  fasting: 'insights',
+  catchup: 'insights',
   kitchen: 'kitchen',
   athome: 'kitchen',
   recipes: 'kitchen',
@@ -167,7 +188,8 @@ const TAB_OF: Record<string, (typeof NAV)[number]['key'] | null> = {
 export function App() {
   const route = useRoute();
   const section = route[0] ?? 'home';
-  const active = section in TAB_OF ? TAB_OF[section] : 'home';
+  // A nutrient over a past period is opened from Insights and belongs there.
+  const active = section === 'nutrient' && route[2] === 'range' ? 'insights' : section in TAB_OF ? TAB_OF[section] : 'home';
   const path = route.join('/');
   // Braces matter: an effect's return value is its cleanup, and newer Chrome returns a Promise
   // from scrollTo. React then called that Promise on the next screen change ("is not a function")

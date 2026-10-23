@@ -18,7 +18,7 @@ import { endFast } from '../fast/fastActions';
  * The round button bottom right, on every screen but full-screen tasks (owner's ask, 2026-10-22).
  * Closed it takes one button's space; the first tap turns it into + and fans out the quick actions
  * above, the assistant nearest; the second tap on + opens Log meal. Tapping outside, Escape or the
- * phone's back gesture closes it again. The Kitchen tab holds At home and the basket, so they are
+ * phone's back gesture closes it again. The Kitchen tab holds At home and the shopping list, so they are
  * not in the fan.
  */
 export function QuickActions() {
@@ -77,15 +77,17 @@ export function QuickActions() {
             />
           )}
           {on('sleep') && <SleepButton onDone={close} />}
-          <DialItem
-            icon="moon"
-            label={d.activeFast ? t('home.endFast') : t('home.startFast')}
-            on={!!d.activeFast}
-            onClick={() => {
-              close();
-              void toggleFast();
-            }}
-          />
+          {(on('fasting') || d.activeFast) && (
+            <DialItem
+              icon="moon"
+              label={d.activeFast ? t('home.endFast') : t('home.startFast')}
+              on={!!d.activeFast}
+              onClick={() => {
+                close();
+                void toggleFast();
+              }}
+            />
+          )}
           {on('aiAssistant') && <DialItem icon="chat" label={t('ai.pageTitle')} onClick={() => go('assistant')} />}
         </div>
         <div className="dial-main">

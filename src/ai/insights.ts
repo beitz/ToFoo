@@ -20,6 +20,7 @@ import {
   type CountResult,
   type InsightData,
   type Overview,
+  type ShareKind,
   type Stats,
 } from '../logic/insights';
 import type { AiModel, CreateMessage } from './assistant';
@@ -252,13 +253,18 @@ function dayText(day: string, data: InsightData): string {
   return lines.join('\n');
 }
 
-/** The app's note with the first question: the period and what its data consists of. */
-export function insightNote(now: number, o: Overview, first: boolean): string {
+const KIND_NAME: Record<ShareKind, string> = { food: 'food log', journal: 'journal', sleep: 'sleep', activity: 'activity', water: 'water' };
+
+/** The app's note with the first question: the period, what its data consists of, and what the user chose not to share. */
+export function insightNote(now: number, o: Overview, first: boolean, notShared: readonly ShareKind[] = []): string {
   if (!first) return `(Now: ${fmtLocalDateTime(now)}.)`;
   const s = o.status;
   const parts = [
     `Now: ${fmtLocalDateTime(now)}.`,
-    `Period chosen by the user: ${o.from} to ${o.to} (${o.days} days); stay within it unless the user asks otherwise.`,
+    `Period chosen by the user: ${o.from} to ${o.to} (${o.days} days); the app shares no days outside it, so if the user asks about other days, say they can choose a longer period in a new chat.`,
+    ...(notShared.length
+      ? [`The user chose not to share their ${notShared.map((k) => KIND_NAME[k]).join(', ')}: the tools have no data for it, so draw no conclusions about it; if the question needs it, say they can tick it in a new chat.`]
+      : []),
     `In this period: food log complete on ${o.foodComplete} days (logged ${s.logged}, fasted ${s.fasted}), partly logged ${s.partial}, not logged ${s.unknown + s.filled}, left out by the user ${s.excluded}; ${o.journalEntries} journal entries on ${o.journalDays} days; sleep logged for ${o.nights} nights; activities on ${o.activityDays} days; plain water on ${o.waterDays} days.`,
     "Today's food log counts as incomplete until the day is over.",
   ];

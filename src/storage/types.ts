@@ -77,6 +77,7 @@ export type FeatureKey =
   | 'forecasts'
   | 'notifications'
   | 'uncertaintyRanges'
+  | 'levelEffects'
   | 'absorption'
   | 'retention'
   | 'sunVitaminD'
@@ -102,7 +103,8 @@ export type FeatureKey =
   | 'atHome'
   | 'ketosis'
   | 'questionShortcuts'
-  | 'ketoneReadings';
+  | 'ketoneReadings'
+  | 'fasting';
 
 export interface Settings extends Versioned {
   id: 'settings';
@@ -120,10 +122,16 @@ export interface Settings extends Versioned {
   autoBackupKeep?: number;
   /** Default storage plan for new recipes. */
   defaultPlan: StoragePlan;
-  /** Home layout (2026-10-23): detailed = today's rings and the comet list (unset), compact = lists by averaging window. */
+  /** Earlier single Home layout choice (2026-10-23); no longer read, kept so old backups still load. */
   homeView?: 'compact' | 'detailed';
+  /** Energy and macros as rings or bars, on Home and the nutrients page; unset = rings (see settings/views.ts). */
+  macroView?: 'rings' | 'bars';
+  /** Nutrient lists as comets or bars, on Home and the nutrients page; unset = bars. */
+  nutrientView?: 'comets' | 'bars';
   /** Home nutrient list grouping; unset = by status. */
   homeGrouping?: 'status' | 'type' | 'none';
+  /** What the calendar shows: every tracker as dots, or one of them; unset = all. */
+  calendarLayer?: 'all' | 'meals' | 'sleep' | 'activity' | 'water' | 'journal';
   /** Home groups the user opened (false) or closed (true), by group key; unset keys use the default. */
   homeCollapsed?: Record<string, boolean>;
   /** Foods pinned to the top of the log screen, in the order they were added. */

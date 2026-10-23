@@ -6,6 +6,8 @@
  *  - missing values stay `null`, never zero;
  *  - "<LOD", "<LOQ", "<LOD or <LOQ" and "TR" become "t" (trace / below detection);
  *  - the output records the BLS version.
+ * BLS 4.0 has no selenium, so one column is added: selenium estimated from the UK table CoFID 2021
+ * (data/raw/CoFID_2021.xlsx, scripts/selenium.ts), with its own provenance code "C".
  */
 import { readFileSync, writeFileSync, mkdirSync, existsSync, statSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
@@ -14,9 +16,13 @@ import { fileURLToPath } from 'node:url';
 import { unzipSync } from 'fflate';
 import ExcelJS from 'exceljs';
 import type { BlsFile, BlsFoodRow, BlsNutrientMeta, BlsRawValue } from '../src/foods/blsTypes';
+import { COFID_PROVENANCE } from '../src/foods/blsTypes';
+import { readCofid } from './cofid';
+import { SELENIUM, bestMatch, estimateFrom, prepare, type BlsFoodLike } from './selenium';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const ZIP = resolve(root, 'data/raw/BLS_4_0_2025_DE.zip');
+const COFID = resolve(root, 'data/raw/CoFID_2021.xlsx');
 const OUT = resolve(root, 'public/data/bls-4.0.json');
 const VERSION = '4.0';
 
@@ -191,6 +197,19 @@ async function main() {
   }
   if (unknownProvenance.size) throw new Error(`Unknown provenance values: ${[...unknownProvenance].join(', ')}`);
 
+  // Selenium from CoFID: each food's most alike CoFID food, scaled by protein (scripts/selenium.ts).
+  const candidates = prepare(await readCofid(readFileSync(COFID)), SELENIUM);
+  let withSelenium = 0;
+  for (const row of foods) {
+    const like: BlsFoodLike = { code: row[0], nameEn: row[2], per100: Object.fromEntries(nutrients.map((n, i) => [n.id, row[3][i] ?? null])) };
+    const match = bestMatch(like, candidates);
+    const v = match ? estimateFrom(like, match.cofid) : null;
+    row[3].push(v);
+    row[4] += v === null ? '-' : COFID_PROVENANCE;
+    if (v !== null) withSelenium++;
+  }
+  nutrients.push({ id: 'SE', nameDe: 'Selen', nameEn: 'Selenium', unit: 'µg' });
+
   const out: BlsFile = {
     format: 'tofoo-bls',
     formatVersion: 1,
@@ -199,7 +218,18 @@ async function main() {
     attribution:
       'Max Rubner-Institut (2025): Bundeslebensmittelschlüssel (BLS), Version 4.0 — Deutsche Nährstoffdatenbank. Karlsruhe. DOI: 10.25826/Data20251217-134202-0. Converted and abridged for ToFoo.',
     licence: 'CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)',
-    provenanceCodes: Object.fromEntries(Object.entries(PROVENANCE).map(([k, v]) => [v, k])),
+    provenanceCodes: {
+      ...Object.fromEntries(Object.entries(PROVENANCE).map(([k, v]) => [v, k])),
+      [COFID_PROVENANCE]: 'Geschätzt aus CoFID 2021 (UK), über ein ähnliches Lebensmittel',
+    },
+    extraSources: [
+      {
+        nutrients: ['SE'],
+        attribution:
+          "Public Health England (2021): McCance and Widdowson's The Composition of Foods Integrated Dataset 2021. Selenium estimated for BLS foods by ToFoo (most alike CoFID food, scaled by protein).",
+        licence: 'Open Government Licence v3.0 (https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/)',
+      },
+    ],
     groups: GROUPS,
     nutrients,
     foods,
@@ -208,6 +238,7 @@ async function main() {
   const json = JSON.stringify(out);
   writeFileSync(OUT, json);
   console.log(`Wrote ${foods.length} foods × ${nutrients.length} nutrients → ${OUT} (${(json.length / 1e6).toFixed(2)} MB)`);
+  console.log(`Selenium from CoFID for ${withSelenium} of ${foods.length} foods`);
 }
 
 main().catch((e) => {

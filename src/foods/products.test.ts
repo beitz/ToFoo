@@ -19,8 +19,9 @@ const bls: BlsFile = {
     { id: 'FAT', nameEn: 'Fat', nameDe: 'Fett', unit: 'g' },
     { id: 'MG', nameEn: 'Magnesium', nameDe: 'Magnesium', unit: 'mg' },
     { id: 'VITB12', nameEn: 'B12', nameDe: 'B12', unit: 'µg' },
+    { id: 'SE', nameEn: 'Selenium', nameDe: 'Selen', unit: 'µg' },
   ],
-  foods: [['S610000', 'Pralinen', 'Pralines', [555, 35, 90, null], 'AAAA']],
+  foods: [['S610000', 'Pralinen', 'Pralines', [555, 35, 90, null, 4], 'AAAAC']],
 };
 const foods = buildFoodDb(bls);
 
@@ -41,8 +42,9 @@ describe('products as foods', () => {
     const f = productFood({ ...giotto, match: { version: '4.0', code: 'S610000' } }, foods);
     expect(f.code).toBe('OFF:8000500319475');
     expect(f.group).toBe('S');
-    expect(f.per100).toMatchObject({ ENERCC: 632, FAT: 48, MG: 90, VITB12: null });
-    expect(f.provenance).toMatchObject({ ENERCC: 'B', FAT: 'B', MG: 'U', VITB12: '-' });
+    expect(f.per100).toMatchObject({ ENERCC: 632, FAT: 48, MG: 90, VITB12: null, SE: 4 });
+    // Selenium keeps its CoFID estimate mark ("C"), so it stays as uncertain as in the BLS food.
+    expect(f.provenance).toMatchObject({ ENERCC: 'B', FAT: 'B', MG: 'U', VITB12: '-', SE: 'C' });
   });
 
   it('leaves everything off the label missing without a match', () => {

@@ -14,6 +14,7 @@
 import { DERIVED } from '../model/nutrients';
 import type { RawValue } from '../model/types';
 import type { FoodRef, Product, ProductSource } from '../storage/types';
+import { COFID_PROVENANCE } from './blsTypes';
 import { sumDerived, type Food, type FoodDb } from './foodDb';
 import { productUrl } from './openFoodFacts';
 import { usdaFoodUrl, usdaGroup } from './usda';
@@ -50,7 +51,8 @@ export function productFood(product: Product, foods: Pick<FoodDb, 'byCode'>): Fo
   if (match) {
     for (const [id, v] of Object.entries(match.per100)) {
       per100[id] = v;
-      provenance[id] = v === null ? '-' : BORROWED_PROVENANCE;
+      // Selenium estimated from CoFID stays marked as such: borrowing doesn't make it more certain.
+      provenance[id] = v === null ? '-' : match.provenance[id] === COFID_PROVENANCE ? COFID_PROVENANCE : BORROWED_PROVENANCE;
     }
   }
   const own = hasOwnMicros(product) ? DATABASE_PROVENANCE : LABEL_PROVENANCE;

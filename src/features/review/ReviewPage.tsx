@@ -10,10 +10,14 @@ import type { NutrientResult } from '../../model/simulate';
 import { isOn } from '../../settings/features';
 import { CompactGauge } from '../../ui/Gauge';
 import { Icon } from '../../ui/Icon';
+import { InfoButton } from '../../ui/InfoButton';
 import { Field, Segmented } from '../../ui/controls';
 import { urgencyRank } from '../../ui/status';
 import { DAY_ICON } from './dayStatus';
 import { DateInput } from '../../ui/DateInputs';
+import { viewsOf } from '../../settings/views';
+import { MacroRings, useToday, type MacroValues } from '../home/TodayRings';
+import { CometView } from '../home/NutrientsSection';
 
 const MACRO_ROW = ['ENERCC', 'PROT625', 'FAT', 'CHO', 'FIBT'];
 const DAY_KEY = /^\d{4}-\d{2}-\d{2}$/;
@@ -41,7 +45,17 @@ export function ReviewPage({ from: fromParam, to: toParam }: { from?: string; to
     .filter((r): r is NutrientResult => !!r)
     .sort((a, b) => urgencyRank(a.status) - urgencyRank(b.status) || a.value.central - b.value.central);
 
+  // Energy, macros and the list look as on Home (Settings → Appearance); rings show the average per day.
+  const views = viewsOf(d.settings);
+  const todayValues = useToday();
+  const periodValues: MacroValues = {
+    ...todayValues,
+    amountOf: (id) => period.nutrients.get(id)?.averageIntake ?? 0,
+    partOf: (id) => (period.nutrients.get(id)?.missingDataDays ?? 0) > 0,
+  };
   const go = (f: string, to2: string) => navigate('review', f, to2);
+  // A nutrient opens on this period, not on the usual last days (owner's ask, 2026-10-23).
+  const open = (id: string) => navigate('nutrient', id, 'range', from, to);
   function pick(p: PeriodPreset) {
     if (p === 'range') return setCustom(true);
     setCustom(false);
@@ -94,43 +108,62 @@ export function ReviewPage({ from: fromParam, to: toParam }: { from?: string; to
       )}
 
       <div className="card review-summary">
-        <p>{period.countedDays === 0 ? t('review.noDays') : t(period.countedDays === 1 ? 'review.countedOne' : 'review.counted', { n: period.countedDays })}</p>
-        <ul className="plain-list row wrap small">
-          {parts.map((s) => (
-            <li key={s} className={`day-${s} status-chip`}>
-              <Icon name={DAY_ICON[s]} size={14} /> {t(`day.${s}` as MessageKey)} · {counts[s]}
-            </li>
-          ))}
-        </ul>
-        <p className="muted small">{t(impute ? 'review.hintFilled' : 'review.hint')}</p>
-        <div className="row wrap">
+        {period.countedDays === 0 ? (
+          <p className="small muted grow">{t('review.noDays')}</p>
+        ) : (
+          <ul className="plain-list review-chips" aria-label={t('review.daysLabel')}>
+            {parts.map((s) => (
+              <li key={s} className={`day-${s} status-chip`}>
+                <Icon name={DAY_ICON[s]} size={14} /> {t(`day.${s}` as MessageKey)} · {counts[s]}
+              </li>
+            ))}
+          </ul>
+        )}
+        <div className="review-links">
           {from === to && (
-            <a className="btn btn-small btn-ghost" href={href('diary', from)}>
-              <Icon name="diary" size={16} /> {t('review.openDiary')}
+            <a className="icon-btn" href={href('diary', from)} aria-label={t('review.openDiary')} title={t('review.openDiary')}>
+              <Icon name="diary" size={20} />
             </a>
           )}
-          <a className="btn btn-small btn-ghost" href={href('week', weekStart(to))}>
-            <Icon name="bars" size={16} /> {t('review.weekByWeek')}
+          <a className="icon-btn" href={href('week', weekStart(to))} aria-label={t('review.weekByWeek')} title={t('review.weekByWeek')}>
+            {/* The week look-back's icon, as on Overview: bars would read as "nutrients of this day". */}
+            <Icon name="history" size={20} />
           </a>
-          <a className="btn btn-small btn-ghost" href={href('calendar', to.slice(0, 7))}>
-            <Icon name="calendar" size={16} /> {t('review.calendar')}
+          <a className="icon-btn" href={href('calendar', to.slice(0, 7))} aria-label={t('review.calendar')} title={t('review.calendar')}>
+            <Icon name="calendar" size={20} />
           </a>
+          <InfoButton title={formatRange(from, to, d.today)} label={t('review.aboutNumbers')}>
+            <p>{period.countedDays === 0 ? t('review.noDays') : t(period.countedDays === 1 ? 'review.countedOne' : 'review.counted', { n: period.countedDays })}</p>
+            <p>{t(impute ? 'review.hintFilled' : 'review.hint')}</p>
+            <p>{t('review.explain')}</p>
+            <p>{t('review.tapHint')}</p>
+          </InfoButton>
         </div>
       </div>
 
-      {macros.length > 0 && (
-        <div className="macro-row" role="group" aria-label={t('home.macros')}>
-          {macros.map((r) => (
-            <CompactGauge key={r.id} variant="cell" result={r} onClick={() => navigate('nutrient', r.id)} />
+      {macros.length > 0 &&
+        (views.macros === 'rings' ? (
+          <div className="card home-card">
+            <MacroRings values={periodValues} defaultBased={() => false} today={false} open={open} />
+          </div>
+        ) : (
+          <div className="macro-row" role="group" aria-label={t('home.macros')}>
+            {macros.map((r) => (
+              <CompactGauge key={r.id} variant="cell" result={r} onClick={() => open(r.id)} />
+            ))}
+          </div>
+        ))}
+      {views.nutrients === 'comets' ? (
+        <div className="card home-card">
+          <CometView results={gauges} showRange={isOn(d.settings.features, 'uncertaintyRanges')} open={open} />
+        </div>
+      ) : (
+        <div className="cgauge-grid">
+          {gauges.map((r) => (
+            <CompactGauge key={r.id} result={r} onClick={() => open(r.id)} />
           ))}
         </div>
       )}
-      <div className="cgauge-grid">
-        {gauges.map((r) => (
-          <CompactGauge key={r.id} result={r} onClick={() => navigate('nutrient', r.id)} />
-        ))}
-      </div>
-      <p className="muted small disclaimer">{t('review.explain')}</p>
     </section>
   );
 }

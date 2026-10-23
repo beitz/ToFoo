@@ -38,6 +38,27 @@ describe.runIf(existsSync(file))('generated BLS JSON', () => {
     expect(nulls).toBeGreaterThan(1000);
   });
 
+  it('adds selenium estimated from CoFID, marked "C", with its own attribution', () => {
+    const se = idx('SE');
+    expect(se).toBe(bls.nutrients.length - 1);
+    expect(bls.nutrients[se]).toMatchObject({ id: 'SE', unit: 'µg' });
+    expect(bls.provenanceCodes.C).toContain('CoFID');
+    expect(bls.extraSources?.[0]).toMatchObject({ nutrients: ['SE'], licence: expect.stringContaining('Open Government Licence') });
+    const value = (code: string) => {
+      const f = bls.foods.find((x) => x[0] === code)!;
+      expect(f[4][se]).toBe('C');
+      return f[3][se];
+    };
+    // Plausible against CoFID's own values for the same foods (Brazil nuts 254, cod 23, milk 1 µg/100 g).
+    expect(value('H180100')).toBeGreaterThan(150); // Brazil nut
+    expect(value('T204100')).toBeGreaterThan(10); // cod, raw
+    expect(value('T204100')).toBeLessThan(50);
+    expect(value('M111300')).toBeLessThan(5); // whole milk
+    expect(value('F110100')).toBe('t'); // apple
+    const withValue = bls.foods.filter((f) => f[3][se] !== null).length;
+    expect(withValue / bls.foods.length).toBeGreaterThan(0.95);
+  });
+
   it('has the salt variants used for kitchen defaults', () => {
     const codes = new Set(bls.foods.map((f) => f[0]));
     for (const c of ['R111000', 'R114000', 'R113000']) expect(codes.has(c)).toBe(true);

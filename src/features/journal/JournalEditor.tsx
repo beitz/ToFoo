@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { href } from '../../app/router';
 import { t, type MessageKey } from '../../i18n';
 import { JOURNAL_TRANSCRIBE_PROMPT } from '../../ai/transcribe';
 import { Icon } from '../../ui/Icon';
@@ -68,13 +69,18 @@ export function JournalEditor({
           </button>
           {dictation.startedAt !== undefined ? (
             <span className="voice-status small" role="status">
-              <span className="rec-dot" aria-hidden="true" /> <RecordingTime since={dictation.startedAt} />
+              <span className="rec-dot" aria-hidden="true" /> <RecordingTime since={dictation.startedAt} /> <span className="muted">· {t('voice.sending')}</span>
             </span>
           ) : dictation.transcribing ? (
             <span className="muted small" role="status">
               {t('voice.transcribing')}
             </span>
-          ) : null}
+          ) : (
+            // Next to the speak button: the recording leaves the phone, the entry does not (owner's ask, 2026-10-23).
+            <span className="muted small grow">
+              {t('sent.journalVoiceNote')} <a href={href('about', 'sent')}>{t('sent.more')}</a>
+            </span>
+          )}
         </div>
       )}
       {dictation.failed && <VoiceFailed onRetry={dictation.retry} onDrop={dictation.drop} />}

@@ -15,6 +15,7 @@ import type { MealSummary } from '../model/simulate';
 import type { FoodPart, ModelEntry } from '../model/types';
 import type { Batch, CustomFood, LogEntry } from '../storage/types';
 import { potShare } from './batch';
+import { COFID_PROVENANCE } from '../foods/blsTypes';
 import { BORROWED_PROVENANCE } from '../foods/products';
 
 /** One entry, or one ingredient (`part`, an index into the entry's parts) of a recipe portion. */
@@ -39,17 +40,19 @@ export interface Breakdown {
 }
 
 /**
- * Where a value comes from, as one letter: B the BLS, O Open Food Facts, U USDA FoodData Central,
- * E entered by the user (a saved item or an entry by hand). A product's values borrowed from its
- * similar BLS food count as B; a recipe portion's as its ingredients'.
+ * Where a value comes from, as one letter: B the BLS, C estimated from the UK table CoFID (selenium,
+ * which BLS lacks), O Open Food Facts, U USDA FoodData Central, E entered by the user (a saved item
+ * or an entry by hand). A product's values borrowed from its similar BLS food count as B (or C);
+ * a recipe portion's as its ingredients'.
  */
-export type SourceLetter = 'B' | 'O' | 'U' | 'E';
-export const SOURCE_LETTERS: readonly SourceLetter[] = ['B', 'O', 'U', 'E'];
+export type SourceLetter = 'B' | 'C' | 'O' | 'U' | 'E';
+export const SOURCE_LETTERS: readonly SourceLetter[] = ['B', 'C', 'O', 'U', 'E'];
 
 /** The source of one food's value for one nutrient (none when it has no value). */
 export function partSource(part: Pick<FoodPart, 'code' | 'per100' | 'provenance'>, id: string): SourceLetter | undefined {
   const v = part.per100[id];
   if (v === null || v === undefined) return undefined;
+  if (part.provenance?.[id] === COFID_PROVENANCE) return 'C';
   const code = part.code ?? '';
   const product = code.startsWith('OFF:') ? 'O' : code.startsWith('USDA:') ? 'U' : undefined;
   if (!product) return 'B';

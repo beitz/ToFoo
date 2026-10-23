@@ -52,7 +52,9 @@ export function AssistantSettingsPage() {
 
       <div className="card">
         <Toggle checked={on} onChange={(v) => repo.updateSettings({ features: { ...d.settings.features, aiAssistant: v } })} label={t('ai.enable')} />
-        <p className="muted small">{t('ai.privacy')}</p>
+        <p className="muted small">
+          {t('ai.privacy')} <a href={href('about', 'sent')}>{t('sent.more')}</a>
+        </p>
       </div>
 
       <h2 className="section-title">{t('ai.productsTitle')}</h2>
@@ -202,7 +204,9 @@ function VoiceSettings() {
       <div className="card">
         <p className="small">{t('voice.intro')}</p>
         <Toggle checked={on} onChange={(v) => repo.updateSettings({ features: { ...d.settings.features, voiceInput: v } })} label={t('voice.enable')} />
-        <p className="muted small">{t('voice.privacy')}</p>
+        <p className="muted small">
+          {t('voice.privacy')} <a href={href('about', 'sent')}>{t('sent.more')}</a>
+        </p>
         {on &&
           (key ? (
             <div className="row-between">

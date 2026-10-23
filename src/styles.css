@@ -25,8 +25,16 @@
   --high: #6a45d6;
   --high-soft: color-mix(in srgb, var(--high) 14%, transparent);
   --unknown: #5f676e;
+  --t-meals: #c2410c;
+  --t-sleep: #6d28d9;
+  --t-activity: #be185d;
+  --t-water: #1d6fd6;
+  --t-journal: #8a6d1a;
   --tank: #1a66ae;
   --tank-soft: color-mix(in srgb, var(--tank) 26%, transparent);
+  /* The shopping list: what is still to get, set apart from what is at home (Kitchen tab). */
+  --shop: #2f5fb3;
+  --shop-soft: color-mix(in srgb, var(--shop) 10%, transparent);
   --range: rgba(21, 24, 27, 0.16);
   --shadow: none;
   --radius: 18px;
@@ -63,8 +71,20 @@
     --high: #b69cff;
     --high-soft: color-mix(in srgb, var(--high) 16%, transparent);
     --unknown: #8e99a1;
+  --t-meals: #fb923c;
+  --t-sleep: #a78bfa;
+  --t-activity: #f472b6;
+  --t-water: #60a5fa;
+  --t-journal: #d6b45a;
+    --t-meals: #fb923c;
+    --t-sleep: #a78bfa;
+    --t-activity: #f472b6;
+    --t-water: #60a5fa;
+    --t-journal: #d6b45a;
     --tank: #5baef2;
     --tank-soft: color-mix(in srgb, var(--tank) 26%, transparent);
+    --shop: #8fb4f7;
+    --shop-soft: color-mix(in srgb, var(--shop) 12%, transparent);
     --range: rgba(238, 241, 243, 0.2);
     --shadow: none;
   }
@@ -94,6 +114,8 @@
   --unknown: #8e99a1;
   --tank: #5baef2;
   --tank-soft: color-mix(in srgb, var(--tank) 26%, transparent);
+  --shop: #8fb4f7;
+  --shop-soft: color-mix(in srgb, var(--shop) 12%, transparent);
   --range: rgba(238, 241, 243, 0.2);
   --shadow: none;
 }
@@ -309,10 +331,11 @@ header.page-head:not(.row):not(.row-between) {
 
 /* ── Cards, lists ────────────────────────────────────────────── */
 .card {
+  --card-pad-x: 14px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 12px 14px;
+  padding: 12px var(--card-pad-x);
   margin: 12px 0;
   box-shadow: var(--shadow);
 }
@@ -324,7 +347,9 @@ header.page-head:not(.row):not(.row-between) {
   position: sticky;
   top: 0;
   z-index: 5;
-  padding: 6px 0;
+  /* Edge to edge, so what scrolls under the heading doesn't show at its sides. */
+  margin-inline: calc(-1 * var(--card-pad-x));
+  padding: 6px var(--card-pad-x);
   background: var(--surface);
 }
 .card-head {
@@ -336,6 +361,11 @@ header.page-head:not(.row):not(.row-between) {
 .card-head h2,
 .card-head h3 {
   margin: 0;
+}
+/* ⓘ in a card heading: centred on the title, its 44 px target reaching into the card padding. */
+.card-head > .info-btn {
+  align-self: center;
+  margin: -10px -10px -10px auto;
 }
 .card-head .card-note {
   color: var(--text-faint);
@@ -1880,7 +1910,7 @@ body:has(.composer) .toast-area {
 }
 .calendar-row {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 4px;
 }
 .calendar-weekdays span {
@@ -1943,15 +1973,33 @@ body:has(.composer) .toast-area {
   padding: 0;
   border: 0;
 }
-.review-summary p {
-  margin: 0 0 8px;
+/* One line: how the days were logged, then the links as icons and ⓘ (owner's ask, 2026-10-23: less room). */
+.review-summary {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 4px 6px;
+  padding: 6px 6px 6px 12px;
 }
-.review-summary .row.wrap {
-  gap: 4px 14px;
-  margin-bottom: 8px;
+.review-summary > p {
+  margin: 0;
 }
-.review-summary .btn {
-  min-height: 44px;
+.review-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  font-size: 0.85rem;
+  flex: 1 1 0;
+  min-width: 0;
+}
+.review-links {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  margin-left: auto;
+}
+.review-links .icon-btn {
+  color: var(--text-muted);
 }
 .review-dates {
   gap: 12px;
@@ -2374,6 +2422,9 @@ body:has(.composer) .toast-area {
 .journal-voice .btn {
   min-height: 44px;
 }
+.journal-voice .grow {
+  flex: 1 1 12rem;
+}
 .journal-row {
   grid-template-columns: auto 1fr auto;
   grid-auto-flow: row;
@@ -2692,6 +2743,19 @@ body:has(.fab-stack) .toast-area {
 .insights-overview li + li {
   margin-top: 2px;
 }
+/* What to send: one tickable row per kind of data, counts for the chosen period. */
+.insights-share {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+.insights-share .radio-row {
+  min-height: 44px;
+}
+.insights-shared {
+  margin: 0;
+}
 .insights-answer {
   display: flex;
   flex-direction: column;
@@ -2750,9 +2814,6 @@ body:has(.fab-stack) .toast-area {
 }
 .notice-card p {
   margin: 0;
-}
-.journal-patterns {
-  margin: 0 0 12px;
 }
 
 /* ── Nutrient group info pages (ⓘ on Home "By type", food and nutrient pages) ── */
@@ -3018,9 +3079,7 @@ body:has(.fab-stack) .toast-area {
 .week-energy > li,
 .week-energy > li + li,
 .week-moves > li,
-.week-moves > li + li,
-.week-foods > li + li,
-.week-foods > li {
+.week-moves > li + li {
   padding: 0;
   border: 0;
 }
@@ -3265,22 +3324,6 @@ body:has(.fab-stack) .toast-area {
 .week-spark.week-st-tooHigh {
   --c: var(--high);
 }
-/* For the next batch */
-.week-batch h2 {
-  margin: 2px 0 6px;
-  font-size: 1.3rem;
-}
-.week-batch > p {
-  margin: 0 0 4px;
-}
-.week-batch-actions {
-  display: flex;
-  gap: 8px;
-  margin-top: 12px;
-}
-.week-batch-actions .btn {
-  flex: 1;
-}
 .week-link {
   display: flex;
   align-items: center;
@@ -3288,9 +3331,6 @@ body:has(.fab-stack) .toast-area {
   min-height: 48px;
   color: var(--text);
   text-decoration: none;
-}
-.week-foods > li + li .week-link {
-  border-top: 1px solid var(--border);
 }
 .week-fold h3 {
   margin: 8px 0 4px;
@@ -3560,12 +3600,16 @@ button.week-row:focus-visible {
 }
 .shop-progress {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
+  gap: 6px 10px;
   margin: -4px 0 6px;
 }
+.shop-progress .offline-pill {
+  margin-left: auto;
+}
 .shop-bar {
-  flex: 1;
+  flex: 1 1 100%;
   height: 8px;
   border-radius: 4px;
   background: var(--surface-3);
@@ -4200,22 +4244,22 @@ a.contributor-link > span:first-child {
   position: sticky;
   top: 0;
   z-index: 15;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
-  grid-auto-flow: column;
-  gap: 6px;
+  display: flex;
+  gap: 5px;
   margin: 0 calc(-1 * var(--gutter)) 4px;
   padding: 8px var(--gutter);
   background: var(--bg);
 }
 .kitchen-tile {
+  flex: 1 1 0;
   display: flex;
   flex-direction: column;
+  text-decoration: none;
   align-items: center;
   gap: 2px;
   min-width: 0;
   min-height: 72px;
-  padding: 8px 2px;
+  padding: 8px 0;
   border: 1.5px solid var(--border);
   border-radius: 14px;
   background: var(--surface);
@@ -4229,7 +4273,8 @@ a.contributor-link > span:first-child {
   line-height: 1.1;
 }
 .kitchen-tile span {
-  font-size: 0.75rem;
+  /* Small enough that "Cupboard" and "Shopping" fit five tiles and the separator at 360 px. */
+  font-size: 0.7rem;
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -4238,6 +4283,33 @@ a.contributor-link > span:first-child {
 .kitchen-tile.on {
   border-color: var(--accent);
   color: var(--text);
+}
+/* The shopping list's tile: apart at the right end, in its own colour, and a link to the list. */
+.kitchen-tiles-sep {
+  flex: none;
+  width: 1.5px;
+  margin: 6px 1px;
+  border-radius: 1px;
+  background: var(--edge);
+}
+.kitchen-tile.kitchen-tile-list {
+  border-color: color-mix(in srgb, var(--shop) 55%, transparent);
+  background: var(--shop-soft);
+}
+.kitchen-tile-list svg,
+.kitchen-tile-list strong {
+  color: var(--shop);
+}
+.kitchen-list {
+  border-color: color-mix(in srgb, var(--shop) 45%, transparent);
+}
+.kitchen-list > .card-head h2 {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.kitchen-list > .card-head h2 svg {
+  color: var(--shop);
 }
 .kitchen-section {
   /* Jumping to a section leaves it under the sticky overview, not behind it. */
@@ -4251,13 +4323,29 @@ a.contributor-link > span:first-child {
 .kitchen-page .card > .card-head {
   top: 88px;
 }
+.kitchen-page .card-head h2 {
+  flex: 1;
+}
+/* The "+" in a card heading (owner's ask, 2026-10-23): add straight into that card. */
+.card-head > .card-add {
+  align-self: center;
+  margin: -8px -10px -8px 0;
+  color: var(--text-muted);
+}
+.card-head > .card-add.on {
+  color: var(--text);
+}
+.card-add-box {
+  margin: 4px 0 8px;
+}
 
 /* ── Home (design 2026-10-22, "everything on one screen") ─────── */
 .home-head h1 {
   font-size: 1.5rem;
 }
 .home-card {
-  padding: 10px 12px 12px;
+  --card-pad-x: 12px;
+  padding: 10px var(--card-pad-x) 12px;
 }
 .card-note-btn {
   display: inline-flex;
@@ -4785,12 +4873,12 @@ a.contributor-link > span:first-child {
 }
 
 /* Today: the calorie ring and four macro donuts (owner's ask, 2026-10-22). */
-.today-card {
+.today-rings {
   display: grid;
   grid-template-columns: auto 1fr;
   align-items: center;
   gap: 4px 14px;
-  padding: 12px;
+  padding: 2px 0;
 }
 .today-big {
   position: relative;
@@ -5336,13 +5424,177 @@ a.contributor-link > span:first-child {
   align-items: center;
   gap: 6px;
 }
-.nut-hero-notes {
-  margin-top: 10px;
-  border-top: 1px solid var(--border);
-  padding-top: 8px;
+/* ⓘ in the hero's top right corner; the 44 px target reaches into the card padding. */
+.nut-hero-main > .info-btn {
+  margin: -10px -10px 0 auto;
 }
-.nut-hero-notes p {
-  margin: 4px 0;
+.nut-hero-text.grow {
+  flex: 1;
+}
+/* Need tile over 100 %: the scale's top, and a dashed line at 100 %. */
+.nut-tile-level {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--text);
+  opacity: 0.6;
+}
+.nut-tile-scale {
+  position: absolute;
+  top: 3px;
+  left: 6px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+.nut-tile-need {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 2px dashed var(--text);
+}
+.nut-tile-need > span {
+  position: absolute;
+  right: 5px;
+  bottom: 2px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--text);
+}
+.nut-tile-over {
+  border-top-style: dashed;
+}
+.nut-tile-over .nut-tile-scale {
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 1rem;
+  color: var(--text);
+}
+/* One dot per day behind the average. */
+.day-dots {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px;
+  margin-top: 4px !important;
+}
+.day-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  box-sizing: border-box;
+}
+.day-dot-estimated {
+  background: color-mix(in srgb, var(--text-muted) 35%, transparent);
+}
+.day-dot-leftOut {
+  background: none;
+  border: 1.5px dashed var(--text-faint);
+}
+.day-dot-missing {
+  background: none;
+  border: 2px solid var(--warn);
+}
+.day-dots .small {
+  margin-left: 4px;
+}
+/* An amount against its reference: bar to scale, reference as a mark. */
+.amount-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  font-variant-numeric: tabular-nums;
+}
+.amount-bar > span:first-child,
+.amount-bar > span:last-child {
+  flex: none;
+  white-space: nowrap;
+}
+.amount-track {
+  position: relative;
+  flex: 1;
+  min-width: 40px;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--surface-2);
+}
+.amount-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--c) 70%, transparent);
+}
+.amount-today .amount-fill {
+  background: var(--accent);
+}
+.amount-mark {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 2px;
+  background: var(--text);
+}
+.nut-chips {
+  margin: 8px 0 0;
+}
+.nut-chips:empty {
+  display: none;
+}
+.nut-chips .chip {
+  min-height: 32px;
+  padding: 0 10px;
+  font-size: 0.85rem;
+  cursor: default;
+  background: var(--surface-2);
+}
+.nut-chips .chip-link {
+  min-height: 44px;
+  color: var(--accent);
+  text-decoration: none;
+  cursor: pointer;
+}
+.nut-chips .chip-warn {
+  border-color: var(--warn);
+  color: var(--warn);
+  background: none;
+}
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 6px 0 0;
+}
+.chart-legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.legend-sample {
+  display: inline-block;
+  width: auto;
+  overflow: visible;
+}
+.info-sheet p {
+  margin: 0 0 10px;
+}
+/* What it does, signs, too much and "How is it worked out?" as rows of one card. */
+.fold-group {
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+.fold-group > .fold + .fold,
+.fold-group > .fold-row {
+  border-top: 1px solid var(--border);
+}
+.fold-group .fold-body {
+  padding-bottom: 10px;
+}
+.fold-group > .why-link {
+  min-height: 48px;
 }
 .chart-tank .chart-line {
   stroke: var(--tank);
@@ -5364,10 +5616,26 @@ a.contributor-link > span:first-child {
   display: grid;
   gap: 2px;
   justify-items: center;
+  min-width: 0;
+  padding: 4px 0 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
 }
-.uptake-eaten {
-  font-size: 0.8rem;
-  color: var(--text-muted);
+.uptake-day.picked .uptake-col {
+  background: var(--surface-2);
+  border-radius: 4px 4px 0 0;
+}
+.uptake-day.picked .uptake-wd {
+  color: var(--text);
+  font-weight: 700;
+}
+.uptake-readout {
+  margin: 0 0 6px;
+  font-variant-numeric: tabular-nums;
 }
 .uptake-col {
   position: relative;
@@ -5390,23 +5658,10 @@ a.contributor-link > span:first-child {
   height: 2px;
   background: var(--text);
 }
-.uptake-up {
-  font-weight: 700;
-  font-size: 0.85rem;
-}
 .uptake-wd {
   font-size: 0.75rem;
-}
-.uptake-legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 12px;
-  margin: 8px 0 0;
-}
-.uptake-legend > span {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
+  min-height: 1.2em;
+  white-space: nowrap;
 }
 .legend-bar {
   width: 10px;
@@ -5617,7 +5872,8 @@ a.contributor-link > span:first-child {
 .why-body p {
   margin: 4px 0 0;
 }
-.why-last {
+/* .why-chain in the selector: otherwise `.plain-list > li + li` paints the top edge grey. */
+.why-chain > .why-last {
   border-color: var(--tank);
   background: color-mix(in srgb, var(--tank) 10%, var(--surface));
 }
@@ -6435,6 +6691,23 @@ a.contributor-link > span:first-child {
 .list-info {
   margin: 0 0 8px;
 }
+.list-info > p {
+  margin: 0 0 6px;
+}
+/* Sources under an ⓘ text: small and quiet, the links wrap anywhere so long titles fit 360 px. */
+.list-sources-head {
+  margin: 8px 0 2px;
+  font-size: inherit;
+  font-weight: 600;
+}
+.list-sources {
+  margin: 0 0 6px;
+  padding-left: 1.2em;
+  overflow-wrap: anywhere;
+}
+.list-sources > li {
+  padding: 2px 0;
+}
 .cgauge.gauge-progress .cgauge-fill {
   color: var(--text-muted);
 }
@@ -6510,4 +6783,560 @@ a.contributor-link > span:first-child {
 }
 .settings-label-first {
   margin-top: 0;
+}
+
+/* Catch up: one line under the day strip when yesterday lacks something, and its page. */
+.catchup-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  margin: 0 0 8px;
+  padding: 0 10px 0 12px;
+  background: var(--warn-soft);
+  border: 1px solid color-mix(in srgb, var(--warn) 45%, transparent);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  text-decoration: none;
+  font-size: 0.9rem;
+}
+.catchup-line > svg:first-child {
+  color: var(--warn);
+  flex: none;
+}
+.catchup-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 6px 0;
+  line-height: 1.3;
+}
+.catchup-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.catchup-head h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+.catchup-head > svg:first-child {
+  color: var(--text-muted);
+}
+.catchup-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 0.88rem;
+}
+.catchup-card .prompt-actions {
+  margin: 8px 0 4px;
+}
+.catchup-answered .catchup-head {
+  margin-bottom: 0;
+}
+.catchup-done p {
+  margin-top: 0;
+}
+
+/* Calendar layers: one colour and one fixed spot per tracker; filled = logged, ring = not logged,
+   dash = skipped. The fill, not the colour, says whether it was logged. */
+.cal-layers {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  margin: 0 calc(-1 * var(--gutter)) 4px;
+  padding: 2px var(--gutter);
+  scrollbar-width: none;
+}
+.cal-layers .chip {
+  flex: none;
+  min-height: 44px;
+}
+.cal-meals { --c: var(--t-meals); }
+.cal-sleep { --c: var(--t-sleep); }
+.cal-activity { --c: var(--t-activity); }
+.cal-water { --c: var(--t-water); }
+.cal-journal { --c: var(--t-journal); }
+.cal-dots {
+  display: flex;
+  gap: 1.5px;
+  min-height: 6px;
+}
+.cal-dot {
+  display: inline-block;
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  vertical-align: middle;
+  box-sizing: border-box;
+}
+.cal-dot.mark-logged {
+  background: var(--c, var(--text-muted));
+}
+.cal-dot.mark-missing {
+  border: 1.5px solid var(--c, var(--text-muted));
+}
+.cal-dot.mark-skipped {
+  height: 2px;
+  margin: 2px 0;
+  border-radius: 1px;
+  background: var(--c, var(--text-muted));
+  opacity: 0.6;
+}
+.cal-dot.mark-none {
+  visibility: hidden;
+}
+.chip.on .cal-dot.mark-logged {
+  box-shadow: 0 0 0 1.5px var(--accent-text);
+}
+.cal-value {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--c);
+  white-space: nowrap;
+}
+.calendar-day > .cal-dot {
+  width: 9px;
+  height: 9px;
+}
+.cal-key {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  margin: 0;
+}
+.cal-key .cal-dot:not(:first-child) {
+  margin-left: 8px;
+}
+
+/* Tracker pages (#/activity, #/water): a big average, one bar per day, gaps as rings. */
+.tracker-big {
+  margin: 0;
+  font-size: 1.6rem;
+  font-weight: 700;
+}
+.tracker-hero > .muted.small {
+  margin: 2px 0 8px;
+}
+.tracker-bars-plot {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 120px;
+  border-bottom: 1.5px solid var(--border);
+}
+.tracker-bars.is-narrow .tracker-bars-plot {
+  gap: 1px;
+}
+.tracker-bar {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+}
+.tracker-bar-fill {
+  width: 100%;
+  min-height: 2px;
+  border-radius: 3px 3px 0 0;
+  background: var(--c);
+}
+.tracker-bar > .cal-dot {
+  margin-bottom: 3px;
+}
+.tracker-target {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1.5px dashed var(--text-muted);
+  pointer-events: none;
+}
+.tracker-bars-axis {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+}
+.tracker-missing p {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 8px;
+}
+.tracker-missing .cal-dot {
+  --c: var(--text-muted);
+}
+.tracker-row {
+  min-height: 44px;
+  align-items: center;
+}
+
+/* Insights overview (#/overview): one row per thing tracked, its last 7 days as dots. */
+.ov-card {
+  padding-block: 4px;
+}
+.ov-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 56px;
+  padding: 8px 0;
+  color: inherit;
+  text-decoration: none;
+}
+.ov-row + .ov-row {
+  border-top: 1px solid var(--border);
+}
+.ov-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.ov-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.ov-title {
+  font-weight: 600;
+}
+.ov-sub {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 8px;
+}
+.ov-kcal {
+  white-space: nowrap;
+}
+.ov-sub {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+.ov-tally {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  vertical-align: middle;
+}
+.ov-tally .status {
+  gap: 2px;
+}
+.ov-strip {
+  display: flex;
+  gap: 3px;
+}
+.ov-strip .cal-dot {
+  width: 7px;
+  height: 7px;
+}
+.ov-strip .cal-dot.mark-skipped {
+  height: 2px;
+  margin: 2.5px 0;
+}
+.ov-more {
+  margin: 8px 4px;
+}
+
+/* What your levels mean: the line at the top of a nutrient page and the summary on Insights. */
+.level-card > summary {
+  align-items: flex-start;
+  padding-block: 2px;
+}
+.level-card > summary > svg {
+  flex: none;
+  margin-top: 3px;
+}
+.level-line {
+  line-height: 1.4;
+}
+.level-body > p,
+.level-body > a {
+  margin: 0 0 8px;
+}
+.level-sub {
+  margin: 10px 0 2px;
+  font-size: 0.9rem;
+}
+.level-severity {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.sev-dots {
+  display: inline-flex;
+  gap: 3px;
+  flex: none;
+  margin-top: 5px;
+}
+.sev-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 1.5px solid var(--text-muted);
+}
+.sev-dot.on {
+  background: var(--text);
+  border-color: var(--text);
+}
+.level-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 44px;
+}
+.level-sources p {
+  margin: 4px 0 2px;
+}
+.level-sources ul {
+  margin: 0;
+  padding-left: 18px;
+}
+.level-sources li {
+  margin: 2px 0;
+}
+.levels-sum > summary.ov-row {
+  min-height: 56px;
+}
+.levels-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.levels-body {
+  padding-bottom: 8px;
+}
+.levels-list > li {
+  padding: 0;
+}
+.levels-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-height: 44px;
+  padding: 8px 0;
+  color: inherit;
+  text-decoration: none;
+}
+.levels-item > svg:first-child {
+  flex: none;
+  margin-top: 3px;
+}
+.levels-item > svg:last-child {
+  flex: none;
+  align-self: center;
+}
+.levels-effect {
+  display: block;
+  color: var(--text-muted);
+}
+.levels-group {
+  margin: 8px 0;
+  line-height: 1.6;
+}
+.levels-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  min-height: 44px;
+  padding-right: 6px;
+}
+.levels-fine {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  color: inherit;
+  text-decoration: none;
+}
+
+/* Settings → Features, in sections (2026-10-23); a feature that needs another sits indented under it. */
+.settings-fold {
+  padding-block: 4px;
+}
+.settings-fold-title {
+  font-weight: 600;
+}
+.settings-fold .fold-body > div + div > .toggle-row {
+  border-top: 1px solid var(--border);
+}
+.feature-sub > .toggle-row {
+  padding-left: 14px;
+  box-shadow: inset 2px 0 0 var(--border);
+}
+
+/* What leaves your phone (#/about/sent). */
+.sent-page .sent-flow h2 {
+  font-size: 1.02rem;
+  margin: 0;
+}
+.sent-page .sent-flow h3 {
+  margin: 10px 0 2px;
+  font-weight: 600;
+}
+.sent-page .sent-flow p,
+.sent-page .sent-flow ul {
+  margin: 4px 0 0;
+}
+.sent-page .sent-flow ul {
+  padding-left: 1.1rem;
+}
+.sent-page .sent-flow li + li {
+  margin-top: 3px;
+}
+.sent-page .sent-on {
+  color: var(--text);
+  border-color: var(--accent);
+}
+.sent-note a {
+  white-space: nowrap;
+}
+
+/* ── A nutrient over a past period (#/nutrient/<id>/range/<from>/<to>) ── */
+/* Above the cards' own sticky headings, which stop just under it on this page. */
+.nutrient-range {
+  --band-h: 56px;
+}
+.nutrient-range .card > .card-head,
+.nutrient-range .card > h2:first-child {
+  top: calc(var(--band-h) + 4px);
+}
+.range-banner {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-sizing: border-box;
+  height: var(--band-h);
+  overflow: hidden;
+  margin: 0 0 8px;
+  padding: 2px 4px 2px 14px;
+  border: 1.5px solid var(--accent);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--accent) 14%, var(--bg));
+  color: var(--text);
+}
+.range-banner > svg {
+  flex: none;
+  color: var(--accent);
+}
+.range-banner-sub {
+  display: block;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+.range-banner-x {
+  flex: none;
+}
+.rday-bars {
+  display: flex;
+  align-items: stretch;
+  gap: 3px;
+  height: 96px;
+  margin: 6px 0 4px;
+}
+.rday-bars.is-dense {
+  gap: 1px;
+}
+.rday-bars > li {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+}
+.rday {
+  display: block;
+  height: 100%;
+  text-decoration: none;
+}
+.rday-track {
+  position: relative;
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  background: var(--surface-2);
+}
+.rday-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: 4px;
+  background: var(--accent);
+}
+.rday.is-missing .rday-bar {
+  background: repeating-linear-gradient(135deg, var(--accent) 0 4px, color-mix(in srgb, var(--accent) 55%, transparent) 4px 7px);
+}
+/* A day the average leaves out: an empty, dashed track. */
+.rday.is-out .rday-track {
+  background: none;
+  border: 1px dashed var(--edge);
+}
+.rday-ref {
+  position: absolute;
+  left: -1px;
+  right: -1px;
+  border-top: 1.5px dashed var(--text-muted);
+}
+.rday-axis {
+  display: flex;
+  justify-content: space-between;
+  margin: 0;
+}
+
+/* ── Journal folds (#/journal) ── */
+.journal-month > summary,
+.journal-year > summary {
+  gap: 10px;
+}
+.journal-fold-title {
+  font-weight: 700;
+}
+.journal-year {
+  margin: 16px 0 8px;
+}
+.journal-year > summary {
+  padding: 0 4px;
+  font-size: 1.1rem;
+}
+.journal-day + .journal-day {
+  border-top: 1px solid var(--border);
+}
+.journal-day-title {
+  margin: 10px 0 0;
+  font-weight: 600;
+}
+.journal-day-title a {
+  color: var(--text-muted);
+}
+
+/* An AI way in that fills the width, drawn as the question chips are. */
+.ask-link {
+  display: flex;
+  width: 100%;
+  max-width: 100%;
+  margin: 8px 0 12px;
+  padding: 8px 14px;
+  gap: 10px;
+  border-radius: 22px;
+  color: var(--text);
+  text-decoration: none;
+}
+.ask-link-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.week-show-all {
+  margin-top: 6px;
 }

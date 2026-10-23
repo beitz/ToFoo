@@ -28,6 +28,18 @@ export function AboutPage() {
         . {t('about.blsConverted')}
       </p>
 
+      <h2>{t('about.cofidHeading')}</h2>
+      <p>
+        {t('about.cofid')}{' '}
+        <a href="https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/" target="_blank" rel="noreferrer">
+          Open Government Licence v3.0
+        </a>
+        {' · '}
+        <a href="https://www.gov.uk/government/publications/composition-of-foods-integrated-dataset-cofid" target="_blank" rel="noreferrer">
+          gov.uk
+        </a>
+      </p>
+
       <h2>{t('about.offHeading')}</h2>
       <p>
         {t('about.off')}{' '}
@@ -57,6 +69,9 @@ export function AboutPage() {
 
       <h2>{t('about.privacyHeading')}</h2>
       <p>{t('about.privacy')}</p>
+      <p>
+        <a href={href('about', 'sent')}>{t('about.sentLink')}</a>
+      </p>
 
       <h2>{t('about.codeHeading')}</h2>
       <p>

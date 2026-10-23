@@ -111,7 +111,7 @@ export const groupInfoEn = {
   'ginfo.minerals.intro': 'Minerals are chemical elements. The body cannot make any of them; they come from food, drinking water and salt. DGE sorts them into two kinds:',
   'ginfo.minerals.major': 'Major minerals: sodium, chloride, potassium, calcium, phosphorus and magnesium, needed in amounts of hundreds of milligrams or more a day.',
   'ginfo.minerals.trace':
-    'Trace elements: iron, zinc, iodine, copper, manganese, fluoride, chromium and molybdenum (and selenium, which BLS has no data for), needed in milligrams or micrograms.',
+    'Trace elements: iron, zinc, iodine, selenium, copper, manganese, fluoride, chromium and molybdenum, needed in milligrams or micrograms. BLS has no selenium; ToFoo estimates it from the UK food table CoFID.',
   'ginfo.minerals.absorption': 'How much you absorb depends on the meal',
   'ginfo.minerals.absHeme': 'Iron from meat and fish (haem iron) is absorbed much better than iron from plant foods.',
   'ginfo.minerals.absHelp': 'Vitamin C and meat or fish in the same meal help the body take up plant iron.',
@@ -145,6 +145,7 @@ export const groupInfoEn = {
   'ginfo.from.FE': 'Both: meat (absorbed best), legumes, whole grains, greens',
   'ginfo.from.ZN': 'Both: meat, seafood, cheese (absorbed best), whole grains, legumes, seeds',
   'ginfo.from.ID': 'Iodised salt, fish, dairy',
+  'ginfo.from.SE': 'Mostly animal: fish, seafood, offal, meat, eggs; in plants it depends on the soil',
   'ginfo.from.CU': 'Mostly plants: nuts, seeds, whole grains, legumes; also offal',
   'ginfo.from.MN': 'Plants: whole grains, nuts, legumes, tea',
   'ginfo.from.FD': 'Fluoridated salt, tea, some mineral waters, toothpaste',

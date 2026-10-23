@@ -6,7 +6,7 @@ ToFoo is a personal nutrition PWA (see `docs/SPEC.md`, the source of truth for b
 
 ```sh
 npm install
-npm run data        # data/raw/BLS zip → public/data/bls-4.0.json (needed before dev/test/build)
+npm run data        # data/raw/BLS zip (+ CoFID selenium) → public/data/bls-4.0.json (needed before dev/test/build)
 npm run dev         # local dev server
 npm test            # Vitest
 npm run typecheck   # tsc, strict
@@ -20,8 +20,8 @@ CI (`.github/workflows/deploy.yml`) runs data → typecheck → test → build o
 
 | Path | What |
 | --- | --- |
-| `data/raw/` | BLS 4.0 zip, never edited. Format documented in `data/README.md`. |
-| `scripts/` | Build-time scripts (BLS conversion). |
+| `data/raw/` | BLS 4.0 zip and the UK table CoFID 2021 (selenium only), never edited. Formats documented in `data/README.md`. |
+| `scripts/` | Build-time scripts (BLS conversion, selenium from CoFID). |
 | `model/` | **Data files with sources**: `reference-values.ts` (DGE/EFSA), `parameters.ts` (absorption, capacity, retention, sun). Every number has a citation, a low/central/high range and a confidence note. |
 | `src/model/` | The nutrient model: **pure functions only** (no React, no IndexedDB, no `Date.now()`), fully unit-tested. |
 | `src/foods/` | Loading the BLS JSON, food lookup, search. |

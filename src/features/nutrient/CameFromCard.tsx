@@ -13,13 +13,15 @@ import { refHref } from '../food/links';
  * and a list of the biggest sources and the rest. "Per time eaten" divides by how often each was
  * eaten (×4), so a big plate eaten once shows next to something small eaten every day.
  */
-export function CameFromCard({ r }: { r: NutrientResult }) {
+export function CameFromCard({ r, days }: { r: NutrientResult; days?: readonly string[] }) {
   const d = useData();
   const [perTime, setPerTime] = useState(false);
-  const windowDays = useMemo(() => new Set(d.modelDays.slice(-r.windowDays)), [d.modelDays, r.windowDays]);
+  // The model's window, or the days of a past period (`days`, the ones its averages count).
+  const windowDays = useMemo(() => new Set(days ?? d.modelDays.slice(-r.windowDays)), [days, d.modelDays, r.windowDays]);
   const times = useMemo(() => timesEaten(d.log, windowDays), [d.log, windowDays]);
   if (r.contributors.length === 0) return null;
-  const { total, lines, rest } = cameFrom(r.contributors, r.windowDays, times, perTime);
+  const n = days ? days.length : r.windowDays;
+  const { total, lines, rest } = cameFrom(r.contributors, n, times, perTime);
   const all = rest ? [...lines, rest] : lines;
   return (
     <div className="card came-from">
@@ -27,7 +29,7 @@ export function CameFromCard({ r }: { r: NutrientResult }) {
         <h2>{t('came.title')}</h2>
         <span className="card-note">
           {t('came.note', {
-            days: r.windowDays,
+            days: n,
             amount: fmtAmount(r.id, total),
           })}
         </span>
@@ -82,7 +84,7 @@ export function CameFromCard({ r }: { r: NutrientResult }) {
  * Where a "Where it came from" line leads: contributors are summed by name, so the latest entry of
  * that name says what it is: a recipe portion its recipe, a food its page, anything else that entry.
  */
-function contributorHref(d: AppData, label: string): string | undefined {
+export function contributorHref(d: AppData, label: string): string | undefined {
   let latest: LogEntry | undefined;
   for (const e of d.log) if (e.label === label && (!latest || e.time > latest.time)) latest = e;
   if (!latest) return undefined;

@@ -50,7 +50,7 @@ export function SleepPage() {
   return (
     <section>
       <header className="page-head row">
-        <BackButton to={['week']} />
+        <BackButton to={['overview']} />
         <h1 className="grow">{t('nights.title')}</h1>
       </header>
       <Segmented label={t('nights.window')} value={win} onChange={setWin} options={WINDOWS.map((w) => ({ value: w, label: t('nights.nights', { n: Number(w) }) }))} />

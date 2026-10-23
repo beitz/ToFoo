@@ -58,3 +58,21 @@ export function AskChips({ questions, to = 'assistant', className }: { questions
   );
 }
 
+
+/**
+ * A way into the assistant or Patterns that sends data once used, drawn like the question chips
+ * (dashed, round) so everything that leads to the AI looks the same (owner's ask, 2026-10-23):
+ * full width, a title, an optional line under it, and a chevron.
+ */
+export function AskLink({ to, icon, title, sub }: { to: string; icon: string; title: string; sub?: string }) {
+  return (
+    <a className="ask-chip ask-link" href={to}>
+      <Icon name={icon} size={20} />
+      <span className="grow ask-link-text">
+        <span>{title}</span>
+        {sub && <span className="small muted">{sub}</span>}
+      </span>
+      <Icon name="chevron" size={16} />
+    </a>
+  );
+}

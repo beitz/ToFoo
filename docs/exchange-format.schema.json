@@ -406,12 +406,37 @@
                         "detailed"
                       ]
                     },
+                    "macroView": {
+                      "type": "string",
+                      "enum": [
+                        "rings",
+                        "bars"
+                      ]
+                    },
+                    "nutrientView": {
+                      "type": "string",
+                      "enum": [
+                        "comets",
+                        "bars"
+                      ]
+                    },
                     "homeGrouping": {
                       "type": "string",
                       "enum": [
                         "status",
                         "type",
                         "none"
+                      ]
+                    },
+                    "calendarLayer": {
+                      "type": "string",
+                      "enum": [
+                        "all",
+                        "meals",
+                        "sleep",
+                        "activity",
+                        "water",
+                        "journal"
                       ]
                     },
                     "homeCollapsed": {

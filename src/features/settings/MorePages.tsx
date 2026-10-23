@@ -67,7 +67,11 @@ export function StartChoice({ value, onChange }: { value: StartingLevelChoice; o
     <div className="choice-list" role="radiogroup" aria-label={t('settings.start')}>
       {options.map((o) => (
         <button key={o} role="radio" aria-checked={value === o} className={`choice${value === o ? ' on' : ''}`} onClick={() => onChange(o)}>
-          <strong>{t(`start.${o}` as MessageKey)}</strong>
+          <strong>
+            {t(`start.${o}` as MessageKey)}
+            {/* Average is the pick when unsure (owner, 2026-10-23); "Skip" on first launch uses it too. */}
+            {o === 'average' && <span className="muted"> {t('start.recommended')}</span>}
+          </strong>
           <span className="small">{t(`start.${o}Pro` as MessageKey)}</span>
           <span className="small muted">{t(`start.${o}Con` as MessageKey)}</span>
         </button>

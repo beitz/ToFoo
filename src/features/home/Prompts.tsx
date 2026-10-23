@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useData } from '../../app/data';
-import { href, navigate } from '../../app/router';
+import { href } from '../../app/router';
 import { t } from '../../i18n';
 import { addDays, daysBetween } from '../../lib/dates';
 import { isOn } from '../../settings/features';
@@ -63,31 +63,6 @@ function OnePrompt() {
     return !!at && daysBetween(at, d.today) < DISMISS_DAYS;
   };
   const dismiss = (key: string) => repo.setMeta(`dismissed:${key}`, d.today);
-  const yesterday = addDays(d.today, -1);
-  const f = d.settings.features;
-
-  // 1. Yesterday without status
-  if (isOn(f, 'yesterdayNudge') && yesterday >= d.profile.modelStartDay && d.model.dayStatus[yesterday] === 'unknown' && !m.get(`nudge:${yesterday}`)) {
-    return (
-      <div className="card prompt">
-        <p>{t('prompt.yesterday')}</p>
-        <div className="prompt-actions">
-          <button className="btn btn-small" onClick={() => navigate('log', yesterday)}>
-            {t('prompt.logYesterday')}
-          </button>
-          <button className="btn btn-small" onClick={() => repo.setDayStatus(yesterday, 'fasted')}>
-            {t('prompt.fasted')}
-          </button>
-          <button className="btn btn-small" onClick={() => repo.setDayStatus(yesterday, 'excluded')}>
-            {t('prompt.leaveOut')}
-          </button>
-          <button className="btn btn-small btn-ghost" onClick={() => repo.setMeta(`nudge:${yesterday}`, true)}>
-            {t('prompt.notLogged')}
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   // 2. A slow store whose intake has been low for weeks: only a blood test shows the real level.
   for (const r of d.model.nutrients.values()) {
@@ -180,7 +155,7 @@ function OnePrompt() {
       </div>
     );
   }
-  if (!p.outdoorRoutine && !dismissed('sun')) {
+  if (isOn(d.settings.features, 'sunVitaminD') && !p.outdoorRoutine && !dismissed('sun')) {
     return (
       <div className="card prompt">
         <p>{t('prompt.sun')}</p>

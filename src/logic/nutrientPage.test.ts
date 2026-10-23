@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { DailyTotals } from '../model/simulate';
-import { cameFrom, storeAhead, timesEaten, uptakeDays } from './nutrientPage';
+import type { DailyTotals, MealSummary } from '../model/simulate';
+import type { ModelEntry } from '../model/types';
+import { cameFrom, contributorsOver, periodDays, storeAhead, tileTop, timesEaten, uptakeDays, windowDays } from './nutrientPage';
 
 const totals = (intake: number, absorbed: number, missing = false): DailyTotals => ({
   absorbed: {
@@ -118,5 +119,72 @@ describe('nutrient page numbers', () => {
       ).map((p) => p.central),
     ).toEqual([0.98, 1, 1]);
     expect(storeAhead({ capacity: 100, level: { low: 1, central: 1, high: 1 } }, '2026-10-22', 3)).toEqual([]);
+  });
+
+  it('lists the averaging window up to yesterday, with how each day counts', () => {
+    const days = ['2026-10-18', '2026-10-19', '2026-10-20', '2026-10-21', '2026-10-22', '2026-10-23'];
+    const daily = [totals(1, 1), totals(1, 1, true), totals(0, 0), totals(0, 0), totals(1, 1), totals(5, 5)];
+    const status = {
+      '2026-10-18': 'logged',
+      '2026-10-19': 'logged',
+      '2026-10-20': 'unknown',
+      '2026-10-21': 'excluded',
+      '2026-10-22': 'fasted',
+      '2026-10-23': 'pending',
+    } as const;
+    expect(windowDays(days, daily, status, 'FE', 4, false)).toEqual([
+      { day: '2026-10-19', dot: 'known', missing: true },
+      { day: '2026-10-20', dot: 'known', missing: false },
+      { day: '2026-10-21', dot: 'leftOut', missing: false },
+      { day: '2026-10-22', dot: 'known', missing: false },
+    ]);
+    // With "Fill in unlogged days" on, the unlogged day is an estimate.
+    expect(windowDays(days, daily, status, 'FE', 4, true)[1]).toEqual({ day: '2026-10-20', dot: 'estimated', missing: false });
+    // A window longer than the model's days starts at the first day.
+    expect(windowDays(days, daily, status, 'FE', 14, false)).toHaveLength(5);
+  });
+
+  it('grows the tile in steps so the likely range fits, and says when it goes past the last step', () => {
+    expect(tileTop(0.6)).toEqual({ top: 1, over: false });
+    expect(tileTop(1)).toEqual({ top: 1, over: false });
+    expect(tileTop(1.2)).toEqual({ top: 1.5, over: false });
+    expect(tileTop(1.87)).toEqual({ top: 2, over: false });
+    expect(tileTop(2.5)).toEqual({ top: 3, over: false });
+    expect(tileTop(10.9)).toEqual({ top: 3, over: true });
+  });
+
+  it('splits each meal over its entries by intake and sums the chosen days by name', () => {
+    const entry = (id: string, label: string, day: string, mg: number): ModelEntry => ({
+      id,
+      label,
+      time: Date.parse(`${day}T12:00:00Z`),
+      dayKey: day,
+      confidence: 'A',
+      isSupplement: false,
+      parts: [],
+      direct: { FE: mg },
+    });
+    const entries = [entry('a', 'Oats', '2026-10-01', 3), entry('b', 'Lentils', '2026-10-01', 9), entry('c', 'Oats', '2026-10-02', 3), entry('d', 'Liver', '2026-10-05', 20)];
+    const meal = (day: string, ids: string[], intake: number, absorbed: number): MealSummary => ({ day, start: 0, entryIds: ids, intake: { FE: intake }, absorbed: { FE: absorbed } });
+    const meals = [meal('2026-10-01', ['a', 'b'], 12, 1.2), meal('2026-10-02', ['c'], 3, 0.4), meal('2026-10-05', ['d'], 20, 3)];
+    const out = contributorsOver(['2026-10-01', '2026-10-02'], entries, meals, 'FE', { retention: false });
+    // Lentils: 9/12 of 1.2 = 0.9; oats: 0.3 + 0.4 = 0.7; per day over 2 days. Liver is outside the days.
+    expect(out.map((c) => c.label)).toEqual(['Lentils', 'Oats']);
+    expect(out[0]!.amount).toBeCloseTo(0.45);
+    expect(out[1]!.amount).toBeCloseTo(0.35);
+    expect(out[0]!.share).toBeCloseTo(0.9 / 1.6);
+    expect(contributorsOver([], entries, meals, 'FE', { retention: false })).toEqual([]);
+  });
+
+  it('gives each day of a period its share as the average counts it, none for days left out', () => {
+    const days = ['2026-10-01', '2026-10-02', '2026-10-03'];
+    const daily = [totals(10, 1), totals(20, 2, true), totals(5, 0.5)];
+    expect(periodDays(days, ['2026-10-01', '2026-10-02'], days, daily, 'FE', { kind: 'rolling', ref: 2 })).toEqual([
+      { day: '2026-10-01', value: 0.5, missing: false },
+      { day: '2026-10-02', value: 1, missing: true },
+      { day: '2026-10-03', missing: false },
+    ]);
+    expect(periodDays(['2026-10-01'], ['2026-10-01'], days, daily, 'FE', { kind: 'limit', ref: 20 })[0]!.value).toBe(0.5);
+    expect(periodDays(['2026-10-01'], ['2026-10-01'], days, daily, 'FE', { kind: 'info' })[0]!.value).toBe(10);
   });
 });
