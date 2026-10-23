@@ -3,7 +3,7 @@ import type * as Beta from '@anthropic-ai/sdk/resources/beta/messages/messages';
 import type { Food } from '../foods/foodDb';
 import { buildIndex } from '../foods/search';
 import { appNote, emptyConversation, requestParams, retirePhotos, sendMessage, textOf, type CreateMessage } from './assistant';
-import { describeFood, validateBatchProposal, validatePortionProposal, MAX_INGREDIENT_GRAMS, MAX_ITEM_GRAMS, runCheckRecipe, runListRecipes, validateRecipeProposal, validateIngredientsProposal, runLookupBarcode, runSearchFoods, runSearchUsda, validateJournalProposal, validateProposal, validateSleepProposal, validateActivityProposal, validateWaterProposal, validateKetoneProposal, validateShoppingProposal, validateHomeProposal, type ProductTools, type ToolContext } from './tools';
+import { describeFood, validateBatchProposal, validatePortionProposal, MAX_INGREDIENT_GRAMS, MAX_ITEM_GRAMS, runCheckRecipe, runListRecipes, validateRecipeProposal, validateIngredientsProposal, runLookupBarcode, runSearchFoods, runSearchProducts, runSearchUsda, validateJournalProposal, validateProposal, validateSleepProposal, validateActivityProposal, validateWaterProposal, validateKetoneProposal, validateShoppingProposal, validateHomeProposal, type ProductTools, type ToolContext } from './tools';
 import type { Product } from '../storage/types';
 import type { FindResult } from '../foods/findProduct';
 
@@ -334,9 +334,39 @@ describe('packaged products (Open Food Facts lookup on)', () => {
     );
     const { outcome } = await sendMessage(api.create, 'claude-opus-5-5', emptyConversation(), { text: 'one ball', images: [], appNote: '(Barcodes the app read from the photos: 4008400121925)' }, { ...ctx, products: products() });
     expect(outcome.kind === 'proposal' && outcome.proposals[0]!.items[0]!.product?.code).toBe('4008400121925');
-    expect(api.requests[0]!.tools!.map((t) => (t as { name: string }).name)).toEqual(['search_foods', 'lookup_barcode', 'propose_meal']);
+    expect(api.requests[0]!.tools!.map((t) => (t as { name: string }).name)).toEqual(['search_foods', 'search_products', 'lookup_barcode', 'propose_meal']);
     expect(JSON.stringify(api.requests[0]!.messages[0]!.content)).toContain('Barcodes the app read');
     expect(requestParams('claude-opus-5-5', []).tools!.map((t) => (t as { name: string }).name)).toEqual(['search_foods', 'propose_meal']);
+  });
+
+  it('finds a barcode by name in the bundled product list, then looks it up', async () => {
+    const queries: string[] = [];
+    const p: ProductTools = {
+      ...products(),
+      searchProducts: async (q) => {
+        queries.push(q);
+        return q === 'Giotto' ? [{ code: giotto.code, name: 'Giotto', brand: 'Ferrero', quantity: '38,7 g' }] : [];
+      },
+    };
+    const r = await runSearchProducts({ queries: ['Giotto', 'Nothing here'] }, { ...ctx, products: p });
+    expect(r.ok).toBe(true);
+    expect(r.text).toContain('4008400121925 | Giotto (Ferrero) | 38,7 g');
+    expect(r.text).toContain('Products for "Nothing here" (barcode | name (brand) | pack size):\nNo matches.');
+    expect(queries).toEqual(['Giotto', 'Nothing here']);
+    expect((await runSearchProducts({ queries: ['x'] }, { ...ctx, products: products() })).ok).toBe(false);
+    const failing: ProductTools = { ...products(), searchProducts: async () => Promise.reject(new Error('HTTP 404')) };
+    const failed = await runSearchProducts({ queries: ['x'] }, { ...ctx, products: failing });
+    expect(!failed.ok && failed.text).toContain('HTTP 404');
+
+    const api = scripted(
+      reply([toolUse('t1', 'search_products', { queries: ['Giotto'] })], 'tool_use'),
+      reply([toolUse('t2', 'lookup_barcode', { barcodes: [giotto.code] })], 'tool_use'),
+      reply([toolUse('t3', 'propose_meal', { summary: 'Giotto', items: [{ code: 'OFF:4008400121925', grams: 4.3, preparation: 'asListed', note: '', micros_from: 'S450000' }], assumptions: [], confidence: 'B' })], 'tool_use'),
+    );
+    const { outcome } = await sendMessage(api.create, 'claude-opus-5-5', emptyConversation(), { text: 'one Giotto ball', images: [] }, { ...ctx, products: p });
+    expect(outcome.kind === 'proposal' && outcome.proposals[0]!.items[0]!.product?.code).toBe('4008400121925');
+    expect(JSON.stringify(api.requests[1]!.messages)).toContain('Giotto (Ferrero)');
+    expect(api.requests[0]!.system).toContain('search_products');
   });
 
   it('finds a barcode by name with web search, then looks it up; carries on after a paused search', async () => {
@@ -354,8 +384,8 @@ describe('packaged products (Open Food Facts lookup on)', () => {
     const { conversation, outcome } = await sendMessage(api.create, 'claude-opus-5-5', emptyConversation(), { text: 'one ball', images: [] }, { ...ctx, products: { ...products(), webSearch: true } });
     expect(outcome.kind === 'proposal' && outcome.proposals[0]!.items[0]!.product?.code).toBe('4008400121925');
     const tools = api.requests[0]!.tools!;
-    expect(tools.map((t) => (t as { name: string }).name)).toEqual(['search_foods', 'lookup_barcode', 'web_search', 'propose_meal']);
-    expect(tools[2]).toMatchObject({ type: 'web_search_20250305', allowed_domains: ['openfoodfacts.org'] });
+    expect(tools.map((t) => (t as { name: string }).name)).toEqual(['search_foods', 'search_products', 'lookup_barcode', 'web_search', 'propose_meal']);
+    expect(tools[3]).toMatchObject({ type: 'web_search_20250305', allowed_domains: ['openfoodfacts.org'] });
     expect(api.requests[0]!.system).toContain('web_search');
     // After the pause the same conversation goes back unchanged, ending with the paused search.
     expect(api.requests[1]!.messages.at(-1)).toEqual({ role: 'assistant', content: [search] });
@@ -447,7 +477,7 @@ describe('USDA FoodData Central (on)', () => {
     expect(outcome.kind === 'proposal' && outcome.proposals[0]!.items[0]!.product?.id).toBe('USDA:170392');
     expect(api.requests[0]!.tools!.map((t) => (t as { name: string }).name)).toEqual(['search_foods', 'search_usda', 'propose_meal']);
     expect(api.requests[0]!.system).toContain('search_usda');
-    expect(requestParams('claude-opus-5-5', [], { off: true, usda: true }).tools!.map((t) => (t as { name: string }).name)).toEqual(['search_foods', 'lookup_barcode', 'search_usda', 'propose_meal']);
+    expect(requestParams('claude-opus-5-5', [], { off: true, usda: true }).tools!.map((t) => (t as { name: string }).name)).toEqual(['search_foods', 'search_products', 'lookup_barcode', 'search_usda', 'propose_meal']);
     // The same objects every time, so the prompt cache keeps working.
     expect(requestParams('claude-opus-5-5', [], { usda: true }).system).toBe(requestParams('claude-opus-5-5', [], { usda: true }).system);
   });
@@ -709,7 +739,7 @@ describe('the recipe editor assistant', () => {
   it('offers the lookups and propose_ingredients, never meals or the trackers', () => {
     const names = (sources: Parameters<typeof requestParams>[2]) => requestParams('claude-opus-5-5', [], sources).tools!.map((t) => (t as { name: string }).name);
     expect(names({ recipe: true, journal: true, water: true })).toEqual(['search_foods', 'propose_ingredients']);
-    expect(names({ recipe: true, off: true, usda: true, webSearch: true })).toEqual(['search_foods', 'lookup_barcode', 'web_search', 'search_usda', 'propose_ingredients']);
+    expect(names({ recipe: true, off: true, usda: true, webSearch: true })).toEqual(['search_foods', 'search_products', 'lookup_barcode', 'web_search', 'search_usda', 'propose_ingredients']);
     const system = requestParams('claude-opus-5-5', [], { recipe: true, off: true, usda: true }).system as string;
     expect(system).toContain('enter a recipe');
     expect(system).toContain('code in propose_ingredients');

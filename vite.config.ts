@@ -48,7 +48,13 @@ export default defineConfig({
         maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
         // The barcode reader for browsers without a built-in one (iPhone): not precached, since Chrome on
         // Android never needs it, but kept once fetched so scanning then works offline too.
-        runtimeCaching: [{ urlPattern: /\.wasm$/, handler: 'CacheFirst', options: { cacheName: 'wasm' } }],
+        // The list of packaged products for name search (~5 MB): not precached either, since only people with
+        // the Open Food Facts lookup on need it, but kept once loaded so search then works offline. Its
+        // name carries the date it was built, so a new list replaces the old one.
+        runtimeCaching: [
+          { urlPattern: /\.wasm$/, handler: 'CacheFirst', options: { cacheName: 'wasm' } },
+          { urlPattern: /off-products-.*\.tsv\.gz$/, handler: 'CacheFirst', options: { cacheName: 'off-products', expiration: { maxEntries: 1 } } },
+        ],
       },
     }),
   ],
