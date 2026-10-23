@@ -24,7 +24,7 @@ export function CameFromCard({ r, days }: { r: NutrientResult; days?: readonly s
   const { total, lines, rest } = cameFrom(r.contributors, n, times, perTime);
   const all = rest ? [...lines, rest] : lines;
   return (
-    <div className="card came-from">
+    <div className="card came-from" data-tour="nutrient.sources">
       <div className="card-head">
         <h2>{t('came.title')}</h2>
         <span className="card-note">

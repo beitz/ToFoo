@@ -105,7 +105,7 @@ export function HomePage() {
 
       <RecentDays />
       <p className="muted small disclaimer">{t('home.disclaimer')}</p>
-      <AskChips className="ask-chips-wrap" questions={[t('ask.howAmIDoing'), t('ask.whatNext')]} />
+      <AskChips className="ask-chips-wrap" tour="home.chips" questions={[t('ask.howAmIDoing'), t('ask.whatNext')]} />
     </section>
   );
 }

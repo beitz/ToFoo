@@ -36,7 +36,7 @@ export function LevelsSummary({ reviewHref }: { reviewHref: string }) {
   if (counted === 0) return null;
 
   return (
-    <details className="card ov-card fold levels-sum">
+    <details className="card ov-card fold levels-sum" data-tour="insights.levels">
       <summary className="ov-row">
         <Icon name="info" size={20} />
         <span className="ov-text">

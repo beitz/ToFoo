@@ -13,6 +13,7 @@ import { ActivitySheet } from '../activity/ActivitySheet';
 import { SleepButton } from '../sleep/SleepButton';
 import { DialItem } from './DialItem';
 import { endFast } from '../fast/fastActions';
+import { useTourControl } from '../tour/TourHost';
 
 /**
  * The round button bottom right, on every screen but full-screen tasks (owner's ask, 2026-10-22).
@@ -31,6 +32,12 @@ export function QuickActions() {
   const [fastStart, setFastStart] = useState(today);
   const close = () => setOpen(false);
   useBackCloses(open, close);
+  // The menu's own tour starts the first time it opens.
+  const { setFanOpen } = useTourControl();
+  useEffect(() => {
+    setFanOpen(open);
+    return () => setFanOpen(false);
+  }, [open, setFanOpen]);
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
@@ -65,11 +72,12 @@ export function QuickActions() {
       <div className={`fab-stack dial${open ? ' open' : ''}`}>
         {/* Hidden items stay rendered so they can animate out; visibility keeps them out of reach. */}
         <div className="dial-items" id="quick-actions" role="group" aria-label={t('home.quickActions')}>
-          {on('journal') && <DialItem icon="journal" label={t('home.journal')} onClick={() => go('journal')} />}
+          {on('journal') && <DialItem icon="journal" label={t('home.journal')} tour="fan.journal" onClick={() => go('journal')} />}
           {on('activity') && (
             <DialItem
               icon="activity"
               label={t('home.logActivity')}
+              tour="fan.activity"
               onClick={() => {
                 close();
                 setActivity(true);
@@ -81,6 +89,7 @@ export function QuickActions() {
             <DialItem
               icon="moon"
               label={d.activeFast ? t('home.endFast') : t('home.startFast')}
+              tour="fan.fast"
               on={!!d.activeFast}
               onClick={() => {
                 close();
@@ -88,7 +97,12 @@ export function QuickActions() {
               }}
             />
           )}
-          {on('aiAssistant') && <DialItem icon="chat" label={t('ai.pageTitle')} onClick={() => go('assistant')} />}
+          {/* Off, it stays in the menu and leads to setting it up (owner's ask, 2026-10-23). */}
+          {on('aiAssistant') ? (
+            <DialItem icon="chat" label={t('ai.pageTitle')} tour="fan.assistant" onClick={() => go('assistant')} />
+          ) : (
+            <DialItem icon="chat" label={t('ai.setUpEntry')} tour="fan.assistant" onClick={() => go('settings', 'assistant', 'key')} />
+          )}
         </div>
         <div className="dial-main">
           <span className="dial-label" aria-hidden>
@@ -96,6 +110,7 @@ export function QuickActions() {
           </span>
           <button
             className="fab"
+            data-tour="round-button"
             onClick={() => (open ? go('log') : setOpen(true))}
             aria-label={open ? t('home.logMeal') : t('home.quickActions')}
             title={open ? t('home.logMeal') : t('home.quickActions')}

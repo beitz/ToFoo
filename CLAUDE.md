@@ -50,6 +50,7 @@ CI (`.github/workflows/deploy.yml`) runs data → typecheck → test → build o
 10. **Privacy:** no analytics, no third-party requests except opt-in features the user turns on (the AI assistant, which talks to Anthropic with the user's own key; the Open Food Facts lookup, which sends only a barcode; voice input, which sends recordings to OpenAI with the user's own key). Nothing personal in the repo; API keys stay on the device and out of backups.
 11. Food names: English is the primary display and search language, German second (both from BLS).
 12. Keep `docs/SPEC.md`, `docs/OPEN_QUESTIONS.md` and the exchange-format docs current when decisions change.
+13. **Guided tours** (`src/features/tour/tours.ts`): a new screen, card or menu entry gets a look at its tour in the same PR. Steps point at `data-tour` markers (a test fails on a marker that no longer exists); tour lines say what a part is, never how it looks, and stay one short line.
 
 ## Workflow
 

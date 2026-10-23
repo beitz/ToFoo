@@ -125,6 +125,10 @@
   --accent: #0f6a6a;
   --accent-text: #ffffff;
 }
+:root[data-accent='blue'] {
+  --accent: #2b59c3;
+  --accent-text: #ffffff;
+}
 :root[data-accent='rose'] {
   --accent: #a3305b;
   --accent-text: #ffffff;
@@ -138,6 +142,10 @@
     --accent: #5cc8c2;
     --accent-text: #0b1a19;
   }
+  :root[data-accent='blue']:not([data-theme='light']) {
+    --accent: #86a8ff;
+    --accent-text: #0c1530;
+  }
   :root[data-accent='rose']:not([data-theme='light']) {
     --accent: #f08cb4;
     --accent-text: #1d0d14;
@@ -150,6 +158,10 @@
 :root[data-theme='dark'][data-accent='teal'] {
   --accent: #5cc8c2;
   --accent-text: #0b1a19;
+}
+:root[data-theme='dark'][data-accent='blue'] {
+  --accent: #86a8ff;
+  --accent-text: #0c1530;
 }
 :root[data-theme='dark'][data-accent='rose'] {
   --accent: #f08cb4;
@@ -7339,4 +7351,146 @@ a.contributor-link > span:first-child {
 }
 .week-show-all {
   margin-top: 6px;
+}
+
+/* First launch (docs/SPEC.md "First launch and guided tours"): a small sheet over Home, the app in view behind it. */
+.first-launch {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.18);
+}
+.first-launch-sheet {
+  width: 100%;
+  max-width: 640px;
+  max-height: 72dvh;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-bottom: 0;
+  border-radius: 18px 18px 0 0;
+  padding: 14px var(--gutter) calc(16px + env(safe-area-inset-bottom));
+  box-shadow: 0 -8px 28px rgba(0, 0, 0, 0.18);
+}
+.first-launch-sheet h2 {
+  margin: 0 0 4px;
+}
+
+/* The sample week behind the first-launch sheets and the Home and Insights tours. */
+.sample-band {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 110;
+  padding: calc(env(safe-area-inset-top) + 5px) var(--gutter) 5px;
+  background: var(--text);
+  color: var(--bg);
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-align: center;
+  pointer-events: none;
+}
+.sample-band-space {
+  height: 28px;
+}
+
+/* Guided tours: the screen dims around one outlined element and a bubble says one line. */
+.tour-blocker {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+}
+.tour-dim {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(0, 0, 0, 0.6);
+}
+.tour-spot {
+  position: fixed;
+  z-index: 100;
+  border-radius: 14px;
+  outline: 3px solid var(--accent);
+  outline-offset: 0;
+  box-shadow: 0 0 0 200vmax rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+  transition:
+    top 0.2s ease,
+    left 0.2s ease,
+    width 0.2s ease,
+    height 0.2s ease;
+}
+.tour-bubble {
+  position: fixed;
+  z-index: 101;
+  left: max(var(--gutter), calc((100vw - 420px) / 2));
+  right: max(var(--gutter), calc((100vw - 420px) / 2));
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--edge);
+  border-radius: var(--radius-sm);
+  padding: 14px 14px 8px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+.tour-bubble-center {
+  top: 50%;
+  transform: translateY(-50%);
+}
+.tour-text {
+  margin: 0 0 8px;
+  font-size: 1.02rem;
+}
+.tour-extra {
+  margin-bottom: 4px;
+}
+.tour-link {
+  display: block;
+  min-height: 44px;
+  padding: 0;
+  background: none;
+  border: 0;
+  color: var(--text-muted);
+  text-decoration: underline;
+  font: inherit;
+  cursor: pointer;
+}
+.tour-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.tour-count {
+  flex: 1;
+}
+.tour-foot .btn {
+  min-height: 44px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tour-spot {
+    transition: none;
+  }
+}
+
+/* A settings row that acts instead of opening a page. */
+button.link-row {
+  width: 100%;
+  background: none;
+  border: 0;
+  padding-left: 0;
+  padding-right: 0;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+/* Continue / Skip stay in reach on a short screen. */
+.first-launch-sheet .sheet-actions {
+  position: sticky;
+  bottom: calc(-16px - env(safe-area-inset-bottom));
+  margin: 0 calc(-1 * var(--gutter));
+  padding: 10px var(--gutter) calc(16px + env(safe-area-inset-bottom));
+  background: var(--surface);
 }

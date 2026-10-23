@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { useData } from '../../app/data';
+import { useToast } from '../../app/toast';
 import { href } from '../../app/router';
 import { t, type MessageKey } from '../../i18n';
 import { needsCheck } from '../../foods/products';
@@ -26,9 +27,9 @@ function Fold({ title, note, children }: { title: string; note?: string; childre
   );
 }
 
-function LinkRow({ to, label, detail }: { to: string[]; label: string; detail?: string }) {
+function LinkRow({ to, label, detail, tour }: { to: string[]; label: string; detail?: string; tour?: string }) {
   return (
-    <li>
+    <li data-tour={tour}>
       <a className="link-row" href={href(...to)}>
         <span>
           {label}
@@ -42,6 +43,7 @@ function LinkRow({ to, label, detail }: { to: string[]; label: string; detail?: 
 
 export function SettingsPage() {
   const d = useData();
+  const toast = useToast();
   const s = d.settings;
   const views = viewsOf(s);
   const p = d.profile;
@@ -54,7 +56,7 @@ export function SettingsPage() {
       </header>
 
       <ul className="link-list card">
-        <LinkRow to={['settings', 'profile']} label={t('settings.profile')} detail={p.sex || p.birthYear || p.weightHistory.length ? t('settings.profileSet') : t('settings.profileDefaults')} />
+        <LinkRow to={['settings', 'profile']} tour="settings.profile" label={t('settings.profile')} detail={p.sex || p.birthYear || p.weightHistory.length ? t('settings.profileSet') : t('settings.profileDefaults')} />
         {isOn(s.features, 'sunVitaminD') && (
           <LinkRow to={['settings', 'sun']} label={t('settings.sun')} detail={p.outdoorRoutine ? t('settings.sunSet', { n: p.outdoorRoutine.length }) : t('settings.sunDefault')} />
         )}
@@ -63,7 +65,7 @@ export function SettingsPage() {
         <LinkRow to={['settings', 'nutrients']} label={t('settings.nutrients')} detail={hiddenCount ? t('settings.hidden', { n: hiddenCount }) : t('settings.allVisible')} />
         <LinkRow to={['settings', 'saved']} label={t('settings.saved')} detail={t('settings.savedDetail', { n: d.customFoods.length })} />
         {d.products.length > 0 && <LinkRow to={['settings', 'products']} label={t('match.title')} detail={toCheck ? t('match.settingsDetailCheck', { n: d.products.length, c: toCheck }) : t('match.settingsDetail', { n: d.products.length })} />}
-        <LinkRow to={['settings', 'backup']} label={t('settings.backup')} detail={isOn(s.features, 'autoBackup') ? t('backup.linkOn') : t('backup.linkOff')} />
+        <LinkRow to={['settings', 'backup']} tour="settings.backup" label={t('settings.backup')} detail={isOn(s.features, 'autoBackup') ? t('backup.linkOn') : t('backup.linkOff')} />
         <LinkRow to={['settings', 'assistant']} label={t('ai.settingsTitle')} detail={isOn(s.features, 'aiAssistant') ? t('ai.statusOn') : t('ai.statusOff')} />
         <LinkRow to={['settings', 'usda']} label={t('usda.heading')} detail={isOn(s.features, 'usda') ? t('ai.statusOn') : t('ai.statusOff')} />
       </ul>
@@ -128,7 +130,9 @@ export function SettingsPage() {
         <AccentPicker />
       </Fold>
 
-      <h2 className="section-title">{t('settings.features')}</h2>
+      <h2 className="section-title" data-tour="settings.features">
+        {t('settings.features')}
+      </h2>
       {FEATURE_GROUPS.map((g) => {
         const list = FEATURES.filter((f) => f.group === g && !f.page);
         const ready = list.filter((f) => !f.comingIn);
@@ -154,6 +158,21 @@ export function SettingsPage() {
       })}
 
       <ul className="link-list card">
+        <li data-tour="settings.tours">
+          <button
+            type="button"
+            className="link-row"
+            onClick={() => {
+              void repo.updateSettings({ toursSeen: [] });
+              toast(t('tour.again'));
+            }}
+          >
+            <span>
+              {t('tour.showAgain')}
+              <span className="muted small block">{t('tour.showAgainDetail')}</span>
+            </span>
+          </button>
+        </li>
         <LinkRow to={['about']} label={t('about.title')} />
         <LinkRow to={['settings', 'diagnostics']} label={t('diag.title')} detail={t('diag.linkDetail')} />
       </ul>

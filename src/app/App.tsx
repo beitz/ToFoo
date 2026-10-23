@@ -42,7 +42,8 @@ import { SavedChatsPage } from '../features/settings/SavedChatsPage';
 import { ProductsPage } from '../features/settings/ProductsPage';
 import { BackupPage, ExclusionsPage, NutrientVisibilityPage, SavedPage, StartPage } from '../features/settings/MorePages';
 import { InsightsPage } from '../features/insights/InsightsPage';
-import { Onboarding } from '../features/onboarding/Onboarding';
+import { FirstLaunch } from '../features/onboarding/FirstLaunch';
+import { TourHost } from '../features/tour/TourHost';
 import { FastPage } from '../features/fast/FastPage';
 import { CookPage } from '../features/recipes/CookPage';
 import { SleepPage } from '../features/sleep/SleepPage';
@@ -53,7 +54,6 @@ import { WaterPage } from '../features/trackers/WaterPage';
 function Page({ route }: { route: string[] }) {
   const d = useData();
   const [a, b, c, e, f] = route;
-  if (!d.profile.onboarded) return <Onboarding />;
   switch (a) {
     case 'log':
       return <LogPage key={`${b}-${c}`} day={b} foodCode={c} />;
@@ -106,7 +106,7 @@ function Page({ route }: { route: string[] }) {
         case 'backup':
           return <BackupPage />;
         case 'assistant':
-          return <AssistantSettingsPage />;
+          return <AssistantSettingsPage focusKey={c === 'key'} />;
         case 'usda':
           return <UsdaSettingsPage />;
         case 'diagnostics':
@@ -152,6 +152,11 @@ function Page({ route }: { route: string[] }) {
 /** Its children only once the user has been through onboarding. */
 function Onboarded({ children }: { children: ReactNode }) {
   return useData().profile.onboarded ? <>{children}</> : null;
+}
+
+/** The first-launch sheets, over Home, until they are done. */
+function FirstLaunchGate() {
+  return useData().profile.onboarded ? null : <FirstLaunch />;
 }
 
 const NAV = [
@@ -219,14 +224,17 @@ export function App() {
                 )
               }
             >
-              {/* Keyed by route: navigating away from a broken page gives the next page a fresh start. */}
-              <ErrorBoundary key={path} showHome={route.length > 0}>
-                <Page route={route} />
-              </ErrorBoundary>
-              {!hidesQuickActions(route) && <Onboarded>{<QuickActions key={route[0] ?? 'home'} />}</Onboarded>}
+              <TourHost route={route}>
+                {/* Keyed by route: navigating away from a broken page gives the next page a fresh start. */}
+                <ErrorBoundary key={path} showHome={route.length > 0}>
+                  <Page route={route} />
+                </ErrorBoundary>
+                {!hidesQuickActions(route) && <Onboarded>{<QuickActions key={route[0] ?? 'home'} />}</Onboarded>}
+              </TourHost>
+              <FirstLaunchGate />
             </DataProvider>
           </main>
-          <nav className="bottom-nav" aria-label="Main">
+          <nav className="bottom-nav" aria-label="Main" data-tour="tabs">
             {NAV.map((n) => (
               <a key={n.key} href={href(...n.to)} aria-current={active === n.key ? 'page' : undefined}>
                 <Icon name={n.icon} size={24} />

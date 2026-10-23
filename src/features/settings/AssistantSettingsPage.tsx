@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useData } from '../../app/data';
 import { useToast } from '../../app/toast';
 import { href } from '../../app/router';
@@ -21,13 +21,18 @@ const MODEL_LABEL: Record<AiModel, { name: string; detail: 'ai.model.opus' | 'ai
 };
 
 /** Turn the AI assistant on, enter the API key (stored on this device only) and pick a model. */
-export function AssistantSettingsPage() {
+export function AssistantSettingsPage({ focusKey = false }: { focusKey?: boolean }) {
   const d = useData();
   const toast = useToast();
   const on = isOn(d.settings.features, 'aiAssistant');
   const [saved, setSaved] = useState<{ apiKey: string; model: AiModel }>();
   const [draft, setDraft] = useState('');
   const [usage, setUsage] = useState<UsageDay[]>();
+  // From the round button or a question shortcut while the assistant had no key: straight to the key.
+  const keyCard = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (focusKey && saved) keyCard.current?.scrollIntoView({ block: 'center' });
+  }, [focusKey, saved]);
   useEffect(() => {
     void getAiSettings().then(setSaved);
     void getUsage().then(setUsage);
@@ -35,6 +40,8 @@ export function AssistantSettingsPage() {
 
   async function saveKey(key: string) {
     await setApiKey(key);
+    // A key is what the assistant was waiting for: saving one turns it on.
+    if (key.trim() && !on) await repo.updateSettings({ features: { ...d.settings.features, aiAssistant: true } });
     setSaved((s) => s && { ...s, apiKey: key.trim() });
     setDraft('');
     toast(t(key.trim() ? 'ai.keySaved' : 'ai.keyRemoved'));
@@ -95,7 +102,12 @@ export function AssistantSettingsPage() {
       </ul>
 
       <h2 className="section-title">{t('ai.key')}</h2>
-      <div className="card">
+      <div className="card" ref={keyCard}>
+        {focusKey && saved && !saved.apiKey && (
+          <p className="notice-card small" role="note">
+            {t('ai.keyNeeded')}
+          </p>
+        )}
         {saved?.apiKey ? (
           <div className="row-between">
             <span>
@@ -108,7 +120,7 @@ export function AssistantSettingsPage() {
         ) : (
           <>
             <Field label={t('ai.key')} hint={t('ai.keyHint')}>
-              {(id) => <input id={id} type="password" autoComplete="off" spellCheck={false} placeholder="sk-ant-…" value={draft} onChange={(e) => setDraft(e.target.value)} />}
+              {(id) => <input id={id} autoFocus={focusKey} type="password" autoComplete="off" spellCheck={false} placeholder="sk-ant-…" value={draft} onChange={(e) => setDraft(e.target.value)} />}
             </Field>
             <button className="btn btn-primary" disabled={!draft.trim()} onClick={() => void saveKey(draft)}>
               {t('common.save')}

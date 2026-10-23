@@ -116,7 +116,9 @@ export interface Settings extends Versioned {
   longWindowDays: number;
   theme: 'system' | 'light' | 'dark';
   /** Accent (action) colour; unset = green. */
-  accent?: 'green' | 'teal' | 'rose' | 'ink';
+  accent?: 'green' | 'teal' | 'blue' | 'rose' | 'ink';
+  /** Guided tours already shown (or skipped), by tour id; unset = an install from before the tours, which counts as all seen. */
+  toursSeen?: string[];
   backupReminderDays: number;
   /** How many automatic backups to keep on the phone; unset = DEFAULT_AUTO_BACKUP_KEEP. */
   autoBackupKeep?: number;

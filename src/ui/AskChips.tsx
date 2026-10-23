@@ -30,22 +30,26 @@ export function useHasApiKey(on: boolean): boolean | undefined {
 /**
  * Question shortcuts (design 2026-10-22, "Q1 How am I doing?"): small chips that open the assistant
  * (or Patterns, for questions about what goes together) with the question already typed. The user
- * still presses Send, so a tap never costs anything. Hidden without the assistant, its API key or
- * the "Question shortcuts" setting.
+ * still presses Send, so a tap never costs anything. Hidden with the "Question shortcuts" setting off.
+ * Without the assistant or its API key they stay and lead to setting it up (owner's ask, 2026-10-23).
  */
-export function AskChips({ questions, to = 'assistant', className }: { questions: string[]; to?: 'assistant' | 'insights'; className?: string }) {
+export function AskChips({ questions, to = 'assistant', className, tour }: { questions: string[]; to?: 'assistant' | 'insights'; className?: string; tour?: string }) {
   const d = useData();
-  const on = isOn(d.settings.features, 'aiAssistant') && isOn(d.settings.features, 'questionShortcuts');
-  const hasKey = useHasApiKey(on);
-  if (!on || !hasKey || questions.length === 0) return null;
+  const assistant = isOn(d.settings.features, 'aiAssistant');
+  const hasKey = useHasApiKey(assistant);
+  if (!isOn(d.settings.features, 'questionShortcuts') || questions.length === 0) return null;
+  // Still reading whether a key is set: nothing yet, rather than a chip that changes what it does.
+  if (assistant && hasKey === undefined) return null;
+  const ready = assistant && hasKey;
   return (
-    <div className={className ? `ask-chips ${className}` : 'ask-chips'} role="group" aria-label={t('ask.label')}>
+    <div className={className ? `ask-chips ${className}` : 'ask-chips'} role="group" aria-label={t('ask.label')} data-tour={tour}>
       {questions.map((q) => (
         <button
           key={q}
           type="button"
           className="ask-chip"
           onClick={() => {
+            if (!ready) return navigate('settings', 'assistant', 'key');
             setAsk(q);
             navigate(to);
           }}
@@ -64,9 +68,9 @@ export function AskChips({ questions, to = 'assistant', className }: { questions
  * (dashed, round) so everything that leads to the AI looks the same (owner's ask, 2026-10-23):
  * full width, a title, an optional line under it, and a chevron.
  */
-export function AskLink({ to, icon, title, sub }: { to: string; icon: string; title: string; sub?: string }) {
+export function AskLink({ to, icon, title, sub, tour }: { to: string; icon: string; title: string; sub?: string; tour?: string }) {
   return (
-    <a className="ask-chip ask-link" href={to}>
+    <a className="ask-chip ask-link" href={to} data-tour={tour}>
       <Icon name={icon} size={20} />
       <span className="grow ask-link-text">
         <span>{title}</span>

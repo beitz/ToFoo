@@ -54,7 +54,8 @@ export interface AppData {
   weightKg: number;
 }
 
-const DataContext = createContext<AppData | null>(null);
+/** Exported so the tour can show its screens with a sample week in place of the user's own data. */
+export const DataContext = createContext<AppData | null>(null);
 
 export function useData(): AppData {
   const d = useContext(DataContext);
@@ -74,6 +75,103 @@ function useToday(): string {
     };
   }, []);
   return today;
+}
+
+/** What the app's data is computed from: the stored records, the food database and today. */
+export interface RawData {
+  today: string;
+  foods: FoodDb;
+  searchIndex: SearchIndex;
+  profile: Profile;
+  settings: Settings;
+  recipes: Recipe[];
+  batches: Batch[];
+  log: LogEntry[];
+  customFoods: CustomFood[];
+  dayStatus: DayStatusRecord[];
+  fasts: Fast[];
+  sunEntries: SunEntry[];
+  productList: Product[];
+  activities: ActivityRecord[];
+  ketones: KetoneReading[];
+}
+
+/** Everything the screens read, derived from the stored records; also used for the tour's sample week. */
+export function computeAppData({ today, foods, searchIndex, profile, settings, recipes, batches, log, customFoods, dayStatus, fasts, sunEntries, productList, activities, ketones }: RawData): AppData {
+  const batchesById = new Map(batches.map((b) => [b.id, b]));
+  const customFoodsById = new Map(customFoods.map((c) => [c.id, c]));
+  const weight = currentWeight(profile);
+  const requirements = resolveRequirements(
+    { birthYear: profile.birthYear, sex: profile.sex, weightKg: weight, activity: profile.activity, phytate: profile.phytate, menstruation: profile.menstruation, energyTargetKcal: profile.energyTargetKcal, nutrientTargets: profile.nutrientTargets },
+    Number(today.slice(0, 4)),
+  );
+  const productsById = new Map(productList.map((p) => [p.id, p]));
+  const ctx = { foods, products: productsById, batches: batchesById, customFoods: customFoodsById, salt: profile.salt };
+  const modelEntries = log.map((e) => resolveEntry(e, ctx)).filter((e): e is ModelEntry => e !== null);
+  const earliestLog = log.reduce((min, e) => (e.day < min ? e.day : min), profile.modelStartDay);
+  const start = earliestLog < addDays(today, -MAX_MODEL_DAYS) ? addDays(today, -MAX_MODEL_DAYS) : earliestLog;
+  const days = dayRange(start <= today ? start : today, today);
+  const f = settings.features;
+  const model = simulate({
+    days,
+    dayStatus: explicitDayStatus(dayStatus, fasts, log, customFoodsById, today),
+    entries: modelEntries,
+    requirements,
+    settings: {
+      absorption: isOn(f, 'absorption'),
+      retention: isOn(f, 'retention'),
+      sun: isOn(f, 'sunVitaminD'),
+      imputeUnlogged: isOn(f, 'fillUnloggedDays'),
+      shortWindowDays: settings.shortWindowDays,
+      longWindowDays: settings.longWindowDays,
+      mealWindowMinutes: settings.mealWindowMinutes,
+    },
+    sunByDay: sunByDay(days, profile, [...sunEntries, ...(isOn(f, 'activity') ? activitySun(activities) : [])]),
+    startingLevel: profile.startingLevel,
+    customStartLevels: profile.customStartLevels,
+    measuredStores: measuredStores(profile.labResults),
+    weightKg: weight ?? 70,
+    sex: profile.sex,
+  });
+  const recentFoods = new Map<string, number>();
+  let rank = 0;
+  const lastUsed = new Map<string, number>();
+  for (let i = log.length - 1; i >= 0; i--) {
+    const e = log[i]!;
+    if (e.kind !== 'food') continue;
+    if ((e.ref.source === 'OFF' || e.ref.source === 'USDA') && !lastUsed.has(refKey(e.ref))) lastUsed.set(refKey(e.ref), e.time);
+    if (rank < 60 && e.ref.source === 'BLS' && !recentFoods.has(e.ref.code)) recentFoods.set(e.ref.code, 1 / (1 + rank++ * 0.15));
+  }
+  const products = [...productList].sort((a, b) => (lastUsed.get(b.id) ?? b.fetchedAt) - (lastUsed.get(a.id) ?? a.fetchedAt));
+  for (const r of recipes) for (const ing of r.ingredients) if (ing.ref.source === 'BLS' && !recentFoods.has(ing.ref.code)) recentFoods.set(ing.ref.code, 0.3);
+  return {
+    today,
+    foods,
+    searchIndex,
+    searchBoost: (key: string) => groupSearchBoost(key.charAt(0)),
+    profile,
+    settings,
+    recipes,
+    batches,
+    batchesById,
+    log,
+    customFoods,
+    customFoodsById,
+    products,
+    productsById,
+    dayStatus,
+    fasts,
+    sunEntries,
+    requirements,
+    modelEntries,
+    model,
+    modelDays: days,
+    activeFast: activeFast(fasts, log, customFoodsById, today),
+    activities,
+    ketones,
+    recentFoods,
+    weightKg: weight ?? 70,
+  };
 }
 
 export function DataProvider({ children, fallback }: { children: ReactNode; fallback: (state: { error?: string }) => ReactNode }) {
@@ -138,80 +236,7 @@ export function DataProvider({ children, fallback }: { children: ReactNode; fall
 
   const value = useMemo<AppData | null>(() => {
     if (!foods || !searchIndex || !profile || !settings || !recipes || !batches || !log || !customFoods || !dayStatus || !fasts || !sunEntries || !productList || !activities || !ketones) return null;
-    const batchesById = new Map(batches.map((b) => [b.id, b]));
-    const customFoodsById = new Map(customFoods.map((c) => [c.id, c]));
-    const weight = currentWeight(profile);
-    const requirements = resolveRequirements(
-      { birthYear: profile.birthYear, sex: profile.sex, weightKg: weight, activity: profile.activity, phytate: profile.phytate, menstruation: profile.menstruation, energyTargetKcal: profile.energyTargetKcal, nutrientTargets: profile.nutrientTargets },
-      Number(today.slice(0, 4)),
-    );
-    const productsById = new Map(productList.map((p) => [p.id, p]));
-    const ctx = { foods, products: productsById, batches: batchesById, customFoods: customFoodsById, salt: profile.salt };
-    const modelEntries = log.map((e) => resolveEntry(e, ctx)).filter((e): e is ModelEntry => e !== null);
-    const earliestLog = log.reduce((min, e) => (e.day < min ? e.day : min), profile.modelStartDay);
-    const start = earliestLog < addDays(today, -MAX_MODEL_DAYS) ? addDays(today, -MAX_MODEL_DAYS) : earliestLog;
-    const days = dayRange(start <= today ? start : today, today);
-    const f = settings.features;
-    const model = simulate({
-      days,
-      dayStatus: explicitDayStatus(dayStatus, fasts, log, customFoodsById, today),
-      entries: modelEntries,
-      requirements,
-      settings: {
-        absorption: isOn(f, 'absorption'),
-        retention: isOn(f, 'retention'),
-        sun: isOn(f, 'sunVitaminD'),
-        imputeUnlogged: isOn(f, 'fillUnloggedDays'),
-        shortWindowDays: settings.shortWindowDays,
-        longWindowDays: settings.longWindowDays,
-        mealWindowMinutes: settings.mealWindowMinutes,
-      },
-      sunByDay: sunByDay(days, profile, [...sunEntries, ...(isOn(f, 'activity') ? activitySun(activities) : [])]),
-      startingLevel: profile.startingLevel,
-      customStartLevels: profile.customStartLevels,
-      measuredStores: measuredStores(profile.labResults),
-      weightKg: weight ?? 70,
-      sex: profile.sex,
-    });
-    const recentFoods = new Map<string, number>();
-    let rank = 0;
-    const lastUsed = new Map<string, number>();
-    for (let i = log.length - 1; i >= 0; i--) {
-      const e = log[i]!;
-      if (e.kind !== 'food') continue;
-      if ((e.ref.source === 'OFF' || e.ref.source === 'USDA') && !lastUsed.has(refKey(e.ref))) lastUsed.set(refKey(e.ref), e.time);
-      if (rank < 60 && e.ref.source === 'BLS' && !recentFoods.has(e.ref.code)) recentFoods.set(e.ref.code, 1 / (1 + rank++ * 0.15));
-    }
-    const products = [...productList].sort((a, b) => (lastUsed.get(b.id) ?? b.fetchedAt) - (lastUsed.get(a.id) ?? a.fetchedAt));
-    for (const r of recipes) for (const ing of r.ingredients) if (ing.ref.source === 'BLS' && !recentFoods.has(ing.ref.code)) recentFoods.set(ing.ref.code, 0.3);
-    return {
-      today,
-      foods,
-      searchIndex,
-      searchBoost: (key: string) => groupSearchBoost(key.charAt(0)),
-      profile,
-      settings,
-      recipes,
-      batches,
-      batchesById,
-      log,
-      customFoods,
-      customFoodsById,
-      products,
-      productsById,
-      dayStatus,
-      fasts,
-      sunEntries,
-      requirements,
-      modelEntries,
-      model,
-      modelDays: days,
-      activeFast: activeFast(fasts, log, customFoodsById, today),
-      activities,
-      ketones,
-      recentFoods,
-      weightKg: weight ?? 70,
-    };
+    return computeAppData({ today, foods, searchIndex, profile, settings, recipes, batches, log, customFoods, dayStatus, fasts, sunEntries, productList, activities, ketones });
   }, [foods, searchIndex, profile, settings, recipes, batches, log, customFoods, dayStatus, fasts, sunEntries, productList, activities, ketones, today]);
 
   if (error) return <>{fallback({ error })}</>;

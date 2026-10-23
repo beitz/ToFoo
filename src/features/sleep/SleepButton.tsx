@@ -30,6 +30,7 @@ export function SleepButton({ onDone }: { onDone: () => void }) {
       icon={asleep ? 'sun' : 'bed'}
       label={t(asleep ? 'sleep.imUp' : 'sleep.goingToSleep')}
       on={asleep}
+      tour="fan.sleep"
       onClick={() => {
         onDone();
         void toggleSleep(toast);

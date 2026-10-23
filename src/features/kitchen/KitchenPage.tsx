@@ -95,7 +95,7 @@ export function KitchenPage() {
     <section className="kitchen-page">
       <header className="page-head row-between">
         <h1 className="grow">{t('kitchen.title')}</h1>
-        <a className="btn btn-small btn-secondary" href={href('recipes')}>
+        <a className="btn btn-small btn-secondary" href={href('recipes')} data-tour="kitchen.recipes">
           <Icon name="recipes" size={18} /> {t('recipes.title')}
         </a>
         <SettingsButton />
@@ -103,7 +103,7 @@ export function KitchenPage() {
       {homeOn && <AskChips questions={[t('kitchen.ask')]} />}
 
       {(sections.length > 0 || shoppingOn) && (
-        <nav className="kitchen-tiles" ref={tilesRef} aria-label={t('kitchen.overview')}>
+        <nav className="kitchen-tiles" ref={tilesRef} aria-label={t('kitchen.overview')} data-tour="kitchen.tiles">
           {sections.map((sec, i) => (
             <button key={sec.key} type="button" className={`kitchen-tile${i === inView ? ' on' : ''}`} aria-current={i === inView ? 'location' : undefined} onClick={() => jump(sec.key)}>
               <Icon name={sec.icon} size={22} />
@@ -113,7 +113,7 @@ export function KitchenPage() {
           ))}
           {shoppingOn && sections.length > 0 && <span className="kitchen-tiles-sep" aria-hidden />}
           {shoppingOn && (
-            <a className="kitchen-tile kitchen-tile-list" href={href('shopping')} aria-label={t('kitchen.tileListLabel', { n: toGet.length })}>
+            <a className="kitchen-tile kitchen-tile-list" data-tour="kitchen.shopping" href={href('shopping')} aria-label={t('kitchen.tileListLabel', { n: toGet.length })}>
               <Icon name="cart" size={22} />
               <strong>{toGet.length}</strong>
               <span>{t('kitchen.tile.shopping')}</span>

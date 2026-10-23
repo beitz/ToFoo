@@ -96,7 +96,7 @@ export function OverviewPage() {
     <section>
       <InsightsTabs view="overview" day={d.today} />
 
-      <div className="card ov-card">
+      <div className="card ov-card" data-tour="insights.summary">
         <Row to={href('week', week.monday)} icon="history" title={t('overview.week', { n: isoWeek(week.monday) })}>
           {week.counted === 0
             ? t('overview.nothingYet')
@@ -126,7 +126,7 @@ export function OverviewPage() {
       </div>
 
       {off.length < 4 && (
-        <div className="card ov-card">
+        <div className="card ov-card" data-tour="insights.trackers">
           {isOn(f, 'sleep') && (
             <Row to={href('nights')} icon="bed" title={t('nights.title')} strip={strip('sleep')}>
               {nights.average === undefined
@@ -161,7 +161,7 @@ export function OverviewPage() {
       <LevelsSummary reviewHref={href('review', finished[0]!, finished[finished.length - 1]!)} />
 
       {isOn(f, 'aiAssistant') && isOn(f, 'insights') && (
-        <AskLink to={href('insights')} icon="insights" title={t('insights.open')} sub={t('overview.patterns')} />
+        <AskLink to={href('insights')} icon="insights" title={t('insights.open')} sub={t('overview.patterns')} tour="insights.patterns" />
       )}
 
       {offNames.length > 0 && (
