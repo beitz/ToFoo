@@ -782,10 +782,10 @@ export const trendDisplay = {
     note: 'The arrow shows how much the shown value moved over this many days. The value itself already runs on each nutrient\'s own timescale (its average window or its store), so one lookback fits all.',
   } satisfies Valued<number>,
   minDays: {
-    value: 3,
-    source: 'Modelling choice',
+    value: 1,
+    source: 'Modelling choice (owner, 2026-10-23)',
     confidence: 'assumption',
-    note: 'Fewer days of history than this: no arrow, since one or two days say little about a direction.',
+    note: 'An arrow from the second finished day on, comparing it with the day before: early feedback keeps a new user going, and the arrow steadies as days come in. Early averages are marked with their days so far.',
   } satisfies Valued<number>,
   arrowDays: {
     value: { fast: 7, medium: 30 },

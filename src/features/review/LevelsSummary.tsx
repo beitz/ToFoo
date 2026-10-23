@@ -19,7 +19,7 @@ const nameOf = (id: string) => NUTRIENT_BY_ID.get(id)?.name ?? id;
 /**
  * "What your levels mean" on Insights (owner's ask, 2026-10-23): one line that opens to what the
  * nutrients that are low or too much can do, each opening its page; then short lines for the rest
- * (a bit low, filling, only own goals, no known effect, enough, no data). Same results as Home and
+ * (a bit low, filling, too early to tell, only own goals, no known effect, enough, no data). Same results as Home and
  * the nutrient pages, so the words match.
  */
 export function LevelsSummary({ reviewHref }: { reviewHref: string }) {
@@ -32,7 +32,7 @@ export function LevelsSummary({ reviewHref }: { reviewHref: string }) {
   if (!isOn(d.settings.features, 'levelEffects')) return null;
   const days = d.settings.shortWindowDays;
   const preview = sum.effects.slice(0, PREVIEW);
-  const counted = sum.effects.length + sum.aBitLow.length + sum.filling.length + sum.ownOnly.length + sum.noEffect.length + sum.fine.length;
+  const counted = sum.effects.length + sum.aBitLow.length + sum.filling.length + sum.early.length + sum.ownOnly.length + sum.noEffect.length + sum.fine.length;
   if (counted === 0) return null;
 
   return (
@@ -73,6 +73,7 @@ export function LevelsSummary({ reviewHref }: { reviewHref: string }) {
         )}
         <Group label={t('levels.aBitLow')} items={sum.aBitLow} />
         <Group label={t('levels.filling')} items={sum.filling} />
+        <Group label={t('levels.early')} items={sum.early} />
         <Group label={t('levels.ownOnly')} items={sum.ownOnly} />
         <Group label={t('levels.noEffect')} items={sum.noEffect} />
         {sum.fine.length > 0 && (

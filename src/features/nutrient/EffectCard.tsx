@@ -22,14 +22,14 @@ const TOP_SOURCES = 3;
  * "What your levels mean" at the top of a nutrient page (owner's ask, 2026-10-23): when the level is
  * low or too much, one line with what that can do; a tap opens why it shows, what helps, where yours
  * came from (too much) or what fills it (too little), and the sources. Nothing when the level is fine,
- * there is no data, or a store is filling (the hero already says so).
+ * there is no data, a store is filling, or a low reading is still early (the hero already says so).
  */
 export function EffectCard({ r }: { r: NutrientResult }) {
   const d = useData();
   if (!isOn(d.settings.features, 'levelEffects')) return null;
   const req = d.requirements.byNutrient.get(r.id);
   const f = findingOf(r, req, hasEffectText);
-  if (!f || f.filling) return null;
+  if (!f || f.filling || f.early) return null;
   const key = infoId(r.id);
   const text = (part: string) => t(`effect.${key}.${part}` as MessageKey);
   const has = (part: string) => !text(part).startsWith('effect.');

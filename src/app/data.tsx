@@ -12,7 +12,7 @@ import type { ActivityRecord, Batch, CustomFood, KetoneReading, DayStatusRecord,
 import { resolveRequirements, type ResolvedRequirements } from '../model/requirements';
 import { simulate, type SimulationResult } from '../model/simulate';
 import type { ModelEntry } from '../model/types';
-import { currentWeight, explicitDayStatus, resolveEntry, sunByDay, activeFast } from '../logic/resolve';
+import { currentWeight, explicitDayStatus, firstModelDay, resolveEntry, sunByDay, activeFast } from '../logic/resolve';
 import { activitySun } from '../logic/activity';
 import { measuredStores } from '../logic/lab';
 
@@ -108,13 +108,14 @@ export function computeAppData({ today, foods, searchIndex, profile, settings, r
   const productsById = new Map(productList.map((p) => [p.id, p]));
   const ctx = { foods, products: productsById, batches: batchesById, customFoods: customFoodsById, salt: profile.salt };
   const modelEntries = log.map((e) => resolveEntry(e, ctx)).filter((e): e is ModelEntry => e !== null);
-  const earliestLog = log.reduce((min, e) => (e.day < min ? e.day : min), profile.modelStartDay);
-  const start = earliestLog < addDays(today, -MAX_MODEL_DAYS) ? addDays(today, -MAX_MODEL_DAYS) : earliestLog;
-  const days = dayRange(start <= today ? start : today, today);
+  const explicit = explicitDayStatus(dayStatus, fasts, log, customFoodsById, today);
+  const first = firstModelDay(log, explicit, today);
+  const start = first < addDays(today, -MAX_MODEL_DAYS) ? addDays(today, -MAX_MODEL_DAYS) : first;
+  const days = dayRange(start, today);
   const f = settings.features;
   const model = simulate({
     days,
-    dayStatus: explicitDayStatus(dayStatus, fasts, log, customFoodsById, today),
+    dayStatus: explicit,
     entries: modelEntries,
     requirements,
     settings: {

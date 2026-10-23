@@ -8,8 +8,9 @@ const trend = (kind: GaugeKind, values: HistoryPoint[], ulRatio?: number) =>
   trendOf({ kind, history: values, ulRatio, value: { low: 0, central: values[values.length - 1]!.central, high: 0 } });
 
 describe('trendOf', () => {
-  it('needs a few days of history and a status', () => {
-    expect(trend('rolling', line(0.5, 0.05, 3))).toBeNull();
+  it('shows an arrow from the second day on, and needs a status', () => {
+    expect(trend('rolling', line(0.5, 0.05, 1))).toBeNull();
+    expect(trend('rolling', line(0.5, 0.05, 2))).toMatchObject({ direction: 'up' });
     expect(trend('info', line(0.5, 0.05))).toBeNull();
   });
 

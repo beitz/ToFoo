@@ -1,4 +1,4 @@
-import type { NutrientResult, StoreResult } from '../model/simulate';
+import { earlyReading, type GaugeStatus, type NutrientResult, type StoreResult } from '../model/simulate';
 import { storeTrendOf, trendOf, type Trend } from '../model/trend';
 import { NUTRIENT_BY_ID } from '../model/nutrients';
 import { storeNeedsAttention } from '../logic/stores';
@@ -35,6 +35,39 @@ function OwnMark({ result: r }: { result: NutrientResult }) {
 
 const ownSpoken = (r: NutrientResult) => (r.ownTarget ? `, ${t('gauge.ownTarget')}` : '');
 
+/** The status icon: an early low reading gets the "below" arrow, not the warning sign (too early to warn). */
+const iconStatus = (r: NutrientResult): GaugeStatus => (r.status === 'low' && earlyReading(r) ? 'gettingLow' : r.status);
+
+/**
+ * How many days a line averages, when that differs from its card's heading (`usual`, e.g. 7): "14 d"
+ * for the omega-3 fats, or "5 of 14 d" while the log is younger than the window (owner, 2026-10-23).
+ */
+export function windowTag(r: NutrientResult, usual?: number): { text: string; short: string; spoken: string } | null {
+  if (r.kind === 'info' || r.store || hasNoData(r)) return null;
+  const early = earlyReading(r);
+  if (early && early.of !== usual) return { text: t('gauge.windowEarly', early), short: t('gauge.windowEarlyShort', early), spoken: t('gauge.windowEarlySpoken', early) };
+  if (!early && usual !== undefined && r.windowLength !== undefined && r.windowLength !== usual) {
+    const text = t('gauge.window', { n: r.windowLength });
+    return { text, short: text, spoken: t('gauge.windowSpoken', { n: r.windowLength }) };
+  }
+  return null;
+}
+
+/** `reserve`: keep the tag's room even without one, so every bar in a grid has the same length. */
+function WindowTag({ result: r, usual, short, reserve }: { result: NutrientResult; usual?: number; short?: boolean; reserve?: boolean }) {
+  const tag = windowTag(r, usual);
+  return tag || reserve ? (
+    <span className="gauge-window" aria-hidden>
+      {tag ? (short ? tag.short : tag.text) : ''}
+    </span>
+  ) : null;
+}
+
+const windowSpoken = (r: NutrientResult, usual?: number) => {
+  const tag = windowTag(r, usual);
+  return tag ? `, ${tag.spoken}` : '';
+};
+
 /** Visual scale: averages show 0–150 % of the need, so the 100 % mark sits at two thirds of the bar. */
 const toScale = (v: number) => clamp01(v / 1.5);
 
@@ -46,7 +79,14 @@ function gaugeLabel(r: NutrientResult): string {
  * Dense variant: one line with status icon, name and value, and a thin bar below.
  * `cell` is the narrow column layout used in the energy/macro row.
  */
-export function CompactGauge({ result: r, onClick, defaultBased, variant = 'row' }: Pick<Props, 'result' | 'onClick' | 'defaultBased'> & { variant?: 'row' | 'cell' }) {
+export function CompactGauge({
+  result: r,
+  onClick,
+  defaultBased,
+  variant = 'row',
+  usualWindow,
+  reserveWindow,
+}: Pick<Props, 'result' | 'onClick' | 'defaultBased'> & { variant?: 'row' | 'cell'; usualWindow?: number; reserveWindow?: boolean }) {
   const def = NUTRIENT_BY_ID.get(r.id);
   const name = def?.short ?? r.id;
   // Cells are narrow: no "of max" / "/day" suffixes or units there. A limit cell shows the amount against
@@ -64,13 +104,13 @@ export function CompactGauge({ result: r, onClick, defaultBased, variant = 'row'
     );
   const noData = r.status === 'unknown' || hasNoData(r);
   const value = noData ? '–' : variant === 'cell' ? cellValue : gaugeLabel(r);
-  const icon = <Icon name={STATUS_ICON[r.status]} size={14} />;
+  const icon = <Icon name={STATUS_ICON[iconStatus(r)]} size={14} />;
   const fill = noData ? 0 : toScale(r.value.central);
   return (
     <button
       className={`cgauge cgauge-${variant} gauge-${r.kind} gauge-${r.status}`}
       onClick={onClick}
-      aria-label={`${def?.name ?? r.id}: ${noData ? '' : gaugeLabel(r)}, ${statusLabel(r.status)}${ownSpoken(r)}`}
+      aria-label={`${def?.name ?? r.id}: ${noData ? '' : gaugeLabel(r)}, ${statusLabel(r.status)}${ownSpoken(r)}${windowSpoken(r, usualWindow)}`}
     >
       <span className="cgauge-line">
         {variant === 'row' && icon}
@@ -89,9 +129,13 @@ export function CompactGauge({ result: r, onClick, defaultBased, variant = 'row'
         </span>
       )}
       {r.kind !== 'info' && (
-        <span className="cgauge-bar" aria-hidden>
-          <span className="cgauge-fill" style={{ width: `${fill * 100}%` }} />
-          <span className="cgauge-target" style={{ left: `${(1 / 1.5) * 100}%` }} />
+        <span className="cgauge-barline">
+          <span className="cgauge-bar" aria-hidden>
+            <span className="cgauge-fill" style={{ width: `${fill * 100}%` }} />
+            <span className="cgauge-target" style={{ left: `${(1 / 1.5) * 100}%` }} />
+          </span>
+          {/* On the bar's line, so a narrow cell's name keeps its room. */}
+          {variant === 'row' && <WindowTag result={r} usual={usualWindow} short reserve={reserveWindow} />}
         </span>
       )}
     </button>
@@ -206,13 +250,14 @@ export function GaugeRow({ result: r, showRange, onClick, defaultBased }: Pick<P
     <button
       className={`nrow gauge-${r.kind} gauge-${r.status}`}
       onClick={onClick}
-      aria-label={`${def?.name ?? r.id}: ${noData ? t('gauge.noData') : gaugeLabel(r)}${range}, ${statusLabel(r.status)}${ownSpoken(r)}`}
+      aria-label={`${def?.name ?? r.id}: ${noData ? t('gauge.noData') : gaugeLabel(r)}${range}, ${statusLabel(r.status)}${ownSpoken(r)}${windowSpoken(r)}`}
     >
-      <Icon name={STATUS_ICON[r.status]} size={14} />
+      <Icon name={STATUS_ICON[iconStatus(r)]} size={14} />
       <span className="nrow-name">
         {name}
         {defaultBased && <span className="gauge-default">*</span>}
         <OwnMark result={r} />
+        <WindowTag result={r} />
       </span>
       {isInfo ? <span className="nrow-bar" aria-hidden /> : <Bar value={scaled} showRange={showRange} target={1 / 1.5} />}
       <span className="nrow-value" aria-hidden>
