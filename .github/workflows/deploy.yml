@@ -27,8 +27,9 @@ jobs:
       - run: npm test
       - run: npx vite build
       # End-to-end tests of the main flows against the build (e2e/, playwright.config.ts).
-      - run: npx playwright install --with-deps chromium
-        # Once hung on apt for over 10 minutes and held a deploy back; normally takes about a minute.
+      # Browser only: the runner image already has the libraries Chromium needs, and --with-deps went
+      # through apt, whose mirror stalled for 10+ minutes twice on 2026-10-23 and held deploys back.
+      - run: npx playwright install chromium
         timeout-minutes: 5
       - run: npx playwright test
       - uses: actions/upload-artifact@v4
