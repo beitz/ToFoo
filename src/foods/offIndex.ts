@@ -8,7 +8,7 @@
  */
 import { gunzipSync } from 'fflate';
 import { OFF_INDEX } from './offIndexInfo';
-import { normalize } from './search';
+import { normalize, withinOneEdit } from './search';
 
 export interface OffListing {
   code: string;
@@ -18,13 +18,19 @@ export interface OffListing {
 }
 
 export interface OffIndex {
-  /** When the list was built (YYYY-MM-DD) and how many products it has, for the settings line. */
+  /** When the list was built (YYYY-MM-DD). */
   date: string;
   /** Per row, the file's line ("barcode\tname\tbrand\tquantity"): one string each keeps memory low on a phone. */
   lines: string[];
-  /** Per row: " <name and brand words>", normalized for search. */
+  /** Per row: " <name words> | <brand words>", normalized for search. Rows are most-scanned first. */
   hay: string[];
 }
+
+/**
+ * Like the food search's normalize, but "Wrigley's" becomes "wrigleys" (not "wrigley s"), so the
+ * brand matches however it is typed.
+ */
+const prep = (s: string) => normalize(s.replace(/['’‘`´]/g, ''));
 
 export function parseOffIndex(text: string, date = ''): OffIndex {
   const lines: string[] = [];
@@ -34,7 +40,7 @@ export function parseOffIndex(text: string, date = ''): OffIndex {
     const { code, name, brand } = listing(line);
     if (!code || !name) continue;
     lines.push(line);
-    hay.push(` ${normalize(`${name} ${brand}`)}`);
+    hay.push(` ${prep(name)} | ${prep(brand)}`);
   }
   return { date, lines, hay };
 }
@@ -44,36 +50,105 @@ export function listing(line: string): OffListing {
   return { code, name, brand, quantity };
 }
 
-/** Enough matches to rank: the list is most-scanned first, so later matches are rarer products. */
-const SCAN_LIMIT = 300;
+/**
+ * Matches ranked; more are only rarer products (the list is most-scanned first), and the cap keeps a
+ * one-word search ("milch", thousands of hits) fast on a phone.
+ */
+const MAX_HITS = 1000;
+/** Below this many hits, words one typo away count too ("wrigly"). */
+const FEW_HITS = 3;
+/** Typed words this long may be one typo off, or miss a last letter ("keks" for "Kekse"); shorter ones would match too much. */
+const LONG_WORD = 4;
 
 /**
- * Products whose name or brand has every typed word at a word start ("pick up" → "PiCK UP! Choco"),
- * or that contain the typed words run together ("pickup"). Products named with the words lead those
- * found by brand alone; otherwise the most-scanned come first. `exclude`: barcodes already shown.
+ * Per typed word, how well it matched (tuned by feel; offIndex.test.ts pins the expected order). A
+ * word start scores more the more of the word it covers, so "wrigley" for "Wrigleys" is nearly whole.
+ */
+const WORD = { name: 3, namePrefix: 2, brand: 2.5, brandPrefix: 1.5, runTogether: 1.5, typo: 1 };
+/** Each name word nobody typed costs this much (up to EXTRA_MAX): "Milch" before "Milchreis Classic". */
+const EXTRA_WORD = 0.12;
+const EXTRA_MAX = 1;
+/** Popularity adds up to this much: the most-scanned product of two equal matches comes first. */
+const POPULARITY = 1.2;
+
+/** How well `t` matches one word: whole word, word start, or (with `typos`) one edit off. */
+function wordMatch(t: string, w: string, typos: boolean): 'word' | 'prefix' | 'typo' | null {
+  // A word with one more letter is the same word: "wrigley" for "Wrigleys", "keks" for "Kekse".
+  if (w === t || (t.length >= LONG_WORD && w.length === t.length + 1 && w.startsWith(t))) return 'word';
+  if (w.startsWith(t)) return 'prefix';
+  if (typos && t.length >= LONG_WORD && (withinOneEdit(t, w) || (w.length > t.length && withinOneEdit(t, w.slice(0, t.length))))) return 'typo';
+  return null;
+}
+
+/** Relevance of one row whose words all matched; see the weights above. */
+function relevance(hay: string, tokens: string[], at: number, total: number, typos: boolean): number {
+  const bar = hay.indexOf(' | ');
+  const nameWords = hay.slice(1, bar).split(' ').filter(Boolean);
+  const brandWords = hay.slice(bar + 3).split(' ').filter(Boolean);
+  const used = new Set<number>();
+  let sum = 0;
+  for (const t of tokens) {
+    let best = 0;
+    const score = (w: string, whole: number, start: number) => {
+      const m = wordMatch(t, w, typos);
+      if (m === 'word') return whole;
+      if (m === 'prefix') return start + ((whole - start) * t.length) / w.length;
+      return m === 'typo' ? WORD.typo : 0;
+    };
+    nameWords.forEach((w, k) => {
+      const s = score(w, WORD.name, WORD.namePrefix);
+      if (s) used.add(k);
+      best = Math.max(best, s);
+    });
+    for (const w of brandWords) best = Math.max(best, score(w, WORD.brand, WORD.brandPrefix));
+    sum += best || WORD.runTogether;
+  }
+  // Pack sizes and percentages ("1,5%", "50er") are not extra words.
+  const extra = nameWords.filter((w, k) => !used.has(k) && !/\d/.test(w)).length;
+  const popularity = 1 - Math.log10(at + 1) / Math.log10(total + 1);
+  return sum / tokens.length - Math.min(EXTRA_MAX, EXTRA_WORD * extra) + POPULARITY * popularity;
+}
+
+/**
+ * Products whose name or brand has every typed word at a word start ("wrigley pepp" → "Wrigley's
+ * Extra Peppermint"), or that contain the typed words run together ("pickup" → "Pick Up"); when
+ * that finds almost nothing, words one typo away too. Ranked by how well the words match (whole
+ * words before word starts, the name before the brand, few other words), then by popularity.
+ * `exclude`: barcodes already shown.
  */
 export function searchOffIndex(index: OffIndex, query: string, opts: { limit?: number; exclude?: ReadonlySet<string> } = {}): OffListing[] {
-  const q = normalize(query);
+  const q = prep(query);
   if (q.length < 2) return [];
   const tokens = q.split(' ');
-  const compact = q.replace(/ /g, '');
-  const hits: Array<{ row: OffListing; score: number; at: number }> = [];
-  for (let i = 0; i < index.hay.length && hits.length < SCAN_LIMIT; i++) {
-    const words = index.hay[i]!;
-    const line = index.lines[i]!;
-    if (opts.exclude?.has(line.slice(0, line.indexOf('\t')))) continue;
-    let score: number;
-    if (tokens.every((t) => words.includes(` ${t}`))) score = 2;
-    else if (runTogetherAtWordStart(words, compact)) score = 1;
-    else continue;
-    const row = listing(line);
-    const name = ` ${normalize(row.name)}`;
-    if (tokens.every((t) => name.includes(` ${t}`))) score += 1;
-    if (name.startsWith(` ${tokens[0]}`)) score += 1;
-    hits.push({ row, score, at: i });
+  const compact = tokens.join('');
+  const total = index.hay.length;
+  const find = (typos: boolean) => {
+    const hits: Array<{ at: number; score: number }> = [];
+    for (let i = 0; i < total && hits.length < MAX_HITS; i++) {
+      const words = index.hay[i]!;
+      const found = typos
+        ? tokens.every((t) => words.split(' ').some((w) => w !== '|' && wordMatch(t, w, true)))
+        : tokens.every((t) => words.includes(` ${t}`)) || (startsAWord(words, compact) && runTogetherAtWordStart(words, compact));
+      if (!found) continue;
+      const line = index.lines[i]!;
+      if (opts.exclude?.has(line.slice(0, line.indexOf('\t')))) continue;
+      hits.push({ at: i, score: relevance(words, tokens, i, total, typos) });
+    }
+    return hits;
+  };
+  let hits = find(false);
+  if (hits.length < FEW_HITS && tokens.some((t) => t.length >= LONG_WORD)) {
+    const seen = new Set(hits.map((h) => h.at));
+    hits = [...hits, ...find(true).filter((h) => !seen.has(h.at))];
   }
   hits.sort((a, b) => b.score - a.score || a.at - b.at);
-  return hits.slice(0, opts.limit ?? 20).map((h) => h.row);
+  return hits.slice(0, opts.limit ?? 20).map((h) => listing(index.lines[h.at]!));
+}
+
+/** A quick test that rules out most rows before runTogetherAtWordStart: a word starts with compact's first two letters, maybe split ("5 gum"). */
+function startsAWord(words: string, compact: string): boolean {
+  const [a = '', b = ''] = compact;
+  return words.includes(` ${a}${b}`) || words.includes(` ${a} ${b}`);
 }
 
 /** Whether `compact` (words run together) starts at a word start of `words`, spaces ignored: "pickup" in " pick up choco". */

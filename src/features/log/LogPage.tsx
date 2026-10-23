@@ -461,9 +461,10 @@ export function LogPage({ day: dayParam, foodCode }: { day?: string; foodCode?: 
             </ul>
           )}
           {productMatches.length > 0 && <ProductList pinnable products={productMatches} onPick={(product) => setSelected({ kind: 'product', product })} />}
-          {!offSearch.genericFirst && <OffResults key={query.trim()} search={offSearch} onPick={(product) => setSelected({ kind: 'product', product })} />}
+          {/* Keys name the list: two siblings keyed by the same query made old lists pile up (owner's report, 2026-10-23). */}
+          {!offSearch.genericFirst && <OffResults key={`off:${query.trim()}`} search={offSearch} onPick={(product) => setSelected({ kind: 'product', product })} />}
           <FoodList foods={results.map((r) => d.foods.byCode.get(r.key)!).filter(Boolean)} onPick={(food) => setSelected({ kind: 'food', food })} />
-          {offSearch.genericFirst && <OffResults key={query.trim()} search={offSearch} onPick={(product) => setSelected({ kind: 'product', product })} />}
+          {offSearch.genericFirst && <OffResults key={`off:${query.trim()}`} search={offSearch} onPick={(product) => setSelected({ kind: 'product', product })} />}
           {results.length === 0 && customMatches.length === 0 && productMatches.length === 0 && offSearch.hits.length === 0 && offSearch.status !== 'loading' && (
             <div className="empty">
               <p>{t(offOn ? 'off.noResults' : 'log.noResults')}</p>
@@ -479,7 +480,7 @@ export function LogPage({ day: dayParam, foodCode }: { day?: string; foodCode?: 
               </div>
             </div>
           )}
-          {usdaOn && <UsdaResults key={query.trim()} query={query.trim()} onPick={(product) => setSelected({ kind: 'product', product })} />}
+          {usdaOn && <UsdaResults key={`usda:${query.trim()}`} query={query.trim()} onPick={(product) => setSelected({ kind: 'product', product })} />}
         </>
       )}
 

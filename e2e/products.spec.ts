@@ -28,14 +28,24 @@ test('a packaged product is found by name and logged after its barcode lookup', 
 
   await page.goto('./#/settings');
   await page.getByText('Food sources').click();
-  // The setting is saved first and shown after, so click and wait rather than check().
-  const lookup = page.getByRole('switch', { name: /^Open Food Facts lookup/ });
-  await lookup.click();
-  await expect(lookup).toBeChecked();
+  // The setting is saved first and shown after, so click and wait rather than check(). USDA too: its
+  // button once shared a key with the product list, and old lists piled up while typing.
+  for (const name of [/^Open Food Facts lookup/, /^USDA FoodData Central/]) {
+    const toggle = page.getByRole('switch', { name });
+    await toggle.click();
+    await expect(toggle).toBeChecked();
+  }
 
   await page.goto('./#/log');
-  await page.getByPlaceholder('Search foods').fill('pick up');
+  // A search typed, cleared and typed again, as the owner did: only the new results show.
+  const box = page.getByPlaceholder('Search foods');
+  await box.pressSequentially('wrigley', { delay: 50 });
+  await expect(page.locator('.off-results')).toContainText(/wrigley/i);
+  await box.clear();
+  await box.pressSequentially('pick up', { delay: 50 });
   await expect(page.getByRole('heading', { name: 'Packaged products · Open Food Facts' })).toBeVisible();
+  await expect(page.locator('.off-results')).toHaveCount(1);
+  await expect(page.locator('.off-results')).not.toContainText(/wrigley/i);
   expect(lookups).toEqual([]);
 
   // The most-scanned Pick Up comes first; whichever it is, the fake answer above is the Choco minis.
