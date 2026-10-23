@@ -41,3 +41,18 @@ export function appendText(old: string, added: string, continued = false): strin
   if (!old.trim()) return added;
   return continued ? `${old.trimEnd()} ${added}` : `${old.trimEnd()}\n${added}`;
 }
+
+/**
+ * Add a tapped answer to the chat box (forgotten foods, docs/SPEC.md): every answer about one card
+ * on one line after its prefix ("M1 also had: oil or butter in the pan, a drink"), so several taps
+ * read as one sentence and the user can add the amounts before sending.
+ */
+export function addAnswer(old: string, prefix: string, answer: string): string {
+  const lines = old.split('\n');
+  const i = lines.findIndex((l) => l.startsWith(prefix));
+  if (i < 0) return appendText(old, `${prefix}${answer}`);
+  const line = lines[i]!.trimEnd();
+  if (line.slice(prefix.length).split(', ').includes(answer)) return old;
+  lines[i] = line === prefix.trimEnd() ? `${prefix}${answer}` : `${line}, ${answer}`;
+  return lines.join('\n');
+}

@@ -4251,6 +4251,24 @@ a.contributor-link > span:first-child {
   max-width: 100%;
 }
 
+/* Forgotten foods on a meal card: the chips wrap inside the card instead of scrolling past its edge. */
+.forgotten-ask {
+  margin: 8px 0;
+}
+.forgotten-ask .ask-chips {
+  flex-wrap: wrap;
+  margin: 6px 0 0;
+  padding: 0;
+  overflow: visible;
+}
+.forgotten-ask .ask-chip[aria-pressed='true'] {
+  border-style: solid;
+  border-color: var(--accent);
+}
+.forgotten-ask .ask-chip[aria-pressed='true'] svg {
+  color: var(--accent);
+}
+
 /* ── Kitchen tab ─────────────────────────────────────────────── */
 .kitchen-tiles {
   position: sticky;

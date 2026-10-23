@@ -53,6 +53,15 @@ const MAX_INSTRUCTIONS_CHARS = 8000;
 const FUTURE_SLACK_MS = 10 * 60_000;
 const MAX_PAST_MS = 400 * 86_400_000;
 
+/**
+ * What food logs most often leave out (docs/SPEC.md, "Forgotten foods"): a meal card asks about the
+ * ones the assistant thinks this meal had and the user didn't mention.
+ */
+export const FORGOTTEN = ['cooking_fat', 'spread', 'sauce', 'drink', 'milk_sugar'] as const;
+export type Forgotten = (typeof FORGOTTEN)[number];
+/** One short question, not a form: at most this many answers on a card. */
+const MAX_FORGOTTEN = 3;
+
 export const searchInput = z.object({ queries: z.array(z.string()).min(1) });
 export const lookupInput = z.object({ barcodes: z.array(z.string()).min(1) });
 export const usdaInput = z.object({ queries: z.array(z.string()).min(1), branded: z.boolean() });
@@ -78,6 +87,8 @@ export const proposalInput = z.object({
   time: z.string().optional(),
   /** Id of the open card this proposal replaces (e.g. "M2"); empty for a new meal. */
   replaces: z.string().optional(),
+  /** With "Ask about forgotten foods" on: what to ask about on the card. */
+  ask_about: z.array(z.enum(FORGOTTEN)).default([]),
 });
 
 export type ProposalInput = z.infer<typeof proposalInput>;
@@ -314,6 +325,21 @@ export interface Proposal {
   time?: number;
   /** Card id this one replaces. */
   replaces?: string;
+  /** Things to ask about on the card (see forgottenAsks); absent when none. */
+  askAbout?: Forgotten[];
+}
+
+/**
+ * What a meal card asks about: the assistant's picks, minus what the meal already has (a fat or a
+ * drink from the BLS), none for packaged products alone (their label holds everything in them).
+ */
+export function forgottenAsks(asked: readonly Forgotten[], items: readonly Pick<ProposedItem, 'food' | 'product'>[]): Forgotten[] {
+  const generic = items.filter((i) => !i.product);
+  if (!generic.length) return [];
+  const groups = new Set(generic.map((i) => i.food.code.charAt(0)));
+  // BLS main groups: Q fats and oils, N non-alcoholic and P alcoholic drinks.
+  const covered = (f: Forgotten) => ((f === 'cooking_fat' || f === 'spread') && groups.has('Q')) || (f === 'drink' && (groups.has('N') || groups.has('P')));
+  return [...new Set(asked)].filter((f) => !covered(f)).slice(0, MAX_FORGOTTEN);
 }
 
 function fmt(v: RawValue | undefined): string {
@@ -378,6 +404,8 @@ export interface ToolContext {
   recipe?: boolean;
   /** The main chat's recipe book: save, change and (with recipe ideas on) suggest recipes. Absent in the recipe editor. */
   recipes?: RecipeTools;
+  /** "Ask about forgotten foods" on: meal cards ask about what logs most often miss. */
+  forgotten?: boolean;
 }
 
 /** The recipe book as the assistant may read it, and the app's numbers for ideas. */
@@ -400,7 +428,7 @@ export interface IdeaTools {
 }
 
 /** Which online sources the assistant is offered (decides the prompt and tool variant). */
-export function sourcesOf(ctx: Pick<ToolContext, 'products' | 'journal' | 'sleep' | 'activity' | 'water' | 'ketones' | 'shopping' | 'pantry' | 'recipe' | 'recipes'>): {
+export function sourcesOf(ctx: Pick<ToolContext, 'products' | 'journal' | 'sleep' | 'activity' | 'water' | 'ketones' | 'shopping' | 'pantry' | 'recipe' | 'recipes' | 'forgotten'>): {
   off: boolean;
   usda: boolean;
   webSearch: boolean;
@@ -414,10 +442,11 @@ export function sourcesOf(ctx: Pick<ToolContext, 'products' | 'journal' | 'sleep
   recipe: boolean;
   recipes: boolean;
   ideas: boolean;
+  forgotten: boolean;
 } {
   const { products } = ctx;
   const online = { off: !!products?.find, usda: !!products?.searchUsda, webSearch: !!products?.find && !!products.webSearch };
-  if (ctx.recipe) return { ...online, journal: false, sleep: false, activity: false, water: false, ketones: false, shopping: false, pantry: false, recipe: true, recipes: false, ideas: false };
+  if (ctx.recipe) return { ...online, journal: false, sleep: false, activity: false, water: false, ketones: false, shopping: false, pantry: false, recipe: true, recipes: false, ideas: false, forgotten: false };
   return {
     ...online,
     journal: !!ctx.journal,
@@ -430,6 +459,7 @@ export function sourcesOf(ctx: Pick<ToolContext, 'products' | 'journal' | 'sleep
     recipe: false,
     recipes: !!ctx.recipes,
     ideas: !!ctx.recipes?.ideas,
+    forgotten: !!ctx.forgotten,
   };
 }
 
@@ -776,6 +806,7 @@ export function validateProposal(
   if (problem) problems.push(problem);
   if (problems.length) return { ok: false, error: `${problems.join('\n')}\nFix these and call propose_meal again.` };
   const replaces = parsed.data.replaces?.trim();
+  const askAbout = forgottenAsks(parsed.data.ask_about, items);
   return {
     ok: true,
     proposal: {
@@ -785,6 +816,7 @@ export function validateProposal(
       confidence: parsed.data.confidence,
       ...(time !== undefined ? { time } : {}),
       ...(replaces ? { replaces } : {}),
+      ...(askAbout.length ? { askAbout } : {}),
     },
   };
 }

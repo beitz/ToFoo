@@ -969,3 +969,35 @@ describe('recipes in the main chat', () => {
     expect(conversation.pendingResults.map((r) => r.content)).toContain('Shown to the user as card R1. Not saved yet; their reply follows.');
   });
 });
+
+describe('forgotten foods (docs/SPEC.md)', () => {
+  const oil = food('Q100000', 'Rapeseed oil', 'Rapsöl', 884);
+  const cola = food('N310000', 'Cola', 'Cola', 42);
+  const withFoods = { byCode: new Map([...foods, oil, cola].map((f) => [f.code, f])), groups: {} };
+  const meal = (codes: string[], ask: string[]) => ({ summary: 'Dinner', items: codes.map((code) => ({ code, grams: 100, preparation: 'asListed', note: '' })), assumptions: [], confidence: 'C', ask_about: ask });
+
+  it('keeps what the assistant asks about, at most three, without what the meal already has', () => {
+    const r = validateProposal(meal(['D7A5400'], ['spread', 'drink', 'spread', 'sauce', 'cooking_fat']), withFoods);
+    expect(r.ok && r.proposal.askAbout).toEqual(['spread', 'drink', 'sauce']);
+    const fat = validateProposal(meal(['D7A5400', 'Q100000', 'N310000'], ['spread', 'cooking_fat', 'drink', 'sauce']), withFoods);
+    expect(fat.ok && fat.proposal.askAbout).toEqual(['sauce']);
+  });
+
+  it('asks nothing when none was given, and old chats without the field still load', () => {
+    const r = validateProposal(meal(['D7A5400'], []), withFoods);
+    expect(r.ok && r.proposal).not.toHaveProperty('askAbout');
+    const { ask_about: _, ...old } = meal(['D7A5400'], []);
+    expect(validateProposal(old, withFoods).ok).toBe(true);
+    expect(validateProposal(meal(['D7A5400'], ['dessert']), withFoods).ok).toBe(false);
+  });
+
+  it('offers ask_about only with the switch on, and keeps the strict grammar small', () => {
+    const meal = (sources: Parameters<typeof requestParams>[2]) =>
+      (requestParams('claude-opus-5-5', [], sources).tools ?? []).find((t) => 'name' in t && t.name === 'propose_meal') as { input_schema: { properties: object; required: string[] } };
+    expect(meal({}).input_schema.properties).not.toHaveProperty('ask_about');
+    expect(meal({ forgotten: true }).input_schema.properties).toHaveProperty('ask_about');
+    expect(meal({ forgotten: true }).input_schema.required).toContain('ask_about');
+    expect(JSON.stringify(requestParams('claude-opus-5-5', [], { forgotten: true }).system)).toContain('ask_about');
+    expect(JSON.stringify(requestParams('claude-opus-5-5', [], {}).system)).not.toContain('ask_about');
+  });
+});

@@ -333,6 +333,8 @@ Logging should feel like telling a friend what you ate, not operating a database
 
 **Confidence**: entries from the assistant are logged as C · Estimate by default; the assistant may suggest B when the food is certain and the amount comes from a label or a standard portion. Assumptions the assistant made ("assumed one bowl of broth") are shown on the confirm card.
 
+**Forgotten foods** (built 2026-10-23, owner's pick from the "What's left" review): food records come out short mostly from what is easy to leave out (cooking fat, spreads, sauces and dressings, drinks, milk or sugar in coffee), and 10 g of oil is already about 90 kcal. With the switch "Ask about forgotten foods" (on, under AI assistant) `propose_meal` carries `ask_about`: the kinds this meal probably had that the user neither said nor showed (`cooking_fat`, `spread`, `sauce`, `drink`, `milk_sugar`). The card shows them as one short question, "Anything else with it?", with a tap answer per kind and "That's all". A tap writes the answer into the chat box under the card's id ("M1 also had: a drink, a sauce or dressing"), so the user can add how much and send; nothing is sent until they do, and the assistant then updates the card. The app drops kinds the meal already covers (a fat or oil, or a drink, from the BLS) and keeps at most three; packaged products alone get no question, since their label holds everything in them, and servings from a batch (`propose_portion`) are never asked about. The assistant leaves `ask_about` empty for a snack or a drink on its own, for a BLS dish that already holds its fat and sauce, and for a card that already took the answer; it never asks about these kinds in text. The question takes no extra request: it rides on the card that was proposed anyway.
+
 **Why one model, not several voting**: models share the same blind spots (portion size, hidden fat), so several models tend to agree and be wrong together; a fourth model to break ties has no ground truth either. Restricting the AI to database foods, asking when unsure, and a quick human check catch more errors for a quarter of the cost.
 
 **Technical shape**:
@@ -790,6 +792,7 @@ Each section is folded to its title with "n of m on" (2026-10-23, owner's ask), 
 | Water | Off | Plain water with one tap or via the assistant, plus water in foods, against the DGE guide value |
 | Shopping list | On | A list to take shopping, offline: by hand, from a recipe's ingredients for N portions, or through the assistant |
 | At home | On | What was bought and is at home, by place; one-tap logging, amounts counted down from the log, running low → shopping list |
+| Ask about forgotten foods | On | With the assistant on: a meal card asks about oil, spreads, sauces, drinks or milk and sugar the message did not mention, with tap answers |
 | Save assistant chats | On | Keep each assistant chat on the phone to share as a file (not in backups) |
 | Automatic backups | On | A full backup on the phone once a day and before a restore or a storage upgrade; switched in Settings → Backup |
 | Backup reminder | On | A note on Home when the last saved backup file is older than N days; switched in Settings → Backup |

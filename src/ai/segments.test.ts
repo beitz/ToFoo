@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { appendText, PAUSE_MS, promptWithContext, rms, SEGMENT_MAX_MS, SEGMENT_TARGET_MS, shouldCut } from './segments';
+import { addAnswer, appendText, PAUSE_MS, promptWithContext, rms, SEGMENT_MAX_MS, SEGMENT_TARGET_MS, shouldCut } from './segments';
 
 describe('recording parts', () => {
   it('cuts at a pause once a part is long enough, and always at the maximum', () => {
@@ -23,5 +23,17 @@ describe('recording parts', () => {
     expect(appendText('', 'b')).toBe('b');
     expect(appendText('a ', 'b', true)).toBe('a b');
     expect(appendText('a', 'b')).toBe('a\nb');
+  });
+});
+
+describe('addAnswer', () => {
+  it('collects the answers about one card on its line, once each', () => {
+    let s = addAnswer('', 'M1 also had: ', 'a drink');
+    expect(s).toBe('M1 also had: a drink');
+    s = addAnswer(s, 'M1 also had: ', 'oil or butter in the pan');
+    expect(s).toBe('M1 also had: a drink, oil or butter in the pan');
+    expect(addAnswer(s, 'M1 also had: ', 'a drink')).toBe(s);
+    s = addAnswer(`was a big plate\n${s}`, 'M2 also had: ', 'a sauce');
+    expect(s).toBe('was a big plate\nM1 also had: a drink, oil or butter in the pan\nM2 also had: a sauce');
   });
 });

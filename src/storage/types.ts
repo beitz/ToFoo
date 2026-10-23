@@ -104,7 +104,8 @@ export type FeatureKey =
   | 'ketosis'
   | 'questionShortcuts'
   | 'ketoneReadings'
-  | 'fasting';
+  | 'fasting'
+  | 'forgottenCheck';
 
 export interface Settings extends Versioned {
   id: 'settings';
