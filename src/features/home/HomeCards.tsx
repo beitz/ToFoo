@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { useData } from '../../app/data';
 import { href, navigate } from '../../app/router';
 import { t, type MessageKey } from '../../i18n';
+import { storeSources, todaySources, weekSources, type HomeSource } from '../../i18n/homeInfo.en';
 import { fmtNumber, fmtPercent } from '../../lib/format';
 import { NUTRIENT_BY_ID } from '../../model/nutrients';
 import type { NutrientResult, StoreResult } from '../../model/simulate';
@@ -49,11 +50,11 @@ export function HomeCards({
   const comets = views.nutrients === 'comets';
   return (
     <>
-      <ListCard id="today" title={t('home.today')} note={t('home.todayNote')} info={t('home.todayInfo')}>
+      <ListCard id="today" title={t('home.today')} note={t('home.todayNote')} info={t('home.todayInfo')} sources={todaySources(t)}>
         {views.macros === 'rings' ? <MacroRings values={today} defaultBased={defaultBased} today /> : <TodayCells defaultBased={defaultBased} />}
       </ListCard>
       {rest.length > 0 && (
-        <ListCard id="week" title={t('home.lastDays', { n: windowDays })} note={t('home.weekNote')} info={`${t('home.weekInfo', { n: windowDays })}${comets ? ` ${t('home.cometLegend')}` : ''}`}>
+        <ListCard id="week" title={t('home.lastDays', { n: windowDays })} note={t('home.weekNote')} info={`${t('home.weekInfo', { n: windowDays })}${comets ? ` ${t('home.cometLegend')}` : ''}`} sources={weekSources(t)}>
           {comets ? (
             <NutrientsSection results={rest} showRange={showRange} />
           ) : (
@@ -66,7 +67,7 @@ export function HomeCards({
         </ListCard>
       )}
       {stores.length > 0 && (
-        <ListCard id="stores" title={t('home.stores')} note={t('home.storesListNote')} info={t('home.storesInfo', { start: t(`start.${startLevel}` as MessageKey) })}>
+        <ListCard id="stores" title={t('home.stores')} note={t('home.storesListNote')} info={t('home.storesInfo', { start: t(`start.${startLevel}` as MessageKey) })} sources={storeSources(t)}>
           {comets ? (
             <StoresSection stores={stores} showRange={showRange} />
           ) : (
@@ -82,8 +83,8 @@ export function HomeCards({
   );
 }
 
-/** A card with its heading, a short note on what the numbers are, and an ⓘ that opens why. */
-function ListCard({ id, title, note, info, children }: { id: string; title: string; note: string; info: string; children: ReactNode }) {
+/** A card with its heading, a short note on what the numbers are, and an ⓘ that opens why, with the sources to check it. */
+function ListCard({ id, title, note, info, sources, children }: { id: string; title: string; note: string; info: string; sources: HomeSource[]; children: ReactNode }) {
   const [open, setOpen] = useState(false);
   return (
     <div className="card home-card list-card">
@@ -94,9 +95,21 @@ function ListCard({ id, title, note, info, children }: { id: string; title: stri
         </button>
       </div>
       {open && (
-        <p className="muted small list-info" id={`${id}-info`}>
-          {info}
-        </p>
+        <div className="muted small list-info" id={`${id}-info`}>
+          <p>{info}</p>
+          <h3 className="list-sources-head">{t('home.sources')}</h3>
+          <ul className="list-sources">
+            {sources.map((s) => (
+              <li key={s.url}>
+                <a href={s.url} target="_blank" rel="noreferrer">
+                  {s.label}
+                </a>
+                {s.about && ` · ${s.about}`}
+              </li>
+            ))}
+          </ul>
+          <p>{t('home.src.more')}</p>
+        </div>
       )}
       {children}
     </div>
