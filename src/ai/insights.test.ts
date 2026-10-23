@@ -128,6 +128,13 @@ describe('insight conversation', () => {
     expect(r.conversation.messages).toHaveLength(6);
   });
 
+  it('tells the model what the user chose not to share', () => {
+    const note = insightNote(at(8, 9), overview(data, key(1), key(7)), true, ['sleep', 'water']);
+    expect(note).toContain('no days outside it');
+    expect(note).toContain('chose not to share their sleep, water');
+    expect(insightNote(at(8, 9), overview(data, key(1), key(7)), true)).not.toContain('not to share');
+  });
+
   it('gives up after too many tool rounds and leaves the conversation as it was', async () => {
     const loop = Array.from({ length: 16 }, (_, i) => reply([toolUse(`t${i}`, 'read_journal', { from: key(1), to: key(7), words: [] })], 'tool_use'));
     const { create } = scripted(...loop);

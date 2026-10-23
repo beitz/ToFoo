@@ -28,6 +28,7 @@ import { prepareImage, type PreparedImage } from '../../ai/image';
 import { photoLabel, readPhotoTime, type PhotoTime } from '../../ai/photoTime';
 import { appendText, useDictation } from './useDictation';
 import { RecordingTime } from './RecordingTime';
+import { SentNote } from './SentNote';
 import { clipTime, VoiceClip } from './VoiceClip';
 import { UsageLine } from './UsageLine';
 import { VoiceFailed } from './VoiceFailed';
@@ -561,7 +562,7 @@ function Chat({ apiKey, model, day, recipe, reopened }: { apiKey: string; model:
   const voiceStatus =
     dictation.startedAt !== undefined ? (
       <p className="composer-note voice-status small" role="status">
-        <span className="rec-dot" aria-hidden="true" /> <RecordingTime since={dictation.startedAt} />
+        <span className="rec-dot" aria-hidden="true" /> <RecordingTime since={dictation.startedAt} /> <span className="muted">· {t('voice.sending')}</span>
       </p>
     ) : transcribing ? (
       <p className="composer-note muted small" role="status">
@@ -723,6 +724,8 @@ function Chat({ apiKey, model, day, recipe, reopened }: { apiKey: string; model:
         {timedOut > 0 && <p className="composer-note muted small">{t('ai.photoTimesMissing', { n: timedOut })}</p>}
         {micButton && images.length > 0 && !voiceStatus && <p className="composer-note muted small">{t('viewer.hint')}</p>}
         {voiceStatus}
+        {/* Before the first message: what goes where, in one line (owner's ask, 2026-10-23). */}
+        {!voiceStatus && bubbles.length === 0 && images.length === 0 && <SentNote text={t(micButton ? 'sent.chatVoiceNote' : 'sent.chatNote')} />}
         {voice.length > 0 && (
           <div className="composer-note voice-pending small">
             <Icon name="mic" size={16} />
@@ -1362,7 +1365,10 @@ function ProposalCard({ card, day, toast, onLogged, register }: CardProps<Extrac
               ) : (
                 <a href={href('food', it.food.code)}>{it.food.nameEn}</a>
               )}
-              <span className="muted small block">{it.note || it.food.nameDe}</span>
+              <span className="muted small block">
+                {/* Where the numbers come from, as on recipe cards: BLS, a scanned product, USDA. */}
+                <SourceTag source={it.product?.source ?? 'BLS'} product={it.product} /> {it.note || it.food.nameDe}
+              </span>
               {it.product?.match && (
                 <span className="muted small block">{t('ai.microsFrom', { name: d.foods.byCode.get(it.product.match.code)?.nameEn ?? it.product.match.code })}</span>
               )}

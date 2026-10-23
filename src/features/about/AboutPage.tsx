@@ -57,6 +57,9 @@ export function AboutPage() {
 
       <h2>{t('about.privacyHeading')}</h2>
       <p>{t('about.privacy')}</p>
+      <p>
+        <a href={href('about', 'sent')}>{t('about.sentLink')}</a>
+      </p>
 
       <h2>{t('about.codeHeading')}</h2>
       <p>
