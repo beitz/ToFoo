@@ -4,15 +4,14 @@ import { useToast } from '../../app/toast';
 import { t } from '../../i18n';
 import { newId } from '../../lib/id';
 import { errorText } from '../../lib/shareFile';
-import { search } from '../../foods/search';
-import type { Food } from '../../foods/foodDb';
-import { amountText, bySection, isOpen, onList, parseEntry, planAdd, planClear, sectionOfCode, shareText, suggestions, type NewShoppingItem } from '../../logic/shopping';
+import { amountText, bySection, isOpen, onList, planAdd, planClear, shareText } from '../../logic/shopping';
 import { repo } from '../../storage/repo';
 import { CURRENT_SCHEMA_VERSION, type ShoppingItem } from '../../storage/types';
 import { Icon } from '../../ui/Icon';
 import { ItemSheet, sectionName } from './ItemSheet';
 import { RecipeToListSheet } from './RecipeToListSheet';
-import { useShopFoods, useShopping } from './useShopping';
+import { useShopping } from './useShopping';
+import { ShoppingAdd } from './ShoppingAdd';
 import { useWakeLock } from './useWakeLock';
 import { isOn } from '../../settings/features';
 import { needsBuying, onShoppingList } from '../../logic/pantry';
@@ -23,9 +22,6 @@ import { portionGrams } from '../../model/ranking';
 import { NUTRIENT_BY_ID } from '../../model/nutrients';
 import { BackButton } from '../../ui/BackButton';
 
-/** Foods from the database offered while typing, after things bought before. */
-const FOOD_SUGGESTIONS = 3;
-
 /**
  * Route #/shopping: the shopping list. Everything is on the phone, so it works in a shop without
  * a connection. Type to add (things bought before come back as suggestions), add a recipe's
@@ -35,7 +31,6 @@ export function ShoppingPage() {
   const d = useData();
   const toast = useToast();
   const all = useShopping();
-  const [text, setText] = useState('');
   const [fromRecipe, setFromRecipe] = useState(false);
   const [editing, setEditing] = useState<ShoppingItem | null>(null);
   const [puttingAway, setPuttingAway] = useState(false);
@@ -45,27 +40,10 @@ export function ShoppingPage() {
   const { asShopping, placeOf } = usePantryFoods();
   // Running low or used up at home and not on the list yet (marking it puts it on; eating it up does not).
   const needed = atHome ? (pantry ?? []).filter((p) => needsBuying(left(p)) && !onShoppingList(p, all ?? [])).sort((a, b) => a.name.localeCompare(b.name)) : [];
-  const { typed } = useShopFoods();
   const items = useMemo(() => (all ?? []).filter(onList), [all]);
   const toBuy = items.filter(isOpen);
   const basket = items.filter((i) => i.checkedAt !== undefined).sort((a, b) => b.checkedAt! - a.checkedAt!);
   useWakeLock(items.length > 0);
-
-  const entry = parseEntry(text);
-  const past = useMemo(() => suggestions(all ?? [], entry.name), [all, entry.name]);
-  const foods = useMemo(() => {
-    if (!entry.name.trim()) return [];
-    return search(d.searchIndex, entry.name, { limit: 12, recent: d.recentFoods, boost: d.searchBoost })
-      .map((r) => d.foods.byCode.get(r.key))
-      .filter((f): f is Food => !!f && !past.some((p) => p.ref?.source === 'BLS' && p.ref.code === f.code))
-      .slice(0, FOOD_SUGGESTIONS);
-  }, [entry.name, past, d.searchIndex, d.recentFoods, d.searchBoost, d.foods]);
-
-  async function add(item: NewShoppingItem) {
-    const withAmount = { ...item, ...(entry.grams ? { grams: entry.grams } : {}), ...(entry.amount ? { amount: entry.amount } : {}) };
-    await repo.changeShopping((current) => planAdd(current, [withAmount], Date.now(), newId, CURRENT_SCHEMA_VERSION));
-    setText('');
-  }
 
   async function addNeeded(names: readonly string[]) {
     const things = needed.filter((p) => names.includes(p.id));
@@ -107,7 +85,6 @@ export function ShoppingPage() {
     }
   }
 
-  const showSuggestions = entry.name.trim() !== '' && (past.length > 0 || foods.length > 0);
   const done = items.length > 0 ? basket.length / items.length : 0;
 
   return (
@@ -115,21 +92,22 @@ export function ShoppingPage() {
       <header className="page-head row-between">
         <BackButton to={['kitchen']} />
         <h1 className="grow">{t('shopping.title')}</h1>
-        <span className="offline-pill small">
-          <Icon name="check" size={14} /> {t('shopping.offline')}
-        </span>
         <button className="icon-btn" onClick={() => void share()} disabled={toBuy.length === 0} aria-label={t('shopping.share')} title={t('shopping.share')}>
           <Icon name="share" />
         </button>
       </header>
-      {items.length > 0 && (
-        <div className="shop-progress">
+      {/* Under the title, not beside it: "Shopping list" needs the header's width at 360 px. */}
+      <div className="shop-progress">
+        {items.length > 0 && <span className="small muted">{t('shopping.progress', { get: toBuy.length, trolley: basket.length })}</span>}
+        <span className="offline-pill small">
+          <Icon name="check" size={14} /> {t('shopping.offline')}
+        </span>
+        {items.length > 0 && (
           <span className="shop-bar" aria-hidden>
             <span style={{ width: `${done * 100}%` }} />
           </span>
-          <span className="small muted">{t('shopping.progress', { get: toBuy.length, trolley: basket.length })}</span>
-        </div>
-      )}
+        )}
+      </div>
 
       {needed.length > 0 && (
         <div className="card shop-needed">
@@ -194,43 +172,7 @@ export function ShoppingPage() {
       </button>
       {items.length > 0 && 'wakeLock' in navigator && <p className="muted small shop-awake">{t('shopping.screenOn')}</p>}
 
-      <div className="shop-dock">
-        {showSuggestions && (
-          <ul className="result-list shop-suggestions" aria-label={t('shopping.suggestions')}>
-            {past.map((p) => (
-              <li key={p.id}>
-                <button className="result" onClick={() => void add({ name: p.name, section: p.section, ...(p.ref ? { ref: p.ref } : {}) })}>
-                  <span className="result-name">{p.name}</span>
-                  <span className="muted small">{t('shopping.boughtBefore')}</span>
-                </button>
-              </li>
-            ))}
-            {foods.map((f) => (
-              <li key={f.code}>
-                <button className="result" onClick={() => void add({ name: f.nameEn, ref: { source: 'BLS', version: d.foods.version, code: f.code }, section: sectionOfCode(f.code) })}>
-                  <span className="result-name">{f.nameEn}</span>
-                  <span className="muted small">{f.nameDe}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-        <form
-          className="shop-add"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (entry.name.trim()) void add(typed(entry.name.trim(), all ?? []));
-          }}
-        >
-          <div className="search-box grow">
-            <Icon name="plus" />
-            <input value={text} onChange={(e) => setText(e.target.value)} placeholder={t('shopping.addPlaceholder')} aria-label={t('shopping.addPlaceholder')} enterKeyHint="done" autoComplete="off" />
-          </div>
-          <button className="btn btn-primary" type="submit" disabled={!entry.name.trim()}>
-            {t('shopping.add')}
-          </button>
-        </form>
-      </div>
+      <ShoppingAdd docked />
 
       {fromRecipe && <RecipeToListSheet onClose={() => setFromRecipe(false)} />}
       {editing && <ItemSheet key={editing.id} item={editing} onClose={() => setEditing(null)} />}

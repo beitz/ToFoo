@@ -32,6 +32,9 @@
   --t-journal: #8a6d1a;
   --tank: #1a66ae;
   --tank-soft: color-mix(in srgb, var(--tank) 26%, transparent);
+  /* The shopping list: what is still to get, set apart from what is at home (Kitchen tab). */
+  --shop: #2f5fb3;
+  --shop-soft: color-mix(in srgb, var(--shop) 10%, transparent);
   --range: rgba(21, 24, 27, 0.16);
   --shadow: none;
   --radius: 18px;
@@ -80,6 +83,8 @@
     --t-journal: #d6b45a;
     --tank: #5baef2;
     --tank-soft: color-mix(in srgb, var(--tank) 26%, transparent);
+    --shop: #8fb4f7;
+    --shop-soft: color-mix(in srgb, var(--shop) 12%, transparent);
     --range: rgba(238, 241, 243, 0.2);
     --shadow: none;
   }
@@ -109,6 +114,8 @@
   --unknown: #8e99a1;
   --tank: #5baef2;
   --tank-soft: color-mix(in srgb, var(--tank) 26%, transparent);
+  --shop: #8fb4f7;
+  --shop-soft: color-mix(in srgb, var(--shop) 12%, transparent);
   --range: rgba(238, 241, 243, 0.2);
   --shadow: none;
 }
@@ -3599,12 +3606,16 @@ button.week-row:focus-visible {
 }
 .shop-progress {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
+  gap: 6px 10px;
   margin: -4px 0 6px;
 }
+.shop-progress .offline-pill {
+  margin-left: auto;
+}
 .shop-bar {
-  flex: 1;
+  flex: 1 1 100%;
   height: 8px;
   border-radius: 4px;
   background: var(--surface-3);
@@ -4239,22 +4250,22 @@ a.contributor-link > span:first-child {
   position: sticky;
   top: 0;
   z-index: 15;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
-  grid-auto-flow: column;
-  gap: 6px;
+  display: flex;
+  gap: 5px;
   margin: 0 calc(-1 * var(--gutter)) 4px;
   padding: 8px var(--gutter);
   background: var(--bg);
 }
 .kitchen-tile {
+  flex: 1 1 0;
   display: flex;
   flex-direction: column;
+  text-decoration: none;
   align-items: center;
   gap: 2px;
   min-width: 0;
   min-height: 72px;
-  padding: 8px 2px;
+  padding: 8px 0;
   border: 1.5px solid var(--border);
   border-radius: 14px;
   background: var(--surface);
@@ -4268,7 +4279,8 @@ a.contributor-link > span:first-child {
   line-height: 1.1;
 }
 .kitchen-tile span {
-  font-size: 0.75rem;
+  /* Small enough that "Cupboard" and "Shopping" fit five tiles and the separator at 360 px. */
+  font-size: 0.7rem;
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -4277,6 +4289,33 @@ a.contributor-link > span:first-child {
 .kitchen-tile.on {
   border-color: var(--accent);
   color: var(--text);
+}
+/* The shopping list's tile: apart at the right end, in its own colour, and a link to the list. */
+.kitchen-tiles-sep {
+  flex: none;
+  width: 1.5px;
+  margin: 6px 1px;
+  border-radius: 1px;
+  background: var(--edge);
+}
+.kitchen-tile.kitchen-tile-list {
+  border-color: color-mix(in srgb, var(--shop) 55%, transparent);
+  background: var(--shop-soft);
+}
+.kitchen-tile-list svg,
+.kitchen-tile-list strong {
+  color: var(--shop);
+}
+.kitchen-list {
+  border-color: color-mix(in srgb, var(--shop) 45%, transparent);
+}
+.kitchen-list > .card-head h2 {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.kitchen-list > .card-head h2 svg {
+  color: var(--shop);
 }
 .kitchen-section {
   /* Jumping to a section leaves it under the sticky overview, not behind it. */
@@ -4289,6 +4328,21 @@ a.contributor-link > span:first-child {
 }
 .kitchen-page .card > .card-head {
   top: 88px;
+}
+.kitchen-page .card-head h2 {
+  flex: 1;
+}
+/* The "+" in a card heading (owner's ask, 2026-10-23): add straight into that card. */
+.card-head > .card-add {
+  align-self: center;
+  margin: -8px -10px -8px 0;
+  color: var(--text-muted);
+}
+.card-head > .card-add.on {
+  color: var(--text);
+}
+.card-add-box {
+  margin: 4px 0 8px;
 }
 
 /* ── Home (design 2026-10-22, "everything on one screen") ─────── */
