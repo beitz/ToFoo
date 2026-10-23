@@ -614,7 +614,7 @@ textarea:focus-visible,
 }
 .small-input {
   min-height: 36px;
-  font-size: 0.9rem;
+  /* Not smaller: Safari on iPhone zooms the page into inputs under 16px. */
 }
 .helper-row {
   margin: 6px 0;
@@ -6815,6 +6815,24 @@ a.contributor-link > span:first-child {
 .catchup-line > svg:first-child {
   color: var(--warn);
   flex: none;
+}
+/* iPhone browser tab: add to Home Screen first. Same line as catch up, as a button that opens the steps. */
+.install-hint-line {
+  width: 100%;
+  font: inherit;
+  font-size: 0.9rem;
+  text-align: start;
+  cursor: pointer;
+}
+.install-steps {
+  margin: -4px 0 8px;
+}
+.install-steps p {
+  margin: 0 0 6px;
+}
+.install-steps ol {
+  margin: 0 0 6px;
+  padding-inline-start: 20px;
 }
 .catchup-text {
   flex: 1 1 auto;

@@ -16,6 +16,7 @@ import { WaterCard } from '../water/WaterCard';
 import { withStores } from '../../logic/stores';
 import { DayStrip } from './DayStrip';
 import { CatchUpLine } from '../catchup/CatchUpLine';
+import { InstallHint } from './InstallHint';
 import { FastCard, FastChip } from './FastCard';
 import { NextToCook } from './NextToCook';
 import { RecentDays } from './RecentDays';
@@ -66,6 +67,7 @@ export function HomePage() {
         <FastChip />
         <SettingsButton />
       </header>
+      <InstallHint />
       <DayStrip days={windowDays} />
       <CatchUpLine />
       <FastCard />

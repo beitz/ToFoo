@@ -46,6 +46,9 @@ export default defineConfig({
         // The bundled BLS data (~3 MB) must be available offline.
         globPatterns: ['**/*.{js,css,html,svg,png,json,woff2}'],
         maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
+        // The barcode reader for browsers without a built-in one (iPhone): not precached, since Chrome on
+        // Android never needs it, but kept once fetched so scanning then works offline too.
+        runtimeCaching: [{ urlPattern: /\.wasm$/, handler: 'CacheFirst', options: { cacheName: 'wasm' } }],
       },
     }),
   ],
