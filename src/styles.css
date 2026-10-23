@@ -5652,7 +5652,8 @@ a.contributor-link > span:first-child {
 .why-body p {
   margin: 4px 0 0;
 }
-.why-last {
+/* .why-chain in the selector: otherwise `.plain-list > li + li` paints the top edge grey. */
+.why-chain > .why-last {
   border-color: var(--tank);
   background: color-mix(in srgb, var(--tank) 10%, var(--surface));
 }
