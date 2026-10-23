@@ -50,6 +50,7 @@ import { SleepPage } from '../features/sleep/SleepPage';
 import { CatchUpPage } from '../features/catchup/CatchUpPage';
 import { ActivityPage } from '../features/trackers/ActivityPage';
 import { WaterPage } from '../features/trackers/WaterPage';
+import { WeightPage } from '../features/weight/WeightPage';
 
 function Page({ route }: { route: string[] }) {
   const d = useData();
@@ -141,6 +142,8 @@ function Page({ route }: { route: string[] }) {
       return <ActivityPage />;
     case 'water':
       return <WaterPage />;
+    case 'weight':
+      return <WeightPage />;
     case 'catchup':
       return <CatchUpPage key={b} day={b ?? d.today} />;
     default:
@@ -179,6 +182,7 @@ const TAB_OF: Record<string, (typeof NAV)[number]['key'] | null> = {
   nights: 'insights',
   activity: 'insights',
   water: 'insights',
+  weight: 'insights',
   fasting: 'insights',
   catchup: 'insights',
   kitchen: 'kitchen',

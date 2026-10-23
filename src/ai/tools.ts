@@ -20,6 +20,8 @@ import { refKey } from '../lib/refs';
 import { MAX_SLEEP_MS } from '../logic/sleep';
 import { MAX_ACTIVITY_MINUTES } from '../logic/activity';
 import { MAX_WATER_ML } from '../logic/water';
+import { MAX_WEIGHT_KG, MIN_WEIGHT_KG } from '../logic/weight';
+import { dayKey } from '../lib/dates';
 import { MAX_POT_GRAMS, MAX_POT_PORTIONS } from '../logic/batch';
 import type { Preparation } from '../model/paramTypes';
 import type { RawValue } from '../model/types';
@@ -224,6 +226,22 @@ export const ketoneProposalInput = z.object({
   replaces: z.string().optional(),
 });
 
+export const weightProposalInput = z.object({
+  kg: z.number(),
+  /** Local "YYYY-MM-DD" of the weigh-in; empty for today. */
+  day: z.string().optional(),
+  /** Id of the open weight card this replaces (e.g. "G1"); empty for a new one. */
+  replaces: z.string().optional(),
+});
+
+/** A weigh-in the assistant proposes, for the user to check. */
+export interface WeightProposal {
+  kg: number;
+  /** Local day key; absent means today. */
+  day?: string;
+  replaces?: string;
+}
+
 /** A ketone measurement the assistant proposes, for the user to check. */
 export interface KetoneProposal {
   type: KetoneType;
@@ -406,6 +424,8 @@ export interface ToolContext {
   water?: boolean;
   /** The ketosis estimate is on: the assistant may propose ketone measurements. */
   ketones?: boolean;
+  /** Weight is on: the assistant may propose weigh-ins. */
+  weight?: boolean;
   /** The shopping list is on: the assistant may propose things to put on it. */
   shopping?: boolean;
   /** At home is on: the assistant may propose things bought or running low, and search_foods marks what is at home (by refKey). */
@@ -441,7 +461,7 @@ export interface IdeaTools {
 }
 
 /** Which online sources the assistant is offered (decides the prompt and tool variant). */
-export function sourcesOf(ctx: Pick<ToolContext, 'products' | 'journal' | 'sleep' | 'activity' | 'water' | 'ketones' | 'shopping' | 'pantry' | 'recipe' | 'recipes' | 'forgotten'>): {
+export function sourcesOf(ctx: Pick<ToolContext, 'products' | 'journal' | 'sleep' | 'activity' | 'water' | 'ketones' | 'weight' | 'shopping' | 'pantry' | 'recipe' | 'recipes' | 'forgotten'>): {
   off: boolean;
   usda: boolean;
   webSearch: boolean;
@@ -450,6 +470,7 @@ export function sourcesOf(ctx: Pick<ToolContext, 'products' | 'journal' | 'sleep
   activity: boolean;
   water: boolean;
   ketones: boolean;
+  weight: boolean;
   shopping: boolean;
   pantry: boolean;
   recipe: boolean;
@@ -459,7 +480,7 @@ export function sourcesOf(ctx: Pick<ToolContext, 'products' | 'journal' | 'sleep
 } {
   const { products } = ctx;
   const online = { off: !!products?.find, usda: !!products?.searchUsda, webSearch: !!products?.find && !!products.webSearch };
-  if (ctx.recipe) return { ...online, journal: false, sleep: false, activity: false, water: false, ketones: false, shopping: false, pantry: false, recipe: true, recipes: false, ideas: false, forgotten: false };
+  if (ctx.recipe) return { ...online, journal: false, sleep: false, activity: false, water: false, ketones: false, weight: false, shopping: false, pantry: false, recipe: true, recipes: false, ideas: false, forgotten: false };
   return {
     ...online,
     journal: !!ctx.journal,
@@ -467,6 +488,7 @@ export function sourcesOf(ctx: Pick<ToolContext, 'products' | 'journal' | 'sleep
     activity: !!ctx.activity,
     water: !!ctx.water,
     ketones: !!ctx.ketones,
+    weight: !!ctx.weight,
     shopping: !!ctx.shopping,
     pantry: !!ctx.pantry,
     recipe: false,
@@ -730,6 +752,25 @@ export function validateKetoneProposal(input: unknown, now?: number): { ok: true
   if (problems.length) return { ok: false, error: `${problems.join('\n')}\nFix these and call propose_ketone again.` };
   const replaces = parsed.data.replaces?.trim();
   return { ok: true, proposal: { type, value, ...(time !== undefined ? { time } : {}), ...(replaces ? { replaces } : {}) } };
+}
+
+/** Check a `propose_weight` call: a plausible weight in kg, on a day not in the future. */
+export function validateWeightProposal(input: unknown, now?: number): { ok: true; proposal: WeightProposal } | { ok: false; error: string } {
+  const parsed = weightProposalInput.safeParse(input);
+  if (!parsed.success) return { ok: false, error: `Invalid input: ${parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}` };
+  const problems: string[] = [];
+  const { kg } = parsed.data;
+  if (!(kg >= MIN_WEIGHT_KG && kg <= MAX_WEIGHT_KG)) problems.push(`${kg} kg is not a plausible body weight (expected ${MIN_WEIGHT_KG}–${MAX_WEIGHT_KG} kg); convert pounds or stone to kg.`);
+  const day = parsed.data.day?.trim() ?? '';
+  if (day && !/^\d{4}-\d{2}-\d{2}$/.test(day)) problems.push(`day "${day}" must be local "YYYY-MM-DD", or empty for today.`);
+  else if (day && now !== undefined) {
+    const today = dayKey(new Date(now));
+    if (day > today) problems.push(`day ${day} is in the future (today is ${today}).`);
+    else if (now - new Date(`${day}T12:00`).getTime() > MAX_PAST_MS) problems.push(`day ${day} is more than a year ago.`);
+  }
+  if (problems.length) return { ok: false, error: `${problems.join('\n')}\nFix these and call propose_weight again.` };
+  const replaces = parsed.data.replaces?.trim();
+  return { ok: true, proposal: { kg: Math.round(kg * 10) / 10, ...(day ? { day } : {}), ...(replaces ? { replaces } : {}) } };
 }
 
 /** Check a `propose_shopping` call: something to buy, and recipes that are in the book. */

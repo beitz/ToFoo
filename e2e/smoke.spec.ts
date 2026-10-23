@@ -20,6 +20,7 @@ const ROUTES = [
   'nutrient/PROT625/foods',
   'food/C133000',
   'fasting',
+  'weight',
   'settings',
   'settings/profile',
   'settings/backup',

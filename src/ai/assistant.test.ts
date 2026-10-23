@@ -3,7 +3,7 @@ import type * as Beta from '@anthropic-ai/sdk/resources/beta/messages/messages';
 import type { Food } from '../foods/foodDb';
 import { buildIndex } from '../foods/search';
 import { appNote, emptyConversation, requestParams, retirePhotos, sendMessage, textOf, type CreateMessage } from './assistant';
-import { describeFood, validateBatchProposal, validatePortionProposal, MAX_INGREDIENT_GRAMS, MAX_ITEM_GRAMS, runCheckRecipe, runListRecipes, validateRecipeProposal, validateIngredientsProposal, runLookupBarcode, runSearchFoods, runSearchProducts, runSearchUsda, validateJournalProposal, validateProposal, validateSleepProposal, validateActivityProposal, validateWaterProposal, validateKetoneProposal, validateShoppingProposal, validateHomeProposal, type ProductTools, type ToolContext } from './tools';
+import { describeFood, validateBatchProposal, validatePortionProposal, MAX_INGREDIENT_GRAMS, MAX_ITEM_GRAMS, runCheckRecipe, runListRecipes, validateRecipeProposal, validateIngredientsProposal, runLookupBarcode, runSearchFoods, runSearchProducts, runSearchUsda, validateJournalProposal, validateProposal, validateSleepProposal, validateActivityProposal, validateWaterProposal, validateKetoneProposal, validateWeightProposal, validateShoppingProposal, validateHomeProposal, type ProductTools, type ToolContext } from './tools';
 import type { Product } from '../storage/types';
 import type { FindResult } from '../foods/findProduct';
 
@@ -682,6 +682,37 @@ describe('ketones', () => {
     expect(validateKetoneProposal({ type: 'blood', value: 20, time: '', replaces: '' }, now)).toMatchObject({ ok: false });
     expect(validateKetoneProposal({ type: 'urine', value: 4, time: '2026-10-22 09:00', replaces: '' }, now)).toMatchObject({ ok: false });
     expect(validateKetoneProposal({ type: 'breath', value: 30, time: '', replaces: 'K1' }, now)).toEqual({ ok: true, proposal: { type: 'breath', value: 30, replaces: 'K1' } });
+  });
+});
+
+describe('weight', () => {
+  const now = new Date(2026, 9, 23, 9, 0).getTime();
+
+  it('offers propose_weight only with Weight on, not strict, never in the recipe editor', () => {
+    const tool = (sources: Parameters<typeof requestParams>[2]) => (requestParams('claude-opus-5-5', [], sources).tools ?? []).find((t) => 'name' in t && t.name === 'propose_weight') as { strict?: boolean } | undefined;
+    expect(tool({})).toBeUndefined();
+    expect(tool({ weight: true, recipe: true })).toBeUndefined();
+    expect(tool({ weight: true })!.strict).toBeUndefined();
+    expect(String(requestParams('claude-opus-5-5', [], { weight: true }).system)).toContain('do not comment on the weight itself');
+  });
+
+  it('shows weight cards next to the others', async () => {
+    const api = scripted(reply([toolUse('g', 'propose_weight', { kg: 82.44, day: '2026-10-22', replaces: '' }), toolUse('h', 'propose_weight', { kg: 82, day: '', replaces: '' })], 'tool_use'));
+    const { conversation, outcome } = await sendMessage(api.create, 'claude-opus-5-5', emptyConversation(), { text: '82.4 yesterday, 82 today', images: [] }, { ...ctx, now, weight: true });
+    expect(outcome.kind === 'proposal' && outcome.weights).toEqual([
+      { id: 'G1', kg: 82.4, day: '2026-10-22' },
+      { id: 'G2', kg: 82 },
+    ]);
+    expect(conversation.weights).toBe(2);
+  });
+
+  it('checks a weigh-in: kg in a plausible range, a day not in the future', () => {
+    expect(validateWeightProposal({ kg: 180, day: '', replaces: '' }, now)).toMatchObject({ ok: true });
+    // 180 lb sent as kg would pass, but 900 is surely pounds or grams.
+    expect(validateWeightProposal({ kg: 900, day: '', replaces: '' }, now)).toMatchObject({ ok: false });
+    expect(validateWeightProposal({ kg: 80, day: '2026-10-24', replaces: '' }, now)).toMatchObject({ ok: false });
+    expect(validateWeightProposal({ kg: 80, day: '23.10.2026', replaces: '' }, now)).toMatchObject({ ok: false });
+    expect(validateWeightProposal({ kg: 80, day: '2026-10-23', replaces: 'G1' }, now)).toEqual({ ok: true, proposal: { kg: 80, day: '2026-10-23', replaces: 'G1' } });
   });
 });
 

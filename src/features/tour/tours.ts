@@ -8,7 +8,7 @@ import type { FeatureKey, Settings } from '../../storage/types';
  * marker isn't on screen (feature off, card hidden) is skipped. Lines say what a part is, never how
  * it looks (owner's ask), so a restyle doesn't make them wrong.
  */
-export type TourId = 'home' | 'insights' | 'kitchen' | 'fan' | 'settings' | 'assistant' | 'nutrient';
+export type TourId = 'home' | 'insights' | 'kitchen' | 'fan' | 'settings' | 'assistant' | 'nutrient' | 'weight';
 
 export interface TourStep {
   /** The `data-tour` marker to outline; none = a bubble in the middle of the screen. */
@@ -97,6 +97,13 @@ export const TOURS: Record<TourId, Tour> = {
       { target: 'nutrient.why', text: 'tour.nutrient.why' },
     ],
   },
+  weight: {
+    requires: 'weight',
+    steps: [
+      { target: 'weight.trend', text: 'tour.weight.trend' },
+      { target: 'weight.check', text: 'tour.weight.check' },
+    ],
+  },
 };
 
 export const TOUR_IDS = Object.keys(TOURS) as TourId[];
@@ -114,6 +121,7 @@ export function tourForRoute(route: readonly string[]): TourId | undefined {
   if (a === 'assistant' && b !== 'chat') return 'assistant';
   // The nutrient page itself, not its food list, Why page or a split over a recipe or meal.
   if (a === 'nutrient' && b && !c) return 'nutrient';
+  if (a === 'weight') return 'weight';
   return undefined;
 }
 

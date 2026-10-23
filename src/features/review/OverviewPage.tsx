@@ -26,6 +26,8 @@ import { useSleepNeed } from '../settings/SleepNeed';
 import { hmText } from '../sleep/format';
 import { useSleep } from '../sleep/useSleep';
 import { waterText } from '../water/format';
+import { fmtKg } from '../weight/format';
+import { useWeight } from '../weight/useWeight';
 import { InsightsTabs } from './InsightsTabs';
 import { LevelsSummary } from './LevelsSummary';
 
@@ -89,7 +91,7 @@ export function OverviewPage() {
   const wat = waterSummary(new Map([...plain.keys()].map((day) => [day, dayWater(day, d.modelEntries, water).totalMl])), target);
   const notes = journal.filter((j) => j.day >= days[0]!);
   const latest = notes[notes.length - 1];
-  const off = (['sleep', 'activity', 'water', 'journal'] as const).filter((k) => !isOn(f, k));
+  const off = (['sleep', 'activity', 'water', 'weight', 'journal'] as const).filter((k) => !isOn(f, k));
   const offNames = [...(isOn(f, 'fasting') ? [] : [t('overview.fasting')]), ...off.map((k) => t(OFF_NAME[k]))];
 
   return (
@@ -125,7 +127,7 @@ export function OverviewPage() {
         )}
       </div>
 
-      {off.length < 4 && (
+      {off.length < 5 && (
         <div className="card ov-card" data-tour="insights.trackers">
           {isOn(f, 'sleep') && (
             <Row to={href('nights')} icon="bed" title={t('nights.title')} strip={strip('sleep')}>
@@ -148,6 +150,7 @@ export function OverviewPage() {
               {wat.averageMl === undefined ? t('overview.nothingDays') : t('overview.water', { avg: waterText(wat.averageMl), n: wat.daysAtTarget, target: waterText(target) })}
             </Row>
           )}
+          {isOn(f, 'weight') && <WeightRow />}
           {isOn(f, 'journal') && (
             <Row to={href('journal')} icon="journal" title={t('journal.title')} strip={strip('journal')}>
               {!latest
@@ -174,12 +177,32 @@ export function OverviewPage() {
   );
 }
 
-const OFF_NAME: Record<'sleep' | 'activity' | 'water' | 'journal', MessageKey> = {
+const OFF_NAME: Record<'sleep' | 'activity' | 'water' | 'weight' | 'journal', MessageKey> = {
   sleep: 'nights.title',
   activity: 'activity.short',
   water: 'water.title',
+  weight: 'weight.title',
   journal: 'journal.title',
 };
+
+/** Weight: the trend now, and what the log check says once it can say something. */
+function WeightRow() {
+  const { points, check } = useWeight();
+  const last = points[points.length - 1];
+  const verdict =
+    check.state === 'fits'
+      ? t('weight.shortFits')
+      : check.state === 'low'
+        ? t('weight.shortLow', { pct: Math.max(5, Math.round((check.missingShare * 100) / 5) * 5) })
+        : check.state === 'high'
+          ? t('weight.shortHigh')
+          : undefined;
+  return (
+    <Row to={href('weight')} icon="scale" title={t('weight.title')}>
+      {last ? [t('weight.kg', { kg: fmtKg(last.trend) }), verdict].filter(Boolean).join(' · ') : t('weight.none')}
+    </Row>
+  );
+}
 
 function Row({ to, icon, title, strip, children }: { to: string; icon: string; title: string; strip?: ReactNode; children: ReactNode }) {
   return (

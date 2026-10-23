@@ -105,7 +105,8 @@ export type FeatureKey =
   | 'questionShortcuts'
   | 'ketoneReadings'
   | 'fasting'
-  | 'forgottenCheck';
+  | 'forgottenCheck'
+  | 'weight';
 
 export interface Settings extends Versioned {
   id: 'settings';
