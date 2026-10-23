@@ -104,8 +104,8 @@ export function SettingsPage() {
           value={views.macros}
           onChange={(v) => repo.updateSettings({ macroView: v })}
           options={[
-            { value: 'bars', label: t('settings.viewBars') },
             { value: 'rings', label: t('settings.viewRings') },
+            { value: 'bars', label: t('settings.viewBars') },
           ]}
         />
         <p className="muted small settings-label">{t('settings.nutrientView')}</p>
