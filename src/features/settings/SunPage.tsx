@@ -1,7 +1,11 @@
 import { useData } from '../../app/data';
 import { t } from '../../i18n';
 import { fmtNumber } from '../../lib/format';
-import { DEFAULT_LATITUDE } from '../../logic/resolve';
+import { addDays } from '../../lib/dates';
+import { activitySun } from '../../logic/activity';
+import { DEFAULT_LATITUDE, sunByDay } from '../../logic/resolve';
+import { windowDays } from '../../logic/trackers';
+import { isOn } from '../../settings/features';
 import { sunVitaminD } from '../../model/sun';
 import { sun as sunParams, sunGuidance } from '../../../model/parameters';
 import { repo } from '../../storage/repo';
@@ -46,6 +50,13 @@ export function SunPage() {
   const june = weekAverage(6, 2);
   const dec = weekAverage(12, 1);
   const today = d.model.nutrients.get('VITD');
+  // What the model counted over the last 7 finished days: the routine on its weekdays plus logged time outside.
+  const lastWeek = (() => {
+    const days = windowDays(addDays(d.today, -1), 7);
+    const extra = [...d.sunEntries, ...(isOn(d.settings.features, 'activity') ? activitySun(d.activities) : [])];
+    const byDay = sunByDay(days, p, extra);
+    return days.reduce((a, day) => a + (byDay[day]?.central ?? 0), 0) / days.length;
+  })();
 
   return (
     <SubPage title={t('settings.sun')}>
@@ -88,6 +99,7 @@ export function SunPage() {
 
       <h2 className="section-title">{t('sun.estimate')}</h2>
       <div className="card small">
+        {isOn(d.settings.features, 'sunVitaminD') && <p>{t('sun.lastWeek', { ug: fmtNumber(lastWeek, 1) })}</p>}
         <p>{t('sun.estimateJune', { ug: fmtNumber(june.central, 1), low: fmtNumber(june.low, 1), high: fmtNumber(june.high, 1) })}</p>
         <p>{t('sun.estimateDec', { ug: fmtNumber(dec.central, 1) })}</p>
         <p className="muted">{t('sun.midday')}</p>

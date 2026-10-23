@@ -1117,6 +1117,7 @@ function KetoneProposalCard({ card, day, toast, onLogged, register }: CardProps<
 /** An activity the assistant proposes: a summary to check, the full form behind Change, then save. */
 function ActivityCard({ card, toast, onLogged, register }: CardProps<Extract<Card, { kind: 'activity' }>>) {
   const { activity } = card;
+  const d = useData();
   const [draft, setDraft] = useState<ActivityDraft>(() => ({
     kind: activity.kind,
     name: activity.name ?? '',
@@ -1184,7 +1185,7 @@ function ActivityCard({ card, toast, onLogged, register }: CardProps<Extract<Car
       ) : (
         <p className="muted">
           {formatDay(dayKey(new Date(draft.time)))}, {summary}
-          {draft.outside && draft.sun && ` · ${t('ai.activitySun')}`}
+          {draft.outside && draft.sun && isOn(d.settings.features, 'sunVitaminD') && ` · ${t('ai.activitySun')}`}
         </p>
       )}
       <div className="sheet-actions">
