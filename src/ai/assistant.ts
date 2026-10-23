@@ -11,6 +11,7 @@ import { fmtLocalDateTime } from './photoTime';
 import {
   runLookupBarcode,
   runSearchFoods,
+  runSearchProducts,
   runSearchUsda,
   sourcesOf,
   validateJournalProposal,
@@ -293,6 +294,9 @@ export async function sendMessage(
         results.push({ type: 'tool_result', tool_use_id: use.id, content: r.text, is_error: !r.ok });
       } else if (use.name === 'lookup_barcode' && sources.off) {
         const r = await runLookupBarcode(use.input, ctx);
+        results.push({ type: 'tool_result', tool_use_id: use.id, content: r.text, is_error: !r.ok });
+      } else if (use.name === 'search_products' && sources.off) {
+        const r = await runSearchProducts(use.input, ctx);
         results.push({ type: 'tool_result', tool_use_id: use.id, content: r.text, is_error: !r.ok });
       } else if (use.name === 'search_usda' && sources.usda) {
         const r = await runSearchUsda(use.input, ctx);

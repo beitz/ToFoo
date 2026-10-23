@@ -34,6 +34,7 @@ import { UsageLine } from './UsageLine';
 import { VoiceFailed } from './VoiceFailed';
 import type { ProposedItem, ProductTools, RecipeTools } from '../../ai/tools';
 import { findProduct, findUsda } from '../../foods/findProduct';
+import { loadOffIndex, searchOffIndex } from '../../foods/offIndex';
 import { productLabel, productPageUrl, productRef } from '../../foods/products';
 import { KETONE_TYPES, type Batch, type FoodRef, type Ingredient, type KetoneType, type LogEntry, type Product } from '../../storage/types';
 import { barcodesInPhoto } from '../log/barcode';
@@ -370,7 +371,13 @@ function Chat({ apiKey, model, day, recipe, reopened }: { apiKey: string; model:
           ? {
               saved: d.productsById,
               seen: seenProducts,
-              ...(offOn ? { find: (code: string) => findProduct(code), webSearch: webSearchOn } : {}),
+              ...(offOn
+                ? {
+                    find: (code: string) => findProduct(code),
+                    searchProducts: async (q: string) => searchOffIndex(await loadOffIndex(import.meta.env.BASE_URL), q, { limit: 8 }),
+                    webSearch: webSearchOn,
+                  }
+                : {}),
               ...(usdaOn ? { searchUsda: (q: string, kind: 'generic' | 'branded') => findUsda(q, kind, 8) } : {}),
             }
           : undefined;

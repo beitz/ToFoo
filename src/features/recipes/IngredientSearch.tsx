@@ -9,6 +9,7 @@ import { FoodList } from '../log/FoodList';
 import type { PickedFood } from '../log/FoodPicker';
 import { ProductList } from '../log/ProductList';
 import { UsdaResults } from '../log/UsdaResults';
+import { OffResults, useOffSearch } from '../log/OffResults';
 
 /**
  * Find an ingredient: the same sources as the log screen (BLS, products saved on this phone, USDA
@@ -37,6 +38,8 @@ export function IngredientSearch({ onPick, onScan }: { onPick: (p: PickedFood) =
     return d.products.filter((p) => `${p.name} ${p.brand ?? ''} ${p.code}`.toLowerCase().includes(lower));
   }, [q, d.products, offOn, usdaOn]);
 
+  const offSearch = useOffSearch(q, offOn, results);
+
   function pick(p: PickedFood) {
     setQuery('');
     onPick(p);
@@ -56,8 +59,10 @@ export function IngredientSearch({ onPick, onScan }: { onPick: (p: PickedFood) =
         )}
       </div>
       {q && products.length > 0 && <ProductList pinnable products={products} onPick={(product) => pick({ product })} />}
+      {q && !offSearch.genericFirst && <OffResults key={q} search={offSearch} onPick={(product) => pick({ product })} />}
       {q && <FoodList foods={results} onPick={(food) => pick({ food })} />}
-      {q && results.length === 0 && products.length === 0 && <p className="muted">{t(offOn ? 'edit.noResultsScan' : 'edit.noResults')}</p>}
+      {q && offSearch.genericFirst && <OffResults key={q} search={offSearch} onPick={(product) => pick({ product })} />}
+      {q && results.length === 0 && products.length === 0 && offSearch.hits.length === 0 && offSearch.status !== 'loading' && <p className="muted">{t(offOn ? 'edit.noResultsScan' : 'edit.noResults')}</p>}
       {q && usdaOn && <UsdaResults key={q} query={q} onPick={(product) => pick({ product })} />}
     </div>
   );

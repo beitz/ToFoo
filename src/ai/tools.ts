@@ -9,6 +9,7 @@
 import { z } from 'zod';
 import type { Food, FoodDb } from '../foods/foodDb';
 import type { FindResult, UsdaFindResult } from '../foods/findProduct';
+import type { OffListing } from '../foods/offIndex';
 import { normalizeBarcode } from '../foods/openFoodFacts';
 import { hasOwnMicros, isProductCode, productFood, productId, productLabel, productRef } from '../foods/products';
 import { normalize, search, type SearchIndex } from '../foods/search';
@@ -56,6 +57,7 @@ const MAX_PAST_MS = 400 * 86_400_000;
 export const searchInput = z.object({ queries: z.array(z.string()).min(1) });
 export const lookupInput = z.object({ barcodes: z.array(z.string()).min(1) });
 export const usdaInput = z.object({ queries: z.array(z.string()).min(1), branded: z.boolean() });
+export const productsInput = z.object({ queries: z.array(z.string()).min(1) });
 
 export const proposalInput = z.object({
   summary: z.string(),
@@ -338,6 +340,8 @@ export interface ProductTools {
   saved: ReadonlyMap<string, Product>;
   /** Look up a barcode: this phone first, then Open Food Facts. Absent when the lookup is off. */
   find?: (barcode: string) => Promise<FindResult>;
+  /** Search the bundled list of Open Food Facts products by name (on the phone, no request). Absent when the lookup is off. */
+  searchProducts?: (query: string) => Promise<OffListing[]>;
   /** Search USDA FoodData Central by name. Absent when USDA is off. */
   searchUsda?: (query: string, kind: 'generic' | 'branded') => Promise<UsdaFindResult>;
   /**
@@ -511,6 +515,29 @@ export async function runLookupBarcode(input: unknown, ctx: ToolContext): Promis
     else lines.push(`${code}: could not be looked up. Error: ${r.detail} Tell the user this error word for word (it helps them trace the problem), then use the closest generic BLS food instead.`);
   }
   return { ok: true, text: lines.join('\n') };
+}
+
+/** Products listed per query: enough to hold the sizes and variants of one product line. */
+const MAX_PRODUCT_HITS = 8;
+
+/** Run `search_products`: barcodes from the bundled Open Food Facts list, for lookup_barcode. */
+export async function runSearchProducts(input: unknown, ctx: ToolContext): Promise<{ ok: boolean; text: string }> {
+  const searchProducts = ctx.products?.searchProducts;
+  if (!searchProducts) return { ok: false, text: 'The Open Food Facts lookup is off.' };
+  const parsed = productsInput.safeParse(input);
+  if (!parsed.success) return { ok: false, text: 'Invalid input: expected {"queries": ["…"]}.' };
+  let rows: OffListing[][];
+  try {
+    rows = await Promise.all(parsed.data.queries.slice(0, MAX_QUERIES).map((q) => searchProducts(q)));
+  } catch (e) {
+    return { ok: false, text: `The product list could not be loaded (${e instanceof Error ? e.message : String(e)}). Use web_search if offered, else the closest generic BLS food.` };
+  }
+  const blocks = parsed.data.queries.slice(0, MAX_QUERIES).map((q, i) => {
+    const hits = rows[i]!.slice(0, MAX_PRODUCT_HITS);
+    const lines = hits.map((r) => `${r.code} | ${r.name}${r.brand ? ` (${r.brand})` : ''}${r.quantity ? ` | ${r.quantity}` : ''}`);
+    return `Products for "${q}" (barcode | name (brand) | pack size):\n${lines.length ? lines.join('\n') : 'No matches. Try the brand alone, or fewer words.'}`;
+  });
+  return { ok: true, text: blocks.join('\n\n') };
 }
 
 const USDA_ERRORS: Record<Extract<UsdaFindResult, { kind: 'error' }>['reason'], string> = {

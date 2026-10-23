@@ -11,12 +11,12 @@ const GENERIC_NOTE = `say so in assumptions (e.g. "generic hazelnut praline, not
 
 const BRANDED_BLS_ONLY = `- Branded or unknown products: choose the closest generic BLS food (a filled hazelnut praline for a Giotto, for example) and ${GENERIC_NOTE}. Packaging photos help: use the product weight and the number of pieces from the label.`;
 
-const BRANDED_WITH_PRODUCTS = (propose: string) => `- Packaged products can be looked up by barcode in Open Food Facts with lookup_barcode, which returns the label values. Barcodes the app read from the user's photos are given to you in the message; you may also read the digits printed under a barcode in a photo, or the user may type them. Products the user logged before are also listed by search_foods, with codes like OFF:4008400121925. Use the product's OFF: code in ${propose} and set micros_from to the BLS code of the most similar generic food (from search_foods; a filled hazelnut praline for a Giotto, for example), which supplies the vitamins and minerals the label lacks. If the user already chose a similar food for the product (or label values only), micros_from can be empty and is ignored; if the app picked one by itself, keep it with an empty micros_from or give a closer food. Do not guess barcodes. When there is no barcode or the product is not found, choose the closest generic BLS food instead and ${GENERIC_NOTE}. Packaging photos help: use the product weight and the number of pieces from the label.`;
+const BRANDED_WITH_PRODUCTS = (propose: string) => `- Packaged products can be looked up by barcode in Open Food Facts with lookup_barcode, which returns the label values. Barcodes the app read from the user's photos are given to you in the message; you may also read the digits printed under a barcode in a photo, or the user may type them. Products the user logged before are also listed by search_foods, with codes like OFF:4008400121925. Use the product's OFF: code in ${propose} and set micros_from to the BLS code of the most similar generic food (from search_foods; a filled hazelnut praline for a Giotto, for example), which supplies the vitamins and minerals the label lacks. If the user already chose a similar food for the product (or label values only), micros_from can be empty and is ignored; if the app picked one by itself, keep it with an empty micros_from or give a closer food. Without a barcode, find the product by name with search_products (brand and product name as on the package, e.g. "Leibniz Pick Up"): it searches the Open Food Facts products sold in Germany on the phone, at no cost. Pick the row whose name, brand and pack size match, call lookup_barcode with its barcode, and check the product returned; if several sizes or variants fit, take the closest and say which in assumptions. A barcode from search_products is not a guess. Do not guess barcodes. When there is no barcode or the product is not found, choose the closest generic BLS food instead and ${GENERIC_NOTE}. Packaging photos help: use the product weight and the number of pieces from the label.`;
 
 // Open Food Facts' own name search refuses browser apps (docs/OPEN_QUESTIONS.md), so the model
 // finds the barcode through Anthropic's web search, limited to openfoodfacts.org, and then looks it
 // up like a scanned one: the values still come from Open Food Facts, never from a web page.
-const WEB_SEARCH = `- A package without a readable barcode (only the front, brand and name visible): before falling back to a generic food, find the product with web_search, which searches openfoodfacts.org only. Search with the brand, product name and pack size from the photo, e.g. "Ferrero Giotto 38,7 g". A product's barcode is the long number in its result address (world.openfoodfacts.org/product/4008400121925/giotto-ferrero, or /produkt/ on de.openfoodfacts.org); a barcode taken from a result is not a guess. Pick the result whose name, brand and size match the package, call lookup_barcode with its barcode, and check that the product returned is the one in the photo; if two sizes or variants fit, take the one that matches the photo best and say which in assumptions. One or two searches are enough. Never take nutrient values from search results. If nothing matches, use the generic food. Do not ask the user for a barcode photo just to find the product.`;
+const WEB_SEARCH = `- A package without a readable barcode (only the front, brand and name visible) that search_products did not find: before falling back to a generic food, find the product with web_search, which searches openfoodfacts.org only. Search with the brand, product name and pack size from the photo, e.g. "Ferrero Giotto 38,7 g". A product's barcode is the long number in its result address (world.openfoodfacts.org/product/4008400121925/giotto-ferrero, or /produkt/ on de.openfoodfacts.org); a barcode taken from a result is not a guess. Pick the result whose name, brand and size match the package, call lookup_barcode with its barcode, and check that the product returned is the one in the photo; if two sizes or variants fit, take the one that matches the photo best and say which in assumptions. One or two searches are enough. Never take nutrient values from search results. If nothing matches, use the generic food. Do not ask the user for a barcode photo just to find the product.`;
 
 const USDA = (propose: string) => `- When no BLS food fits a single food or ingredient well (foods common outside Germany, a specific variety), search USDA FoodData Central with search_usda, in English. Its generic foods (branded: false; codes like USDA:168462) have their own full nutrient data: use the USDA: code in ${propose} and set micros_from to the BLS code of the most similar food if one is close (it fills the few gaps, such as iodine), else leave it empty. For a US packaged product, search with branded: true; micros_from is then required, as for a label. Prefer a fitting BLS food over USDA, and split mixed dishes into BLS ingredients rather than taking a USDA dish, unless the USDA dish matches closely. USDA foods the user logged before are also listed by search_foods. Each USDA search is an online request, so search only when the BLS has nothing good.`;
 
@@ -210,6 +210,20 @@ const SEARCH_USDA: BetaTool = {
   },
 };
 
+const SEARCH_PRODUCTS: BetaTool = {
+  name: 'search_products',
+  description:
+    'Find packaged products sold in Germany by name or brand in the Open Food Facts list on the phone (no label values). Returns per query up to 8 rows: "barcode | name (brand) | pack size", most-scanned first. Then call lookup_barcode with the barcode of the matching row.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      queries: { type: 'array', items: { type: 'string' }, description: 'Up to 6 searches, brand and product name, e.g. ["Leibniz Pick Up", "Giotto"].' },
+    },
+    required: ['queries'],
+    additionalProperties: false,
+  },
+};
+
 const LOOKUP_BARCODE: BetaTool = {
   name: 'lookup_barcode',
   description:
@@ -269,7 +283,7 @@ function tools({ off = false, usda = false, webSearch = false, journal = false, 
     required: ['replaces', 'code', 'grams', 'preparation', ...(withProducts ? ['micros_from'] : [])],
     additionalProperties: false,
   };
-  const lookups = [SEARCH_FOODS, ...(off ? [LOOKUP_BARCODE] : []), ...(off && webSearch ? [WEB_SEARCH_TOOL] : []), ...(usda ? [SEARCH_USDA] : [])];
+  const lookups = [SEARCH_FOODS, ...(off ? [SEARCH_PRODUCTS, LOOKUP_BARCODE] : []), ...(off && webSearch ? [WEB_SEARCH_TOOL] : []), ...(usda ? [SEARCH_USDA] : [])];
   if (recipe) {
     return [
       ...lookups,

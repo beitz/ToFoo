@@ -12,7 +12,7 @@ const SCAN_INTERVAL_MS = 250;
 
 type Status = { kind: 'idle' } | { kind: 'looking'; code: string } | { kind: 'notFound'; code: string } | { kind: 'error'; message: MessageKey; detail?: string };
 
-const LOOKUP_ERRORS: Record<'offline' | 'busy' | 'denied' | 'other', MessageKey> = {
+export const LOOKUP_ERRORS: Record<'offline' | 'busy' | 'denied' | 'other', MessageKey> = {
   offline: 'off.error.offline',
   busy: 'off.error.busy',
   denied: 'off.error.denied',
