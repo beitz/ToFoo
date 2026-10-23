@@ -5,6 +5,8 @@ import type { ActivityLevel, Sex } from '../../model/paramTypes';
 import { repo } from '../../storage/repo';
 import { Field, NumberInput, Segmented } from '../../ui/controls';
 import { AccentPicker } from '../settings/AccentPicker';
+import { isAppleBrowserTab } from '../../lib/platform';
+import { Icon } from '../../ui/Icon';
 
 /**
  * First launch (docs/SPEC.md "First launch and guided tours"): a small sheet over Home, so the app
@@ -26,6 +28,11 @@ function LookStep({ onDone }: { onDone: () => void }) {
     <>
       <h2 id="first-launch-title">{t('onboarding.title')}</h2>
       <p className="muted small">{t('onboarding.welcome')}</p>
+      {isAppleBrowserTab() && (
+        <p className="notice small">
+          <Icon name="warning" size={16} /> {t('install.ios.onboarding')}
+        </p>
+      )}
       <p className="muted small settings-label" id="accent-label">
         {t('settings.accent')}
       </p>

@@ -3,7 +3,7 @@ import { QUIET_RMS, rms, shouldCut } from '../../ai/segments';
 
 export type RecorderState = { kind: 'idle' } | { kind: 'recording'; startedAt: number } | { kind: 'denied' } | { kind: 'unsupported' };
 
-/** Compressed speech formats Chrome can record, smallest first; the API accepts all of them. */
+/** Compressed speech formats, smallest first (Chrome records WebM; older Safari on iPhone only audio/mp4); the API accepts all of them. */
 const MIME_TYPES = ['audio/webm;codecs=opus', 'audio/ogg;codecs=opus', 'audio/mp4'];
 
 /** The kept whole recording: Opus speech is clear at this rate, at most about 240 kB a minute (Chrome's default is ~4× that). */
@@ -82,6 +82,8 @@ export function useRecorder(onPart: (audio: Blob) => void, onWhole?: (audio: Blo
     let ctx: AudioContext | undefined;
     try {
       ctx = new AudioContext();
+      // Safari starts a context made outside a tap suspended, and a suspended analyser reads silence.
+      if (ctx.state === 'suspended') void ctx.resume().catch(() => undefined);
       const analyser = ctx.createAnalyser();
       analyser.fftSize = 2048;
       ctx.createMediaStreamSource(s).connect(analyser);
