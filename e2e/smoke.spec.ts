@@ -43,3 +43,17 @@ test('every main screen opens without an error', async ({ page }) => {
     });
   }
 });
+
+test('the round button fans out, and a second tap opens Log meal and stays there', async ({ page }) => {
+  const errors = watchErrors(page);
+  await firstLaunch(page);
+  const round = page.locator('[data-tour="round-button"]');
+  await round.click();
+  await expect(round).toHaveAttribute('aria-expanded', 'true');
+  await round.click();
+  await expect(page.getByPlaceholder('Search foods')).toBeVisible();
+  // The fan's history entry must not take the user back to Home once Log meal is open.
+  await page.waitForTimeout(300);
+  expect(new URL(page.url()).hash).toBe('#/log');
+  expect(errors).toEqual([]);
+});
