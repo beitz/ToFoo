@@ -61,15 +61,52 @@ const PIECE_WORDS = [
   'pezzi',
   'piezas?',
   'unidades?',
+  // Found in the names and pack sizes of Open Food Facts products sold in Germany (2026-10-23).
+  'stck',
+  'kpl',
+  'sztuk',
+  'ct',
+  'count',
+  'packs?',
+  'pk',
+  'er',
+  'kapseln',
+  'capsules?',
+  'caps',
+  'pads',
+  'comprimés',
+  'barres?',
+  'tranches?',
+  'unités?',
+  'pastillas?',
+  'sobres?',
+  'minis',
+  'wraps?',
+  'croissants?',
+  'tortillas?',
+  'galettes?',
+  'gummies',
+  'sheets?',
+  'bags?',
+  'dumplings?',
+  'brownies?',
+  'muffins?',
+  'nuggets?',
+  // German compounds: "Fischstäbchen", "Teebeutel", "Müsliriegel", "Lutschtabletten".
+  `[${'a-zäöüß'}]*(?:tabletten|beutel|riegel|kekse|eier|scheiben|stäbchen|brötchen|waffeln|pralinen|würstchen|knödel|bällchen|klopse|kugeln|sticks|kapseln|bonbons|dragees)`,
 ].join('|');
 
 /** A letter that may not follow or precede a piece word (so "st" does not match in "strong"). */
 const L = 'a-zà-ÿß';
 const NUM = '(\\d+(?:[.,]\\d+)?)';
-const COUNT = new RegExp(`(?<![${L}\\d.,])${NUM}\\s*(?:x\\s*)?(?:${PIECE_WORDS})\\.?(?![${L}])`, 'i');
+// "60 pieces", "50pcs", "8-Pack", "15er", "x 12 Stück".
+const COUNT_PART = `(?<![${L}\\d.,])${NUM}\\s*-?\\s*(?:x\\s*)?(?:${PIECE_WORDS})\\.?(?![${L}])`;
+const COUNT = new RegExp(COUNT_PART, 'i');
 const WEIGHT = new RegExp(`(?<![${L}\\d.,])${NUM}\\s*(kg|g|gr|grams?|gramm|ml|cl|l)\\.?(?![${L}])`, 'i');
 /** A multipack: "10 x 1.5 g", "6*14g", "4 × 125 g". */
 const MULTI = new RegExp(`(?<![${L}\\d.,])(\\d+)\\s*[x×*]\\s*${NUM}\\s*(kg|g|gr|grams?|gramm|ml|cl|l)\\.?(?![${L}])`, 'i');
+/** Pieces with the weight of each: "10 Sticks a 2 g", "8 Riegel x 25 g", "2 Stück à 9,125 g", "10 barres de 18.5 g". */
+const EACH = new RegExp(`${COUNT_PART}\\s*(?:a|à|á|x|×|je|zu|de|von|of)\\s*${NUM}\\s*(kg|g|gr|grams?|gramm|ml|cl|l)\\.?(?![${L}])`, 'i');
 
 const UNIT_FACTOR: Record<string, number> = { kg: 1000, g: 1, gr: 1, gram: 1, grams: 1, gramm: 1, ml: 1, cl: 10, l: 1000 };
 
@@ -86,7 +123,9 @@ function weightIn(text: string): number | undefined {
 /** How many pieces a text counts: "60 pieces" → 60, "10 Dragees" → 10; undefined if it counts none. */
 export function pieceCount(text: string | undefined): number | undefined {
   const m = text ? COUNT.exec(text) : null;
-  const n = m ? num(m[1]!) : NaN;
+  // "2x 12 slices" is 24 slices.
+  const times = m ? /(\d+)\s*[x×*]\s*$/i.exec(text!.slice(0, m.index)) : null;
+  const n = m ? num(m[1]!) * (times ? Number(times[1]) : 1) : NaN;
   return n > 0 ? n : undefined;
 }
 
@@ -119,6 +158,11 @@ export function labelPiece(p: LabelText): LabelPiece | undefined {
     if (n && g > 0 && g / n <= MAX_PIECE_GRAMS) return { grams: rounded(g / n), from: 'serving', text: serving };
   }
   const pack = p.quantity;
+  for (const [text, from] of [[pack, 'pack'], [p.name, 'name']] as const) {
+    const each = text ? EACH.exec(text) : null;
+    const g = each ? num(each[2]!) * (UNIT_FACTOR[each[3]!.toLowerCase()] ?? NaN) : NaN;
+    if (g > 0 && g <= MAX_PIECE_GRAMS) return { grams: rounded(g), from, text: text! };
+  }
   if (pack) {
     const multi = MULTI.exec(pack);
     if (multi) {
