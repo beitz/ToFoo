@@ -26,6 +26,7 @@ import { hmText } from '../sleep/format';
 import { useSleep } from '../sleep/useSleep';
 import { waterText } from '../water/format';
 import { InsightsTabs } from './InsightsTabs';
+import { LevelsSummary } from './LevelsSummary';
 
 const STRIP_DAYS = 7;
 const TALLY: GaugeStatus[] = ['low', 'gettingLow', 'fine', 'tooHigh'];
@@ -155,6 +156,8 @@ export function OverviewPage() {
           )}
         </div>
       )}
+
+      <LevelsSummary reviewHref={href('review', finished[0]!, finished[finished.length - 1]!)} />
 
       {isOn(f, 'aiAssistant') && isOn(f, 'insights') && (
         <div className="card ov-card">
