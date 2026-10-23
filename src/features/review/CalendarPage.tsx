@@ -5,7 +5,6 @@ import { href, navigate } from '../../app/router';
 import { t, type MessageKey } from '../../i18n';
 import { parseDay } from '../../lib/dates';
 import { addMonths, formatMonth, monthGrid, presetRange } from '../../lib/periods';
-import type { CatchUpKind } from '../../logic/catchUp';
 import { dayLayers, layerCounts, LAYERS, type DayLayers, type Layer } from '../../logic/calendarLayers';
 import type { DayStatus } from '../../model/types';
 import { repo } from '../../storage/repo';
@@ -15,27 +14,19 @@ import { isOn } from '../../settings/features';
 import { InsightsTabs } from './InsightsTabs';
 import { DAY_ICON } from './dayStatus';
 import { useSleep } from '../sleep/useSleep';
+import { useSkipped } from '../catchup/useCatchUp';
 import { useJournal } from '../journal/useJournal';
 import { hmShort } from '../sleep/format';
 import { fmtNumber } from '../../lib/format';
 
 type View = NonNullable<Settings['calendarLayer']>;
 
+/** Each tracker's own page, linked under the month when that tracker is shown. */
+const PAGE: Partial<Record<View, string>> = { sleep: 'nights', activity: 'activity', water: 'water', journal: 'journal' };
+
 /** The trackers switched on, in the calendar's fixed order (meals always). */
 function layersOn(features: Settings['features']): Layer[] {
   return LAYERS.filter((l) => l === 'meals' || isOn(features, l));
-}
-
-/** Kinds skipped on the fill-in page, by day, from the meta table ("nudge:<day>" is the meals skip). */
-function useSkipped(): Record<string, CatchUpKind[]> | undefined {
-  return useLiveQuery(async () => {
-    const out: Record<string, CatchUpKind[]> = {};
-    for (const m of await repo.db.meta.toArray()) {
-      if (m.key.startsWith('catchUp:') && Array.isArray(m.value)) out[m.key.slice(8)] = [...(out[m.key.slice(8)] ?? []), ...(m.value as CatchUpKind[])];
-      else if (m.key.startsWith('nudge:') && m.value === true) out[m.key.slice(6)] = [...(out[m.key.slice(6)] ?? []), 'food'];
-    }
-    return out;
-  }, []);
 }
 
 const STATUSES: Array<DayStatus | 'pending'> = ['logged', 'partial', 'fasted', 'unknown', 'filled', 'excluded'];
@@ -179,6 +170,13 @@ export function CalendarPage({ month: monthParam }: { month?: string }) {
                 );
               })}
             </ul>
+            {PAGE[view] && (
+              <a className="meal-foot" href={href(PAGE[view]!)}>
+                <span className={`cal-dot cal-${view} mark-logged`} aria-hidden />
+                <span className="grow">{t('calendar.openPage', { name: t(`calendar.layer.${view}` as MessageKey) })}</span>
+                <Icon name="chevron" size={16} />
+              </a>
+            )}
             <p className="muted small cal-key">
               <span className="cal-dot mark-logged" aria-hidden /> {t('calendar.keyLogged')} <span className="cal-dot mark-missing" aria-hidden /> {t('calendar.keyMissing')}{' '}
               <span className="cal-dot mark-skipped" aria-hidden /> {t('calendar.keySkipped')}

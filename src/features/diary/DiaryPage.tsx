@@ -214,6 +214,11 @@ export function DiaryPage({ day: dayParam }: { day?: string }) {
                 <Icon name="edit" size={16} />
               </span>
             </button>
+            <a className="meal-foot" href={href('activity')}>
+              <Icon name="activity" size={16} />
+              <span className="grow">{t('diary.allActivities')}</span>
+              <Icon name="chevron" size={16} />
+            </a>
           </div>
         ) : item.kind === 'sleep' ? (
           <div className="card sleep-card" key={item.sleep.id}>

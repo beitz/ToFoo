@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { isOn } from '../../settings/features';
 import { useData } from '../../app/data';
 import { href } from '../../app/router';
@@ -14,6 +14,8 @@ import { agoText, KETONE_TYPE_KEY, ketoneValueText } from './ketoneFormat';
 import type { KetoneReading } from '../../storage/types';
 import { fmtBhbRange, fmtFastDuration, PHASE_KEY, useFast } from './useFast';
 import { BackButton } from '../../ui/BackButton';
+import { fastClock, fastEnd } from '../../logic/fasting';
+import { pastFasts } from '../../logic/trackers';
 
 /** Every number the estimate uses, with its source and confidence, generated from model/parameters.ts. */
 const SOURCE_ROWS: ReadonlyArray<readonly [keyof typeof ketosis, MessageKey]> = [
@@ -176,7 +178,48 @@ export function FastPage() {
           )}
         </>
       )}
+      <PastFasts />
       {sheet && <KetoneSheet reading={sheet.reading} onClose={() => setSheet(null)} />}
     </section>
+  );
+}
+
+/** Every fast started in the app with its length, newest first (owner's ask, 2026-10-23: fasting history any time). */
+function PastFasts() {
+  const d = useData();
+  const list = useMemo(() => {
+    const items = d.fasts.map((f) => {
+      const clock = fastClock(f, d.log, d.customFoodsById, d.settings.mealWindowMinutes);
+      return { id: f.id, startDay: f.startDay, since: clock.since, end: fastEnd(f, clock, d.log, d.customFoodsById), fromMeal: clock.fromMeal };
+    });
+    return pastFasts(items, Date.now());
+  }, [d.fasts, d.log, d.customFoodsById, d.settings.mealWindowMinutes]);
+  const done = list.filter((f) => !f.running);
+  return (
+    <div className="card">
+      <div className="card-head">
+        <h2>{t('fast.history')}</h2>
+        {done.length > 1 && <span className="card-note">{t('fast.longest', { d: fmtFastDuration(Math.max(...done.map((f) => f.hours))) })}</span>}
+      </div>
+      {list.length === 0 ? (
+        <p className="muted small">{t('fast.historyNone')}</p>
+      ) : (
+        <ul className="plain-list">
+          {list.map((f) => (
+            <li key={f.id}>
+              <a className="entry-row" href={href('diary', f.startDay)}>
+                <span className="entry-label">
+                  {f.fromMeal ? '' : '≥ '}
+                  {fmtFastDuration(f.hours)}
+                  {f.running ? ` · ${t('fast.running')}` : ''}
+                </span>
+                <span className="muted small">{t('fast.startedOn', { day: formatDay(f.startDay, d.today) })}</span>
+                <Icon name="chevron" size={16} />
+              </a>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
