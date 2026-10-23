@@ -10,6 +10,8 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # A hung step would otherwise hold the deploy back for hours (default limit 6 h).
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
         with:
@@ -26,6 +28,8 @@ jobs:
       - run: npx vite build
       # End-to-end tests of the main flows against the build (e2e/, playwright.config.ts).
       - run: npx playwright install --with-deps chromium
+        # Once hung on apt for over 10 minutes and held a deploy back; normally takes about a minute.
+        timeout-minutes: 5
       - run: npx playwright test
       - uses: actions/upload-artifact@v4
         if: failure()
@@ -44,6 +48,11 @@ jobs:
     if: github.ref == 'refs/heads/main'
     needs: build
     runs-on: ubuntu-latest
+    # Two merges close together used to fail the second deploy ("in progress deployment", PR #132
+    # never went live). Deploys now wait their turn; a newer waiting one replaces an older waiting one.
+    concurrency:
+      group: pages
+      cancel-in-progress: false
     permissions:
       pages: write
       id-token: write
