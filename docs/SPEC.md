@@ -91,7 +91,7 @@ Profile inputs, grouped (all optional, all editable in settings):
 | Kitchen defaults | Salt: iodised yes/no, fluoridated yes/no | Iodised, not fluoridated | Default for salt in all recipes, overridable per recipe |
 | Food preferences | Excluded foods or food groups (allergies, dislikes, diets such as vegetarian) | None | Filtering suggestions only |
 
-**Low-friction onboarding**: first launch asks at most one optional screen (starting levels) and goes straight to the dashboard. Afterwards the app asks one question at a time when it would improve accuracy ("Add your weight for more accurate tanks"). Values based on defaults are marked, so the user sees which inputs would sharpen the picture. Exclusions only filter suggestions; the app makes no allergy-safety claims.
+**Low-friction onboarding**: first launch shows a small look picker (accent colour, light or dark) and a short guided tour of Home, both skippable; no questions (see "First launch and guided tours"). Afterwards the app asks one question at a time when it would improve accuracy ("Add your weight for more accurate tanks"). Values based on defaults are marked, so the user sees which inputs would sharpen the picture. Exclusions only filter suggestions; the app makes no allergy-safety claims.
 
 Rules for reference values:
 
@@ -593,6 +593,63 @@ The home screen answers "how am I doing, and what do I eat next?" at a glance, w
 - Calm by default: no streaks, no guilt messages, notifications off unless enabled.
 - Accessible: good contrast, scalable text, large touch targets, dark mode.
 
+## First launch and guided tours
+
+New users (owner's request 2026-10-23, before sharing the app with others) get a quick, skippable tour instead of a manual: one short line per part of the screen, never blocks of text. The first launch shows a small look picker, then the Home tour; each other area explains itself the first time it is opened.
+
+**Look picker** (first thing on first launch): a small sheet at the bottom of Home, not a full screen, so the app stays visible behind it. Five accent colours as round swatches and Light / Dark (System preselected when the phone has a preference). Every tap restyles the app behind the sheet at once; **Done** keeps the choice. It uses the same settings as Settings → Appearance (the accent colour setting and the theme), so it can be changed there any time. Swatches carry their name for screen readers and a ✓ on the chosen one, so the choice is never shown by colour alone.
+
+**How a tour looks**: the screen dims, one element gets a clear outline, and a bubble beside it shows one line (about 90 characters at most) with **Next** and **Skip**, plus "2 of 9" so it's clear how long it is. Tapping outside the bubble does nothing, so nobody leaves a tour by accident. Respects `prefers-reduced-motion` (no sliding, the outline just jumps), works in light and dark mode, buttons are 44 px.
+
+**Rules**
+
+- Each tour runs once, the first time its screen or menu is opened, and is then remembered (`settings.toursSeen`, in backups).
+- **Skip** ends the tour of the current screen only; the other tours still run when their screen is first opened. The welcome bubble also has a small **No tours** link that marks every tour as seen.
+- Settings → Appearance → **Show tours again** clears the list, for trying them out or after a long break.
+- A step whose element isn't on screen (no data yet, feature switched off, the other Home layout) is skipped, never an error. The tour runs on the real screen, also when it is still empty; there is no demo data.
+- Installs that existed before the tours count as having seen them all.
+- A changed tour is not shown again to people who saw it, unless it is deliberately marked "show again" because its screen changed a lot.
+
+**Tours** (draft lines; the final wording goes in `src/i18n/en.ts` under `tour.*`; "7 days" stands for the window set in Settings):
+
+*Home*, first launch, after the look picker:
+
+1. Welcome: "Thanks for trying ToFoo. It shows what your food gives your body, nutrient by nutrient." (with **No tours**)
+2. Tabs: "You're on Home. Insights holds your diary, weeks and patterns. Kitchen holds recipes, stock and shopping."
+3. Day strip: "The days your averages are built from. Tap one to open it."
+4. Today: "Energy and macros eaten today. Targets come from your profile, or set your own."
+5. Last 7 days: "Most nutrients can't be stored for long, so they show as your 7-day average per day."
+6. Stores: "6 nutrients your body stores for weeks. Shown as how full, and whether filling or draining."
+7. Any number: "Tap any number to see where it comes from and what it means."
+8. Next to cook: "The recipe that fills your current gaps best."
+9. Question chips: "Tap one to ask the assistant." (skipped while the assistant is off)
+10. Settings, top right: "Profile, features and backups. Your profile makes the targets yours." with a **Set up profile** button.
+11. Round button, bottom right: "Log a meal, start a fast and more. Tap it to see." While the assistant is off it adds: "Turn on the assistant in Settings to log by talking or with photos."
+
+*Mini tours*, each when first opened:
+
+| Tour | Steps, in short |
+| --- | --- |
+| Insights | Day, Calendar, Week and Patterns · the day card and its status · log for an earlier day |
+| Kitchen | Tiles jump to Basket, Fridge, Freezer, Cupboard, Spices · type "oats 500 g" to add · recipes and cooking a batch |
+| Round button | Each entry in one line · a second tap logs a meal |
+| Settings | Profile makes targets personal · Features turns parts on or off · Backup keeps your data safe |
+| Assistant | Speak, type or add photos · nothing is saved until you accept a card · numbers come from food databases, not the AI |
+| Nutrient page | Status and trend · where it came from · what fills it best · "Why" for the science |
+
+More tours (recipe editor, cooking a batch, fasting, trackers) can follow the same pattern later.
+
+**Keeping tours current** (the app still changes a lot):
+
+- All tours are data in one file (`src/features/tour/tours.ts`): per tour, a list of steps, each a target name and a text key. No tour logic on the screens themselves.
+- Screens only carry a marker on the element (`data-tour="home.stores"`). Moving or restyling an element keeps its marker; both Home layouts mark their matching parts with the same name.
+- A test fails when a step's marker appears nowhere in `src/`, when a step has no English text, or when a line is over the length limit.
+- A new screen, card or menu entry gets a look at its tour in the same PR (rule in `CLAUDE.md`). The tour lines above are the list to reread when a feature changes, since no test can tell a line that is no longer true.
+
+**First-launch question replaced**: the starting-levels screen no longer appears on first launch. Stores start at "average" and can be changed in Settings → Starting levels.
+
+**Open**: whether new users get the assistant (it needs their own Anthropic API key; without it the tour leaves the assistant out as above), and whether a German UI is needed (today the UI is English, food names English and German).
+
 ## Nutrient wiki
 
 Each nutrient has a short, sourced page that explains why it matters, what realistically happens when it runs low or too high, and which cheap, simple foods supply it.
@@ -799,6 +856,7 @@ v1 is the smallest app that is useful every day; each later version adds to the 
 - [ ] Energy in and out (calorie balance; the personal energy target exists since 2026-10-17, activity energy not yet): would be nice in one app since it overlaps with nutrient tracking, but the focus stays on nutrients, not weight loss or gain. Only if it can be added cleanly, as an optional feature that keeps the gamification guardrails (no rewards for eating less).
 - [ ] **Research: how long the body copes without each nutrient** (owner's question 2026-10-20, parked; research first, no app change decided). Per nutrient, from studies: how long body stores or pools last with no intake (e.g. vitamin C depletion studies, thiamine), what shows first and how gradually (no hard cutoff), and how often a check makes sense (e.g. ferritin for iron). Could later feed the nutrient pages, the "lasts" figures beyond the six stores, and when Home should warn; every number needs a source in `model/` before it is used.
 - [ ] **How it works: transparency and sources** (owner's request 2026-10-20): "How is this calculated?" from every number, with the calculation, data origin, sources and how exact it can be, hidden until asked for; see "How it works: transparency and sources".
+- [ ] **Look picker and guided tours** (owner's request 2026-10-23, next up): first-launch accent colour and light/dark picker over a live Home, a one-line-per-step tour of Home, mini tours for Insights, Kitchen, the round button, Settings, the assistant and nutrient pages; see "First launch and guided tours".
 - [ ] Keep in mind, not needed now: user-set target per nutrient (e.g. from a doctor), clearly marked as user-set. The DGE-derived targets stay as they are.
 
 **Not planned**: social features, community recipes, coaching, ads (one user, privacy, calm by default).
