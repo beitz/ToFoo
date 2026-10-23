@@ -46,7 +46,7 @@ const snapshot: Snapshot = {
   log: [
     { id: '1', schemaVersion: 1, time: 1, day: '2026-10-15', confidence: 'A', label: 'Hafer', kind: 'food', ref: { source: 'BLS', version: '4.0', code: 'C133000' }, grams: 60.5, preparation: 'asListed' },
     { id: '2', schemaVersion: 1, time: 2, day: '2026-10-15', confidence: 'C', label: 'Tea', kind: 'drink', drink: 'tea' },
-    { id: '3', schemaVersion: 1, time: 3, day: '2026-10-15', confidence: 'A', label: 'Giotto', kind: 'food', ref: { source: 'OFF', code: '8000500319475' }, grams: 4.3, preparation: 'asListed' },
+    { id: '3', schemaVersion: 1, time: 3, day: '2026-10-15', confidence: 'A', label: 'Giotto', kind: 'food', ref: { source: 'OFF', code: '8000500319475' }, grams: 4.3, preparation: 'asListed', pieces: 1 },
     { id: '4', schemaVersion: 1, time: 4, day: '2026-10-15', confidence: 'C', label: 'Kimchi', kind: 'food', ref: { source: 'USDA', code: '170392' }, grams: 50, preparation: 'asListed' },
     { id: '5', schemaVersion: 1, time: 5, day: '2026-10-15', confidence: 'A', label: 'Chili', kind: 'portion', batchId: 'b1', storage: 'freezer', portions: 1, grams: 380, ingredients: [{ ...lentils, grams: 200 }] },
   ],
@@ -115,7 +115,10 @@ const snapshot: Snapshot = {
     { id: 'k1', schemaVersion: 1, time: 17, day: '2026-10-21', type: 'blood', value: 1.4 },
     { id: 'k2', schemaVersion: 1, time: 18, day: '2026-10-21', type: 'breath', value: 12 },
   ],
-  portionSizes: [{ food: 'C133000', sizes: [{ label: 'My bowl', grams: 60 }] }],
+  portionSizes: [
+    { food: 'C133000', sizes: [{ label: 'My bowl', grams: 60 }] },
+    { food: 'OFF:8000500319475', sizes: [{ label: 'piece', grams: 4.3, piece: true }] },
+  ],
 };
 
 describe('exchange format', () => {
@@ -125,7 +128,7 @@ describe('exchange format', () => {
     expect(parsed.ok).toBe(true);
     if (parsed.ok && parsed.value.type === 'backup') {
       expect(parsed.value.data).toEqual(snapshot);
-      expect(snapshotCounts(parsed.value.data)).toMatchObject({ log: 5, journal: 1, portionSizes: 1 });
+      expect(snapshotCounts(parsed.value.data)).toMatchObject({ log: 5, journal: 1, portionSizes: 2 });
     }
   });
 

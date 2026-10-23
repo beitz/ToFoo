@@ -98,7 +98,8 @@ function restoreItem(x: unknown, ctx: RestoreContext): ProposedItem | undefined 
   }
   const food = product ? productFood(product, ctx.db) : ctx.db.byCode.get(x.code);
   if (!food) return undefined;
-  return { food, grams: x.grams, preparation: x.preparation as Preparation, note: typeof x.note === 'string' ? x.note : '', ...(product ? { product } : {}) };
+  const pieces = isObj(x.pieces) && typeof x.pieces.n === 'number' && typeof x.pieces.grams === 'number' && x.pieces.n > 0 ? (x.pieces as NonNullable<ProposedItem['pieces']>) : undefined;
+  return { food, grams: x.grams, preparation: x.preparation as Preparation, note: typeof x.note === 'string' ? x.note : '', ...(product ? { product } : {}), ...(pieces ? { pieces } : {}) };
 }
 
 /** A card from its summary in a saved chat; undefined if one of its foods or products is not on this phone. */

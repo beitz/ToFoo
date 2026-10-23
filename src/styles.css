@@ -619,6 +619,33 @@ textarea:focus-visible,
 .helper-row {
   margin: 6px 0;
 }
+/* Grams or pieces: a small switch beside the amount's label. */
+.amount-field > .row-between {
+  gap: 8px;
+}
+.segmented.amount-unit {
+  margin: 0 0 6px;
+  min-width: 10rem;
+}
+.piece-line {
+  margin: 4px 0;
+}
+.piece-line .btn-small {
+  min-height: 44px;
+}
+.piece-editor {
+  background: var(--surface-2);
+  border-radius: 14px;
+  padding: 10px 12px;
+  margin: 6px 0;
+}
+.piece-actions .btn-small {
+  min-height: 44px;
+}
+.piece-actions {
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
 .segmented {
   display: flex;
   background: var(--surface-2);

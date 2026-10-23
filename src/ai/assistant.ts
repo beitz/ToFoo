@@ -339,7 +339,7 @@ export async function sendMessage(
           results.push({ type: 'tool_result', tool_use_id: use.id, content: r.error, is_error: true });
         }
       } else if (use.name === 'propose_meal' && !sources.recipe) {
-        const r = validateProposal(use.input, ctx.db, ctx.products, ctx.now);
+        const r = validateProposal(use.input, ctx.db, ctx.products, ctx.now, ctx.pieces);
         if (r.ok) proposals.push({ id: use.id, proposal: r.proposal });
         else {
           rejected = true;

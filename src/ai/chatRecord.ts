@@ -10,6 +10,7 @@
 import type { Food } from '../foods/foodDb';
 import type { Product } from '../storage/types';
 import type { Conversation } from './assistant';
+import type { ProposedItem } from './tools';
 import { fmtLocalDateTime } from './photoTime';
 import type { ModelTokens } from './pricing';
 
@@ -169,6 +170,7 @@ export interface ItemLike {
   grams: number | undefined;
   preparation: string;
   note?: string;
+  pieces?: ProposedItem['pieces'];
   product?: Pick<Product, 'id' | 'name' | 'brand' | 'match'>;
 }
 
@@ -183,6 +185,7 @@ export function itemSummary(it: ItemLike) {
     grams: it.grams,
     preparation: it.preparation,
     ...(it.note ? { note: it.note } : {}),
+    ...(it.pieces ? { pieces: it.pieces } : {}),
     ...(p ? { product: { id: p.id, name: p.name, ...(p.brand ? { brand: p.brand } : {}), ...(p.match ? { microsFrom: p.match.code } : {}) } } : {}),
   };
 }

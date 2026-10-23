@@ -658,6 +658,11 @@
                                         "baked",
                                         "fried"
                                       ]
+                                    },
+                                    "pieces": {
+                                      "description": "Logged as a count of pieces: how many (grams is what counts)",
+                                      "type": "number",
+                                      "exclusiveMinimum": 0
                                     }
                                   },
                                   "required": [
@@ -1760,6 +1765,11 @@
                           "baked",
                           "fried"
                         ]
+                      },
+                      "pieces": {
+                        "description": "Logged as a count of pieces: how many (grams is what counts)",
+                        "type": "number",
+                        "exclusiveMinimum": 0
                       }
                     },
                     "required": [
@@ -2939,6 +2949,11 @@
                         "grams": {
                           "type": "number",
                           "exclusiveMinimum": 0
+                        },
+                        "piece": {
+                          "description": "The weight of one piece of this food (at most one per food), so amounts can be given as a count",
+                          "type": "boolean",
+                          "const": true
                         }
                       },
                       "required": [

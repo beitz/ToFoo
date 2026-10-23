@@ -18,6 +18,7 @@ import { FoodPicker, type PickedFood } from '../log/FoodPicker';
 import { PreparationSelect } from '../log/PreparationSelect';
 import { PortionFields, portionDraftValid, type PortionDraft } from '../log/PortionFields';
 import { MatchPicker, ProductInfo, saveProductChoice, useMatchChoice } from '../log/ProductParts';
+import { AmountField } from '../log/AmountField';
 import { TimeField } from '../log/TimeField';
 
 /** A portion entry with changed fields; a field set to undefined is left out (not stored as undefined). */
@@ -131,9 +132,14 @@ export function EditEntrySheet({ entry, onClose, nutrientsLink = true }: { entry
           )}
           {draft.kind === 'food' && (
             <>
-              <Field label={t('log.amount')}>
-                {(id) => <NumberInput id={id} value={draft.grams} onChange={(v) => set({ grams: v })} placeholder="0" suffix={productDraft?.perMl ? 'ml' : 'g'} min={0} autoFocus={!draft.grams} />}
-              </Field>
+              <AmountField
+                key={refKey(draft.ref)}
+                code={food?.code ?? refKey(draft.ref)}
+                product={productDraft}
+                value={{ grams: draft.grams, ...(draft.pieces !== undefined ? { pieces: draft.pieces } : {}) }}
+                onChange={(a) => set({ grams: a.grams, pieces: a.pieces })}
+                autoFocus={!draft.grams}
+              />
               {productDraft && <MatchPicker key={productDraft.id} product={productDraft} choice={choice} onChange={setChoice} />}
               <PreparationSelect value={draft.preparation} onChange={(p) => set({ preparation: p })} />
             </>

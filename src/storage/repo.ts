@@ -5,6 +5,7 @@ import { newId } from '../lib/id';
 import { refKey } from '../lib/refs';
 import { overlaps, sleepDay } from '../logic/sleep';
 import { withPot, type PotDetails } from '../logic/batch';
+import { savedPiece, withPiece } from '../foods/pieces';
 import { dailyBackupDue, keepCount, PORTIONS_PREFIX, pruneAutoBackups, readSnapshot, SNAPSHOT_TABLES, writeAutoBackup } from './autoBackup';
 import type { Table } from 'dexie';
 import { db as defaultDb, runMigrations, type ToFooDB } from './db';
@@ -16,6 +17,7 @@ import {
   type CustomFood,
   type DayStatusRecord,
   type FoodPortionSizes,
+  type PortionSize,
   type FavouriteMeal,
   type FoodRef,
   type Fast,
@@ -507,6 +509,28 @@ export function createRepo(db: ToFooDB) {
     },
     async setMeta(key: string, value: unknown): Promise<void> {
       await db.meta.put({ key, value });
+    },
+    /**
+     * Set (or, with undefined, remove) the weight of one piece of a food, kept with its saved
+     * portion sizes. Returns the sizes as they were, for undo.
+     */
+    async setPieceWeight(code: string, grams: number | undefined, label: string): Promise<PortionSize[] | undefined> {
+      const key = PORTIONS_PREFIX + code;
+      return db.transaction('rw', db.meta, async () => {
+        const before = (await db.meta.get(key))?.value as PortionSize[] | undefined;
+        await db.meta.put({ key, value: withPiece(before, grams, label) });
+        return before;
+      });
+    },
+    /** Piece weights the user saved, by food code (for the assistant). */
+    async pieceWeights(): Promise<Map<string, number>> {
+      const rows = await db.meta.where('key').startsWith(PORTIONS_PREFIX).toArray();
+      const out = new Map<string, number>();
+      for (const r of rows) {
+        const g = Array.isArray(r.value) ? savedPiece(r.value as PortionSize[]) : undefined;
+        if (g) out.set(r.key.slice(PORTIONS_PREFIX.length), g);
+      }
+      return out;
     },
 
     // ── Saved assistant chats ──

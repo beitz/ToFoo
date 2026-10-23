@@ -36,5 +36,8 @@ export function replaceFood(e: EntryDraft, ref: FoodRef, label: string, customFo
 /** The finished entry, or null while the amount is missing. */
 export function completeDraft(e: EntryDraft): LogEntry | null {
   if (e.kind !== 'food') return e;
-  return e.grams && e.grams > 0 ? { ...e, grams: e.grams } : null;
+  if (!e.grams || !(e.grams > 0)) return null;
+  // Pieces only while the amount is a count (changing the grams drops them).
+  const { pieces, ...rest } = e;
+  return { ...rest, grams: e.grams, ...(pieces && pieces > 0 ? { pieces } : {}) };
 }
