@@ -129,6 +129,13 @@ export function DataProvider({ children, fallback }: { children: ReactNode; fall
     else document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
 
+  // Green is the stylesheet's default; the other accents switch the tokens through data-accent.
+  const accent = settings?.accent;
+  useEffect(() => {
+    if (!accent || accent === 'green') document.documentElement.removeAttribute('data-accent');
+    else document.documentElement.setAttribute('data-accent', accent);
+  }, [accent]);
+
   const value = useMemo<AppData | null>(() => {
     if (!foods || !searchIndex || !profile || !settings || !recipes || !batches || !log || !customFoods || !dayStatus || !fasts || !sunEntries || !productList || !activities || !ketones) return null;
     const batchesById = new Map(batches.map((b) => [b.id, b]));

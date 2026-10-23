@@ -42,8 +42,8 @@ export function HomePage() {
   const showRange = isOn(settings.features, 'uncertaintyRanges');
   const hidden = new Set(settings.hiddenNutrients);
   const windowDays = settings.shortWindowDays;
-  // Two layouts while the owner tries them (2026-10-23): lists by averaging window (default), or rings and comets.
-  const rings = settings.homeView === 'detailed';
+  // Two layouts (owner, 2026-10-23): rings and comets (default), or lists by averaging window.
+  const rings = settings.homeView !== 'compact';
 
   const shown = NUTRIENTS.filter((n) => !hidden.has(n.id))
     .map((n) => model.nutrients.get(n.id))

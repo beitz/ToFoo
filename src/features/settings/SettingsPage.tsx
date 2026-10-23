@@ -5,6 +5,7 @@ import { needsCheck } from '../../foods/products';
 import { FEATURES, isOn } from '../../settings/features';
 import { repo } from '../../storage/repo';
 import { Field, NumberInput, Segmented, Toggle } from '../../ui/controls';
+import { AccentPicker } from './AccentPicker';
 import { Icon } from '../../ui/Icon';
 
 function LinkRow({ to, label, detail }: { to: string[]; label: string; detail?: string }) {
@@ -84,6 +85,7 @@ export function SettingsPage() {
 
       <h2 className="section-title">{t('settings.appearance')}</h2>
       <div className="card">
+        <p className="muted small settings-label settings-label-first">{t('settings.theme')}</p>
         <Segmented
           label={t('settings.theme')}
           value={s.theme}
@@ -97,13 +99,17 @@ export function SettingsPage() {
         <p className="muted small settings-label">{t('settings.homeLayout')}</p>
         <Segmented
           label={t('settings.homeLayout')}
-          value={s.homeView === 'detailed' ? 'detailed' : 'compact'}
+          value={s.homeView === 'compact' ? 'compact' : 'detailed'}
           onChange={(v) => repo.updateSettings({ homeView: v })}
           options={[
-            { value: 'compact', label: t('settings.homeLists') },
             { value: 'detailed', label: t('settings.homeRings') },
+            { value: 'compact', label: t('settings.homeLists') },
           ]}
         />
+        <p className="muted small settings-label" id="accent-label">
+          {t('settings.accent')}
+        </p>
+        <AccentPicker />
       </div>
 
       <ul className="link-list card">

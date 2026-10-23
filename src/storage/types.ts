@@ -113,12 +113,14 @@ export interface Settings extends Versioned {
   shortWindowDays: number;
   longWindowDays: number;
   theme: 'system' | 'light' | 'dark';
+  /** Accent (action) colour; unset = green. */
+  accent?: 'green' | 'teal' | 'rose' | 'ink';
   backupReminderDays: number;
   /** How many automatic backups to keep on the phone; unset = DEFAULT_AUTO_BACKUP_KEEP. */
   autoBackupKeep?: number;
   /** Default storage plan for new recipes. */
   defaultPlan: StoragePlan;
-  /** Home layout (2026-10-23): compact = lists by averaging window (unset), detailed = today's rings and the comet list. */
+  /** Home layout (2026-10-23): detailed = today's rings and the comet list (unset), compact = lists by averaging window. */
   homeView?: 'compact' | 'detailed';
   /** Home nutrient list grouping; unset = by status. */
   homeGrouping?: 'status' | 'type' | 'none';
