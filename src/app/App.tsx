@@ -43,6 +43,7 @@ import { Onboarding } from '../features/onboarding/Onboarding';
 import { FastPage } from '../features/fast/FastPage';
 import { CookPage } from '../features/recipes/CookPage';
 import { SleepPage } from '../features/sleep/SleepPage';
+import { CatchUpPage } from '../features/catchup/CatchUpPage';
 
 function Page({ route }: { route: string[] }) {
   const d = useData();
@@ -127,6 +128,8 @@ function Page({ route }: { route: string[] }) {
       return <SleepShortcut />;
     case 'nights':
       return <SleepPage />;
+    case 'catchup':
+      return <CatchUpPage key={b} day={b ?? d.today} />;
     default:
       return <HomePage />;
   }

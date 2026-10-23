@@ -15,6 +15,7 @@ import { SleepQuestion } from '../sleep/SleepQuestion';
 import { WaterCard } from '../water/WaterCard';
 import { withStores } from '../../logic/stores';
 import { DayStrip } from './DayStrip';
+import { CatchUpLine } from '../catchup/CatchUpLine';
 import { FastCard, FastChip } from './FastCard';
 import { NextToCook } from './NextToCook';
 import { RecentDays } from './RecentDays';
@@ -66,6 +67,7 @@ export function HomePage() {
         <SettingsButton />
       </header>
       <DayStrip days={windowDays} />
+      <CatchUpLine />
       <FastCard />
 
       {isOn(d.settings.features, 'sleep') && <SleepQuestion />}
