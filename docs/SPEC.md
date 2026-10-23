@@ -676,6 +676,8 @@ Guardrails: no rewards for fewer calories, longer fasts, weight change or oversh
 
 Optional features are modules with an on/off switch, so the app can be tuned between calm and detailed without code changes.
 
+Since 2026-10-23 (owner's ask: the list was one long run of unrelated switches) Settings shows them in sections: **What you track** (journal, sleep, activity, water, fasting with ketosis estimate and ketone readings), **Kitchen**, **Food sources**, **AI assistant**, **Reminders**, **How the numbers are worked out**, and **Coming later**. A feature that only works with another (everything under the AI assistant, the ketosis estimate under fasting, ketone readings under the estimate) sits indented under it and is greyed out while that one is off. **Fasting** became a switch the same day (owner's ask: few people fast), off for new installs and kept on for anyone whose settings predate it (`unsetMeans` in src/settings/features.ts); off hides the fasting button on Home and the Overview row, while a fast already running still shows until it is ended, and marking a day as fasted in the diary or on the fill-in page stays available.
+
 | Toggle | Default | Effect |
 | --- | --- | --- |
 | Forecasts | On | "Runs low in \~6 weeks" on gauges |

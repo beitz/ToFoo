@@ -77,15 +77,17 @@ export function QuickActions() {
             />
           )}
           {on('sleep') && <SleepButton onDone={close} />}
-          <DialItem
-            icon="moon"
-            label={d.activeFast ? t('home.endFast') : t('home.startFast')}
-            on={!!d.activeFast}
-            onClick={() => {
-              close();
-              void toggleFast();
-            }}
-          />
+          {(on('fasting') || d.activeFast) && (
+            <DialItem
+              icon="moon"
+              label={d.activeFast ? t('home.endFast') : t('home.startFast')}
+              on={!!d.activeFast}
+              onClick={() => {
+                close();
+                void toggleFast();
+              }}
+            />
+          )}
           {on('aiAssistant') && <DialItem icon="chat" label={t('ai.pageTitle')} onClick={() => go('assistant')} />}
         </div>
         <div className="dial-main">

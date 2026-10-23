@@ -88,6 +88,7 @@ export function OverviewPage() {
   const notes = journal.filter((j) => j.day >= days[0]!);
   const latest = notes[notes.length - 1];
   const off = (['sleep', 'activity', 'water', 'journal'] as const).filter((k) => !isOn(f, k));
+  const offNames = [...(isOn(f, 'fasting') ? [] : [t('overview.fasting')]), ...off.map((k) => t(OFF_NAME[k]))];
 
   return (
     <section>
@@ -111,13 +112,15 @@ export function OverviewPage() {
             </>
           )}
         </Row>
-        <Row to={href('fasting')} icon="hourglass" title={t('overview.fasting')}>
-          {!fast
-            ? t('overview.noFasts')
-            : fast.running
-              ? t('overview.fastRunning', { d: fmtFastDuration(fast.hours) })
-              : t('overview.fastLast', { d: `${fast.fromMeal ? '' : '≥ '}${fmtFastDuration(fast.hours)}`, day: formatDay(fast.startDay, d.today) })}
-        </Row>
+        {(isOn(f, 'fasting') || fast?.running) && (
+          <Row to={href('fasting')} icon="hourglass" title={t('overview.fasting')}>
+            {!fast
+              ? t('overview.noFasts')
+              : fast.running
+                ? t('overview.fastRunning', { d: fmtFastDuration(fast.hours) })
+                : t('overview.fastLast', { d: `${fast.fromMeal ? '' : '≥ '}${fmtFastDuration(fast.hours)}`, day: formatDay(fast.startDay, d.today) })}
+          </Row>
+        )}
       </div>
 
       {off.length < 4 && (
@@ -161,9 +164,9 @@ export function OverviewPage() {
         </div>
       )}
 
-      {off.length > 0 && (
+      {offNames.length > 0 && (
         <p className="small muted ov-more">
-          {t('overview.offList', { names: off.map((k) => t(OFF_NAME[k])).join(', ') })} <a href={href('settings')}>{t('overview.turnOn')}</a>
+          {t('overview.offList', { names: offNames.join(', ') })} <a href={href('settings')}>{t('overview.turnOn')}</a>
         </p>
       )}
       <p className="small muted ov-more">{t('overview.stripKey')}</p>

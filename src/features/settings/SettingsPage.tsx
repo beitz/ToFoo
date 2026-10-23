@@ -2,7 +2,7 @@ import { useData } from '../../app/data';
 import { href } from '../../app/router';
 import { t, type MessageKey } from '../../i18n';
 import { needsCheck } from '../../foods/products';
-import { FEATURES, isOn } from '../../settings/features';
+import { FEATURE_GROUPS, FEATURES, isOn } from '../../settings/features';
 import { repo } from '../../storage/repo';
 import { Field, NumberInput, Segmented, Toggle } from '../../ui/controls';
 import { AccentPicker } from './AccentPicker';
@@ -56,18 +56,22 @@ export function SettingsPage() {
       </div>
 
       <h2 className="section-title">{t('settings.features')}</h2>
-      <div className="card">
-        {FEATURES.filter((f) => !f.page).map((f) => (
-          <Toggle
-            key={f.key}
-            checked={isOn(s.features, f.key)}
-            disabled={!!f.comingIn}
-            onChange={(v) => repo.updateSettings({ features: { ...s.features, [f.key]: v } })}
-            label={f.comingIn ? `${f.label} (${t('settings.comingIn', { v: f.comingIn })})` : f.label}
-            description={f.description}
-          />
-        ))}
-      </div>
+      {FEATURE_GROUPS.map((g) => (
+        <div key={g} className="card feature-group">
+          <h3 className="feature-group-title">{t(`settings.group.${g}` as MessageKey)}</h3>
+          {FEATURES.filter((f) => f.group === g && !f.page).map((f) => (
+            <div key={f.key} className={f.requires ? 'feature-sub' : undefined}>
+              <Toggle
+                checked={isOn(s.features, f.key)}
+                disabled={!!f.comingIn || (!!f.requires && !isOn(s.features, f.requires))}
+                onChange={(v) => repo.updateSettings({ features: { ...s.features, [f.key]: v } })}
+                label={f.comingIn ? `${f.label} (${t('settings.comingIn', { v: f.comingIn })})` : f.label}
+                description={f.description}
+              />
+            </div>
+          ))}
+        </div>
+      ))}
 
       <h2 className="section-title">{t('settings.model')}</h2>
       <div className="card">

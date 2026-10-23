@@ -6791,3 +6791,23 @@ a.contributor-link > span:first-child {
 .ov-more {
   margin: 8px 4px;
 }
+
+/* Settings → Features, in sections (2026-10-23); a feature that needs another sits indented under it. */
+.feature-group {
+  margin-bottom: 10px;
+}
+.feature-group-title {
+  margin: 4px 0 2px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.feature-group > div + div > .toggle-row {
+  border-top: 1px solid var(--border);
+}
+.feature-sub > .toggle-row {
+  padding-left: 14px;
+  box-shadow: inset 2px 0 0 var(--border);
+}

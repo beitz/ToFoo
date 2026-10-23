@@ -102,7 +102,8 @@ export type FeatureKey =
   | 'atHome'
   | 'ketosis'
   | 'questionShortcuts'
-  | 'ketoneReadings';
+  | 'ketoneReadings'
+  | 'fasting';
 
 export interface Settings extends Versioned {
   id: 'settings';
