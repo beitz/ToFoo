@@ -44,6 +44,8 @@ import { FastPage } from '../features/fast/FastPage';
 import { CookPage } from '../features/recipes/CookPage';
 import { SleepPage } from '../features/sleep/SleepPage';
 import { CatchUpPage } from '../features/catchup/CatchUpPage';
+import { ActivityPage } from '../features/trackers/ActivityPage';
+import { WaterPage } from '../features/trackers/WaterPage';
 
 function Page({ route }: { route: string[] }) {
   const d = useData();
@@ -128,6 +130,10 @@ function Page({ route }: { route: string[] }) {
       return <SleepShortcut />;
     case 'nights':
       return <SleepPage />;
+    case 'activity':
+      return <ActivityPage />;
+    case 'water':
+      return <WaterPage />;
     case 'catchup':
       return <CatchUpPage key={b} day={b ?? d.today} />;
     default:
@@ -158,6 +164,10 @@ const TAB_OF: Record<string, (typeof NAV)[number]['key'] | null> = {
   entry: 'insights',
   journal: 'insights',
   nights: 'insights',
+  activity: 'insights',
+  water: 'insights',
+  fasting: 'insights',
+  catchup: 'insights',
   kitchen: 'kitchen',
   athome: 'kitchen',
   recipes: 'kitchen',

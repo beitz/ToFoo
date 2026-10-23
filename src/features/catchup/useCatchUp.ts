@@ -44,3 +44,15 @@ export function useCatchUp(day: string): CatchUpKind[] | undefined {
     skipped,
   });
 }
+
+/** Kinds skipped on the fill-in page, by day, from the meta table ("nudge:<day>" is the meals skip). */
+export function useSkipped(): Record<string, CatchUpKind[]> | undefined {
+  return useLiveQuery(async () => {
+    const out: Record<string, CatchUpKind[]> = {};
+    for (const m of await repo.db.meta.toArray()) {
+      if (m.key.startsWith('catchUp:') && Array.isArray(m.value)) out[m.key.slice(8)] = [...(out[m.key.slice(8)] ?? []), ...(m.value as CatchUpKind[])];
+      else if (m.key.startsWith('nudge:') && m.value === true) out[m.key.slice(6)] = [...(out[m.key.slice(6)] ?? []), 'food'];
+    }
+    return out;
+  }, []);
+}
