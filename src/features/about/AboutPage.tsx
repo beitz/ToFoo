@@ -1,6 +1,7 @@
 import { href } from '../../app/router';
 import { t } from '../../i18n';
 import { useData } from '../../app/data';
+import { applyUpdate, checkForUpdate, useAppUpdate } from '../../app/update';
 
 export const BLS_CITATION =
   'Max Rubner-Institut (2025): Bundeslebensmittelschlüssel (BLS), Version 4.0 — Deutsche Nährstoffdatenbank. Karlsruhe.';
@@ -81,8 +82,9 @@ export function AboutPage() {
         </a>
         .
       </p>
+      <AppVersionInfo />
       <p className="muted">
-        {t('about.version')}: {__APP_VERSION__} · {t('about.dataVersion')}: BLS {d.foods.version} ({d.foods.foods.length.toLocaleString('en-GB')} foods)
+        {t('about.dataVersion')}: BLS {d.foods.version} ({d.foods.foods.length.toLocaleString('en-GB')} foods)
       </p>
       <p className="muted small">
         <a href="https://github.com/beitz/ToFoo/blob/main/docs/OPEN_QUESTIONS.md" target="_blank" rel="noreferrer">
@@ -92,5 +94,47 @@ export function AboutPage() {
         <a href={href('settings', 'diagnostics')}>{t('diag.title')}</a>
       </p>
     </section>
+  );
+}
+
+/** Version, commit and build time, with a way to ask for a newer version (src/app/update.ts). */
+function AppVersionInfo() {
+  const u = useAppUpdate();
+  const built = new Date(__APP_BUILT_AT__).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  return (
+    <div className="app-version-info" id="version">
+      <p className="muted">
+        {t('about.version')}: <strong>{__APP_VERSION__}</strong>
+        {__APP_COMMIT__ && (
+          <>
+            {' '}
+            (
+            <a href={`https://github.com/beitz/ToFoo/commit/${__APP_COMMIT__}`} target="_blank" rel="noreferrer">
+              {__APP_COMMIT__}
+            </a>
+            )
+          </>
+        )}
+        {' · '}
+        {t('about.built', { when: built })}
+      </p>
+      <p className="muted small">{t('about.versionHow')}</p>
+      {u.status === 'ready' ? (
+        <button type="button" className="btn btn-primary" onClick={applyUpdate}>
+          {u.next ? t('version.readyNamed', { v: u.next }) : t('version.ready')} {t('version.tapToLoad')}
+        </button>
+      ) : (
+        <p className="row app-version-check">
+          <button type="button" className="btn" disabled={u.status === 'checking' || u.status === 'downloading'} onClick={() => void checkForUpdate()}>
+            {u.status === 'checking' ? t('about.checking') : t('about.check')}
+          </button>
+          <span className="muted small" role="status">
+            {u.status === 'current' && t('about.current')}
+            {u.status === 'downloading' && t('about.downloading')}
+            {u.status === 'unavailable' && t('about.unavailable')}
+          </span>
+        </p>
+      )}
+    </div>
   );
 }

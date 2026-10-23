@@ -6862,6 +6862,41 @@ a.contributor-link > span:first-child {
   color: var(--warn);
   flex: none;
 }
+/* App version above the date on Home: tiny, with a full-size tap area that doesn't take room. */
+.app-version {
+  position: relative;
+  display: inline-block;
+  font-size: 0.7rem;
+  line-height: 1.2;
+  color: var(--text-faint);
+  text-decoration: none;
+}
+.app-version::after {
+  content: '';
+  position: absolute;
+  inset: -14px -8px;
+}
+.home-title h1 {
+  margin: 0;
+}
+/* A new version is in place: same line as catch up, in the accent colour, as a button. */
+.update-line {
+  width: 100%;
+  font: inherit;
+  font-size: 0.9rem;
+  text-align: start;
+  cursor: pointer;
+  background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+}
+.update-line > svg:first-child {
+  color: var(--accent);
+}
+.app-version-check {
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
 /* iPhone browser tab: add to Home Screen first. Same line as catch up, as a button that opens the steps. */
 .install-hint-line {
   width: 100%;
