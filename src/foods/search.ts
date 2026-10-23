@@ -48,7 +48,7 @@ export function buildIndex(items: readonly SearchItem[]): SearchIndex {
 }
 
 /** Damerau-free edit distance ≤ 1 check (substitution, insertion, deletion). */
-function withinOneEdit(a: string, b: string): boolean {
+export function withinOneEdit(a: string, b: string): boolean {
   if (Math.abs(a.length - b.length) > 1) return false;
   let i = 0;
   let j = 0;

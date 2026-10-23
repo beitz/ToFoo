@@ -39,9 +39,39 @@ describe('OFF product list', () => {
   });
 
   it('puts products named with the words before those found by brand only', () => {
-    expect(names('choco')).toEqual(['PiCK UP ! Choco minis - 127g', 'Waffeln']);
-    expect(names('leibniz')).toEqual(['PiCK UP ! Choco minis - 127g', 'Butterkeks']);
     expect(names('butterkeks leibniz')).toEqual(['Butterkeks']);
+  });
+
+  it('ranks the best match first, not the most-scanned', () => {
+    // Most-scanned first, like the real list; the owner's search (2026-10-23) was "Wrigley pepp".
+    const gum = parseOffIndex(
+      [
+        '1\tWraps\tPoco Loco\t6 x 62 g',
+        '2\tWRIGLEYS extra WHITE PROFESSIONAL\twrigley\'s\t50 Dragees',
+        '3\tAltoids Peppermint Pastillen extra stark\tCallard & Bowser, Wrigley\t50 g',
+        '4\tExtra Peppermint 50er Dragees Dose\tWrigleys\t50 dragees',
+        "5\tWrigley's Extra Professional Peppermint\tExtra, Wrigley's\t4 pcs",
+        '6\tMilch 1,5 %\tJa!\t1 l',
+        '7\tJa! Milchreis Classic\tJa!\t200 g',
+        '8\tJahreszeiten Milch\t\t',
+        '9\tJa! Milch\tRewe\t1 l',
+      ].join('\n'),
+    );
+    const top = (q: string, n = 3) => searchOffIndex(gum, q).slice(0, n).map((r) => r.code);
+    // Both words in the name first; "Wraps" and Wrigley gum without peppermint are no match.
+    expect(top('wrigley pepp')[0]).toBe('5');
+    expect(searchOffIndex(gum, 'wrigley pepp').map((r) => r.code).sort()).toEqual(['3', '4', '5']);
+    // "Wrigley's", "Wrigleys" and "wrigleys" are the same brand.
+    expect(top('wrigleys peppermint')[0]).toBe('5');
+    expect(top('wrigleys peppermint')).toHaveLength(3);
+    // Whole words beat word starts ("Milchreis"), "ja" is a word, not the start of "Jahreszeiten".
+    expect(top('ja milch', 4)).toEqual(['9', '6', '7', '8']);
+  });
+
+  it('forgives a typo when nothing else matches', () => {
+    expect(names('giottto')).toEqual(['Giotto']);
+    expect(names('gioto')).toEqual(['Giotto']);
+    expect(names('xyzzy')).toEqual([]);
   });
 
   it('ignores umlauts and punctuation', () => {

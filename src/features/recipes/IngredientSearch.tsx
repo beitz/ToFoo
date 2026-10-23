@@ -59,11 +59,11 @@ export function IngredientSearch({ onPick, onScan }: { onPick: (p: PickedFood) =
         )}
       </div>
       {q && products.length > 0 && <ProductList pinnable products={products} onPick={(product) => pick({ product })} />}
-      {q && !offSearch.genericFirst && <OffResults key={q} search={offSearch} onPick={(product) => pick({ product })} />}
+      {q && !offSearch.genericFirst && <OffResults key={`off:${q}`} search={offSearch} onPick={(product) => pick({ product })} />}
       {q && <FoodList foods={results} onPick={(food) => pick({ food })} />}
-      {q && offSearch.genericFirst && <OffResults key={q} search={offSearch} onPick={(product) => pick({ product })} />}
+      {q && offSearch.genericFirst && <OffResults key={`off:${q}`} search={offSearch} onPick={(product) => pick({ product })} />}
       {q && results.length === 0 && products.length === 0 && offSearch.hits.length === 0 && offSearch.status !== 'loading' && <p className="muted">{t(offOn ? 'edit.noResultsScan' : 'edit.noResults')}</p>}
-      {q && usdaOn && <UsdaResults key={q} query={q} onPick={(product) => pick({ product })} />}
+      {q && usdaOn && <UsdaResults key={`usda:${q}`} query={q} onPick={(product) => pick({ product })} />}
     </div>
   );
 }

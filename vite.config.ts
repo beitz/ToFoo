@@ -50,7 +50,7 @@ export default defineConfig({
         // Android never needs it, but kept once fetched so scanning then works offline too.
         // The list of packaged products for name search (~5 MB): not precached either, since only people with
         // the Open Food Facts lookup on need it, but kept once loaded so search then works offline. Its
-        // name carries the date it was built, so a new list replaces the old one.
+        // name carries its date and content hash, so a new list replaces the old one.
         runtimeCaching: [
           { urlPattern: /\.wasm$/, handler: 'CacheFirst', options: { cacheName: 'wasm' } },
           { urlPattern: /off-products-.*\.tsv\.gz$/, handler: 'CacheFirst', options: { cacheName: 'off-products', expiration: { maxEntries: 1 } } },
