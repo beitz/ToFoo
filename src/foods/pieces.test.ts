@@ -12,6 +12,26 @@ describe('pieceCount', () => {
     expect(pieceCount('1 Riegel = 25 g')).toBe(1);
   });
 
+  it('reads the other ways counts are written on Open Food Facts products in Germany', () => {
+    expect(pieceCount('Toffifee 15er')).toBe(15);
+    expect(pieceCount('Knoppers 8-Pack')).toBe(8);
+    expect(pieceCount('16 pack 160g')).toBe(16);
+    expect(pieceCount('Tortilla Original Medium 8pk')).toBe(8);
+    expect(pieceCount('50 pc')).toBe(50);
+    expect(pieceCount('10 stck.')).toBe(10);
+    expect(pieceCount('24 ct')).toBe(24);
+    expect(pieceCount('15 Fischstäbchen')).toBe(15);
+    expect(pieceCount('20 Brausetabletten 82g')).toBe(20);
+    expect(pieceCount('25 Aufgussbeutel')).toBe(25);
+    expect(pieceCount('80g (20 comprimés)')).toBe(20);
+    expect(pieceCount('2x 12 slices (225g)')).toBe(24);
+    // Numbers that are not pieces.
+    expect(pieceCount('5-Korn Müsli')).toBeUndefined();
+    expect(pieceCount('Nescafe 3 in 1 classic')).toBeUndefined();
+    expect(pieceCount('Frühlings Quark 7 Kräuter')).toBeUndefined();
+    expect(pieceCount('1 Packung 190g')).toBeUndefined();
+  });
+
   it('does not count weights, measures or words that merely start like a piece word', () => {
     expect(pieceCount('42 g')).toBeUndefined();
     expect(pieceCount('2 tbsp (30 g)')).toBeUndefined();
@@ -45,6 +65,15 @@ describe('labelPiece', () => {
     expect(labelPiece({ quantity: '60 pieces' })).toBeUndefined();
     expect(labelPiece({ quantity: '42 g' })).toBeUndefined();
     expect(labelPiece({})).toBeUndefined();
+  });
+
+  it('reads the weight of each piece where the text gives it', () => {
+    expect(labelPiece({ quantity: '10 Sticks a 2 g' })).toEqual({ grams: 2, from: 'pack', text: '10 Sticks a 2 g' });
+    expect(labelPiece({ quantity: '200 g (8 Riegel x 25 g)' })?.grams).toBe(25);
+    expect(labelPiece({ quantity: '185 g, 10 barres de 18.5 g' })?.grams).toBe(18.5);
+    expect(labelPiece({ name: 'Snickers (5 x 2 Stück à 9.125 g)' })).toMatchObject({ grams: 9.13, from: 'name' });
+    expect(labelPiece({ name: 'Zwieback', quantity: '2x 12 slices (225g)' })?.grams).toBe(9.38);
+    expect(labelPiece({ name: 'Kitkat Chunky White 4er-Pack', quantity: '160 g' })?.grams).toBe(40);
   });
 
   it('reads the count in the name, with the weight from the pack or the name', () => {
