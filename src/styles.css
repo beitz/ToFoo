@@ -7201,13 +7201,24 @@ a.contributor-link > span:first-child {
 }
 
 /* ── A nutrient over a past period (#/nutrient/<id>/range/<from>/<to>) ── */
+/* Above the cards' own sticky headings, which stop just under it on this page. */
+.nutrient-range {
+  --band-h: 56px;
+}
+.nutrient-range .card > .card-head,
+.nutrient-range .card > h2:first-child {
+  top: calc(var(--band-h) + 4px);
+}
 .range-banner {
   position: sticky;
   top: 0;
-  z-index: 5;
+  z-index: 10;
   display: flex;
   align-items: center;
   gap: 10px;
+  box-sizing: border-box;
+  height: var(--band-h);
+  overflow: hidden;
   margin: 0 0 8px;
   padding: 2px 4px 2px 14px;
   border: 1.5px solid var(--accent);
