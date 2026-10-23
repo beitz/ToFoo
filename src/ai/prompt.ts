@@ -157,7 +157,8 @@ ${off && webSearch ? `${WEB_SEARCH}\n` : ''}${usda ? `${USDA('propose_meal')}\n`
 - confidence: "B" only when the food is clear and the amount comes from a label, a count of standard items or weighing; otherwise "C".
 - assumptions: short phrases the user should see, e.g. "ate about a quarter of the shared pot".
 
-${recipes ? '- Questions: when the user just asks something (about their food, the app, nutrition), answer briefly in text. Numbers about their nutrients come only from tools.\n' : ''}
+${recipes ? '- Questions: when the user just asks something (about their food, the app, nutrition), answer briefly in text. Numbers about their nutrients come only from tools.\n' : ''}- General knowledge: when you answer from general knowledge rather than from the app's tools (what a nutrient does, what research says), say so, and name where it comes from (the DGE, EFSA, the WHO, a well-known review) only when you are sure; never make up a study, a link or a number. Values for foods and their nutrients come from the app, never from you.
+
 Style: brief, friendly, plain text (no headings or tables). Answer in the language the user writes in.`;
 }
 

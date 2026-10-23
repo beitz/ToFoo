@@ -442,6 +442,42 @@ export interface Overview {
   waterDays: number;
 }
 
+/** What the user can choose to share in Insights, each a whole tracker (docs/SPEC.md, "Insights"). */
+export const SHARE_KINDS = ['food', 'journal', 'sleep', 'activity', 'water'] as const satisfies readonly MeasureGroup[];
+export type ShareKind = (typeof SHARE_KINDS)[number];
+
+/**
+ * Only what the user chose to send: the days from `from` to today, and the kinds ticked. The
+ * assistant's tools read nothing else, so a day or tracker left out cannot reach Anthropic whatever
+ * the model asks for. A kind left out reads as not tracked (unknown), never as zero.
+ */
+export function shareInsightData(data: InsightData, from: string, kinds: ReadonlySet<ShareKind>): InsightData {
+  const first = from > data.first ? from : data.first;
+  const hidden = new Set(MEASURES.filter((m) => !kinds.has(m.group)).map((m) => m.id));
+  // Water from drinks and food needs the food log too.
+  if (!kinds.has('food')) hidden.add('total_water');
+  const food = kinds.has('food');
+  const days = new Map<string, DayFacts>();
+  for (const [day, f] of data.days) {
+    if (day < first) continue;
+    const { night, ...rest } = f;
+    days.set(day, {
+      ...rest,
+      ...(kinds.has('sleep') && night ? { night } : {}),
+      status: food ? f.status : 'unknown',
+      foodComplete: food && f.foodComplete,
+      entries: food ? f.entries : [],
+      foodText: food ? f.foodText : ' ',
+      journal: kinds.has('journal') ? f.journal : [],
+      journalText: kinds.has('journal') ? f.journalText : ' ',
+      activities: kinds.has('activity') ? f.activities : [],
+      values: Object.fromEntries(Object.entries(f.values).map(([id, v]) => [id, hidden.has(id) ? null : v])),
+      missing: new Set([...f.missing].filter((id) => !hidden.has(id))),
+    });
+  }
+  return { days, first, today: data.today };
+}
+
 /** What a period's data consists of: the user sees it before asking, the assistant gets it with the question. */
 export function overview(data: InsightData, from: string, to: string): Overview {
   const days = periodDays(data, from, to).map((d) => data.days.get(d)!);

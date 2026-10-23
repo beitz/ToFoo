@@ -3,7 +3,7 @@ import { dayRange } from '../lib/dates';
 import type { DailyTotals } from '../model/simulate';
 import type { DayStatus, FoodPart, ModelEntry } from '../model/types';
 import type { JournalEntry, SleepRecord } from '../storage/types';
-import { buildInsightData, compareMeasures, conditionProblem, countDays, fisherExact, holds, journalEntries, overview, permutationChance, type InsightInput } from './insights';
+import { buildInsightData, compareMeasures, conditionProblem, countDays, fisherExact, holds, journalEntries, overview, permutationChance, shareInsightData, type InsightInput } from './insights';
 
 const at = (day: number, h: number, m = 0) => new Date(2026, 9, day, h, m).getTime();
 const key = (day: number) => `2026-10-${String(day).padStart(2, '0')}`;
@@ -109,6 +109,25 @@ describe('insight day facts', () => {
     expect(overview(data, '2026-09-01', key(10))).toMatchObject({ from: key(1), to: key(10), days: 10, foodComplete: 8, journalEntries: 4, journalDays: 4, nights: 9 });
     expect(journalEntries(data, key(1), key(10), ['KOPF']).map((j) => j.day)).toEqual([key(3), key(5), key(8)]);
     expect(journalEntries(data, key(1), key(2), [])).toHaveLength(1);
+  });
+
+  it('shares only the chosen period and kinds, and leaves the rest unknown', () => {
+    const shared = shareInsightData(data, key(4), new Set(['journal', 'water']));
+    expect(shared.first).toBe(key(4));
+    expect([...shared.days.keys()]).toEqual(dayRange(key(4), key(10)));
+    // Nothing from before the period, even when a tool asks for it.
+    expect(journalEntries(shared, key(1), key(10), [])).toHaveLength(2);
+    expect(holds(headache, key(4), shared)).toBe(false);
+    expect(holds({ ...headache, offset: -1 }, key(4), shared)).toBeNull();
+    const d7 = shared.days.get(key(7))!;
+    expect(d7).toMatchObject({ status: 'unknown', foodComplete: false, entries: [], activities: [] });
+    expect(d7.night).toBeUndefined();
+    expect(d7.values).toMatchObject({ ENERCC: null, alcohol: null, sleep_hours: null, total_water: null, journal_entries: 0 });
+    expect(holds({ kind: 'food', words: ['bier'] }, key(7), shared)).toBeNull();
+    expect(overview(shared, key(1), key(10))).toMatchObject({ from: key(4), days: 7, foodComplete: 0, journalEntries: 2, nights: 0 });
+    // All kinds: the same days as before, unchanged.
+    const all = shareInsightData(data, '2026-01-01', new Set(['food', 'journal', 'sleep', 'activity', 'water']));
+    expect(all.days.get(key(7))).toEqual(data.days.get(key(7)));
   });
 
   it('rejects conditions it cannot check', () => {

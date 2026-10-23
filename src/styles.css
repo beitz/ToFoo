@@ -2392,6 +2392,9 @@ body:has(.composer) .toast-area {
 .journal-voice .btn {
   min-height: 44px;
 }
+.journal-voice .grow {
+  flex: 1 1 12rem;
+}
 .journal-row {
   grid-template-columns: auto 1fr auto;
   grid-auto-flow: row;
@@ -2709,6 +2712,19 @@ body:has(.fab-stack) .toast-area {
 }
 .insights-overview li + li {
   margin-top: 2px;
+}
+/* What to send: one tickable row per kind of data, counts for the chosen period. */
+.insights-share {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+.insights-share .radio-row {
+  min-height: 44px;
+}
+.insights-shared {
+  margin: 0;
 }
 .insights-answer {
   display: flex;
@@ -6805,4 +6821,31 @@ a.contributor-link > span:first-child {
 .feature-sub > .toggle-row {
   padding-left: 14px;
   box-shadow: inset 2px 0 0 var(--border);
+}
+
+/* What leaves your phone (#/about/sent). */
+.sent-page .sent-flow h2 {
+  font-size: 1.02rem;
+  margin: 0;
+}
+.sent-page .sent-flow h3 {
+  margin: 10px 0 2px;
+  font-weight: 600;
+}
+.sent-page .sent-flow p,
+.sent-page .sent-flow ul {
+  margin: 4px 0 0;
+}
+.sent-page .sent-flow ul {
+  padding-left: 1.1rem;
+}
+.sent-page .sent-flow li + li {
+  margin-top: 3px;
+}
+.sent-page .sent-on {
+  color: var(--text);
+  border-color: var(--accent);
+}
+.sent-note a {
+  white-space: nowrap;
 }

@@ -13,7 +13,7 @@ import { mergeModelTokens, type ModelTokens } from '../../ai/pricing';
 import { JOURNAL_TRANSCRIBE_PROMPT } from '../../ai/transcribe';
 import { addDays, formatDay } from '../../lib/dates';
 import { fmtNumber } from '../../lib/format';
-import { buildInsightData, MEASURE_BY_ID, overview, type InsightData, type Stats } from '../../logic/insights';
+import { buildInsightData, MEASURE_BY_ID, overview, SHARE_KINDS, shareInsightData, type InsightData, type ShareKind, type Stats } from '../../logic/insights';
 import { isOn } from '../../settings/features';
 import { repo } from '../../storage/repo';
 import { Segmented } from '../../ui/controls';
@@ -26,6 +26,7 @@ import { VoiceFailed } from '../assistant/VoiceFailed';
 import { useJournal } from '../journal/useJournal';
 import { describeConditions, verdict } from './describe';
 import { BackButton } from '../../ui/BackButton';
+import { SentNote } from '../assistant/SentNote';
 
 type Period = '2w' | '4w' | '3m' | 'all';
 const PERIOD_DAYS: Record<Exclude<Period, 'all'>, number> = { '2w': 14, '4w': 28, '3m': 91 };
@@ -36,6 +37,8 @@ const THIN_JOURNAL_ENTRIES = 5;
 type Bubble = { role: 'user'; text: string } | { role: 'assistant'; text: string; checks: Check[] };
 interface ChatState {
   period: Period;
+  /** The kinds of data the user ticked to send; fixed once the chat has started. */
+  share: ShareKind[];
   conversation: InsightConversation;
   bubbles: Bubble[];
   tokens: ModelTokens;
@@ -128,13 +131,21 @@ function useInsightData(): InsightData | undefined {
   }, [d.modelDays, d.model, d.modelEntries, d.settings.mealWindowMinutes, d.today, f, journal, sleep, activities, water]);
 }
 
+/** The kinds of data there are to send: the food log, and each tracker that is on. */
+function availableKinds(f: Parameters<typeof isOn>[0]): ShareKind[] {
+  return SHARE_KINDS.filter((k) => k === 'food' || isOn(f, k));
+}
+
 function Chat({ apiKey, model }: { apiKey: string; model: AiModel }) {
   const d = useData();
   const data = useInsightData();
+  const kinds = availableKinds(d.settings.features);
   const [state, setState] = useState<ChatState>(
     () =>
       lastChat ?? {
         period: '3m',
+        // Everything that is tracked, as before: the user unticks what they would rather keep.
+        share: kinds,
         conversation: { messages: [] },
         bubbles: [],
         tokens: {},
@@ -160,11 +171,15 @@ function Chat({ apiKey, model }: { apiKey: string; model: AiModel }) {
 
   const from = data ? (state.period === 'all' ? data.first : addDays(d.today, -(PERIOD_DAYS[state.period] - 1))) : d.today;
   const ov = data ? overview(data, from, d.today) : undefined;
+  // What the assistant's tools can read: only the period and the kinds ticked, enforced here rather than asked of the model.
+  const shared = useMemo(() => (data ? shareInsightData(data, from, new Set(state.share)) : undefined), [data, from, state.share]);
+  const sharedOv = shared ? overview(shared, from, d.today) : undefined;
   const started = state.bubbles.length > 0;
-  const f = d.settings.features;
+  const ticked = (k: ShareKind) => state.share.includes(k);
+  const toggle = (k: ShareKind, on: boolean) => setState((s) => ({ ...s, share: on ? SHARE_KINDS.filter((x) => x === k || s.share.includes(x)) : s.share.filter((x) => x !== k) }));
 
   async function send(question: string) {
-    if (busy || !data || !ov || !question.trim()) return;
+    if (busy || !shared || !sharedOv || !state.share.length || !question.trim()) return;
     setBusy(true);
     setError(undefined);
     setText('');
@@ -179,8 +194,9 @@ function Chat({ apiKey, model }: { apiKey: string; model: AiModel }) {
       void saveUsage(tokens);
     };
     try {
-      const note = insightNote(Date.now(), ov, before.conversation.messages.length === 0);
-      const r = await askInsights(create, model, before.conversation, { text: question, appNote: note }, data, onUsage);
+      const notShared = kinds.filter((k) => !before.share.includes(k));
+      const note = insightNote(Date.now(), sharedOv, before.conversation.messages.length === 0, notShared);
+      const r = await askInsights(create, model, before.conversation, { text: question, appNote: note }, shared, onUsage);
       recorder.conversation(r.conversation.messages, { system: INSIGHT_SYSTEM, tools: INSIGHT_TOOLS });
       if (r.outcome.kind === 'error') {
         const reason = r.outcome.reason;
@@ -207,13 +223,17 @@ function Chat({ apiKey, model }: { apiKey: string; model: AiModel }) {
     }
   }
 
-  // Example questions for the trackers that are on; a tap types one in (the user still presses Send).
-  const examples = [
-    ...(isOn(f, 'sleep') ? [t('insights.exSleepMood'), t('nights.ask')] : []),
-    ...(isOn(f, 'journal') ? [t('insights.exHeadache')] : []),
-    t('insights.exEnergy'),
-  ];
-  const thin = ov && (ov.foodComplete < THIN_FOOD_DAYS || (isOn(f, 'journal') && ov.journalEntries < THIN_JOURNAL_ENTRIES));
+  const thin = sharedOv && ((ticked('food') && sharedOv.foodComplete < THIN_FOOD_DAYS) || (ticked('journal') && sharedOv.journalEntries < THIN_JOURNAL_ENTRIES));
+  const canSend = !!shared && state.share.length > 0;
+  const count: Record<ShareKind, string> = ov
+    ? {
+        food: t('insights.ovFood', { n: ov.foodComplete, days: ov.days }),
+        journal: t('insights.ovJournal', { n: ov.journalEntries }),
+        sleep: t('insights.ovNights', { n: ov.nights }),
+        activity: t('insights.ovActivity', { n: ov.activityDays }),
+        water: t('insights.ovWater', { n: ov.waterDays }),
+      }
+    : { food: '', journal: '', sleep: '', activity: '', water: '' };
   const { recording, transcribing } = dictation;
 
   return (
@@ -238,28 +258,33 @@ function Chat({ apiKey, model }: { apiKey: string; model: AiModel }) {
                 <p className="small">
                   <strong>{t('insights.ovRange', { from: formatDay(ov.from, d.today), to: formatDay(ov.to, d.today) })}</strong>
                 </p>
-                <ul className="plain-list small insights-overview">
-                  <li>{t('insights.ovFood', { n: ov.foodComplete, days: ov.days })}</li>
-                  {isOn(f, 'journal') && <li>{t('insights.ovJournal', { n: ov.journalEntries })}</li>}
-                  {isOn(f, 'sleep') && <li>{t('insights.ovNights', { n: ov.nights })}</li>}
-                  {isOn(f, 'activity') && <li>{t('insights.ovActivity', { n: ov.activityDays })}</li>}
-                  {isOn(f, 'water') && <li>{t('insights.ovWater', { n: ov.waterDays })}</li>}
-                </ul>
-                {thin && <p className="muted small">{t('insights.thin')}</p>}
+                <p className="muted small">
+                  {t('insights.sendNote')} <a href={href('about', 'sent')}>{t('sent.more')}</a>
+                </p>
+                <fieldset className="insights-share">
+                  <legend className="visually-hidden">{t('insights.shareLabel')}</legend>
+                  {kinds.map((k) => (
+                    <label key={k} className="radio-row small">
+                      <input type="checkbox" checked={ticked(k)} onChange={(e) => toggle(k, e.target.checked)} /> {count[k]}
+                    </label>
+                  ))}
+                </fieldset>
+                {!state.share.length ? <p className="muted small">{t('insights.nothingShared')}</p> : thin && <p className="muted small">{t('insights.thin')}</p>}
               </>
             )}
-            <div className="ask-chips ask-chips-stack" role="group" aria-label={t('insights.examples')}>
-              {examples.map((q) => (
-                <button key={q} type="button" className="ask-chip" onClick={() => setText(q)}>
-                  <Icon name="chat" size={16} />
-                  {q}
-                </button>
-              ))}
-            </div>
-            <button className="btn btn-primary" disabled={busy || !data} onClick={() => void send(t('insights.lookPrompt'))}>
+            <button className="btn btn-primary" disabled={busy || !canSend} onClick={() => void send(t('insights.lookPrompt'))}>
               <Icon name="insights" size={18} /> {t('insights.open')}
             </button>
           </div>
+        )}
+        {started && sharedOv && (
+          <p className="muted small insights-shared">
+            {t('insights.shared', {
+              from: formatDay(sharedOv.from, d.today),
+              to: formatDay(sharedOv.to, d.today),
+              kinds: state.share.map((k) => t(`insights.kind.${k}`)).join(', '),
+            })}
+          </p>
         )}
         {state.bubbles.map((b, i) =>
           b.role === 'user' ? (
@@ -292,7 +317,7 @@ function Chat({ apiKey, model }: { apiKey: string; model: AiModel }) {
       <div className="composer">
         {dictation.startedAt !== undefined ? (
           <p className="composer-note voice-status small" role="status">
-            <span className="rec-dot" aria-hidden="true" /> <RecordingTime since={dictation.startedAt} />
+            <span className="rec-dot" aria-hidden="true" /> <RecordingTime since={dictation.startedAt} /> <span className="muted">· {t('voice.sending')}</span>
           </p>
         ) : transcribing ? (
           <p className="composer-note muted small" role="status">
@@ -300,7 +325,9 @@ function Chat({ apiKey, model }: { apiKey: string; model: AiModel }) {
           </p>
         ) : dictation.failed ? (
           <VoiceFailed onRetry={dictation.retry} onDrop={dictation.drop} />
-        ) : null}
+        ) : (
+          !started && dictation.available && <SentNote text={t('sent.voiceNote')} />
+        )}
         <div className="composer-row">
           {dictation.available && (
             <button
@@ -314,7 +341,7 @@ function Chat({ apiKey, model }: { apiKey: string; model: AiModel }) {
             </button>
           )}
           <textarea rows={1} value={text} placeholder={t('insights.placeholder')} aria-label={t('insights.placeholder')} onChange={(e) => setText(e.target.value)} enterKeyHint="enter" />
-          <button className="icon-btn composer-btn composer-send" aria-label={t('insights.send')} onClick={() => void send(text)} disabled={busy || dictation.busy || !text.trim() || !data}>
+          <button className="icon-btn composer-btn composer-send" aria-label={t('insights.send')} onClick={() => void send(text)} disabled={busy || dictation.busy || !text.trim() || !canSend}>
             <Icon name="send" />
           </button>
         </div>

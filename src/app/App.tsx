@@ -7,6 +7,7 @@ import { ErrorBoundary } from './ErrorBoundary';
 import { diag, layoutSnapshot } from './diagnostics';
 import { Icon } from '../ui/Icon';
 import { AboutPage } from '../features/about/AboutPage';
+import { SentPage } from '../features/about/SentPage';
 import { HomePage } from '../features/home/HomePage';
 import { FastShortcut } from '../features/home/FastShortcut';
 import { SleepShortcut } from '../features/sleep/SleepShortcut';
@@ -116,6 +117,7 @@ function Page({ route }: { route: string[] }) {
           return <SettingsPage />;
       }
     case 'about':
+      if (b === 'sent') return <SentPage />;
       return <AboutPage />;
     case 'calendar':
       return <CalendarPage month={b} />;
