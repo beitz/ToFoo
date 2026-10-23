@@ -33,6 +33,7 @@ import { BackButton } from '../../ui/BackButton';
 import { CameFromCard } from './CameFromCard';
 import { FillsBest } from './FillsBest';
 import { UptakeCard, uptakeVaries } from './UptakeCard';
+import { EffectCard } from './EffectCard';
 
 export function NutrientPage({ id, context }: { id: string; context?: SplitContext }) {
   const d = useData();
@@ -76,6 +77,7 @@ export function NutrientPage({ id, context }: { id: string; context?: SplitConte
           <h2 className="section-title">{t('split.overall', { name: def.name })}</h2>
         </>
       )}
+      <EffectCard r={r} />
       <Hero r={r} noData={noData} showRange={showRange} whyLabel={t('nutrient.whyLink', { value: shown })} />
       <AskChips questions={gap ? [t('nutrient.askMore', { name: def.name.toLowerCase() })] : []} />
 

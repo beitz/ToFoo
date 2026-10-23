@@ -77,6 +77,7 @@ export type FeatureKey =
   | 'forecasts'
   | 'notifications'
   | 'uncertaintyRanges'
+  | 'levelEffects'
   | 'absorption'
   | 'retention'
   | 'sunVitaminD'

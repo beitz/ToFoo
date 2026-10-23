@@ -82,7 +82,7 @@ export function CameFromCard({ r }: { r: NutrientResult }) {
  * Where a "Where it came from" line leads: contributors are summed by name, so the latest entry of
  * that name says what it is: a recipe portion its recipe, a food its page, anything else that entry.
  */
-function contributorHref(d: AppData, label: string): string | undefined {
+export function contributorHref(d: AppData, label: string): string | undefined {
   let latest: LogEntry | undefined;
   for (const e of d.log) if (e.label === label && (!latest || e.time > latest.time)) latest = e;
   if (!latest) return undefined;
