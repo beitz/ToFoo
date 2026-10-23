@@ -34,15 +34,15 @@ describe('catch up', () => {
     expect(missingOn({ ...base, sleep: [...base.sleep, { day: key(22), end: at(22, 7) }], activities: [...base.activities, { day: key(22) }] })).toEqual(['water']);
   });
 
-  it('leaves out trackers that are off, never used before the day, or skipped', () => {
+  it('leaves out trackers that are off or skipped, and asks about one never used yet', () => {
     expect(missingOn({ ...base, on: { sleep: false, activity: true, water: true } })).toEqual(['activity', 'water']);
-    expect(missingOn({ ...base, water: [{ day: key(23) }] })).toEqual(['sleep', 'activity']);
+    expect(missingOn({ ...base, activities: [] })).toEqual(['sleep', 'activity', 'water']);
     expect(missingOn({ ...base, skipped: new Set(['sleep', 'water'] as const) })).toEqual(['activity']);
   });
 
   it('does not ask about food before the model starts, and a sleep still going does not count', () => {
     expect(missingOn({ ...base, foodUnknown: true, beforeStart: true })).toEqual(['sleep', 'activity', 'water']);
-    expect(missingOn({ ...base, sleep: [{ day: key(20) }] })).toEqual(['activity', 'water']);
+    expect(missingOn({ ...base, sleep: [{ day: key(22) }] })).toEqual(['sleep', 'activity', 'water']);
   });
 
   it('proposes the usual night ending on the day', () => {

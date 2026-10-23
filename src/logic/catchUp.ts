@@ -28,19 +28,18 @@ export interface CatchUpInput {
 }
 
 /**
- * What `day` is missing, in a fixed order. A tracker only counts once it was used before that day,
- * so switching one on does not ask about days before it; a sleep counts for the day it ended on.
+ * What `day` is missing, in a fixed order: every tracker that is on, even one never used yet (the
+ * owner switched Activity on and expected the question; only one day is asked about, so a tracker
+ * switched on today costs at most one Skip). A sleep counts for the day it ended on.
  */
 export function missingOn(input: CatchUpInput): CatchUpKind[] {
   const { day } = input;
-  const usedBefore = (rs: readonly { day: string }[]) => rs.some((r) => r.day < day);
   const has = (rs: readonly { day: string }[]) => rs.some((r) => r.day === day);
   const out: CatchUpKind[] = [];
   if (input.foodUnknown && !input.beforeStart) out.push('food');
-  const finished = input.sleep.filter((r) => r.end !== undefined);
-  if (input.on.sleep && usedBefore(finished) && !has(finished)) out.push('sleep');
-  if (input.on.activity && usedBefore(input.activities) && !has(input.activities)) out.push('activity');
-  if (input.on.water && usedBefore(input.water) && !has(input.water)) out.push('water');
+  if (input.on.sleep && !has(input.sleep.filter((r) => r.end !== undefined))) out.push('sleep');
+  if (input.on.activity && !has(input.activities)) out.push('activity');
+  if (input.on.water && !has(input.water)) out.push('water');
   return out.filter((k) => !input.skipped.has(k));
 }
 
