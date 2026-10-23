@@ -1,7 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Three stores at different levels, like the store cards on Home. Drawing stays inside the central 80 % circle so maskable crops keep it. -->
   <rect width="512" height="512" rx="112" fill="#2f6f4e"/>
-  <rect x="150" y="96" width="212" height="320" rx="44" fill="none" stroke="#f6f5f1" stroke-width="28"/>
-  <path d="M164 300 h184 v58 a44 44 0 0 1 -44 44 h-96 a44 44 0 0 1 -44 -44z" fill="#e9c46a"/>
-  <path d="M164 236 h184" stroke="#f6f5f1" stroke-width="14" stroke-linecap="round" opacity=".55"/>
-  <path d="M164 182 h184" stroke="#f6f5f1" stroke-width="14" stroke-linecap="round" opacity=".55"/>
+  <g fill="none" stroke="#f6f5f1" stroke-width="16">
+    <rect x="113" y="146" width="78" height="220" rx="39"/>
+    <rect x="217" y="146" width="78" height="220" rx="39"/>
+    <rect x="321" y="146" width="78" height="220" rx="39"/>
+  </g>
+  <rect x="131" y="198" width="42" height="150" rx="21" fill="#a6dcbd"/>
+  <rect x="235" y="278" width="42" height="70" rx="21" fill="#e9c46a"/>
+  <rect x="339" y="232" width="42" height="116" rx="21" fill="#f6f5f1"/>
 </svg>
