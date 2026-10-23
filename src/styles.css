@@ -6470,6 +6470,23 @@ a.contributor-link > span:first-child {
 .list-info {
   margin: 0 0 8px;
 }
+.list-info > p {
+  margin: 0 0 6px;
+}
+/* Sources under an ⓘ text: small and quiet, the links wrap anywhere so long titles fit 360 px. */
+.list-sources-head {
+  margin: 8px 0 2px;
+  font-size: inherit;
+  font-weight: 600;
+}
+.list-sources {
+  margin: 0 0 6px;
+  padding-left: 1.2em;
+  overflow-wrap: anywhere;
+}
+.list-sources > li {
+  padding: 2px 0;
+}
 .cgauge.gauge-progress .cgauge-fill {
   color: var(--text-muted);
 }

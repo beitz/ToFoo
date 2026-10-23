@@ -269,6 +269,7 @@ export const storage: Record<string, StorageModel> = {
     capacity: {
       value: r(10_000, 15_000, 20_000),
       source: 'NIH ODS Iodine fact sheet: body of a healthy adult contains 15–20 mg iodine, 70–80 % in the thyroid',
+      url: 'https://ods.od.nih.gov/factsheets/Iodine-HealthProfessional/',
       confidence: 'medium',
       note: 'µg at 70 kg. Checked (fact sheet text, 2026-10-15): "The iodine-replete healthy adult has about 15–20 mg of iodine, 70%–80% of which is contained in the thyroid". Low end 10 mg allows for less than replete stores.',
     },
