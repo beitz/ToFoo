@@ -733,16 +733,28 @@ Owner's request (2026-10-20, not built yet): trust comes from being able to look
 
 ## Motivation and gamification
 
-A light layer of rewards makes regular use feel good, rewarding logging, cooking, variety and nutrients in range, never eating less.
+A light layer of rewards makes regular use feel good, rewarding logging, cooking, variety and nutrients reaching their line, never eating less.
 
-- **Logging chain**: counts days with any status, so fasting days count the same as eating days. One grace day per week keeps a single forgotten day from breaking it. A broken chain shows no guilt message, only the new start and the personal best.
-- **Achievements**, e.g. first recipe, first batch, ten recipes; first time a tank reaches the green zone; all gauges green for a day, then a week; all essential amino acids covered in a day; a new ingredient tried; ten different food groups in a week; first backup saved.
-- **Levels**: experience points from consistent logging, new recipes and gaps closed; a level number and a cosmetic title, nothing more.
-- **Nutrient codex**: each nutrient's wiki entry starts greyed out and "unlocks" the first time it reaches the green zone. Collecting doubles as learning.
-- **Satisfying feedback**: gauges animate as they fill after a log, a short burst when a gauge turns green, haptic tap on Android. Respects the system's reduced-motion setting.
-- **Weekly recap card**: which gaps closed, which tank improved most, one suggestion for the next batch. Built on its own as the weekly look-back (see "Reviewing the past").
+**Small achievements and confetti** (owner's decision 2026-10-23: "not too much, just a little bit"; some people like these elements, so it is on by default and one switch turns it off). Not built yet.
 
-Guardrails: no rewards for fewer calories, longer fasts, weight change or overshooting a nutrient; no countdowns, loss threats or nagging notifications; every element can be switched off.
+- **What earns one** (each once, computed from the log, recipes and backups like everything else, so nothing new is stored except which ones were already shown):
+  - Getting started: first meal logged, first recipe saved, first batch cooked, first backup file saved.
+  - Keeping at it: 7, 30, 100 and 365 days logged in a row. Fasting days count the same as eating days, and one missed day per week is forgiven, so a single forgotten day does not reset it. There is no running streak counter on Home and no message when a run breaks.
+  - Filling up: a store climbs from Low to Enough; a nutrient that was low for at least 7 days reaches Enough; every need line Enough for a day, then for a whole week; all essential amino acids covered in a day.
+  - Variety: 10 different foods in a week, then 20; a food never logged before (the first few times only, then quietly).
+  - Weekly: every day of a week logged (or fasted).
+- **The moment**: when one is earned, the toast that confirms the action gets a small ✦ line ("Iron store is back to Enough") and a short confetti burst from the card or button that caused it, about one second, a few dozen pieces in the accent colour and the status colours, with a light haptic tap on Android. Never more than one burst at a time; several at once share one burst and list in the toast. With reduced motion there is no confetti and no movement, only the toast with ✦. Achievements are checked after the change has been saved, so undo takes the achievement back too.
+- **Where to see them**: Insights → Overview gets one row, "Achievements · 7 of 24", opening a page with the earned ones (date earned, what it was for, tap through to the day, recipe or nutrient) and the open ones greyed with one line on how to get them. No points, levels or titles.
+- **Existing installs**: everything already earned is filled in silently, with the date it was first true, so turning it on never fires a burst of old confetti.
+- The tour gets one line for the Insights row (rule: a new screen gets a look at its tour).
+
+**Guardrails** (unchanged and binding for every element): no rewards for fewer calories, longer fasts, weight change or overshooting a nutrient (a limit line or "Too much" never counts as good); no countdowns, loss threats, guilt messages or nagging notifications; every element can be switched off. Fasting days count as logged days so nothing pushes toward eating or not eating.
+
+**Left out on purpose**: experience points and levels, a nutrient codex that unlocks wiki entries, a visible streak counter. They were in the first draft of this spec; the owner wants only a little, and these are the parts most likely to feel like pressure.
+
+**Satisfying feedback** beyond achievements (later, small): store cards animate their fill after a log, respecting reduced motion.
+
+**Weekly recap**: which gaps closed, which store improved most. Built on its own as the weekly look-back (see "Reviewing the past").
 
 ## Settings and feature toggles
 
@@ -784,7 +796,7 @@ Settings also hold the profile, starting-level choice, salt defaults, meal windo
 
 **Nutrient visibility page**: all nutrients in a collapsible tree, e.g. Macronutrients › Protein › Essential amino acids › Lysine, or Minerals › Trace elements › Iodine. Every level has a show/hide switch: all, a group, a subgroup, or a single nutrient. Hiding affects display only; hidden nutrients are still modelled and still trigger "too high" warnings if that setting is on.
 
-**Gamification** has its own on/off switch and per-element switches (see Motivation).
+**Achievements** (small achievements with confetti) have one on/off switch, on by default (see Motivation).
 
 ## What leaves your phone
 
@@ -834,7 +846,7 @@ v1 is the smallest app that is useful every day; each later version adds to the 
 - [x] AI assistant logging: chat with photos and text, BLS foods, confirm card, user's own API key (built 2026-10-16, first real tests passed)
 - [ ] QR export/import for recipes; exchange-format paste import
 - [ ] Claude helper project instructions
-- [ ] Nutrient wiki; gamification basics (logging chain, achievements, fill animations, nutrient codex)
+- [ ] Nutrient wiki (largely covered by the About texts, group pop-ups and nutrient pages); small achievements with confetti (spec 2026-10-23, see "Motivation and gamification")
 - [ ] Forecasts, "best next batch" ranking, recipe preview
 
 **v3 — More data**
