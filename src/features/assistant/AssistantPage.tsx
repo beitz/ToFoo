@@ -62,6 +62,8 @@ import { leftOf, usageOf } from '../../logic/pantry';
 import { BatchCard, PortionCard } from './BatchCards';
 import { ProposalGroup, cardAnchor } from './ProposalGroup';
 import { CardFrame, useCardIntake } from './CardFrame';
+import { ForgottenAsk } from './ForgottenAsk';
+import { addAnswer } from '../../ai/segments';
 import { refKey } from '../../lib/refs';
 import { itemIngredient } from '../../logic/ingredients';
 import { checkPortion, describeCheck, describeStatus, gapFoods, oftenEaten, portionIntake, recipeInfos } from '../../logic/recipeIdeas';
@@ -401,6 +403,7 @@ function Chat({ apiKey, model, day, recipe, reopened }: { apiKey: string; model:
               water: isOn(d.settings.features, 'water'),
               ketones: isOn(d.settings.features, 'ketosis') && isOn(d.settings.features, 'ketoneReadings'),
               shopping: isOn(d.settings.features, 'shoppingList'),
+              forgotten: isOn(d.settings.features, 'forgottenCheck'),
               ...(atHome ? { pantry: atHome } : {}),
               recipes: recipeTools(),
             }),
@@ -589,8 +592,16 @@ function Chat({ apiKey, model, day, recipe, reopened }: { apiKey: string; model:
     textRef.current?.focus();
   }
 
+  function answerCard(id: string, answer: string) {
+    setText((old) => addAnswer(old, t('ai.forgotten.prefix', { id }), answer));
+    textRef.current?.focus();
+  }
+
   const renderCard = (id: string) => (
-    <CardFrame.Provider key={id} value={{ id, undo: undos.get(id), ...(recipe ? {} : { onChange: () => changeCard(id) }), setIntake: intakeSetter(id) }}>
+    <CardFrame.Provider
+      key={id}
+      value={{ id, undo: undos.get(id), ...(recipe ? {} : { onChange: () => changeCard(id), onAnswer: (a: string) => answerCard(id, a) }), setIntake: intakeSetter(id) }}
+    >
       <div id={cardAnchor(id)} className="card-slot">
         <CardView
           card={cards.get(id)!}
@@ -1417,6 +1428,7 @@ function ProposalCard({ card, day, toast, onLogged, register }: CardProps<Extrac
           </ul>
         </div>
       )}
+      {proposal.askAbout && isOn(d.settings.features, 'forgottenCheck') && <ForgottenAsk asks={proposal.askAbout} />}
       <ConfidenceField value={confidence} onChange={setConfidence} />
       <TimeField value={time} onChange={setTime} />
       <p className="muted small">{t('ai.correctHint')}</p>

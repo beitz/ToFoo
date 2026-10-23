@@ -5,7 +5,7 @@
  */
 import type { BetaTool, BetaToolUnion, BetaWebSearchTool20250305 } from '@anthropic-ai/sdk/resources/beta/messages/messages';
 import { ACTIVITY_KINDS, INTENSITIES } from '../storage/types';
-import { PREPARATIONS } from './tools';
+import { FORGOTTEN as FORGOTTEN_KINDS, PREPARATIONS } from './tools';
 
 const GENERIC_NOTE = `say so in assumptions (e.g. "generic hazelnut praline, not the label values")`;
 
@@ -63,7 +63,13 @@ export interface PromptSources {
   recipes?: boolean;
   /** Recipe ideas on: the assistant may read the nutrient status, check recipes and suggest ideas. */
   ideas?: boolean;
+  /** "Ask about forgotten foods" on: meal cards carry ask_about. */
+  forgotten?: boolean;
 }
+
+// Forgotten foods (docs/SPEC.md, "Forgotten foods"): logs come out short mostly from what is
+// easy to leave out; the app asks on the card with tap answers instead of a question in text.
+const FORGOTTEN = `- Forgotten foods: logs most often miss cooking fat, spreads, sauces and drinks. In each propose_meal, list in ask_about what this meal probably had that the user neither said nor showed, likeliest first: cooking_fat (oil or butter in the pan, for fried, roasted or pan-cooked food), spread (butter or spread on bread or rolls), sauce (a sauce, dressing, ketchup or mayo, e.g. with salad, fries, pasta or a burger), drink (with a main meal that has none), milk_sugar (milk or sugar in coffee or tea). A BLS dish already holds the fat and sauce it is made with (fried potatoes, a dish with sauce), so do not ask about those for it. Leave it empty when nothing fits, for a snack or a drink on its own, for packaged products, and for a card that already took the user's answer. Do not ask about these in your text: the app shows them on the card for the user to tap. When the user answers ("M1 also had: oil or butter in the pan, 1 tbsp"), call propose_meal again with replaces set to that card and the food added (estimate the amount if they gave none, and say so in assumptions).`;
 
 // The shopping list (docs/SPEC.md, "Shopping list"): names as the user says them; the app sorts
 // them into shop sections and adds a recipe's ingredients itself.
@@ -124,7 +130,7 @@ Style: brief, friendly, plain text (no headings or tables). Answer in the langua
 
 function systemPrompt(sources: PromptSources): string {
   if (sources.recipe) return recipeSystemPrompt(sources);
-  const { off = false, usda = false, webSearch = false, journal = false, sleep = false, activity = false, water = false, ketones = false, shopping = false, pantry = false, recipes = false, ideas = false } = sources;
+  const { off = false, usda = false, webSearch = false, journal = false, sleep = false, activity = false, water = false, ketones = false, shopping = false, pantry = false, recipes = false, ideas = false, forgotten = false } = sources;
   const extra = [
     off && ' Packaged products can also be looked up by barcode in Open Food Facts.',
     usda && ' Foods the BLS lacks can be searched in USDA FoodData Central.',
@@ -148,7 +154,7 @@ How to work:
 - Find foods with search_foods. Search short, generic terms, in English and German (e.g. ["milk roll", "Milchbrötchen"]); send several queries in one call. Only use codes that search_foods returned.
 ${off ? BRANDED_WITH_PRODUCTS('propose_meal') : BRANDED_BLS_ONLY}
 ${off && webSearch ? `${WEB_SEARCH}\n` : ''}${usda ? `${USDA('propose_meal')}\n` : ''}${journal ? `${JOURNAL(activity)}\n` : ''}${sleep ? `${SLEEP(journal)}\n` : ''}${activity ? `${ACTIVITY}\n` : ''}${water ? `${WATER}\n` : ''}${ketones ? `${KETONES}\n` : ''}${shopping ? `${SHOPPING(recipes)}\n` : ''}${pantry ? `${PANTRY(off)}\n` : ''}${recipes ? `${RECIPES(ideas)}\n${PAGES}\n` : ''}- Mixed dishes (restaurant meals, a hotpot, a bowl): use a matching BLS dish if there is one, otherwise split it into ingredients with estimated grams. Include what changes the result most: cooking oil, sauces, broth that was actually eaten.
-- Amounts: use what the user said, label weights, counts of standard items, and visual cues (plate size, cutlery, hands, packaging). Think about the portion one person ate, not the whole shared dish.
+${forgotten ? `${FORGOTTEN}\n` : ''}- Amounts: use what the user said, label weights, counts of standard items, and visual cues (plate size, cutlery, hands, packaging). Think about the portion one person ate, not the whole shared dish.
 - Pieces: when the user counts pieces of a food ("one piece of chewing gum", "2 bars", "a handful of 5 sweets"), set pieces to the count. Foods list "1 piece = … g" when the weight of one is known (the user's own, or the label's): then grams is pieces × that weight and the app uses that weight. "weight of one piece unknown": estimate grams for all the pieces from the pack (its weight ÷ the number of pieces printed on it, from a photo or the label data) or what such a piece usually weighs, and say the estimate in assumptions (e.g. "1 piece ≈ 1.4 g: 14 g pack of 10"); the user can save the real weight in the app.
 - Ask when the answer would noticeably change the result (an unknown main food, a portion that could easily be double or half, whether shared food was all eaten). Ask one short question at a time and offer a default the user can just accept, e.g. "About one bowl, roughly 400 ml?". Do not ask about details that barely matter. Do not ask for more photos (barcode, label, packaging) when you can work with what you have: the user often cannot take them. If one would clearly change the result, mention it once alongside your proposal, not instead of it. If the user cannot know, estimate and record the assumption.
 - Everything at once: the user often logs a day or two in one go, in one long message (often spoken for many minutes, with filler words and corrections) and many photos (meals, packaging, barcodes, labels, screenshots). Go through all of it and propose every meal${journal ? ', journal entry' : ''}${sleep ? ', sleep' : ''}${activity ? ', activity' : ''}${water ? ', water' : ''}${recipes ? ', recipe' : ''} it contains: leave nothing out and propose nothing twice. Later words override earlier ones ("no, it was two eggs"). The app puts a line before each photo with its number and capture time. Group the photos into meals by time and content: photos minutes apart of the same table are one meal; the same food at different times (yogurt in the morning and in the evening) is two; a photo of a package or barcode belongs to the meal that food was eaten in. Also include meals the user only describes in words. Before proposing, ask everything that matters in one message, as a short numbered list with a default for each, and say how you grouped the photos (e.g. "Photos 2–5: Korean BBQ, Thu 19:40"); keep it to what really changes the result. Then propose everything in one response, one call per meal${journal ? ', journal entry' : ''}${sleep ? ', sleep' : ''}${activity ? ', activity' : ''}${water ? ', water' : ''}${recipes ? ', recipe' : ''}.
@@ -163,10 +169,10 @@ ${recipes ? '- Questions: when the user just asks something (about their food, t
 Style: brief, friendly, plain text (no headings or tables). Answer in the language the user writes in.`;
 }
 
-const key = ({ off = false, usda = false, webSearch = false, journal = false, sleep = false, activity = false, water = false, ketones = false, shopping = false, pantry = false, recipe = false, recipes = false, ideas = false }: PromptSources) =>
+const key = ({ off = false, usda = false, webSearch = false, journal = false, sleep = false, activity = false, water = false, ketones = false, shopping = false, pantry = false, recipe = false, recipes = false, ideas = false, forgotten = false }: PromptSources) =>
   recipe
     ? `r${off ? 1 : 0}${usda ? 1 : 0}${off && webSearch ? 1 : 0}`
-    : `${off ? 1 : 0}${usda ? 1 : 0}${off && webSearch ? 1 : 0}${journal ? 1 : 0}${sleep ? 1 : 0}${activity ? 1 : 0}${water ? 1 : 0}${ketones ? 1 : 0}${shopping ? 1 : 0}${pantry ? 1 : 0}${recipes ? 1 : 0}${recipes && ideas ? 1 : 0}`;
+    : `${off ? 1 : 0}${usda ? 1 : 0}${off && webSearch ? 1 : 0}${journal ? 1 : 0}${sleep ? 1 : 0}${activity ? 1 : 0}${water ? 1 : 0}${ketones ? 1 : 0}${shopping ? 1 : 0}${pantry ? 1 : 0}${recipes ? 1 : 0}${recipes && ideas ? 1 : 0}${forgotten ? 1 : 0}`;
 const prompts = new Map<string, string>();
 const toolSets = new Map<string, BetaToolUnion[]>();
 
@@ -254,7 +260,7 @@ export const WEB_SEARCH_TOOL: BetaWebSearchTool20250305 = {
   user_location: { type: 'approximate', country: 'DE' },
 };
 
-function tools({ off = false, usda = false, webSearch = false, journal = false, sleep = false, activity = false, water = false, ketones = false, shopping = false, pantry = false, recipe = false, recipes = false, ideas = false }: PromptSources): BetaToolUnion[] {
+function tools({ off = false, usda = false, webSearch = false, journal = false, sleep = false, activity = false, water = false, ketones = false, shopping = false, pantry = false, recipe = false, recipes = false, ideas = false, forgotten = false }: PromptSources): BetaToolUnion[] {
   const withProducts = off || usda;
   const codeHelp = off && usda ? 'BLS code from search_foods, or an OFF: or USDA: code from lookup_barcode, search_usda or search_foods.' : off ? 'BLS code from search_foods, or OFF: product code from lookup_barcode or search_foods.' : usda ? 'BLS code from search_foods, or USDA: code from search_usda or search_foods.' : 'BLS code from search_foods.';
   const items = {
@@ -341,8 +347,9 @@ function tools({ off = false, usda = false, webSearch = false, journal = false, 
           confidence: { type: 'string', enum: ['B', 'C'] },
           time: { type: 'string', description: 'When it was eaten, local "YYYY-MM-DD HH:MM" (e.g. "2026-10-15 19:40"); empty for the chat\'s default time.' },
           replaces: { type: 'string', description: 'Id of the open card this corrects (e.g. "M2"); empty for a new meal.' },
+          ...(forgotten ? { ask_about: { type: 'array', items: { type: 'string', enum: [...FORGOTTEN_KINDS] }, description: 'What this meal probably had that the user did not mention, for the card to ask about (at most 3); empty for none.' } } : {}),
         },
-        required: ['summary', 'items', 'assumptions', 'confidence', 'time', 'replaces'],
+        required: ['summary', 'items', 'assumptions', 'confidence', 'time', 'replaces', ...(forgotten ? ['ask_about'] : [])],
         additionalProperties: false,
       },
     },

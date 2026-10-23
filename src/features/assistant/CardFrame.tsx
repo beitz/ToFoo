@@ -11,6 +11,8 @@ import type { Undo } from './cards';
 export interface CardFrameValue {
   id?: string;
   onChange?: () => void;
+  /** Write a tapped answer about this card into the chat box (forgotten foods). */
+  onAnswer?: (answer: string) => void;
   undo?: Undo;
   setIntake?: (intake: Record<string, number> | undefined) => void;
 }

@@ -11,7 +11,7 @@ function hasObjectList(schema: unknown): boolean {
 
 describe('toolsFor', () => {
   // Every option on: the largest tool set the main chat and the recipe editor can send.
-  const all: PromptSources = { off: true, usda: true, webSearch: true, journal: true, sleep: true, activity: true, water: true, shopping: true, pantry: true, recipes: true, ideas: true };
+  const all: PromptSources = { off: true, usda: true, webSearch: true, journal: true, sleep: true, activity: true, water: true, shopping: true, pantry: true, recipes: true, ideas: true, forgotten: true };
 
   it.each([
     ['main chat', all],
