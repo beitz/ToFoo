@@ -107,6 +107,8 @@ export const settingsSchema = z.object({
   autoBackupKeep: z.number().int().positive().optional(),
   defaultPlan: plan,
   homeView: z.enum(['compact', 'detailed']).optional(),
+  macroView: z.enum(['rings', 'bars']).optional(),
+  nutrientView: z.enum(['comets', 'bars']).optional(),
   homeGrouping: z.enum(['status', 'type', 'none']).optional(),
   homeCollapsed: z.record(z.string(), z.boolean()).optional(),
   favourites: z.array(foodRef).optional(),

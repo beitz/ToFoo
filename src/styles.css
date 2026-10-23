@@ -4785,12 +4785,12 @@ a.contributor-link > span:first-child {
 }
 
 /* Today: the calorie ring and four macro donuts (owner's ask, 2026-10-22). */
-.today-card {
+.today-rings {
   display: grid;
   grid-template-columns: auto 1fr;
   align-items: center;
   gap: 4px 14px;
-  padding: 12px;
+  padding: 2px 0;
 }
 .today-big {
   position: relative;

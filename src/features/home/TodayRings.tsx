@@ -36,31 +36,35 @@ export function useToday() {
   };
 }
 
+export type MacroValues = ReturnType<typeof useToday>;
+
 /**
- * Today at the top of Home (owner's ask, 2026-10-22): what was eaten so far today, as a calorie ring
- * and four macro donuts. Only today, unlike the 7-day card below. A ring fills towards the target;
- * past a maximum the extra laps on in the "too much" colour with ▲, and a nutrient without a target
- * shows its grams in a dashed ring. Each one taps through to its nutrient page.
+ * Energy and the macros as rings (owner's ask, 2026-10-22; Settings → Appearance → "Energy and macros"):
+ * a calorie ring and four donuts for protein, fat, carbs and fibre. Home shows today so far ("left" /
+ * "over"); the nutrients page shows a period's average per day. A ring fills towards the target; past a
+ * maximum the extra laps on in the "too much" colour with ▲, and a nutrient without a target shows its
+ * grams in a dashed ring. Each one taps through to its nutrient page.
  */
-export function TodayRings({ defaultBased }: { defaultBased: (id: string) => boolean }) {
+export function MacroRings({ values, defaultBased, today }: { values: MacroValues; defaultBased: (id: string) => boolean; today: boolean }) {
   const d = useData();
-  const { amountOf, partOf, goalOf, own } = useToday();
+  const { amountOf, partOf, goalOf, own } = values;
+  const spokenKey = today ? 'home.ringSpoken' : 'review.ringSpoken';
 
   const kcal = amountOf('ENERCC');
   const kcalGoal = goalOf('ENERCC');
   const kcalText = `${partOf('ENERCC') ? '≥' : ''}${fmtNumber(kcal)}`;
   const diff = kcalGoal ? kcal - kcalGoal.amount : 0;
   const energySpoken = [
-    t('home.ringSpoken', { name: NUTRIENT_BY_ID.get('ENERCC')?.name ?? 'Energy', amount: `${kcalText} kcal` }),
+    t(spokenKey, { name: NUTRIENT_BY_ID.get('ENERCC')?.name ?? 'Energy', amount: `${kcalText} kcal` }),
     kcalGoal ? t('home.ringOfSpoken', { target: `${fmtNumber(kcalGoal.amount)} kcal` }) : '',
-    kcalGoal ? t(diff > 0 ? 'home.kcalOver' : 'home.kcalLeft', { kcal: fmtNumber(Math.abs(diff)) }) : '',
+    kcalGoal && today ? t(diff > 0 ? 'home.kcalOver' : 'home.kcalLeft', { kcal: fmtNumber(Math.abs(diff)) }) : '',
     partOf('ENERCC') ? t('home.ringMissing') : '',
   ]
     .filter(Boolean)
     .join(', ');
 
   return (
-    <div className="card today-card" role="group" aria-label={t('home.todayLabel')}>
+    <div className="today-rings" role="group" aria-label={t(today ? 'home.todayLabel' : 'review.macrosLabel')}>
       <button type="button" className="today-big" onClick={() => navigate('nutrient', 'ENERCC')} aria-label={energySpoken}>
         <Ring size={132} stroke={11} share={kcalGoal ? kcal / kcalGoal.amount : undefined} over={diff > 0} />
         <span className="today-big-text" aria-hidden>
@@ -69,7 +73,10 @@ export function TodayRings({ defaultBased }: { defaultBased: (id: string) => boo
             {kcalGoal ? t('diary.ofTarget', { kcal: `${fmtNumber(kcalGoal.amount)} kcal` }) : 'kcal'}
             {own('ENERCC') && <Icon name="target" size={11} />}
           </span>
-          {kcalGoal && <span className={diff > 0 ? 'today-big-diff today-over' : 'today-big-diff'}>{t(diff > 0 ? 'home.kcalOver' : 'home.kcalLeft', { kcal: fmtNumber(Math.abs(diff)) })}</span>}
+          {kcalGoal && today && (
+            <span className={diff > 0 ? 'today-big-diff today-over' : 'today-big-diff'}>{t(diff > 0 ? 'home.kcalOver' : 'home.kcalLeft', { kcal: fmtNumber(Math.abs(diff)) })}</span>
+          )}
+          {!today && <span className="today-big-diff">{t('review.perDay')}</span>}
         </span>
       </button>
       <div className="today-small">
@@ -80,7 +87,7 @@ export function TodayRings({ defaultBased }: { defaultBased: (id: string) => boo
           const over = !!goal?.max && amount > goal.amount;
           const value = `${partOf(id) ? '≥' : ''}${fmtNumber(amount, amount > 0 && amount < 10 ? 1 : 0)}`;
           const spoken = [
-            t('home.ringSpoken', { name: def?.name ?? id, amount: `${value} g` }),
+            t(spokenKey, { name: def?.name ?? id, amount: `${value} g` }),
             goal ? t(goal.max ? 'home.ringMaxSpoken' : 'home.ringOfSpoken', { target: `${fmtNumber(goal.amount)} g` }) : t('home.ringNoTarget'),
             over ? t('home.ringOverSpoken') : '',
             own(id) ? t('gauge.ownTarget') : '',
