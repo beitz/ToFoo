@@ -55,7 +55,19 @@ export function goBack(...fallback: string[]): void {
 /** Show another page in place of this one (a saved form): back from it skips this page. */
 export function replaceRoute(...parts: string[]): void {
   replacing = pageDepth;
-  window.location.replace(href(...parts));
+  replaceEntry(href(...parts));
+}
+
+/**
+ * `location.replace` to another hash, as a new page. Chrome gives the new entry an empty state, but
+ * Safari (WebKit) only changes the URL of the current entry and keeps its state: a sheet's layer mark
+ * would stay on the new page, and history.ts would then go back over it, straight back to where the
+ * user came from (iPhone, 2026-10-23: "Log meal" from the round button did nothing). Clearing the state
+ * first makes both behave the same.
+ */
+function replaceEntry(url: string): void {
+  window.history.replaceState(null, '');
+  window.location.replace(url);
 }
 
 export function useRoute(): string[] {
@@ -74,6 +86,6 @@ export function href(...parts: string[]): string {
 
 export function navigate(...parts: string[]): void {
   // From a sheet's own history entry, replace it: back from the new page should not land on it.
-  if (onLayerEntry()) window.location.replace(href(...parts));
+  if (onLayerEntry()) replaceEntry(href(...parts));
   else window.location.hash = href(...parts);
 }

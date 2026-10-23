@@ -14,6 +14,8 @@ type Layer = { close: () => void };
 const layers: Layer[] = [];
 /** History entries added for open layers, on top of the page's own entry. */
 let pushed = 0;
+/** The page those entries were added on. */
+let pushedHash = '';
 /** A `history.go` of ours is under way; its popstate is not the user going back. */
 let traversing = false;
 let scheduled = false;
@@ -35,8 +37,10 @@ function sync(): void {
   if (traversing) return; // runs again when the traversal lands
   // A link or the app changed the page while a layer was open: our entries stay behind as plain
   // entries of the previous page, and must not be gone back over.
-  if (pushed > 0 && depthOf(window.history.state) !== pushed) pushed = 0;
+  // The hash check too, in case a browser keeps an entry's state when its URL is replaced (Safari does).
+  if (pushed > 0 && (depthOf(window.history.state) !== pushed || window.location.hash !== pushedHash)) pushed = 0;
   while (pushed < layers.length) {
+    if (pushed === 0) pushedHash = window.location.hash;
     pushed++;
         // Carries the page's depth (router.ts), so going back onto it from a page linked in a sheet still knows it.
     window.history.pushState({ tofooLayer: pushed, tofooPage: (window.history.state as { tofooPage?: unknown } | null)?.tofooPage }, '');
