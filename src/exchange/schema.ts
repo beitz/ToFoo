@@ -110,6 +110,7 @@ export const settingsSchema = z.object({
   macroView: z.enum(['rings', 'bars']).optional(),
   nutrientView: z.enum(['comets', 'bars']).optional(),
   homeGrouping: z.enum(['status', 'type', 'none']).optional(),
+  calendarLayer: z.enum(['all', 'meals', 'sleep', 'activity', 'water', 'journal']).optional(),
   homeCollapsed: z.record(z.string(), z.boolean()).optional(),
   favourites: z.array(foodRef).optional(),
   favouriteMeals: z.array(favouriteMeal).optional(),

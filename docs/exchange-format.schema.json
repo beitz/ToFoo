@@ -428,6 +428,17 @@
                         "none"
                       ]
                     },
+                    "calendarLayer": {
+                      "type": "string",
+                      "enum": [
+                        "all",
+                        "meals",
+                        "sleep",
+                        "activity",
+                        "water",
+                        "journal"
+                      ]
+                    },
                     "homeCollapsed": {
                       "type": "object",
                       "propertyNames": {

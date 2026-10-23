@@ -128,6 +128,8 @@ export interface Settings extends Versioned {
   nutrientView?: 'comets' | 'bars';
   /** Home nutrient list grouping; unset = by status. */
   homeGrouping?: 'status' | 'type' | 'none';
+  /** What the calendar shows: every tracker as dots, or one of them; unset = all. */
+  calendarLayer?: 'all' | 'meals' | 'sleep' | 'activity' | 'water' | 'journal';
   /** Home groups the user opened (false) or closed (true), by group key; unset keys use the default. */
   homeCollapsed?: Record<string, boolean>;
   /** Foods pinned to the top of the log screen, in the order they were added. */
