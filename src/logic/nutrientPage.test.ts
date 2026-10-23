@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { DailyTotals } from '../model/simulate';
-import { cameFrom, storeAhead, timesEaten, uptakeDays } from './nutrientPage';
+import { cameFrom, storeAhead, tileTop, timesEaten, uptakeDays, windowDays } from './nutrientPage';
 
 const totals = (intake: number, absorbed: number, missing = false): DailyTotals => ({
   absorbed: {
@@ -118,5 +118,37 @@ describe('nutrient page numbers', () => {
       ).map((p) => p.central),
     ).toEqual([0.98, 1, 1]);
     expect(storeAhead({ capacity: 100, level: { low: 1, central: 1, high: 1 } }, '2026-10-22', 3)).toEqual([]);
+  });
+
+  it('lists the averaging window up to yesterday, with how each day counts', () => {
+    const days = ['2026-10-18', '2026-10-19', '2026-10-20', '2026-10-21', '2026-10-22', '2026-10-23'];
+    const daily = [totals(1, 1), totals(1, 1, true), totals(0, 0), totals(0, 0), totals(1, 1), totals(5, 5)];
+    const status = {
+      '2026-10-18': 'logged',
+      '2026-10-19': 'logged',
+      '2026-10-20': 'unknown',
+      '2026-10-21': 'excluded',
+      '2026-10-22': 'fasted',
+      '2026-10-23': 'pending',
+    } as const;
+    expect(windowDays(days, daily, status, 'FE', 4, false)).toEqual([
+      { day: '2026-10-19', dot: 'known', missing: true },
+      { day: '2026-10-20', dot: 'known', missing: false },
+      { day: '2026-10-21', dot: 'leftOut', missing: false },
+      { day: '2026-10-22', dot: 'known', missing: false },
+    ]);
+    // With "Fill in unlogged days" on, the unlogged day is an estimate.
+    expect(windowDays(days, daily, status, 'FE', 4, true)[1]).toEqual({ day: '2026-10-20', dot: 'estimated', missing: false });
+    // A window longer than the model's days starts at the first day.
+    expect(windowDays(days, daily, status, 'FE', 14, false)).toHaveLength(5);
+  });
+
+  it('grows the tile in steps so the likely range fits, and says when it goes past the last step', () => {
+    expect(tileTop(0.6)).toEqual({ top: 1, over: false });
+    expect(tileTop(1)).toEqual({ top: 1, over: false });
+    expect(tileTop(1.2)).toEqual({ top: 1.5, over: false });
+    expect(tileTop(1.87)).toEqual({ top: 2, over: false });
+    expect(tileTop(2.5)).toEqual({ top: 3, over: false });
+    expect(tileTop(10.9)).toEqual({ top: 3, over: true });
   });
 });

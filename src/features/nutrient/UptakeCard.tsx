@@ -1,9 +1,11 @@
 import { useData } from '../../app/data';
 import { href } from '../../app/router';
 import { t, type MessageKey } from '../../i18n';
-import { weekdayShort } from '../../lib/dates';
-import { fmtAmount, fmtNumber } from '../../lib/format';
-import { uptakeDays } from '../../logic/nutrientPage';
+import { useState } from 'react';
+import { formatDay, weekdayShort } from '../../lib/dates';
+import { fmtAmount } from '../../lib/format';
+import { uptakeDays, type UptakeDay } from '../../logic/nutrientPage';
+import { InfoButton } from '../../ui/InfoButton';
 import { NUTRIENT_BY_ID } from '../../model/nutrients';
 import { nutrientParams } from '../../../model/parameters';
 
@@ -18,64 +20,81 @@ export function uptakeVaries(id: string): boolean {
 }
 
 /**
- * "Eaten → taken up" (design 2026-10-22): per day of the window, what the food held (the number on
- * top), what the body took up (the bar) and what it needs (the line). The bars share one scale with
- * the line; what was eaten is a number only, since it is many times larger for iron.
+ * "Eaten → taken up" (design 2026-10-22): per day of the window, what the body took up (the bar) and
+ * what it needs (the line), on one scale. What the food held is a number only, since it is many times
+ * larger for iron; it shows for the day tapped, in one line above the bars.
  */
 export function UptakeCard({ id, need }: { id: string; need: number }) {
   const d = useData();
   const def = NUTRIENT_BY_ID.get(id);
   const r = d.model.nutrients.get(id);
+  const [picked, setPicked] = useState<string | null>(null);
   if (!def || !r) return null;
   const days = uptakeDays(d.modelDays, d.model.daily, d.model.dayStatus, id, r.windowDays);
   if (!days.some((x) => x.eaten !== undefined)) return null;
   const top = Math.max(need, ...days.map((x) => x.takenUp ?? 0)) * 1.1 || 1;
-  const digits = (v: number) => fmtNumber(v, v < 10 ? 1 : 0);
+  // The numbers of one day at a time (a row of numbers per bar did not fit 14 days on a phone):
+  // the day tapped, else the last finished day the log tells (today is still going).
+  const shown = days.find((x) => x.day === picked) ?? [...days].reverse().find((x) => x.eaten !== undefined && x.day < d.today) ?? days.at(-1)!;
+  const spoken = (x: UptakeDay) =>
+    x.eaten === undefined
+      ? t('uptake.daySpokenUnknown', { day: weekdayShort(x.day) })
+      : t('uptake.daySpoken', {
+          day: weekdayShort(x.day),
+          eaten: fmtAmount(id, x.eaten),
+          up: fmtAmount(id, x.takenUp!),
+        }) + (x.missing ? ` ${t('uptake.missingSpoken')}` : '');
+  // Every other weekday under 14 bars, so the labels don't run into each other.
+  const every = days.length > 8 ? 2 : 1;
   return (
     <div className="card uptake">
       <div className="card-head">
         <h2>{t('uptake.title')}</h2>
-        <span className="card-note">{t('uptake.note', { unit: def.unit })}</span>
+        <InfoButton title={t('uptake.title')}>
+          <p>{t('uptake.info', { unit: def.unit, need: fmtAmount(id, need) })}</p>
+          {id === 'VITD' && <p>{t('uptake.vitDSun')}</p>}
+        </InfoButton>
       </div>
-      <div className="uptake-days" role="list">
-        {days.map((x) => {
+      <p className="uptake-readout small" aria-live="polite">
+        <strong>{formatDay(shown.day, d.today)}</strong>{' '}
+        {shown.eaten === undefined
+          ? t('uptake.notLogged')
+          : t('uptake.readout', {
+              eaten: `${fmtAmount(id, shown.eaten)}${shown.missing ? '+' : ''}`,
+              up: fmtAmount(id, shown.takenUp!),
+            })}
+      </p>
+      <div className="uptake-days" role="group" aria-label={t('uptake.title')}>
+        {days.map((x, i) => {
           const known = x.eaten !== undefined;
-          const spoken = !known
-            ? t('uptake.daySpokenUnknown', { day: weekdayShort(x.day) })
-            : t('uptake.daySpoken', {
-                day: weekdayShort(x.day),
-                eaten: fmtAmount(id, x.eaten!),
-                up: fmtAmount(id, x.takenUp!),
-              }) + (x.missing ? ` ${t('uptake.missingSpoken')}` : '');
           return (
-            <div key={x.day} className="uptake-day" role="listitem" aria-label={spoken}>
-              <span className="uptake-eaten" aria-hidden>
-                {known ? `${digits(x.eaten!)}${x.missing ? '+' : ''}` : '–'}
-              </span>
+            <button
+              type="button"
+              key={x.day}
+              className={`uptake-day${x.day === shown.day ? ' picked' : ''}`}
+              aria-label={spoken(x)}
+              aria-pressed={x.day === shown.day}
+              onClick={() => setPicked(x.day)}
+            >
               <span className="uptake-col" aria-hidden>
                 {known && <span className="uptake-bar" style={{ height: `${((x.takenUp ?? 0) / top) * 100}%` }} />}
                 <span className="uptake-need" style={{ bottom: `${(need / top) * 100}%` }} />
               </span>
-              <span className="uptake-up" aria-hidden>
-                {known ? digits(x.takenUp!) : '–'}
-              </span>
               <span className="uptake-wd muted" aria-hidden>
-                {x.fasted ? t('uptake.fast') : weekdayShort(x.day)}
+                {x.fasted ? t('uptake.fast') : (days.length - 1 - i) % every === 0 ? weekdayShort(x.day) : ''}
               </span>
-            </div>
+            </button>
           );
         })}
       </div>
-      <p className="uptake-legend small muted">
-        <span>{t('uptake.legendEaten')}</span>
+      <p className="chart-legend small muted">
         <span>
           <span className="legend-bar" /> {t('uptake.legendUp')}
         </span>
         <span>
-          <span className="legend-line" /> {t('uptake.legendNeed', { need: fmtAmount(id, need) })}
+          <span className="legend-line" /> {t('uptake.legendNeedShort')}
         </span>
       </p>
-      {id === 'VITD' && <p className="small muted">{t('uptake.vitDSun')}</p>}
       {id === 'FE' && <IronHelpers />}
     </div>
   );

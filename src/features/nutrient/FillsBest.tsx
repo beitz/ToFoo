@@ -15,6 +15,7 @@ import { isOn } from '../../settings/features';
 import { repo } from '../../storage/repo';
 import { CURRENT_SCHEMA_VERSION, type Batch, type Recipe } from '../../storage/types';
 import { Icon } from '../../ui/Icon';
+import { InfoButton } from '../../ui/InfoButton';
 import { usePantry, usePantryLeft, leftLabel, placeName } from '../pantry/usePantry';
 import { logPortion, nextStorage, totalLeft } from '../home/StockChips';
 
@@ -159,7 +160,9 @@ export function FillsBest({ id, recommended }: { id: string; recommended: number
     <div className="card fills">
       <div className="card-head">
         <h2>{t('fills.title')}</h2>
-        <span className="card-note">{t('fills.note')}</span>
+        <InfoButton title={t('fills.title')}>
+          <p>{t('fills.info')}</p>
+        </InfoButton>
       </div>
       <ul className="plain-list fills-list">
         {options.map((o) => {
@@ -174,13 +177,19 @@ export function FillsBest({ id, recommended }: { id: string; recommended: number
                   ? o.where
                   : eatenBefore.has(o.food.code)
                     ? t('fills.eatenBefore')
-                    : t('fills.notAtHome');
+                    : '';
+          // Small icons instead of "had before · not at home": only what is true is shown.
+          const icon = o.kind === 'home' ? 'pantry' : o.kind === 'food' && eatenBefore.has(o.food.code) ? 'history' : o.kind === 'batch' ? (o.storage === 'freezer' ? 'snow' : 'fridge') : undefined;
           const key = o.kind === 'batch' ? o.batch.id : o.kind === 'recipe' ? o.recipe.id : `${o.kind}:${o.food.code}`;
           return (
             <li key={key} className="fills-line">
               <a className="fills-name" href={link}>
                 <span>{name}</span>
-                <span className="muted small">{sub}</span>
+                {sub && (
+                  <span className="muted small fills-sub">
+                    {icon && <Icon name={icon} size={14} />} {sub}
+                  </span>
+                )}
               </a>
               <span
                 className="fills-share"

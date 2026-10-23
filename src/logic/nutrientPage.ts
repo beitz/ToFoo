@@ -111,3 +111,55 @@ export function storeAhead(store: Pick<StoreResult, 'capacity' | 'level' | 'netP
   }
   return out;
 }
+
+/** One day of the averaging window, as a dot under the number. */
+export type WindowDot = 'known' | 'estimated' | 'leftOut';
+
+export interface WindowDay {
+  day: string;
+  dot: WindowDot;
+  /** Some food eaten that day has no value for this nutrient. */
+  missing: boolean;
+}
+
+/**
+ * The days behind a nutrient's average, oldest first, with how each one counts: logged or fasted
+ * ('known'), filled in from recent days ('estimated'), or left out of every average. Same window
+ * and the same rules as the model (src/model/simulate.ts): it ends yesterday, and without "Fill in
+ * unlogged days" an unlogged past day counts as known with nothing eaten.
+ */
+export function windowDays(
+  days: readonly string[],
+  daily: readonly DailyTotals[],
+  dayStatus: Readonly<Record<string, DayStatus | 'pending'>>,
+  id: string,
+  n: number,
+  imputeUnlogged: boolean,
+): WindowDay[] {
+  const end = days.length - 2;
+  const out: WindowDay[] = [];
+  for (let i = Math.max(0, end - n + 1); i <= end; i++) {
+    const day = days[i]!;
+    const st = dayStatus[day];
+    const known = st === 'logged' || st === 'fasted' || (!imputeUnlogged && st === 'unknown');
+    out.push({
+      day,
+      dot: st === 'excluded' ? 'leftOut' : known ? 'known' : 'estimated',
+      missing: !!daily[i]?.missing.has(id),
+    });
+  }
+  return out;
+}
+
+/** Heights the need tile can grow to (multiples of the need), so values over 100 % keep their size. */
+const TILE_TOPS = [1, 1.5, 2, 3];
+const TILE_MAX = 3;
+
+/**
+ * The top of a need or limit tile: 100 % until the likely range goes past it, then the smallest
+ * step that holds it. Past the last step the tile is full and `over` says it goes on above.
+ */
+export function tileTop(high: number): { top: number; over: boolean } {
+  const top = TILE_TOPS.find((x) => high <= x + 1e-9);
+  return top === undefined ? { top: TILE_MAX, over: true } : { top, over: false };
+}
