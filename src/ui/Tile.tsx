@@ -66,12 +66,18 @@ const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
  * Status as a shape (design system): enough a filled dot, a bit low a half-filled dot, low an empty
  * ring, too much a triangle, unknown a dashed ring. Colour is extra, never the only cue.
  */
-export function StatusMark({ status, size = 10 }: { status: GaugeStatus; size?: number }) {
+export function StatusMark({ status, size = 10, unsure = false }: { status: GaugeStatus; size?: number; unsure?: boolean }) {
   const cls = `smark smark-${status}`;
   const ring = 'M6 1.75a4.25 4.25 0 1 0 .01 0Z';
   return (
     <svg className={cls} width={size} height={size} viewBox="0 0 12 12" aria-hidden>
-      {status === 'tooHigh' ? (
+      {unsure ? (
+        // The likely range crosses a status line: a ring with a wave, coloured by the middle value.
+        <>
+          <path d={ring} fill="none" stroke="currentColor" strokeWidth="1.5" />
+          <path d="M3.6 6.4c.8-.9 1.6-.9 2.4 0s1.6.9 2.4 0" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+        </>
+      ) : status === 'tooHigh' ? (
         <path d="M6 1.2L10.9 10.2H1.1Z" fill="currentColor" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
       ) : status === 'fine' ? (
         <path d="M6 1.5a4.5 4.5 0 1 0 .01 0Z" fill="currentColor" />

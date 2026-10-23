@@ -5,10 +5,12 @@ import { storeTrendOf } from '../model/trend';
 /**
  * A store needs attention when it is low or getting low and not filling at the recent rate. A low store that is
  * filling (an empty start on a diet that covers the need) is on its way and gets no warning; neither does a store
- * whose recent average covers nothing because nothing was logged.
+ * whose recent average covers nothing because nothing was logged, nor one whose likely range reaches "enough"
+ * (the log can't tell, accuracy review proposal 1).
  */
 export function storeNeedsAttention(st: StoreResult): boolean {
   if (st.status !== 'low' && st.status !== 'gettingLow') return false;
+  if (st.statusSpan?.high === 'fine') return false;
   const tr = storeTrendOf(st);
   return !tr || tr.direction !== 'up';
 }

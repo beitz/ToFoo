@@ -1,3 +1,4 @@
+import { logTrust } from '../../../model/log-trust';
 import type { ReactNode } from 'react';
 import { useData } from '../../app/data';
 import { href } from '../../app/router';
@@ -203,6 +204,11 @@ export function WhyPage({ id }: { id: string }) {
             {t(`why.sure.${sure}` as MessageKey)}
             {bloodTest ? ` ${t('why.sureTest')}` : ''}
           </p>
+          {logTrust[id] && (
+            <p className="small">
+              <Icon name="eye" size={14} /> <strong>{t(`trust.chip.${logTrust[id].trust}`)}.</strong> {t(`trust.reason.${logTrust[id].reason}`)}
+            </p>
+          )}
         </div>
       )}
 

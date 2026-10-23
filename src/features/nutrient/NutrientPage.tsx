@@ -4,9 +4,10 @@ import { href } from '../../app/router';
 import { t, type MessageKey } from '../../i18n';
 import { fmtAmount, fmtFill, fmtNumber, fmtPercent } from '../../lib/format';
 import { NUTRIENT_BY_ID } from '../../model/nutrients';
-import { earlyReading, tankTrend, type GaugeStatus, type HistoryPoint, type NutrientResult, type StoreResult } from '../../model/simulate';
+import { earlyReading, isUnsure, tankTrend, type GaugeStatus, type HistoryPoint, type NutrientResult, type StoreResult } from '../../model/simulate';
 import type { Range } from '../../model/paramTypes';
 import { statusThresholds, trendDisplay } from '../../../model/parameters';
+import { logTrust, trustReasons } from '../../../model/log-trust';
 import { storeTrendOf, trendOf, type Trend } from '../../model/trend';
 import { isOn } from '../../settings/features';
 import { infoId, NUTRIENT_INFO_SOURCES } from '../../i18n/nutrientInfo.en';
@@ -15,7 +16,7 @@ import { InfoButton } from '../../ui/InfoButton';
 import { AskChips } from '../../ui/AskChips';
 import { LineChart } from '../../ui/LineChart';
 import { hasNoData, storeTrendLabel, trendArrows, trendLabel } from '../../ui/Gauge';
-import { statusLabel } from '../../ui/status';
+import { statusText } from '../../ui/status';
 import { StatusMark, symbolOf } from '../../ui/Tile';
 import { Icon } from '../../ui/Icon';
 import { energyBasisText } from '../settings/EnergyTarget';
@@ -173,10 +174,10 @@ function ChartLegend({ tone, ahead, range }: { tone?: 'tank'; ahead: boolean; ra
 /** One word for where the number is heading; the full sentence is in the ⓘ sheet. */
 function trendWord(tr: Trend, store: boolean): string {
   if (store) {
-    if (tr.direction === 'steady') return t(tr.better === false ? 'store.staysEmptyShort' : 'store.holding');
+    if (tr.direction === 'steady') return t(tr.better === false ? 'store.staysEmptyShort' : tr.unsure ? 'store.unsureShort' : 'store.holding');
     return t(tr.direction === 'up' ? 'store.filling' : 'store.draining');
   }
-  return t(tr.direction === 'steady' ? 'trend.steady' : tr.direction === 'up' ? 'trend.up' : 'trend.down');
+  return t(tr.direction === 'steady' ? (tr.unsure ? 'trend.unsureShort' : 'trend.steady') : tr.direction === 'up' ? 'trend.up' : 'trend.down');
 }
 
 /**
@@ -192,8 +193,10 @@ function Hero({ r, noData, showRange, whyLabel }: { r: NutrientResult; noData: b
   const req = d.requirements.byNutrient.get(id);
   const store = r.store;
   const status: GaugeStatus = noData ? 'unknown' : (store?.status ?? r.status);
+  const span = noData ? undefined : (store?.statusSpan ?? r.statusSpan);
   const trend = noData ? null : store ? storeTrendOf(store) : r.status === 'unknown' ? null : trendOf(r);
   const early = noData ? null : earlyReading(r);
+  const trust = logTrust[id];
   const value = noData
     ? '–'
     : store
@@ -252,7 +255,7 @@ function Hero({ r, noData, showRange, whyLabel }: { r: NutrientResult; noData: b
           {range && showRange && <p className="muted small">{t('nutrient.likely', { range })}</p>}
           {r.kind !== 'info' && (
             <p className="status-line">
-              <StatusMark status={status} size={14} /> {statusLabel(status).toLowerCase()}
+              <StatusMark status={status} size={14} unsure={isUnsure(span)} /> {statusText(status, span).toLowerCase()}
             </p>
           )}
           {trend && (
@@ -298,6 +301,11 @@ function Hero({ r, noData, showRange, whyLabel }: { r: NutrientResult; noData: b
         {r.missingDataDays > 0 && (
           <span className="chip chip-warn">
             <Icon name="question" size={14} /> {t('nutrient.chipMissing', { n: r.missingDataDays })}
+          </span>
+        )}
+        {trust && (
+          <span className={trust.trust === 'blind' ? 'chip chip-warn' : 'chip'} data-tour="nutrient.trust">
+            <Icon name="eye" size={14} /> {t(`trust.chip.${trust.trust}`)}
           </span>
         )}
       </div>
@@ -400,6 +408,8 @@ function HeroNotes({ r, noData, trend, weekText }: { r: NutrientResult; noData: 
         {t('nutrient.dotsLegend')}
       </p>
       {r.missingDataDays > 0 && <p>{t('nutrient.missingData', { n: r.missingDataDays })}</p>}
+      {!noData && isUnsure(store?.statusSpan ?? r.statusSpan) && <p>{t('nutrient.unsureExplain')}</p>}
+      <TrustNote id={id} />
       <p className="muted">
         {t('nutrient.modelNote')} {t('nutrient.notAdvice')}
       </p>
@@ -605,8 +615,9 @@ function TankTrendNote({ r, store, need, startedEmpty }: { r: NutrientResult; st
     absorbed: fmtAmount(r.id, Math.max(0, need + store.netPerDay)),
     need: fmtAmount(r.id, need),
   };
-  const text =
-    trend.direction === 'draining'
+  const text = storeTrendOf(store)?.unsure
+    ? t('nutrient.trendUnsure', vars)
+    : trend.direction === 'draining'
       ? t(store.level.central > 0 ? 'nutrient.trendDraining' : 'nutrient.trendEmpty', vars)
       : trend.direction === 'steady'
         ? t('nutrient.trendSteady', vars)
@@ -650,4 +661,21 @@ function IronReferenceNote({ r, store, need }: { r: NutrientResult; store: Store
 function TestHint({ r, name }: { r: NutrientResult; name: string }) {
   const text = testHintText(r, name);
   return text ? <p className="small notice">{text}</p> : null;
+}
+
+/** How far a food log can see this nutrient (model/log-trust.ts), with the reason and its source. */
+function TrustNote({ id }: { id: string }) {
+  const trust = logTrust[id];
+  if (!trust) return null;
+  const reason = trustReasons[trust.reason];
+  return (
+    <p>
+      <strong>{t(`trust.chip.${trust.trust}`)}.</strong> {t(`trust.${trust.trust}`)} {t(`trust.reason.${trust.reason}`)}{' '}
+      {reason.url && (
+        <a href={reason.url} target="_blank" rel="noreferrer">
+          {t('trust.source')}
+        </a>
+      )}
+    </p>
+  );
 }

@@ -4,12 +4,13 @@ import { t, type MessageKey } from '../../i18n';
 import { fmtAmount, fmtPercent } from '../../lib/format';
 import { trendDisplay } from '../../../model/parameters';
 import { NUTRIENT_BY_ID } from '../../model/nutrients';
-import type { GaugeStatus, NutrientResult } from '../../model/simulate';
+import { isUnsure, type GaugeStatus, type NutrientResult } from '../../model/simulate';
 import { trendOf } from '../../model/trend';
 import { repo } from '../../storage/repo';
 import { Segmented } from '../../ui/controls';
 import { hasNoData, trendArrows, trendLabel, windowTag } from '../../ui/Gauge';
 import { Icon } from '../../ui/Icon';
+import { statusText } from '../../ui/status';
 import { StatusMark } from '../../ui/Tile';
 import { GroupInfoButton, hasGroupInfo } from '../info/GroupInfo';
 import { byUrgency, groupNutrients } from './grouping';
@@ -146,7 +147,7 @@ function CometRow({ result: r, showRange, open = (id) => navigate('nutrient', id
   const pct = fmtPercent(now);
   const spoken = noData
     ? t('tile.unknownSpoken', { name: def?.name ?? r.id })
-    : t(r.kind === 'limit' ? 'tile.limitSpoken' : 'tile.needSpoken', { name: def?.name ?? r.id, pct, status: t(`statusWord.${status}` as MessageKey) }) +
+    : t(r.kind === 'limit' ? 'tile.limitSpoken' : 'tile.needSpoken', { name: def?.name ?? r.id, pct, status: isUnsure(r.statusSpan) ? statusText(status, r.statusSpan).toLowerCase() : t(`statusWord.${status}` as MessageKey) }) +
       (tr ? `, ${trendLabel(tr)}` : '') +
       (r.ownTarget ? `, ${t('gauge.ownTarget')}` : '') +
       (tag ? `, ${tag.spoken}` : '');
@@ -166,7 +167,7 @@ function CometRow({ result: r, showRange, open = (id) => navigate('nutrient', id
             {showRange && r.value.high > r.value.low && <span className="comet-band" style={{ left: at(r.value.low), width: `calc(${at(r.value.high)} - ${at(r.value.low)})` }} />}
             {to > from && <span className={was < now ? 'comet-tail' : 'comet-tail comet-tail-back'} style={{ left: at(from), width: `calc(${at(to)} - ${at(from)})` }} />}
             <span className="comet-head" style={{ left: at(now) }}>
-              <StatusMark status={status} size={12} />
+              <StatusMark status={status} size={12} unsure={isUnsure(r.statusSpan)} />
             </span>
           </>
         )}
