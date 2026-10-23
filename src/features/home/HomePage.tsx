@@ -21,6 +21,8 @@ import { NutrientsSection } from './NutrientsSection';
 import { RecentDays } from './RecentDays';
 import { StoresSection } from './StoresSection';
 import { TodayRings } from './TodayRings';
+import { ListLayout } from './ListLayout';
+import { formatDate, parseDay } from '../../lib/dates';
 
 /** Energy and the macronutrients: today's rings at the top, not in the 7-day list; fibre too (owner's ask). */
 const MACRO_ROW = ['ENERCC', 'PROT625', 'FAT', 'CHO', 'FIBT'];
@@ -40,6 +42,8 @@ export function HomePage() {
   const showRange = isOn(settings.features, 'uncertaintyRanges');
   const hidden = new Set(settings.hiddenNutrients);
   const windowDays = settings.shortWindowDays;
+  // Two layouts while the owner tries them (2026-10-23): lists by averaging window (default), or rings and comets.
+  const rings = settings.homeView === 'detailed';
 
   const shown = NUTRIENTS.filter((n) => !hidden.has(n.id))
     .map((n) => model.nutrients.get(n.id))
@@ -50,9 +54,7 @@ export function HomePage() {
   const gaps = useMemo(() => {
     const excludedGroups = new Set(d.profile.exclusions.groups);
     const excludedFoods = new Set(d.profile.exclusions.foods);
-    const candidates = d.foods.foods
-      .filter((f) => !NON_SINGLE_FOOD_GROUPS.has(f.group) && !excludedGroups.has(f.group) && !excludedFoods.has(f.code))
-      .map((f) => ({ key: f.code, per100: f.per100 }));
+    const candidates = d.foods.foods.filter((f) => !NON_SINGLE_FOOD_GROUPS.has(f.group) && !excludedGroups.has(f.group) && !excludedFoods.has(f.code)).map((f) => ({ key: f.code, per100: f.per100 }));
     const ranked = rankFoods(candidates, model.nutrients, d.requirements, 80);
     return diverseTop(ranked, 12, (g) => d.foods.byCode.get(g.key) ?? { code: g.key, nameEn: g.key });
   }, [d.foods, d.profile.exclusions, model, d.requirements]);
@@ -64,24 +66,28 @@ export function HomePage() {
   return (
     <section className="home">
       <header className="page-head row-between home-head">
-        <h1 className="grow">{t('home.today')}</h1>
+        <h1 className="grow">{rings ? t('home.today') : `${parseDay(today).toLocaleDateString('en-GB', { weekday: 'long' })} ${formatDate(today, false)}`}</h1>
         <FastChip />
         <SettingsButton />
       </header>
       <DayStrip days={windowDays} />
-      <TodayRings defaultBased={perKgOnDefault} />
+      {rings && <TodayRings defaultBased={perKgOnDefault} />}
       <FastCard />
 
       {isOn(d.settings.features, 'sleep') && <SleepQuestion />}
       <Prompts />
 
-      <div className="card home-card">
-        <div className="card-head">
-          <h2>{t('home.lastDays', { n: windowDays })}</h2>
+      {rings ? (
+        <div className="card home-card">
+          <div className="card-head">
+            <h2>{t('home.lastDays', { n: windowDays })}</h2>
+          </div>
+          <StoresSection stores={stores} showRange={showRange} startLevel={d.profile.startingLevel} />
+          <NutrientsSection results={rest} showRange={showRange} windowDays={windowDays} />
         </div>
-        <StoresSection stores={stores} showRange={showRange} startLevel={d.profile.startingLevel} />
-        <NutrientsSection results={rest} showRange={showRange} windowDays={windowDays} />
-      </div>
+      ) : (
+        <ListLayout rest={rest} stores={stores} windowDays={windowDays} startLevel={d.profile.startingLevel} defaultBased={perKgOnDefault} />
+      )}
       {isOn(d.settings.features, 'water') && <WaterCard day={today} compact />}
       <NextToCook />
 
