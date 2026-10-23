@@ -46,7 +46,7 @@ export interface UsdaFood extends ProductData {
  *   used, which converts folic acid with factor 1.7 (docs/OPEN_QUESTIONS.md).
  * - Niacin: USDA gives preformed niacin (406 → BLS NIA), not niacin equivalents (NIAEQ), so the
  *   gauge value comes from the similar BLS food if one is chosen, or stays missing.
- * Left out: vitamin A and D in IU (the µg values are used), selenium (not in BLS).
+ * Left out: vitamin A and D in IU (the µg values are used).
  */
 export const USDA_NUTRIENTS: ReadonlyArray<readonly [id: string, numbers: readonly string[], unit: string]> = [
   ['PROT625', ['203'], 'g'],
@@ -91,6 +91,7 @@ export const USDA_NUTRIENTS: ReadonlyArray<readonly [id: string, numbers: readon
   ['FE', ['303'], 'mg'],
   ['ZN', ['309'], 'mg'],
   ['ID', ['314'], 'µg'],
+  ['SE', ['317'], 'µg'],
   ['CU', ['312'], 'µg'],
   ['MN', ['315'], 'µg'],
   ['FD', ['313'], 'µg'],

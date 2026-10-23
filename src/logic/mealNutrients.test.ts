@@ -149,6 +149,9 @@ describe('nutrients of one meal', () => {
     expect(partSource(gummy, 'VITC')).toBeUndefined();
     expect(partSource({ code: 'USDA:123', per100: { FE: 1 }, provenance: { FE: 'D' } }, 'FE')).toBe('U');
     expect(partSource({ code: 'H130100', per100: { FE: 3 } }, 'FE')).toBe('B');
+    // Selenium is estimated from CoFID, in a BLS food or borrowed by a product.
+    expect(partSource({ code: 'H130100', per100: { SE: 5 }, provenance: { SE: 'C' } }, 'SE')).toBe('C');
+    expect(partSource({ ...gummy, per100: { SE: 1 }, provenance: { SE: 'C' } }, 'SE')).toBe('C');
     const label = entry('label', [], { direct: { NA: 200 } });
     const withGummy = new Map([...entries, ['gummy', entry('gummy', [{ ...part('Goldbären', 22, gummy.per100), ...gummy }])], ['label', label]]);
     const b = breakdown([{ entryId: 'nuts' }, { entryId: 'gummy' }, { entryId: 'label' }], withGummy, meals, opts);

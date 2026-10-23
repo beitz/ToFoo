@@ -49,6 +49,7 @@ const SYMBOL: Record<string, string> = {
   P: 'P',
   FE: 'Fe',
   ZN: 'Zn',
+  SE: 'Se',
   ID: 'I',
   CU: 'Cu',
   MN: 'Mn',

@@ -40,7 +40,7 @@ export interface ProductData {
  * Open Food Facts nutriment key → BLS component id. OFF reports `<key>_100g` in grams (kcal for
  * energy-kcal); the factor to the BLS unit comes from the nutrient's unit. Left out on purpose:
  * vitamin A and folate (labels mix units: retinol vs. carotenoid equivalents, folic acid vs.
- * folate equivalents) and selenium (not in BLS).
+ * folate equivalents).
  */
 export const NUTRIMENT_IDS: Readonly<Record<string, string>> = {
   'energy-kcal': 'ENERCC',
@@ -60,6 +60,7 @@ export const NUTRIMENT_IDS: Readonly<Record<string, string>> = {
   iron: 'FE',
   zinc: 'ZN',
   iodine: 'ID',
+  selenium: 'SE',
   copper: 'CU',
   manganese: 'MN',
   fluoride: 'FD',

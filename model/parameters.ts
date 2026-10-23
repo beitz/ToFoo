@@ -196,6 +196,12 @@ export const nutrientParams: Record<string, NutrientParams> = {
   },
   ZN: fixed(0.3, 'EFSA NDA Panel (2014): DRVs for zinc — fractional absorption ~30 %, lower with phytate', 'medium', 'Phytate is handled by the DGE phytate-dependent reference value.', [0.2, 0.4]),
   ID: fixed(0.92, 'EFSA NDA Panel (2014): DRVs for iodine — "an absorption efficiency for iodine of 92 %"', 'high', 'Checked (abstract).'),
+  SE: fixed(
+    0.7,
+    'EFSA NDA Panel (2014): DRVs for selenium — "the Panel considers an absorption efficiency of selenium of 70 % from usual diets"',
+    'medium',
+    'Checked in the public consultation draft of the opinion (EFSA 2014, section 2.3.1); more than 90 % for selenomethionine, 38–73 % in single-food studies.',
+  ),
   CU: fixed(0.5, 'EFSA NDA Panel (2015): DRVs for copper — ~50 % absorbed (range 30–70 %)', 'medium'),
   MN: fixed(0.05, 'EFSA NDA Panel (2013): DRVs for manganese — ~3–5 % absorbed', 'medium'),
   FD: fixed(0.8, 'EFSA NDA Panel (2013): DRVs for fluoride — ~80 % absorbed from food', 'medium'),
@@ -311,6 +317,7 @@ export const storage: Record<string, StorageModel> = {
   MG: { kind: 'rolling', window: 'long' },
   P: { kind: 'rolling', window: 'long' },
   ZN: { kind: 'rolling', window: 'long' },
+  SE: { kind: 'rolling', window: 'long' },
   CU: { kind: 'rolling', window: 'long' },
   MN: { kind: 'rolling', window: 'long' },
   FD: { kind: 'rolling', window: 'long' },
@@ -607,6 +614,7 @@ export const retentionClassOf: Record<string, RetentionClass> = {
   FE: 'minerals',
   ZN: 'minerals',
   ID: 'minerals',
+  SE: 'minerals',
   CU: 'minerals',
   MN: 'minerals',
   FD: 'minerals',
@@ -712,9 +720,10 @@ export const uncertainty = {
   } satisfies Valued<Record<'A' | 'B' | 'C', number>>,
   /** Relative uncertainty of a BLS value by its provenance code (data/README.md). */
   dataByProvenance: {
-    value: { A: 0.1, B: 0.1, F: 0.1, L: 0.15, G: 0.15, D: 0.15, R: 0.2, S: 0.2, M: 0.25, U: 0.3, N: 0.3, Z: 0, T: 0, '-': 0.3 } as Record<string, number>,
+    value: { A: 0.1, B: 0.1, F: 0.1, L: 0.15, G: 0.15, D: 0.15, R: 0.2, S: 0.2, M: 0.25, U: 0.3, N: 0.3, Z: 0, T: 0, C: 0.4, '-': 0.3 } as Record<string, number>,
     source: 'Modelling choice based on the BLS provenance categories',
     confidence: 'assumption',
+    note: 'C = selenium estimated from the UK table CoFID via the most alike food (scripts/selenium.ts). The same method predicts zinc and phosphorus within about ±20 % for a typical food (median; 90th percentile about ×1.7, data/README.md); UK and German foods can differ on top of that, hence wider than "taken over from a similar food" (U).',
   } satisfies Valued<Record<string, number>>,
   maxRelative: { value: 0.9, source: 'Modelling choice', confidence: 'assumption' } satisfies Valued<number>,
   /** How many known days to average for imputing not-logged days (central run). */

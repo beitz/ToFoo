@@ -1,6 +1,7 @@
 /**
  * The nutrients the model tracks, with display names and their place in the visibility tree.
- * Ids are BLS component codes, plus three derived ids (SAA, AAA, EPADHA).
+ * Ids are BLS component codes, plus three derived ids (SAA, AAA, EPADHA). Selenium (SE) is not in
+ * BLS 4.0; its values are estimated from the UK table CoFID at build time (scripts/selenium.ts).
  */
 
 export interface NutrientDef {
@@ -81,6 +82,7 @@ export const NUTRIENTS: NutrientDef[] = [
   n('FE', 'Iron', 'Iron', 'mg', ['minerals', 'trace'], 1),
   n('ZN', 'Zinc', 'Zinc', 'mg', ['minerals', 'trace'], 1),
   n('ID', 'Iodine', 'Iodine', 'µg', ['minerals', 'trace']),
+  n('SE', 'Selenium', 'Selenium', 'µg', ['minerals', 'trace']),
   n('CU', 'Copper', 'Copper', 'µg', ['minerals', 'trace']),
   n('MN', 'Manganese', 'Manganese', 'µg', ['minerals', 'trace']),
   n('FD', 'Fluoride', 'Fluoride', 'µg', ['minerals', 'trace']),
