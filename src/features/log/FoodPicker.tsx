@@ -10,6 +10,7 @@ import { refKey } from '../../lib/refs';
 import { FoodList } from './FoodList';
 import { ProductList } from './ProductList';
 import { UsdaResults } from './UsdaResults';
+import { OffResults, useOffSearch } from './OffResults';
 
 export type PickedFood = { food: Food; product?: undefined } | { product: Product; food?: undefined };
 
@@ -50,6 +51,7 @@ export function FoodPicker({ onPick, onScan, onCancel }: { onPick: (p: PickedFoo
     const lower = q.toLowerCase();
     return d.products.filter((p) => `${p.name} ${p.brand ?? ''} ${p.code}`.toLowerCase().includes(lower));
   }, [q, d.products, favourites]);
+  const offSearch = useOffSearch(q, offOn, results);
   const recent = useMemo(
     () =>
       [...d.recentFoods.entries()]
@@ -101,8 +103,10 @@ export function FoodPicker({ onPick, onScan, onCancel }: { onPick: (p: PickedFoo
           <FoodList foods={recent} onPick={(food) => onPick({ food })} />
         </>
       )}
+      {q && !offSearch.genericFirst && <OffResults key={q} search={offSearch} onPick={(product) => onPick({ product })} />}
       {q && <FoodList foods={results} onPick={(food) => onPick({ food })} />}
-      {q && results.length === 0 && products.length === 0 && <p className="muted">{t(offOn ? 'edit.noResultsScan' : 'edit.noResults')}</p>}
+      {q && offSearch.genericFirst && <OffResults key={q} search={offSearch} onPick={(product) => onPick({ product })} />}
+      {q && results.length === 0 && products.length === 0 && offSearch.hits.length === 0 && offSearch.status !== 'loading' && <p className="muted">{t(offOn ? 'edit.noResultsScan' : 'edit.noResults')}</p>}
       {q && usdaOn && <UsdaResults key={q} query={q} onPick={(product) => onPick({ product })} />}
     </div>
   );

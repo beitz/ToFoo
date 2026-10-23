@@ -20,6 +20,18 @@ describe('repository', () => {
     expect((await repo.getSettings())!.shortWindowDays).toBe(7);
   });
 
+  it('keeps a piece weight with the saved portion sizes, where backups take it', async () => {
+    const repo = await fresh();
+    await repo.setMeta('portions:OFF:4009900482806', [{ label: 'Small pack', grams: 14 }]);
+    const before = await repo.setPieceWeight('OFF:4009900482806', 1.4, 'piece');
+    expect(before).toEqual([{ label: 'Small pack', grams: 14 }]);
+    expect(await repo.pieceWeights()).toEqual(new Map([['OFF:4009900482806', 1.4]]));
+    expect((await repo.snapshot()).portionSizes).toEqual([{ food: 'OFF:4009900482806', sizes: [{ label: 'Small pack', grams: 14 }, { label: 'piece', grams: 1.4, piece: true }] }]);
+    await repo.setPieceWeight('OFF:4009900482806', undefined, 'piece');
+    expect(await repo.pieceWeights()).toEqual(new Map());
+    expect(await repo.getMeta('portions:OFF:4009900482806')).toEqual([{ label: 'Small pack', grams: 14 }]);
+  });
+
   it('tracks freezer stock when portions are logged, deleted and restored', async () => {
     const repo = await fresh();
     const recipe: Recipe = await repo.saveRecipe({ name: 'Linsencurry', portions: 6, ingredients: [], tags: [] });

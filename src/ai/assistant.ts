@@ -11,6 +11,7 @@ import { fmtLocalDateTime } from './photoTime';
 import {
   runLookupBarcode,
   runSearchFoods,
+  runSearchProducts,
   runSearchUsda,
   sourcesOf,
   validateJournalProposal,
@@ -294,6 +295,9 @@ export async function sendMessage(
       } else if (use.name === 'lookup_barcode' && sources.off) {
         const r = await runLookupBarcode(use.input, ctx);
         results.push({ type: 'tool_result', tool_use_id: use.id, content: r.text, is_error: !r.ok });
+      } else if (use.name === 'search_products' && sources.off) {
+        const r = await runSearchProducts(use.input, ctx);
+        results.push({ type: 'tool_result', tool_use_id: use.id, content: r.text, is_error: !r.ok });
       } else if (use.name === 'search_usda' && sources.usda) {
         const r = await runSearchUsda(use.input, ctx);
         results.push({ type: 'tool_result', tool_use_id: use.id, content: r.text, is_error: !r.ok });
@@ -335,7 +339,7 @@ export async function sendMessage(
           results.push({ type: 'tool_result', tool_use_id: use.id, content: r.error, is_error: true });
         }
       } else if (use.name === 'propose_meal' && !sources.recipe) {
-        const r = validateProposal(use.input, ctx.db, ctx.products, ctx.now);
+        const r = validateProposal(use.input, ctx.db, ctx.products, ctx.now, ctx.pieces);
         if (r.ok) proposals.push({ id: use.id, proposal: r.proposal });
         else {
           rejected = true;

@@ -143,3 +143,21 @@ McCance and Widdowson's The Composition of Foods Integrated Dataset 2021 (CoFID)
 | Copper | ×1.38 | ×3.00 | 37 % | 59 % |
 
 Zinc and phosphorus are the closest stand-ins (both follow protein, like selenium). On top of this method error, UK and German foods of the same kind can differ in selenium (soil, animal feed, where wheat comes from); that part is not measured. Spot checks: Brazil nut 300, tuna 83, pork kidney 148, cod 23, egg 24, beef 7, whole milk 1 µg/100 g, apple trace. Known weak spot: mushrooms (BLS and CoFID count mushroom protein differently, so the protein scale overstates them).
+
+## `public/data/off-products-de-<date>.tsv.gz`: packaged products by name
+
+A list of the Open Food Facts products sold in Germany, for finding packaged products by name on the phone (docs/SPEC.md, "Find packaged products by name"). Open Food Facts' own name search does not answer browser apps (docs/OPEN_QUESTIONS.md). Licence: [ODbL](https://opendatacommons.org/licenses/odbl/1-0/), © Open Food Facts contributors, credited on the About page.
+
+Unlike the BLS, this file is committed as built, not generated in CI: its source is Open Food Facts' Parquet export on Hugging Face ([openfoodfacts/product-database](https://huggingface.co/datasets/openfoodfacts/product-database), several GB, changes daily). Refresh it by hand now and then:
+
+```sh
+python3 -m venv /tmp/off && /tmp/off/bin/pip install duckdb
+/tmp/off/bin/python scripts/off-products.py     # ~4 minutes; DuckDB reads only the needed columns over HTTP
+```
+
+It writes the dated file (removing the old one) and `src/foods/offIndexInfo.ts` (file name, date, count), which the app reads; the date in the name makes the service worker fetch the new list.
+
+- **Which products:** `countries_tags` contains `en:germany`, not obsolete, with an energy value per 100 g on the label (a product without label values cannot be logged), a barcode of 8–14 digits, and a name.
+- **Order:** most-scanned first (`unique_scans_n`), then most complete. Search shows the first matches, so popular products lead.
+- **Format:** gzip, UTF-8, one header line starting with `#`, then one product per line, tab-separated: barcode, name (German, else the product's main language, else English), brands (comma-separated, duplicates removed), quantity as printed.
+- **No label values:** they are fetched by barcode when a product is picked, so they are always current and the file stays small.

@@ -10,6 +10,7 @@ import { repo } from '../../storage/repo';
 import type { Batch, CustomFood, FavouriteMeal, FoodRef, LogEntry, Product } from '../../storage/types';
 import { needsCheck, productLabel } from '../../foods/products';
 import { UsdaResults } from './UsdaResults';
+import { OffResults, useOffSearch } from './OffResults';
 import { FoodList } from './FoodList';
 import { EditEntrySheet } from '../diary/EditEntrySheet';
 import { ProductList, productTag } from './ProductList';
@@ -85,6 +86,8 @@ export function LogPage({ day: dayParam, foodCode }: { day?: string; foodCode?: 
     if (!q) return [];
     return d.products.filter((p) => `${p.name} ${p.brand ?? ''} ${p.code}`.toLowerCase().includes(q));
   }, [query, d.products]);
+  // Products not on this phone yet, from the bundled Open Food Facts list.
+  const offSearch = useOffSearch(query, offOn, results);
   const favourites = useMemo(() => {
     const out: Array<{ key: string; ref: FoodRef; pick: Selected; name: string; detail: string }> = [];
     for (const ref of d.settings.favourites ?? []) {
@@ -458,8 +461,10 @@ export function LogPage({ day: dayParam, foodCode }: { day?: string; foodCode?: 
             </ul>
           )}
           {productMatches.length > 0 && <ProductList pinnable products={productMatches} onPick={(product) => setSelected({ kind: 'product', product })} />}
+          {!offSearch.genericFirst && <OffResults key={query.trim()} search={offSearch} onPick={(product) => setSelected({ kind: 'product', product })} />}
           <FoodList foods={results.map((r) => d.foods.byCode.get(r.key)!).filter(Boolean)} onPick={(food) => setSelected({ kind: 'food', food })} />
-          {results.length === 0 && customMatches.length === 0 && productMatches.length === 0 && (
+          {offSearch.genericFirst && <OffResults key={query.trim()} search={offSearch} onPick={(product) => setSelected({ kind: 'product', product })} />}
+          {results.length === 0 && customMatches.length === 0 && productMatches.length === 0 && offSearch.hits.length === 0 && offSearch.status !== 'loading' && (
             <div className="empty">
               <p>{t(offOn ? 'off.noResults' : 'log.noResults')}</p>
               <div className="row wrap">

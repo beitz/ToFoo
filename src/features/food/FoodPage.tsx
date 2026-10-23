@@ -11,6 +11,7 @@ import { Icon } from '../../ui/Icon';
 import { isProductCode, productFood } from '../../foods/products';
 import { partSource } from '../../logic/mealNutrients';
 import { ProductInfo, SavedMatchPicker } from '../log/ProductParts';
+import { PieceWeightLine } from '../log/AmountField';
 import { nutrientType } from '../home/grouping';
 import { GroupInfoButton, groupTitle, hasGroupInfo } from '../info/GroupInfo';
 import { BackButton } from '../../ui/BackButton';
@@ -41,6 +42,7 @@ export function FoodPage({ code }: { code: string }) {
           {food.nameDe} · {group?.en} · BLS {food.code}
         </p>
       )}
+      <PieceWeightLine code={food.code} product={product} />
       <PortionCard per100={food.per100} />
       <a className="btn btn-primary btn-block" href={href('log', d.today, food.code)}>
         <Icon name="plus" /> {t('food.log')}

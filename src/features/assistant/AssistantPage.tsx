@@ -33,7 +33,9 @@ import { clipTime, VoiceClip } from './VoiceClip';
 import { UsageLine } from './UsageLine';
 import { VoiceFailed } from './VoiceFailed';
 import type { ProposedItem, ProductTools, RecipeTools } from '../../ai/tools';
+import { piecesToGrams } from '../../foods/pieces';
 import { findProduct, findUsda } from '../../foods/findProduct';
+import { loadOffIndex, searchOffIndex } from '../../foods/offIndex';
 import { productLabel, productPageUrl, productRef } from '../../foods/products';
 import { KETONE_TYPES, type Batch, type FoodRef, type Ingredient, type KetoneType, type LogEntry, type Product } from '../../storage/types';
 import { barcodesInPhoto } from '../log/barcode';
@@ -372,7 +374,13 @@ function Chat({ apiKey, model, day, recipe, reopened }: { apiKey: string; model:
           ? {
               saved: d.productsById,
               seen: seenProducts,
-              ...(offOn ? { find: (code: string) => findProduct(code), webSearch: webSearchOn } : {}),
+              ...(offOn
+                ? {
+                    find: (code: string) => findProduct(code),
+                    searchProducts: async (q: string) => searchOffIndex(await loadOffIndex(import.meta.env.BASE_URL), q, { limit: 8 }),
+                    webSearch: webSearchOn,
+                  }
+                : {}),
               ...(usdaOn ? { searchUsda: (q: string, kind: 'generic' | 'branded') => findUsda(q, kind, 8) } : {}),
             }
           : undefined;
@@ -383,6 +391,7 @@ function Chat({ apiKey, model, day, recipe, reopened }: { apiKey: string; model:
         index: d.searchIndex,
         boost: d.searchBoost,
         products,
+        pieces: await repo.pieceWeights(),
         now: Date.now(),
         // The recipe editor's assistant proposes ingredients and nothing else.
         ...(recipe
@@ -1284,6 +1293,13 @@ function NoteCard({ card, day, toast, onLogged, register }: CardProps<Extract<Ca
   );
 }
 
+/** "1 piece = 1.4 g (label) · 4.2 g in all": the weight of one and where it is from; an estimate is marked so. */
+function pieceLine(p: NonNullable<ProposedItem['pieces']>, grams: number | undefined, unit: string): string {
+  const g = `${fmtNumber(p.grams, p.grams < 10 ? 2 : 1)} ${unit}`;
+  const one = p.from === 'estimate' ? t('piece.estimate', { g }) : p.from === 'yours' ? t('piece.yoursShort', { g }) : t('piece.labelShort', { g });
+  return grams ? `${one} · ${t('piece.total', { g: `${fmtNumber(grams, 1)} ${unit}` })}` : one;
+}
+
 /** One meal the assistant proposes: check, adjust grams and time, remove items, then log. */
 function ProposalCard({ card, day, toast, onLogged, register }: CardProps<Extract<Card, { kind: 'meal' }>>) {
   const { proposal } = card;
@@ -1322,6 +1338,7 @@ function ProposalCard({ card, day, toast, onLogged, register }: CardProps<Extrac
           ref,
           grams: it.grams!,
           preparation: it.preparation,
+          ...(it.pieces ? { pieces: it.pieces.n } : {}),
           time,
           day: dayKey(new Date(time)),
           confidence,
@@ -1383,8 +1400,18 @@ function ProposalCard({ card, day, toast, onLogged, register }: CardProps<Extrac
               {it.product?.match && (
                 <span className="muted small block">{t('ai.microsFrom', { name: d.foods.byCode.get(it.product.match.code)?.nameEn ?? it.product.match.code })}</span>
               )}
+              {it.pieces && <span className="muted small block">{pieceLine(it.pieces, it.grams, it.product?.perMl ? 'ml' : 'g')}</span>}
             </div>
-            <NumberInput value={it.grams} onChange={(g) => setItems((all) => all.map((x, j) => (j === i ? { ...x, grams: g } : x)))} suffix="g" min={0} />
+            {it.pieces ? (
+              <NumberInput
+                value={it.pieces.n}
+                onChange={(n) => setItems((all) => all.map((x, j) => (j === i && x.pieces ? { ...x, pieces: { ...x.pieces, n: n ?? 0 }, grams: n ? piecesToGrams(n, x.pieces.grams) : undefined } : x)))}
+                suffix={t('piece.pcs')}
+                min={0}
+              />
+            ) : (
+              <NumberInput value={it.grams} onChange={(g) => setItems((all) => all.map((x, j) => (j === i ? { ...x, grams: g } : x)))} suffix="g" min={0} />
+            )}
             <button className="icon-btn" aria-label={t('ai.removeItem', { name: it.food.nameEn })} onClick={() => setItems((all) => all.filter((_, j) => j !== i))}>
               <Icon name="trash" size={18} />
             </button>

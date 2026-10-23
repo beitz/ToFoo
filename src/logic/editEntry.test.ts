@@ -50,6 +50,13 @@ describe('replaceFood', () => {
 });
 
 describe('completeDraft', () => {
+  it('keeps pieces only while the amount is a count', () => {
+    expect(completeDraft({ ...dish, grams: 4.2, pieces: 3 })).toMatchObject({ grams: 4.2, pieces: 3 });
+    const byGrams = completeDraft({ ...dish, grams: 5, pieces: undefined });
+    expect(byGrams).not.toHaveProperty('pieces');
+    expect(replaceFood({ ...dish, pieces: 3 }, product, 'Bar', customFoods)).not.toHaveProperty('pieces');
+  });
+
   it('passes other entries through and rejects a zero amount', () => {
     expect(completeDraft(portion)).toBe(portion);
     expect(completeDraft({ ...dish, grams: 0 })).toBeNull();

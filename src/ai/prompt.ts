@@ -11,12 +11,12 @@ const GENERIC_NOTE = `say so in assumptions (e.g. "generic hazelnut praline, not
 
 const BRANDED_BLS_ONLY = `- Branded or unknown products: choose the closest generic BLS food (a filled hazelnut praline for a Giotto, for example) and ${GENERIC_NOTE}. Packaging photos help: use the product weight and the number of pieces from the label.`;
 
-const BRANDED_WITH_PRODUCTS = (propose: string) => `- Packaged products can be looked up by barcode in Open Food Facts with lookup_barcode, which returns the label values. Barcodes the app read from the user's photos are given to you in the message; you may also read the digits printed under a barcode in a photo, or the user may type them. Products the user logged before are also listed by search_foods, with codes like OFF:4008400121925. Use the product's OFF: code in ${propose} and set micros_from to the BLS code of the most similar generic food (from search_foods; a filled hazelnut praline for a Giotto, for example), which supplies the vitamins and minerals the label lacks. If the user already chose a similar food for the product (or label values only), micros_from can be empty and is ignored; if the app picked one by itself, keep it with an empty micros_from or give a closer food. Do not guess barcodes. When there is no barcode or the product is not found, choose the closest generic BLS food instead and ${GENERIC_NOTE}. Packaging photos help: use the product weight and the number of pieces from the label.`;
+const BRANDED_WITH_PRODUCTS = (propose: string) => `- Packaged products can be looked up by barcode in Open Food Facts with lookup_barcode, which returns the label values. Barcodes the app read from the user's photos are given to you in the message; you may also read the digits printed under a barcode in a photo, or the user may type them. Products the user logged before are also listed by search_foods, with codes like OFF:4008400121925. Use the product's OFF: code in ${propose} and set micros_from to the BLS code of the most similar generic food (from search_foods; a filled hazelnut praline for a Giotto, for example), which supplies the vitamins and minerals the label lacks. If the user already chose a similar food for the product (or label values only), micros_from can be empty and is ignored; if the app picked one by itself, keep it with an empty micros_from or give a closer food. Without a barcode, find the product by name with search_products (brand and product name as on the package, e.g. "Leibniz Pick Up"): it searches the Open Food Facts products sold in Germany on the phone, at no cost. Pick the row whose name, brand and pack size match, call lookup_barcode with its barcode, and check the product returned; if several sizes or variants fit, take the closest and say which in assumptions. A barcode from search_products is not a guess. Do not guess barcodes. When there is no barcode or the product is not found, choose the closest generic BLS food instead and ${GENERIC_NOTE}. Packaging photos help: use the product weight and the number of pieces from the label.`;
 
 // Open Food Facts' own name search refuses browser apps (docs/OPEN_QUESTIONS.md), so the model
 // finds the barcode through Anthropic's web search, limited to openfoodfacts.org, and then looks it
 // up like a scanned one: the values still come from Open Food Facts, never from a web page.
-const WEB_SEARCH = `- A package without a readable barcode (only the front, brand and name visible): before falling back to a generic food, find the product with web_search, which searches openfoodfacts.org only. Search with the brand, product name and pack size from the photo, e.g. "Ferrero Giotto 38,7 g". A product's barcode is the long number in its result address (world.openfoodfacts.org/product/4008400121925/giotto-ferrero, or /produkt/ on de.openfoodfacts.org); a barcode taken from a result is not a guess. Pick the result whose name, brand and size match the package, call lookup_barcode with its barcode, and check that the product returned is the one in the photo; if two sizes or variants fit, take the one that matches the photo best and say which in assumptions. One or two searches are enough. Never take nutrient values from search results. If nothing matches, use the generic food. Do not ask the user for a barcode photo just to find the product.`;
+const WEB_SEARCH = `- A package without a readable barcode (only the front, brand and name visible) that search_products did not find: before falling back to a generic food, find the product with web_search, which searches openfoodfacts.org only. Search with the brand, product name and pack size from the photo, e.g. "Ferrero Giotto 38,7 g". A product's barcode is the long number in its result address (world.openfoodfacts.org/product/4008400121925/giotto-ferrero, or /produkt/ on de.openfoodfacts.org); a barcode taken from a result is not a guess. Pick the result whose name, brand and size match the package, call lookup_barcode with its barcode, and check that the product returned is the one in the photo; if two sizes or variants fit, take the one that matches the photo best and say which in assumptions. One or two searches are enough. Never take nutrient values from search results. If nothing matches, use the generic food. Do not ask the user for a barcode photo just to find the product.`;
 
 const USDA = (propose: string) => `- When no BLS food fits a single food or ingredient well (foods common outside Germany, a specific variety), search USDA FoodData Central with search_usda, in English. Its generic foods (branded: false; codes like USDA:168462) have their own full nutrient data: use the USDA: code in ${propose} and set micros_from to the BLS code of the most similar food if one is close (it fills the few gaps, such as iodine), else leave it empty. For a US packaged product, search with branded: true; micros_from is then required, as for a label. Prefer a fitting BLS food over USDA, and split mixed dishes into BLS ingredients rather than taking a USDA dish, unless the USDA dish matches closely. USDA foods the user logged before are also listed by search_foods. Each USDA search is an online request, so search only when the BLS has nothing good.`;
 
@@ -155,6 +155,7 @@ How to work:
 ${off ? BRANDED_WITH_PRODUCTS('propose_meal') : BRANDED_BLS_ONLY}
 ${off && webSearch ? `${WEB_SEARCH}\n` : ''}${usda ? `${USDA('propose_meal')}\n` : ''}${journal ? `${JOURNAL(activity)}\n` : ''}${sleep ? `${SLEEP(journal)}\n` : ''}${activity ? `${ACTIVITY}\n` : ''}${water ? `${WATER}\n` : ''}${ketones ? `${KETONES}\n` : ''}${shopping ? `${SHOPPING(recipes)}\n` : ''}${pantry ? `${PANTRY(off)}\n` : ''}${recipes ? `${RECIPES(ideas)}\n${PAGES}\n` : ''}- Mixed dishes (restaurant meals, a hotpot, a bowl): use a matching BLS dish if there is one, otherwise split it into ingredients with estimated grams. Include what changes the result most: cooking oil, sauces, broth that was actually eaten.
 ${forgotten ? `${FORGOTTEN}\n` : ''}- Amounts: use what the user said, label weights, counts of standard items, and visual cues (plate size, cutlery, hands, packaging). Think about the portion one person ate, not the whole shared dish.
+- Pieces: when the user counts pieces of a food ("one piece of chewing gum", "2 bars", "a handful of 5 sweets"), set pieces to the count. Foods list "1 piece = … g" when the weight of one is known (the user's own, or the label's): then grams is pieces × that weight and the app uses that weight. "weight of one piece unknown": estimate grams for all the pieces from the pack (its weight ÷ the number of pieces printed on it, from a photo or the label data) or what such a piece usually weighs, and say the estimate in assumptions (e.g. "1 piece ≈ 1.4 g: 14 g pack of 10"); the user can save the real weight in the app.
 - Ask when the answer would noticeably change the result (an unknown main food, a portion that could easily be double or half, whether shared food was all eaten). Ask one short question at a time and offer a default the user can just accept, e.g. "About one bowl, roughly 400 ml?". Do not ask about details that barely matter. Do not ask for more photos (barcode, label, packaging) when you can work with what you have: the user often cannot take them. If one would clearly change the result, mention it once alongside your proposal, not instead of it. If the user cannot know, estimate and record the assumption.
 - Everything at once: the user often logs a day or two in one go, in one long message (often spoken for many minutes, with filler words and corrections) and many photos (meals, packaging, barcodes, labels, screenshots). Go through all of it and propose every meal${journal ? ', journal entry' : ''}${sleep ? ', sleep' : ''}${activity ? ', activity' : ''}${water ? ', water' : ''}${recipes ? ', recipe' : ''} it contains: leave nothing out and propose nothing twice. Later words override earlier ones ("no, it was two eggs"). The app puts a line before each photo with its number and capture time. Group the photos into meals by time and content: photos minutes apart of the same table are one meal; the same food at different times (yogurt in the morning and in the evening) is two; a photo of a package or barcode belongs to the meal that food was eaten in. Also include meals the user only describes in words. Before proposing, ask everything that matters in one message, as a short numbered list with a default for each, and say how you grouped the photos (e.g. "Photos 2–5: Korean BBQ, Thu 19:40"); keep it to what really changes the result. Then propose everything in one response, one call per meal${journal ? ', journal entry' : ''}${sleep ? ', sleep' : ''}${activity ? ', activity' : ''}${water ? ', water' : ''}${recipes ? ', recipe' : ''}.
 - Times: set each meal's time to when it was eaten, as local "YYYY-MM-DD HH:MM". Use what the user said first ("at 8", "yesterday lunch" means a plausible lunch time that day, "after the run" means after the run's time), then the capture time of the meal's first photo. Words like "this morning" or "yesterday" count from the current time the app gives you, not from the photos. A "file date" may be when the photo was saved rather than taken; ask if it looks off. When the user gives no time and there is no photo, pick a plausible time and say so in assumptions. Leave time empty only for a single meal eaten just now or on the day the chat was opened for; when a message covers several meals, set every time.
@@ -216,6 +217,20 @@ const SEARCH_USDA: BetaTool = {
   },
 };
 
+const SEARCH_PRODUCTS: BetaTool = {
+  name: 'search_products',
+  description:
+    'Find packaged products sold in Germany by name or brand in the Open Food Facts list on the phone (no label values). Returns per query up to 8 rows: "barcode | name (brand) | pack size", most-scanned first. Then call lookup_barcode with the barcode of the matching row.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      queries: { type: 'array', items: { type: 'string' }, description: 'Up to 6 searches, brand and product name, e.g. ["Leibniz Pick Up", "Giotto"].' },
+    },
+    required: ['queries'],
+    additionalProperties: false,
+  },
+};
+
 const LOOKUP_BARCODE: BetaTool = {
   name: 'lookup_barcode',
   description:
@@ -262,6 +277,19 @@ function tools({ off = false, usda = false, webSearch = false, journal = false, 
     required: ['code', 'grams', 'preparation', 'note', ...(withProducts ? ['micros_from'] : [])],
     additionalProperties: false,
   };
+  // A meal's items may be a count of pieces ("one piece of gum"): the app weighs them.
+  const mealItems = {
+    ...items,
+    properties: {
+      ...items.properties,
+      pieces: {
+        type: 'number',
+        description:
+          'When the user counted pieces of this food ("one piece", "2 bars", "3 Dragees"): how many; 0 when the amount is not a count. With a known piece weight the app sets grams from it; otherwise grams is your estimate for all the pieces.',
+      },
+    },
+    required: [...items.required, 'pieces'],
+  };
   // A change to a pot or a serving: which ingredient it replaces (or none, for an added food) and the food now.
   const changeItems = {
     type: 'object',
@@ -275,7 +303,7 @@ function tools({ off = false, usda = false, webSearch = false, journal = false, 
     required: ['replaces', 'code', 'grams', 'preparation', ...(withProducts ? ['micros_from'] : [])],
     additionalProperties: false,
   };
-  const lookups = [SEARCH_FOODS, ...(off ? [LOOKUP_BARCODE] : []), ...(off && webSearch ? [WEB_SEARCH_TOOL] : []), ...(usda ? [SEARCH_USDA] : [])];
+  const lookups = [SEARCH_FOODS, ...(off ? [SEARCH_PRODUCTS, LOOKUP_BARCODE] : []), ...(off && webSearch ? [WEB_SEARCH_TOOL] : []), ...(usda ? [SEARCH_USDA] : [])];
   if (recipe) {
     return [
       ...lookups,
@@ -314,7 +342,7 @@ function tools({ off = false, usda = false, webSearch = false, journal = false, 
         type: 'object',
         properties: {
           summary: { type: 'string', description: 'A few words naming the meal, e.g. "Korean hotpot dinner".' },
-          items: { type: 'array', items },
+          items: { type: 'array', items: mealItems },
           assumptions: { type: 'array', items: { type: 'string' } },
           confidence: { type: 'string', enum: ['B', 'C'] },
           time: { type: 'string', description: 'When it was eaten, local "YYYY-MM-DD HH:MM" (e.g. "2026-10-15 19:40"); empty for the chat\'s default time.' },
