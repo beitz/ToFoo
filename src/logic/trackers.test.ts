@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ActivityRecord, WaterRecord } from '../storage/types';
-import { activitySummary, pastFasts, perDay, waterSummary, windowDays } from './trackers';
+import { activitySummary, pastFasts, perDay, statusTally, waterSummary, windowDays } from './trackers';
 
 const key = (day: number) => `2026-10-${String(day).padStart(2, '0')}`;
 const act = (day: number, minutes: number, extra: Partial<ActivityRecord> = {}): ActivityRecord => ({
@@ -54,5 +54,16 @@ describe('tracker pages', () => {
       { id: 'b', startDay: key(20), hours: 30, running: true, fromMeal: false },
       { id: 'a', startDay: key(10), hours: 40, running: false, fromMeal: true },
     ]);
+  });
+
+  it('counts nutrients per status, leaving out info-only and hidden ones', () => {
+    const m = new Map([
+      ['a', { status: 'low' as const, kind: 'rolling' }],
+      ['b', { status: 'fine' as const, kind: 'rolling' }],
+      ['c', { status: 'fine' as const, kind: 'limit' }],
+      ['d', { status: 'info' as const, kind: 'info' }],
+      ['e', { status: 'low' as const, kind: 'rolling' }],
+    ]);
+    expect(statusTally(m, new Set(['e']))).toEqual({ low: 1, fine: 2 });
   });
 });

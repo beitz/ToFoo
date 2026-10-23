@@ -128,7 +128,7 @@ export function WeekPage({ week: param }: { week?: string }) {
 
   return (
     <section>
-      <InsightsTabs view="week" day={monday} />
+      <InsightsTabs view="overview" day={monday} />
       <header className="week-head">
         <div className="grow">
           <h1>{t('week.number', { n: isoWeek(monday) })}</h1>

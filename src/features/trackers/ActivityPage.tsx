@@ -29,7 +29,7 @@ export function ActivityPage() {
   return (
     <section>
       <header className="page-head row">
-        <BackButton to={['calendar']} />
+        <BackButton to={['overview']} />
         <h1 className="grow">{t('activity.short')}</h1>
         <button className="btn btn-small btn-primary" onClick={() => setSheet('new')}>
           <Icon name="plus" size={16} /> {t('tracker.add')}

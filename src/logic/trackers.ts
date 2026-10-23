@@ -1,5 +1,6 @@
 import { addDays } from '../lib/dates';
 import type { ActivityRecord } from '../storage/types';
+import type { GaugeStatus } from '../model/simulate';
 
 /**
  * Numbers for the tracker pages (owner's ask, 2026-10-23: every tracker gets a page you can always
@@ -85,4 +86,14 @@ export function pastFasts(fasts: ReadonlyArray<{ id: string; startDay: string; s
   return [...fasts]
     .sort((a, b) => b.since - a.since)
     .map((f) => ({ id: f.id, startDay: f.startDay, hours: Math.max(0, ((f.end ?? now) - f.since) / 3_600_000), running: f.end === undefined, fromMeal: f.fromMeal }));
+}
+
+/** How many nutrients sit in each status, for one line of icons and numbers. Info-only and hidden ones stay out. */
+export function statusTally(nutrients: ReadonlyMap<string, { status: GaugeStatus; kind: string }>, hidden: ReadonlySet<string> = new Set()): Partial<Record<GaugeStatus, number>> {
+  const out: Partial<Record<GaugeStatus, number>> = {};
+  for (const [id, r] of nutrients) {
+    if (hidden.has(id) || r.kind === 'info' || r.status === 'info') continue;
+    out[r.status] = (out[r.status] ?? 0) + 1;
+  }
+  return out;
 }

@@ -150,11 +150,6 @@ export function DiaryPage({ day: dayParam }: { day?: string }) {
           <a className="btn btn-small btn-secondary" href={href('review', day, day)}>
             <Icon name="bars" size={18} /> {t('diary.dayNutrients')}
           </a>
-          {isOn(d.settings.features, 'aiAssistant') && isOn(d.settings.features, 'insights') && (
-            <a className="btn btn-small btn-secondary" href={href('insights')}>
-              <Icon name="insights" size={18} /> {t('diary.patterns')}
-            </a>
-          )}
         </div>
         <details className="fold diary-status-fold" open={statusOpen} onToggle={(e) => setStatusOpen((e.target as HTMLDetailsElement).open)}>
           <summary>
