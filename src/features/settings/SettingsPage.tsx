@@ -104,8 +104,8 @@ export function SettingsPage() {
           value={views.macros}
           onChange={(v) => repo.updateSettings({ macroView: v })}
           options={[
-            { value: 'rings', label: t('settings.viewRings') },
             { value: 'bars', label: t('settings.viewBars') },
+            { value: 'rings', label: t('settings.viewRings') },
           ]}
         />
         <p className="muted small settings-label">{t('settings.nutrientView')}</p>
@@ -114,8 +114,8 @@ export function SettingsPage() {
           value={views.nutrients}
           onChange={(v) => repo.updateSettings({ nutrientView: v })}
           options={[
-            { value: 'comets', label: t('settings.viewComets') },
             { value: 'bars', label: t('settings.viewBars') },
+            { value: 'comets', label: t('settings.viewComets') },
           ]}
         />
         <p className="muted small">{t('settings.viewsHint')}</p>

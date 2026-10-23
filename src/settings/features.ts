@@ -19,7 +19,7 @@ export const FEATURES: FeatureInfo[] = [
   { key: 'sunVitaminD', label: 'Vitamin D from sun', description: 'Add the estimated vitamin D your skin makes.', default: true },
   { key: 'fillUnloggedDays', label: 'Fill in unlogged days', description: 'Assume you ate as usual on days you did not log, shown as a wider range. Off: a day without entries counts as nothing eaten. Any single day can be set otherwise in the diary.', default: false },
   { key: 'advancedNumbers', label: 'Advanced numbers', description: 'Show units, parameter values and sources inline.', default: false },
-  { key: 'yesterdayNudge', label: 'Ask about yesterday', description: 'A gentle note when yesterday has no status.', default: true },
+  { key: 'yesterdayNudge', label: 'Ask about yesterday', description: 'A line on Home when yesterday is missing something you track (meals, and sleep, activity or water when they are on), with a page to log it, take your usual, or skip.', default: true },
   { key: 'backupReminder', label: 'Backup reminder', description: 'A note on Home when your last saved backup file is older than the set number of days.', default: true, page: 'backup' },
   { key: 'autoBackup', label: 'Automatic backups', description: 'Once a day when you open the app, and before a restore or an app update that changes how data is stored, the app saves a full backup on this phone by itself.', default: true, page: 'backup' },
   { key: 'aiAssistant', label: 'AI assistant', description: 'Log meals by chatting: photos and text, sent to Anthropic with your own API key. Set it up under Settings → AI assistant.', default: false },

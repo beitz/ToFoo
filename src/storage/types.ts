@@ -120,11 +120,11 @@ export interface Settings extends Versioned {
   autoBackupKeep?: number;
   /** Default storage plan for new recipes. */
   defaultPlan: StoragePlan;
-  /** Earlier single Home layout choice (2026-10-23): compact = bars for both; read only as the default for the two below. */
+  /** Earlier single Home layout choice (2026-10-23); no longer read, kept so old backups still load. */
   homeView?: 'compact' | 'detailed';
-  /** Energy and macros as rings or bars, on Home and the nutrients page; unset follows homeView (see settings/views.ts). */
+  /** Energy and macros as rings or bars, on Home and the nutrients page; unset = bars (see settings/views.ts). */
   macroView?: 'rings' | 'bars';
-  /** Nutrient lists as comets or bars, on Home and the nutrients page; unset follows homeView. */
+  /** Nutrient lists as comets or bars, on Home and the nutrients page; unset = bars. */
   nutrientView?: 'comets' | 'bars';
   /** Home nutrient list grouping; unset = by status. */
   homeGrouping?: 'status' | 'type' | 'none';
