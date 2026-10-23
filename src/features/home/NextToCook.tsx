@@ -56,7 +56,7 @@ export function NextToCook() {
   if (options.length === 0 && !canAsk) return null;
 
   return (
-    <div className="card home-card next-cook">
+    <div className="card home-card next-cook" data-tour="home.next">
       <div className="card-head">
         <h2>{t('home.nextToCook')}</h2>
         <span className="card-note">{t('home.nextNote')}</span>

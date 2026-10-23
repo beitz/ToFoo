@@ -78,6 +78,7 @@ export function PantryAdd({ place, autoFocus, placeholder }: { place?: HomePlace
     <>
       <form
         className="shop-add"
+        data-tour={place ? undefined : 'kitchen.add'}
         onSubmit={(e) => {
           e.preventDefault();
           if (q) void add({ name: q });

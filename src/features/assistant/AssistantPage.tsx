@@ -705,7 +705,7 @@ function Chat({ apiKey, model, day, recipe, reopened }: { apiKey: string; model:
         <div ref={endRef} />
       </div>
 
-      <div className="composer" inert={viewing !== undefined}>
+      <div className="composer" data-tour="assistant.input" inert={viewing !== undefined}>
         {images.length > 0 && (
           <div className="composer-photos">
             {images.map((img, i) => (

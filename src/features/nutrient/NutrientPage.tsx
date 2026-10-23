@@ -122,7 +122,7 @@ export function NutrientPage({ id, context }: { id: string; context?: SplitConte
       <CameFromCard r={r} />
       {fills && <FillsBest id={id} recommended={req.recommended} />}
 
-      <div className="card fold-group">
+      <div className="card fold-group" data-tour="nutrient.why">
         <NutrientInfo id={id} />
         <a className="fold-row why-link" href={href('nutrient', id, 'why')}>
           <Icon name="question" size={18} />
@@ -232,7 +232,7 @@ function Hero({ r, noData, showRange, whyLabel }: { r: NutrientResult; noData: b
   const todayKcal = d.model.daily.at(-1)?.intake.ENERCC ?? 0;
 
   return (
-    <div className="card nut-hero">
+    <div className="card nut-hero" data-tour="nutrient.hero">
       <div className="nut-hero-main">
         {r.kind === 'info' ? (
           <span className="nut-sym" aria-hidden>

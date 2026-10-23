@@ -50,11 +50,11 @@ export function HomeCards({
   const comets = views.nutrients === 'comets';
   return (
     <>
-      <ListCard id="today" title={t('home.today')} note={t('home.todayNote')} info={t('home.todayInfo')} sources={todaySources(t)}>
+      <ListCard id="today" tour="home.today" title={t('home.today')} note={t('home.todayNote')} info={t('home.todayInfo')} sources={todaySources(t)}>
         {views.macros === 'rings' ? <MacroRings values={today} defaultBased={defaultBased} today /> : <TodayCells defaultBased={defaultBased} />}
       </ListCard>
       {rest.length > 0 && (
-        <ListCard id="week" title={t('home.lastDays', { n: windowDays })} note={t('home.weekNote')} info={`${t('home.weekInfo', { n: windowDays })}${comets ? ` ${t('home.cometLegend')}` : ''}`} sources={weekSources(t)}>
+        <ListCard id="week" tour="home.week" title={t('home.lastDays', { n: windowDays })} note={t('home.weekNote')} info={`${t('home.weekInfo', { n: windowDays })}${comets ? ` ${t('home.cometLegend')}` : ''}`} sources={weekSources(t)}>
           {comets ? (
             <NutrientsSection results={rest} showRange={showRange} />
           ) : (
@@ -67,7 +67,7 @@ export function HomeCards({
         </ListCard>
       )}
       {stores.length > 0 && (
-        <ListCard id="stores" title={t('home.stores')} note={t('home.storesListNote')} info={t('home.storesInfo', { start: t(`start.${startLevel}` as MessageKey) })} sources={storeSources(t)}>
+        <ListCard id="stores" tour="home.stores" title={t('home.stores')} note={t('home.storesListNote')} info={t('home.storesInfo', { start: t(`start.${startLevel}` as MessageKey) })} sources={storeSources(t)}>
           {comets ? (
             <StoresSection stores={stores} showRange={showRange} />
           ) : (
@@ -84,13 +84,13 @@ export function HomeCards({
 }
 
 /** A card with its heading, a short note on what the numbers are, and an ⓘ that opens why, with the sources to check it. */
-function ListCard({ id, title, note, info, sources, children }: { id: string; title: string; note: string; info: string; sources: HomeSource[]; children: ReactNode }) {
+function ListCard({ id, tour, title, note, info, sources, children }: { id: string; tour: string; title: string; note: string; info: string; sources: HomeSource[]; children: ReactNode }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className="card home-card list-card">
+    <div className="card home-card list-card" data-tour={tour}>
       <div className="card-head">
         <h2>{title}</h2>
-        <button className="card-note card-note-btn" aria-expanded={open} aria-controls={`${id}-info`} onClick={() => setOpen((o) => !o)}>
+        <button className="card-note card-note-btn" data-tour={id === 'today' ? 'home.info' : undefined} aria-expanded={open} aria-controls={`${id}-info`} onClick={() => setOpen((o) => !o)}>
           {note} <Icon name="info" size={14} />
         </button>
       </div>

@@ -16,9 +16,9 @@ export function InsightsTabs({ view, day }: { view: InsightsView; day: string })
   ];
   return (
     <div className="tab-top">
-      <nav className="segmented tab-switch" aria-label={t('nav.insights')}>
+      <nav className="segmented tab-switch" aria-label={t('nav.insights')} data-tour="insights.tabs">
         {links.map((l) => (
-          <a key={l.view} href={l.to} className={l.view === view ? 'on' : ''} aria-current={l.view === view ? 'page' : undefined}>
+          <a key={l.view} href={l.to} data-tour={l.view === 'diary' ? 'insights.days' : undefined} className={l.view === view ? 'on' : ''} aria-current={l.view === view ? 'page' : undefined}>
             {l.label}
           </a>
         ))}

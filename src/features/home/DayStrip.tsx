@@ -24,7 +24,7 @@ export function DayStrip({ days: shown }: { days: number }) {
   const days = Array.from({ length: shown }, (_, i) => addDays(d.today, i - shown));
   return (
     <>
-      <nav className="day-strip" aria-label={t('home.daysLabel')}>
+      <nav className="day-strip" aria-label={t('home.daysLabel')} data-tour="home.days">
         {[...days, d.today].map((day) => {
           const status = day === d.today ? 'today' : (d.model.dayStatus[day] ?? 'unknown');
           const date = parseDay(day);

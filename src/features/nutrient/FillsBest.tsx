@@ -157,7 +157,7 @@ export function FillsBest({ id, recommended }: { id: string; recommended: number
 
   if (options.length === 0) return null;
   return (
-    <div className="card fills">
+    <div className="card fills" data-tour="nutrient.fills">
       <div className="card-head">
         <h2>{t('fills.title')}</h2>
         <InfoButton title={t('fills.title')}>

@@ -353,9 +353,16 @@
                       "enum": [
                         "green",
                         "teal",
+                        "blue",
                         "rose",
                         "ink"
                       ]
+                    },
+                    "toursSeen": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
                     },
                     "backupReminderDays": {
                       "type": "integer",

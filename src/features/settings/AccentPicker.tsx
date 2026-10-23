@@ -10,6 +10,7 @@ type Accent = NonNullable<Settings['accent']>;
 const ACCENTS: Array<{ id: Accent; light: string; dark: string }> = [
   { id: 'green', light: '#2f6f4e', dark: '#6cc396' },
   { id: 'teal', light: '#0f6a6a', dark: '#5cc8c2' },
+  { id: 'blue', light: '#2b59c3', dark: '#86a8ff' },
   { id: 'rose', light: '#a3305b', dark: '#f08cb4' },
   { id: 'ink', light: '#15181b', dark: '#f3eedf' },
 ];
