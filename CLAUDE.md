@@ -9,12 +9,13 @@ npm install
 npm run data        # data/raw/BLS zip (+ CoFID selenium) → public/data/bls-4.0.json (needed before dev/test/build)
 npm run dev         # local dev server
 npm test            # Vitest
+npm run e2e         # Playwright end-to-end tests of the main flows (e2e/), against the build: run `npx vite build` first
 npm run typecheck   # tsc, strict
 npm run build       # data + typecheck + vite build (dist/)
 npm run schema      # regenerate docs/exchange-format.schema.json after changing src/exchange/schema.ts
 ```
 
-CI (`.github/workflows/deploy.yml`) runs data → typecheck → test → build on every push (any branch); pushes to `main` also deploy to Pages.
+CI (`.github/workflows/deploy.yml`) runs data → typecheck → test → build → e2e on every push (any branch); pushes to `main` also deploy to Pages.
 
 ## Layout
 
@@ -35,6 +36,7 @@ CI (`.github/workflows/deploy.yml`) runs data → typecheck → test → build o
 | `src/ui/` | Shared UI components. |
 | `src/i18n/` | UI strings. **All user-visible text goes through `t()`**; English is the default, keys in `en.ts`. |
 | `docs/` | SPEC, OPEN_QUESTIONS, exchange format docs and JSON Schema. |
+| `e2e/` | Playwright tests of the main flows in a real browser (first launch, logging, recipe + batch, backup + restore, every screen opens). A change to one of these flows updates its test in the same PR. |
 
 ## Rules
 

@@ -10,6 +10,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
+    "e2e": "playwright test",
     "typecheck": "tsc",
     "schema": "tsx scripts/gen-schema.ts"
   },
@@ -24,6 +25,7 @@
     "zxing-wasm": "^3.1.6"
   },
   "devDependencies": {
+    "@playwright/test": "^1.56.1",
     "@testing-library/react": "^16.3.3",
     "@types/node": "^22.20.5",
     "@types/react": "^19.3.0",
