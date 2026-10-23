@@ -19,4 +19,9 @@ describe('stores needing attention', () => {
     expect(storeNeedsAttention(store(0.1, 0.5, 'low'))).toBe(false); // empty start, but filling
     expect(storeNeedsAttention(store(0.6, -1, 'fine'))).toBe(false); // draining, but plenty left
   });
+
+  it('does not warn while the likely range reaches enough', () => {
+    expect(storeNeedsAttention({ ...store(0.35, -1, 'gettingLow'), statusSpan: { low: 'gettingLow', high: 'fine' } })).toBe(false);
+    expect(storeNeedsAttention({ ...store(0.15, -1, 'low'), statusSpan: { low: 'low', high: 'gettingLow' } })).toBe(true);
+  });
 });

@@ -38,6 +38,11 @@ export interface Finding {
    * do, so no effect line. Too much still shows at once.
    */
   early?: boolean;
+  /**
+   * The likely range reaches the other side of the line ("enough" for a low, under the limit for a high): the
+   * log can't tell, so no effect line (accuracy review proposal 1).
+   */
+  unsure?: boolean;
   /** There is an effect worth mentioning (a text for this direction, and not only an own goal missed). */
   effect: boolean;
 }
@@ -69,8 +74,10 @@ export function findingOf(r: NutrientResult, req: Requirement | undefined, hasEf
     } else basis = 'need';
   } else return undefined;
   const early = direction === 'low' && !!earlyReading(r);
-  const effect = !filling && !early && basis !== 'ownTarget' && basis !== 'ownMax' && hasEffect(r.id, direction);
-  return { id: r.id, status, direction, basis, filling, ...(early ? { early } : {}), effect };
+  const span = store ? store.statusSpan : r.statusSpan;
+  const unsure = !!span && (direction === 'low' ? span.high === 'fine' : span.low !== 'tooHigh');
+  const effect = !filling && !early && !unsure && basis !== 'ownTarget' && basis !== 'ownMax' && hasEffect(r.id, direction);
+  return { id: r.id, status, direction, basis, filling, ...(early ? { early } : {}), ...(unsure ? { unsure } : {}), effect };
 }
 
 export interface EffectSummary {
@@ -82,6 +89,8 @@ export interface EffectSummary {
   filling: Finding[];
   /** Low on an early reading: too early to tell. */
   early: Finding[];
+  /** Close to the line: the likely range reaches the other side, so the log can't tell. */
+  unsure: Finding[];
   /** Only an own target missed or an own maximum passed. */
   ownOnly: Finding[];
   /** Out of range, with no known effect at that level. */
@@ -94,7 +103,7 @@ export interface EffectSummary {
 
 /** Sorts every nutrient shown on Home into the summary's groups. */
 export function summarise(results: Iterable<NutrientResult>, requirements: ReadonlyMap<string, Requirement>, hasEffect: HasEffect, hidden: ReadonlySet<string> = new Set()): EffectSummary {
-  const out: EffectSummary = { effects: [], aBitLow: [], filling: [], early: [], ownOnly: [], noEffect: [], fine: [], noData: [] };
+  const out: EffectSummary = { effects: [], aBitLow: [], filling: [], early: [], unsure: [], ownOnly: [], noEffect: [], fine: [], noData: [] };
   const far = new Map<string, number>();
   for (const r of results) {
     if (hidden.has(r.id) || r.kind === 'info') continue;
@@ -111,6 +120,7 @@ export function summarise(results: Iterable<NutrientResult>, requirements: Reado
     far.set(r.id, f.direction === 'high' ? (r.ulRatio !== undefined && r.ulRatio > 1 ? r.ulRatio : r.value.central) : 1 - (r.store ? r.store.fill.central : r.value.central));
     if (f.filling) out.filling.push(f);
     else if (f.early) out.early.push(f);
+    else if (f.unsure) out.unsure.push(f);
     else if (f.basis === 'ownTarget' || f.basis === 'ownMax') out.ownOnly.push(f);
     else if (!f.effect) out.noEffect.push(f);
     else if (f.status === 'gettingLow') out.aBitLow.push(f);

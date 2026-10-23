@@ -3,7 +3,7 @@ import { storeTrendOf, trendOf, type Trend } from '../model/trend';
 import { NUTRIENT_BY_ID } from '../model/nutrients';
 import { storeNeedsAttention } from '../logic/stores';
 import { fmtAmount, fmtFill, fmtNumber, fmtPercent } from '../lib/format';
-import { STATUS_ICON, statusLabel } from './status';
+import { statusIconOf, statusText } from './status';
 import { Icon } from './Icon';
 import { fmtDuration } from './duration';
 import { t } from '../i18n';
@@ -37,6 +37,9 @@ const ownSpoken = (r: NutrientResult) => (r.ownTarget ? `, ${t('gauge.ownTarget'
 
 /** The status icon: an early low reading gets the "below" arrow, not the warning sign (too early to warn). */
 const iconStatus = (r: NutrientResult): GaugeStatus => (r.status === 'low' && earlyReading(r) ? 'gettingLow' : r.status);
+
+/** The icon on a line: the circled wave when the likely range crosses a status line ("unclear"). */
+const lineIcon = (r: NutrientResult): string => statusIconOf(iconStatus(r), r.statusSpan);
 
 /**
  * How many days a line averages, when that differs from its card's heading (`usual`, e.g. 7): "14 d"
@@ -104,13 +107,13 @@ export function CompactGauge({
     );
   const noData = r.status === 'unknown' || hasNoData(r);
   const value = noData ? '–' : variant === 'cell' ? cellValue : gaugeLabel(r);
-  const icon = <Icon name={STATUS_ICON[iconStatus(r)]} size={14} />;
+  const icon = <Icon name={lineIcon(r)} size={14} />;
   const fill = noData ? 0 : toScale(r.value.central);
   return (
     <button
       className={`cgauge cgauge-${variant} gauge-${r.kind} gauge-${r.status}`}
       onClick={onClick}
-      aria-label={`${def?.name ?? r.id}: ${noData ? '' : gaugeLabel(r)}, ${statusLabel(r.status)}${ownSpoken(r)}${windowSpoken(r, usualWindow)}`}
+      aria-label={`${def?.name ?? r.id}: ${noData ? '' : gaugeLabel(r)}, ${statusText(r.status, r.statusSpan)}${ownSpoken(r)}${windowSpoken(r, usualWindow)}`}
     >
       <span className="cgauge-line">
         {variant === 'row' && icon}
@@ -152,11 +155,11 @@ export function StoreCompactGauge({ result: r, onClick }: { result: NutrientResu
   const warn = storeNeedsAttention(st);
   const tr = storeTrendOf(st);
   const full = t('gauge.full', { pct: fmtFill(st.fill.central) });
-  const spoken = [`${def?.name ?? r.id}: ${full}`, statusLabel(st.status), tr ? storeTrendLabel(tr) : '', warn ? t('store.warnSpoken') : ''].filter(Boolean).join(', ');
+  const spoken = [`${def?.name ?? r.id}: ${full}`, statusText(st.status, st.statusSpan), tr ? storeTrendLabel(tr) : '', warn ? t('store.warnSpoken') : ''].filter(Boolean).join(', ');
   return (
     <button className={`cgauge cgauge-row gauge-store gauge-${st.status}`} onClick={onClick} aria-label={spoken}>
       <span className="cgauge-line">
-        <Icon name={warn ? 'warning' : STATUS_ICON[st.status]} size={14} />
+        <Icon name={warn ? 'warning' : statusIconOf(st.status, st.statusSpan)} size={14} />
         <span className="cgauge-name">{def?.short ?? r.id}</span>
         <span className="cgauge-value">
           {/* The card's heading says "how full", so the narrow row shows only the percent. */}
@@ -183,7 +186,7 @@ export function trendArrows(tr: Trend): string {
 
 /** Spoken / tooltip text for a trend. */
 export function trendLabel(tr: Trend): string {
-  if (tr.direction === 'steady') return t('trend.steady');
+  if (tr.direction === 'steady') return t(tr.unsure ? 'trend.unsure' : 'trend.steady');
   const dir = t(tr.direction === 'up' ? 'trend.up' : 'trend.down');
   if (tr.daysToNext === undefined) return dir;
   return t(tr.speed === 3 ? 'trend.withinWeek' : tr.speed === 2 ? 'trend.withinMonth' : 'trend.slow', { dir });
@@ -191,7 +194,7 @@ export function trendLabel(tr: Trend): string {
 
 /** Spoken / tooltip text for a store's trend: filling, draining, holding or staying empty. */
 export function storeTrendLabel(tr: Trend): string {
-  if (tr.direction === 'steady') return t(tr.better === false ? 'store.staysEmpty' : 'store.holding');
+  if (tr.direction === 'steady') return t(tr.better === false ? 'store.staysEmpty' : tr.unsure ? 'store.unsure' : 'store.holding');
   const dir = t(tr.direction === 'up' ? 'store.filling' : 'store.draining');
   if (tr.daysToNext === undefined) return dir;
   return t(tr.speed === 3 ? 'trend.withinWeek' : tr.speed === 2 ? 'trend.withinMonth' : 'trend.slow', { dir });
@@ -250,9 +253,9 @@ export function GaugeRow({ result: r, showRange, onClick, defaultBased }: Pick<P
     <button
       className={`nrow gauge-${r.kind} gauge-${r.status}`}
       onClick={onClick}
-      aria-label={`${def?.name ?? r.id}: ${noData ? t('gauge.noData') : gaugeLabel(r)}${range}, ${statusLabel(r.status)}${ownSpoken(r)}${windowSpoken(r)}`}
+      aria-label={`${def?.name ?? r.id}: ${noData ? t('gauge.noData') : gaugeLabel(r)}${range}, ${statusText(r.status, r.statusSpan)}${ownSpoken(r)}${windowSpoken(r)}`}
     >
-      <Icon name={STATUS_ICON[iconStatus(r)]} size={14} />
+      <Icon name={lineIcon(r)} size={14} />
       <span className="nrow-name">
         {name}
         {defaultBased && <span className="gauge-default">*</span>}
@@ -316,7 +319,7 @@ export function TankCard({ result: r, showRange, onClick }: { result: NutrientRe
       onClick={onClick}
       aria-label={[
         `${def?.name ?? r.id}: ${t('gauge.full', { pct: fmtFill(st.fill.central) })}${range}`,
-        statusLabel(st.status),
+        statusText(st.status, st.statusSpan),
         tr ? storeTrendLabel(tr) : '',
         spokenLasts,
         warn ? t('store.warnSpoken') : '',
@@ -325,7 +328,7 @@ export function TankCard({ result: r, showRange, onClick }: { result: NutrientRe
         .join(', ')}
     >
       <span className="tank-card-head" aria-hidden>
-        <Icon name={STATUS_ICON[st.status]} size={14} />
+        <Icon name={statusIconOf(st.status, st.statusSpan)} size={14} />
         <span className="tank-card-name">{def?.short ?? r.id}</span>
         {warn && (
           <span className="tank-card-warn">

@@ -36,6 +36,22 @@ export interface SimulationInput {
 }
 
 export type GaugeStatus = 'fine' | 'gettingLow' | 'low' | 'tooHigh' | 'unknown' | 'info';
+
+/**
+ * The status of the lowest and the highest of the three runs (accuracy review proposal 1, owner's pick
+ * 2026-10-23).
+ */
+export interface StatusSpan {
+  low: GaugeStatus;
+  high: GaugeStatus;
+}
+
+/**
+ * Unsure: the likely range crosses the need (or the limit), so the log can't tell whether you are covered
+ * (or over). Shown as "unclear" with a circled wave; warnings and effect lines wait until the whole range
+ * agrees. A range from "low" to "a bit low" is below the need either way, so it keeps its middle status.
+ */
+export const isUnsure = (span: StatusSpan | undefined): boolean => !!span && (span.low === 'fine') !== (span.high === 'fine');
 /** How a nutrient's main number reads. A nutrient with a body store is 'rolling' too; its fill level is in `store`. */
 export type GaugeKind = 'rolling' | 'limit' | 'info';
 
@@ -69,6 +85,10 @@ export interface StoreResult {
   storeDays?: Range;
   /** Average net change per day over the window (absorbed + sun − need, central), before clamping. */
   netPerDay?: number;
+  /** The same per run: when it runs from minus to plus, the log can't tell filling from draining. */
+  netRange?: Range;
+  /** Status of the lowest and highest fill of the three runs. */
+  statusSpan?: StatusSpan;
   /** Day of the blood test the store was set from, if any. */
   measuredOn?: string;
   /**
@@ -114,6 +134,8 @@ export interface NutrientResult {
   ownTarget?: boolean;
   /** Limit lines: the daily maximum the average intake is compared with. */
   limit?: number;
+  /** Status of the lowest and highest value of the three runs. */
+  statusSpan?: StatusSpan;
 }
 
 export interface SimulationResult {
@@ -284,6 +306,11 @@ export function classify(kind: GaugeKind | 'tank', value: number, ulRatio: numbe
   if (value < t.low) return 'low';
   if (value < t.gettingLow) return 'gettingLow';
   return 'fine';
+}
+
+/** Statuses of the low and high end of a range, for `StatusSpan`. */
+export function spanOf(kind: GaugeKind | 'tank', value: Range, ulRatio: number | undefined, known: boolean): StatusSpan {
+  return { low: classify(kind, value.low, ulRatio, known), high: classify(kind, value.high, ulRatio, known) };
 }
 
 export function simulate(input: SimulationInput): SimulationResult {
@@ -559,16 +586,21 @@ export function simulate(input: SimulationInput): SimulationResult {
         storeHistory.push({ day: days[i]!, low: Math.min(...vals), central: levels.central[i]! / capacity, high: Math.max(...vals) });
       }
       // Net change per day (central) over the window, for "filling / going down" and time to the fine zone.
-      const netPerDay = win.length ? win.reduce((a, i) => a + inflow.central[i]! + sunAt('central', i) - physiological, 0) / win.length : undefined;
+      const netOf = (s: Scenario) => (win.length ? win.reduce((a, i) => a + inflow[s][i]! + sunAt(s, i) - physiological, 0) / win.length : undefined);
+      const netPerDay = netOf('central');
+      const nets = SCENARIOS.map(netOf).filter((v): v is number => v !== undefined);
+      const netRange = netPerDay !== undefined ? { low: Math.min(...nets), central: netPerDay, high: Math.max(...nets) } : undefined;
       const f = { low: level.low / capacity, central: level.central / capacity, high: level.high / capacity };
       const fill = { low: Math.min(f.low, f.central, f.high), central: f.central, high: Math.max(f.low, f.central, f.high) };
       store = {
         fill,
         status: classify('tank', fill.central, ulRatio, true),
+        statusSpan: spanOf('tank', fill, ulRatio, true),
         capacity,
         level,
         storeDays: coverDays,
         netPerDay,
+        ...(netRange ? { netRange } : {}),
         measuredOn: measuredIdx >= 0 ? measured!.day : undefined,
         slow,
         lowForDays,
@@ -579,6 +611,7 @@ export function simulate(input: SimulationInput): SimulationResult {
     results.set(id, {
       ...base,
       status: classify(kind, value.central, ulRatio, knownInWindow > 0),
+      statusSpan: spanOf(kind, value, ulRatio, knownInWindow > 0),
       value,
       history,
       ...(store ? { store } : {}),

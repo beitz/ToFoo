@@ -29,7 +29,7 @@ export function EffectCard({ r }: { r: NutrientResult }) {
   if (!isOn(d.settings.features, 'levelEffects')) return null;
   const req = d.requirements.byNutrient.get(r.id);
   const f = findingOf(r, req, hasEffectText);
-  if (!f || f.filling || f.early) return null;
+  if (!f || f.filling || f.early || f.unsure) return null;
   const key = infoId(r.id);
   const text = (part: string) => t(`effect.${key}.${part}` as MessageKey);
   const has = (part: string) => !text(part).startsWith('effect.');

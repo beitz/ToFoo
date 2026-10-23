@@ -15,7 +15,7 @@
 import { MODEL_NUTRIENT_IDS } from './nutrients';
 import { SCENARIOS, type Range } from './paramTypes';
 import type { ResolvedRequirements } from './requirements';
-import { classify, type GaugeKind, type NutrientResult, type SimulationResult } from './simulate';
+import { classify, spanOf, type GaugeKind, type NutrientResult, type SimulationResult } from './simulate';
 import type { DayStatus } from './types';
 
 export interface PeriodInput {
@@ -79,6 +79,7 @@ export function periodBreakdown(input: PeriodInput): PeriodResult {
       id,
       kind,
       status: classify(kind, value.central, ulRatio, n > 0),
+      statusSpan: spanOf(kind, value, ulRatio, n > 0),
       value,
       averageAbsorbed: absorbed.central,
       averageIntake,

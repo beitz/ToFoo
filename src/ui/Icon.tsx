@@ -42,6 +42,8 @@ const paths: Record<string, string> = {
   calendar: 'M4.5 6.5h15v13h-15zM4.5 10.5h15M8.5 4v4M15.5 4v4',
   half: 'M12 4a8 8 0 1 0 0 16a8 8 0 1 0 0-16zM12 4v16M12 8h4M12 12h5M12 16h4',
   minus: 'M7 12h10',
+  eye: 'M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12zM12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z',
+  unsure: 'M7.5 12.5c1.5-1.6 3-1.6 4.5 0s3 1.6 4.5 0',
   approx: 'M5 9.5c2.3-2 4.7-2 7 0s4.7 2 7 0M5 15c2.3-2 4.7-2 7 0s4.7 2 7 0',
   skip: 'M12 3.5a8.5 8.5 0 1 0 0 17 8.5 8.5 0 0 0 0-17zM6 6l12 12',
   journal: 'M6 3.5h9l3.5 3.5v13.5H6zM15 3.5V7h3.5M9 11h6M9 14.5h6M9 18h3.5',
@@ -68,7 +70,7 @@ export function Icon({ name, size = 20, title, filled }: { name: keyof typeof pa
     <svg width={size} height={size} viewBox="0 0 24 24" fill={filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden={title ? undefined : true} role={title ? 'img' : undefined}>
       {title && <title>{title}</title>}
       <path d={paths[name] ?? paths.info} />
-      {(name === 'alert' || name === 'question' || name === 'info') && <circle cx="12" cy="12" r="9" />}
+      {(name === 'alert' || name === 'question' || name === 'info' || name === 'unsure') && <circle cx="12" cy="12" r="9" />}
     </svg>
   );
 }

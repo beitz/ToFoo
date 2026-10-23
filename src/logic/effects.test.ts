@@ -131,4 +131,14 @@ describe('what a level means', () => {
     expect(s.fine).toEqual(['VITC']);
     expect(s.noData).toEqual(['K']);
   });
+
+  it('holds back the effect line while the likely range reaches the other side', () => {
+    const k = result('K', { status: 'gettingLow', value: { low: 0.6, central: 0.76, high: 0.95 }, statusSpan: { low: 'low', high: 'fine' } });
+    expect(findingOf(k, req('K'), hasEffectText)).toMatchObject({ direction: 'low', unsure: true, effect: false });
+    const sure = result('K', { status: 'low', value: { low: 0.5, central: 0.6, high: 0.75 }, statusSpan: { low: 'low', high: 'gettingLow' } });
+    expect(findingOf(sure, req('K'), hasEffectText)).not.toHaveProperty('unsure');
+    const s = summarise([k], new Map([['K', req('K')]]), hasEffectText);
+    expect(s.unsure.map((f) => f.id)).toEqual(['K']);
+    expect(s.effects).toEqual([]);
+  });
 });

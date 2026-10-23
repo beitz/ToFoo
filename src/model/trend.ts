@@ -13,6 +13,11 @@ export interface Trend {
   daysToNext?: number;
   /** Towards a better status (true) or a worse one (false); undefined when steady or moving within the best zone. */
   better?: boolean;
+  /**
+   * Steady only because the low and high runs disagree on the direction (accuracy review proposal 1): the log
+   * can't tell rising from falling, so no arrow claims one ("about even").
+   */
+  unsure?: boolean;
 }
 
 const RANK: Record<string, number> = { low: 0, gettingLow: 1, fine: 2, tooHigh: 0 };
@@ -69,6 +74,9 @@ export function trendOf(r: Pick<NutrientResult, 'kind' | 'history' | 'ulRatio' |
   const now = h[last]!.central;
   const perDay = (now - h[base]!.central) / span;
   if (Math.abs(perDay) * 7 < trendDisplay.steadyPerWeek.value) return { direction: 'steady', speed: 0, perDay };
+  const lowPerDay = h[last]!.low - h[base]!.low;
+  const highPerDay = h[last]!.high - h[base]!.high;
+  if (lowPerDay * highPerDay < 0) return { direction: 'steady', speed: 0, perDay, unsure: true };
   return trendAt(scale, now, perDay);
 }
 
@@ -77,13 +85,15 @@ export function trendOf(r: Pick<NutrientResult, 'kind' | 'history' | 'ulRatio' |
  * reaches the next status line of its own fill scale. Big stores fill slowly, so even a small net gain shows
  * as filling. Steady when the net is zero, or when it pushes against an empty or full store.
  */
-export function storeTrendOf(st: Pick<StoreResult, 'fill' | 'capacity' | 'netPerDay'>): Trend | null {
+export function storeTrendOf(st: Pick<StoreResult, 'fill' | 'capacity' | 'netPerDay' | 'netRange'>): Trend | null {
   if (st.netPerDay === undefined || !st.capacity) return null;
   const perDay = st.netPerDay / st.capacity;
   const now = st.fill.central;
   if (perDay === 0 || (perDay > 0 && now >= 1)) return { direction: 'steady', speed: 0, perDay: 0 };
   // Empty and still short: nothing left to drain, but not a neutral "holding" either.
   if (perDay < 0 && now <= 0) return { direction: 'steady', speed: 0, perDay: 0, better: false };
+  // Intake close to need: one run fills, another drains, so the direction is within the error.
+  if (st.netRange && st.netRange.low < 0 && st.netRange.high > 0) return { direction: 'steady', speed: 0, perDay: 0, unsure: true };
   const t = statusThresholds.tank.value;
   return trendAt({ lines: [t.low, t.gettingLow], zones: ['low', 'gettingLow', 'fine'] }, now, perDay);
 }

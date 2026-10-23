@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { storeTrendOf, trendOf } from './trend';
-import type { GaugeKind, HistoryPoint } from './simulate';
+import { isUnsure, type GaugeKind, type HistoryPoint } from './simulate';
 
 const hist = (values: number[]): HistoryPoint[] => values.map((v, i) => ({ day: `2026-01-${String(i + 1).padStart(2, '0')}`, low: v, central: v, high: v }));
 const line = (from: number, perDay: number, n = 8) => hist(Array.from({ length: n }, (_, i) => from + perDay * i));
@@ -72,5 +72,31 @@ describe('storeTrendOf', () => {
     expect(store(0, -1)).toMatchObject({ direction: 'steady', better: false }); // stays empty
     expect(store(1, 1)).toMatchObject({ direction: 'steady' });
     expect(store(0.5, undefined)).toBeNull();
+  });
+});
+
+describe('unsure directions (accuracy review proposal 1)', () => {
+  it('shows no direction for a line when the low and high runs move opposite ways', () => {
+    const h = line(0.8, 0.02).map((p, i) => ({ ...p, low: p.central - 0.1 - 0.03 * i, high: p.central + 0.1 + 0.03 * i }));
+    expect(trend('rolling', h)).toMatchObject({ direction: 'steady', speed: 0, unsure: true });
+    // All runs rising: an arrow as usual.
+    expect(trend('rolling', line(0.5, 0.02))).not.toHaveProperty('unsure');
+  });
+
+  it('calls a store about even when one run fills and another drains', () => {
+    const st = { fill: { low: 0.5, central: 0.5, high: 0.5 }, capacity: 100 };
+    expect(storeTrendOf({ ...st, netPerDay: 0.1, netRange: { low: -0.1, central: 0.1, high: 0.3 } })).toMatchObject({ direction: 'steady', unsure: true });
+    expect(storeTrendOf({ ...st, netPerDay: 0.2, netRange: { low: 0.1, central: 0.2, high: 0.3 } })).toMatchObject({ direction: 'up' });
+  });
+});
+
+describe('isUnsure', () => {
+  it('is unsure only when the range reaches both sides of the need or the limit', () => {
+    expect(isUnsure({ low: 'low', high: 'fine' })).toBe(true);
+    expect(isUnsure({ low: 'gettingLow', high: 'fine' })).toBe(true);
+    expect(isUnsure({ low: 'fine', high: 'tooHigh' })).toBe(true);
+    expect(isUnsure({ low: 'low', high: 'gettingLow' })).toBe(false); // below the need either way
+    expect(isUnsure({ low: 'fine', high: 'fine' })).toBe(false);
+    expect(isUnsure(undefined)).toBe(false);
   });
 });

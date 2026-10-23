@@ -5,7 +5,7 @@ import { nutrientParams, startingLevels, statusThresholds } from '../../model/pa
 import { estimateEnergyNeed, resolveRequirements } from './requirements';
 import { referenceValues } from '../../model/reference-values';
 import { retentionFactor } from './retention';
-import { drinkKind, earlyReading, effectiveDayStatus, groupMeals, simulate, tankTrend, type SimulationInput } from './simulate';
+import { drinkKind, earlyReading, effectiveDayStatus, groupMeals, simulate, tankTrend, type SimulationInput, type StoreResult } from './simulate';
 import { clearSkyUvIndex, solarElevation, sunVitaminD } from './sun';
 import { DEFAULT_MODEL_SETTINGS, type ModelEntry } from './types';
 
@@ -541,7 +541,9 @@ describe('simulation', () => {
 
     // Tanks can't skip a day: a left-out day drains like a filled-in one, not like a fast.
     const fe = (dayStatus: SimulationInput['dayStatus']) => simulate(baseInput(d, entries, { dayStatus })).nutrients.get('FE')!;
-    expect(fe({ [d[3]!]: 'excluded' }).store).toEqual(fe({ [d[3]!]: 'filled' }).store);
+    // (The net change per day is an average over the counted days only, so its low and high runs may differ.)
+    const level = (st: StoreResult | undefined) => ({ ...st, netRange: undefined });
+    expect(level(fe({ [d[3]!]: 'excluded' }).store)).toEqual(level(fe({ [d[3]!]: 'filled' }).store));
     expect(fe({ [d[3]!]: 'excluded' }).store!.fill.central).toBeGreaterThan(fe({}).store!.fill.central);
   });
 

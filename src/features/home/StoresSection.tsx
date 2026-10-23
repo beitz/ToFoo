@@ -2,13 +2,13 @@ import { navigate } from '../../app/router';
 import { t } from '../../i18n';
 import { fmtFill } from '../../lib/format';
 import { NUTRIENT_BY_ID } from '../../model/nutrients';
-import type { NutrientResult, StoreResult } from '../../model/simulate';
+import { isUnsure, type NutrientResult, type StoreResult } from '../../model/simulate';
 import { storeTrendOf } from '../../model/trend';
 import { storeNeedsAttention } from '../../logic/stores';
 import { fmtDuration } from '../../ui/duration';
 import { fmtDurationShort, storeLastsDays, storeTrendLabel, trendArrows } from '../../ui/Gauge';
 import { Icon } from '../../ui/Icon';
-import { statusLabel } from '../../ui/status';
+import { statusText } from '../../ui/status';
 import { StatusMark, symbolOf } from '../../ui/Tile';
 
 const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
@@ -41,7 +41,7 @@ function StoreTank({ result: r, showRange }: { result: NutrientResult & { store:
   const warn = storeNeedsAttention(st);
   const spoken = [
     `${def?.name ?? r.id}: ${t('gauge.full', { pct: fmtFill(st.fill.central) })}`,
-    statusLabel(st.status),
+    statusText(st.status, st.statusSpan),
     tr ? storeTrendLabel(tr) : '',
     days === null ? '' : days <= 0 ? t('tank.empty') : t('tank.lasts', { time: days < 1 ? t('duration.underDay') : fmtDuration(days) }),
     warn ? t('store.warnSpoken') : '',
@@ -51,7 +51,7 @@ function StoreTank({ result: r, showRange }: { result: NutrientResult & { store:
   return (
     <button type="button" className={`store-col gauge-${st.status}`} onClick={() => navigate('nutrient', r.id)} aria-label={spoken}>
       <span className="store-mark" aria-hidden>
-        {warn ? <Icon name="warning" size={13} /> : <StatusMark status={st.status} size={12} />}
+        {warn ? <Icon name="warning" size={13} /> : <StatusMark status={st.status} size={12} unsure={isUnsure(st.statusSpan)} />}
       </span>
       <span className="store-tank" aria-hidden>
         <span className="store-band" style={{ bottom: `${low * 100}%`, height: `${(high - low) * 100}%` }} />
