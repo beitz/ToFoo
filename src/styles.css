@@ -847,6 +847,10 @@ textarea:focus-visible,
   padding-top: 8px;
   z-index: 1;
 }
+/* Room above the first field for its focus ring, which the sticky head would otherwise paint over. */
+.sheet-body {
+  padding-top: 6px;
+}
 .sheet-head h2 {
   margin: 0;
   font-size: 1.15rem;
@@ -2673,6 +2677,10 @@ body:has(.composer) .toast-area {
   .dial-scrim.open {
     transition: none;
   }
+}
+/* A sheet or dialog is a task of its own: the round button steps aside so it covers nothing in it. */
+body:has(.sheet-backdrop) :is(.fab-stack, .dial-scrim) {
+  display: none;
 }
 /* Toasts sit left of the buttons so undo stays reachable. */
 body:has(.fab-stack) .toast-area {
