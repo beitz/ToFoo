@@ -29,6 +29,7 @@ const ROUTES = [
   'settings/diagnostics',
   'about',
   'about/sent',
+  'about/versions',
 ];
 
 test('every main screen opens without an error', async ({ page }) => {

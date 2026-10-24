@@ -53,6 +53,7 @@ CI (`.github/workflows/deploy.yml`) runs data → typecheck → test → build �
 11. Food names: English is the primary display and search language, German second (both from BLS).
 12. Keep `docs/SPEC.md`, `docs/OPEN_QUESTIONS.md` and the exchange-format docs current when decisions change.
 13. **Guided tours** (`src/features/tour/tours.ts`): a new screen, card or menu entry gets a look at its tour in the same PR. Steps point at `data-tour` markers (a test fails on a marker that no longer exists); tour lines say what a part is, never how it looks, and stay one short line.
+14. **Version history:** a PR that changes what users see adds a line to `src/i18n/changes.en.ts` (`change.<pr>`, and `change.<pr>.major` for a bigger change) once it has its PR number. Leave out small fixes, CI, tests, specs and work behind the scenes. Never write version numbers or dates there; the build reads them from git.
 
 ## Workflow
 

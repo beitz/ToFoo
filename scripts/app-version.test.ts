@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildInfo, type Git } from './app-version';
+import { buildInfo, releases, type Git } from './app-version';
 
 const now = new Date('2026-10-23T12:00:00Z');
 
@@ -26,5 +26,47 @@ describe('buildInfo', () => {
     const shallow = fakeGit({ 'rev-parse --short': 'e9fec8f', 'rev-parse --is-shallow': 'true', 'log -1': 'abc', 'rev-list': '1' });
     expect(buildInfo('0.1.0', shallow, now).version).toBe('0.1.dev');
     expect(buildInfo('0.1.0', fakeGit({}), now)).toEqual({ version: '0.1.dev', commit: '', builtAt: '2026-10-23T12:00:00.000Z' });
+  });
+});
+
+describe('releases', () => {
+  const log = ['c3\t2026-10-24T15:04:39+02:00\tJournal: private entries (#139)', 'c2\t2026-10-24T15:01:51+02:00\tSheets: focus frame (#138)', 'c1\t2026-10-15T06:11:00+02:00\tAdd files via upload'].join('\n');
+
+  it('gives every squash-merged pull request its version and merge time', () => {
+    const git = fakeGit({
+      'rev-parse --is-shallow': 'false',
+      'log --format=%H -G': 'base',
+      'show base:package.json': '{"version": "0.1.0"}',
+      'log --first-parent': log,
+      'merge-base --is-ancestor base': '',
+      'rev-list --count base..c3': '146',
+      'rev-list --count base..c2': '145',
+    });
+    expect(releases(git)).toEqual({
+      139: { version: '0.1.146', date: '2026-10-24T15:04:39+02:00' },
+      138: { version: '0.1.145', date: '2026-10-24T15:01:51+02:00' },
+    });
+  });
+
+  it('counts each pull request from the version line it was built with', () => {
+    const git = fakeGit({
+      'rev-parse --is-shallow': 'false',
+      'log --format=%H -G': 'bump\nbase',
+      'show bump:package.json': '{"version": "0.2.0"}',
+      'show base:package.json': '{"version": "0.1.0"}',
+      'log --first-parent': log,
+      'merge-base --is-ancestor bump c3': '',
+      'merge-base --is-ancestor base': '',
+      'rev-list --count bump..c3': '1',
+      'rev-list --count base..c2': '145',
+    });
+    expect(releases(git)).toEqual({
+      139: { version: '0.2.1', date: '2026-10-24T15:04:39+02:00' },
+      138: { version: '0.1.145', date: '2026-10-24T15:01:51+02:00' },
+    });
+  });
+
+  it('is empty in a shallow clone', () => {
+    expect(releases(fakeGit({ 'rev-parse --is-shallow': 'true' }))).toEqual({});
   });
 });
