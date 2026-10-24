@@ -10,6 +10,7 @@ import { Field, Sheet } from '../../ui/controls';
 import { DateInput } from '../../ui/DateInputs';
 import { Icon } from '../../ui/Icon';
 import { ActivitySheet } from '../activity/ActivitySheet';
+import { JournalSheet } from '../journal/JournalSheet';
 import { SleepButton } from '../sleep/SleepButton';
 import { DialItem } from './DialItem';
 import { endFast } from '../fast/fastActions';
@@ -28,6 +29,7 @@ export function QuickActions() {
   const { today } = d;
   const [open, setOpen] = useState(false);
   const [activity, setActivity] = useState(false);
+  const [journal, setJournal] = useState(false);
   const [fastSheet, setFastSheet] = useState(false);
   const [fastStart, setFastStart] = useState(today);
   const close = () => setOpen(false);
@@ -72,7 +74,18 @@ export function QuickActions() {
       <div className={`fab-stack dial${open ? ' open' : ''}`}>
         {/* Hidden items stay rendered so they can animate out; visibility keeps them out of reach. */}
         <div className="dial-items" id="quick-actions" role="group" aria-label={t('home.quickActions')}>
-          {on('journal') && <DialItem icon="journal" label={t('home.journal')} tour="fan.journal" onClick={() => go('journal')} />}
+          {/* Writes right where you are, like Log activity; the list lives under Insights (owner's ask, 2026-10-24). */}
+          {on('journal') && (
+            <DialItem
+              icon="journal"
+              label={t('home.journal')}
+              tour="fan.journal"
+              onClick={() => {
+                close();
+                setJournal(true);
+              }}
+            />
+          )}
           {on('activity') && (
             <DialItem
               icon="activity"
@@ -127,6 +140,7 @@ export function QuickActions() {
         </div>
       </div>
       {activity && <ActivitySheet defaultTime={Date.now()} onClose={() => setActivity(false)} />}
+      {journal && <JournalSheet onClose={() => setJournal(false)} />}
       {fastSheet && (
         <Sheet title={t('home.fasting')} onClose={() => setFastSheet(false)}>
           <Field label={t('home.fastSince')} hint={t('home.fastHint')}>
