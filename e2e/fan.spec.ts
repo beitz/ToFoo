@@ -45,3 +45,22 @@ test('trackers that are off stay out of the round button', async ({ page }) => {
     await expect(fan.getByRole('button', { name: label })).toHaveCount(0);
   }
 });
+
+// Owner's report 2026-10-24: Write in journal led to the journal page, one more tap away from writing.
+test('Write in journal opens the writing sheet right where you are', async ({ page }) => {
+  const errors = watchErrors(page);
+  await firstLaunch(page);
+  await turnOn(page, ['Journal']);
+
+  await page.goto('./#/');
+  await page.locator('[data-tour="round-button"]').click();
+  await page.getByRole('group', { name: 'Quick actions' }).getByRole('button', { name: 'Write in journal' }).click();
+  const sheet = page.getByRole('dialog', { name: 'Write in journal' });
+  await expect(sheet.getByRole('textbox')).toBeFocused();
+  await sheet.getByRole('textbox').fill('Tired all afternoon');
+  await sheet.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(sheet).toBeHidden();
+  await expect(page.getByText('Saved to your journal.')).toBeVisible();
+  expect(new URL(page.url()).hash).toBe('#/');
+  expect(errors).toEqual([]);
+});
