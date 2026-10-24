@@ -8,6 +8,7 @@
  * scenes and small fixes. A pull request that changes what users see adds its line here in the same PR.
  */
 export const changesEn = {
+  'change.141': 'Write in journal in the round button opens the writing box right where you are, instead of the journal page.',
   'change.140': 'Version history on the About page: highlights at a glance, or every change with its version and date.',
   'change.140.major': 'Version history on the About page',
   'change.139': 'Journal entries can be private: the assistant never sees them, and Patterns only uses them when you tick them.',
