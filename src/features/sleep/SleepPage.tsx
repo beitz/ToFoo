@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useData } from '../../app/data';
 import { href, navigate } from '../../app/router';
 import { t } from '../../i18n';
-import { formatDate, formatTime, parseDay, weekdayShort } from '../../lib/dates';
+import { addDays, dayKey, formatDate, formatTime, parseDay, weekdayShort } from '../../lib/dates';
 import { lastMealBefore, minuteOfDay, nightsWindow, nightTimes, sleepDebt, weeklySleep, type Night, type Spread } from '../../logic/nights';
 import { sleepNeed } from '../../../model/parameters';
 import { isOn } from '../../settings/features';
@@ -18,10 +18,20 @@ const WINDOWS = ['7', '14', '28'] as const;
 type Window = (typeof WINDOWS)[number];
 /** Weeks in the bottom chart, the current one included. */
 const WEEKS = 8;
-/** "When you slept" runs from 18:00 the evening before to 12:00 (18 hours). */
+/**
+ * "When you slept" runs from 18:00 the evening before to 12:00 (18 hours), and on to the end of the
+ * latest sleep in the window (up to midnight), so a nap in the afternoon fits on its row.
+ */
 const AXIS_START_MIN = 18 * 60;
 const AXIS_MIN = 18 * 60;
-const AXIS_TICKS = [22, 2, 6, 10];
+const AXIS_MAX_MIN = 30 * 60;
+/** Ticks every 4 hours from 22:00 on the usual axis; every 6 hours from midnight on a longer one, so they fit at 360 px. */
+function axisTicks(len: number): number[] {
+  const [first, step] = len > AXIS_MIN ? [6 * 60, 6 * 60] : [4 * 60, 4 * 60];
+  const out: number[] = [];
+  for (let m = first; m <= len - 60; m += step) out.push(m);
+  return out;
+}
 
 /** "Wed 21": the month is in the window's dates already, and the rows are narrow. */
 const dayLabel = (day: string) => `${weekdayShort(day)} ${parseDay(day).getDate()}`;
@@ -46,6 +56,7 @@ export function SleepPage() {
   const mealStarts = useMemo(() => d.model.meals.map((m) => m.start), [d.model.meals]);
   const usual = times.bed && times.wake ? { bed: times.bed.median, wake: times.wake.median } : undefined;
   const unknown = nights.filter((n) => n.asleep === undefined);
+  const axisLen = useMemo(() => axisLength(nights), [nights]);
 
   return (
     <section>
@@ -123,9 +134,9 @@ export function SleepPage() {
             <div className="nights-axis" aria-hidden>
               <span />
               <span className="nights-axis-ticks">
-                {AXIS_TICKS.map((h) => (
-                  <span key={h} style={{ left: `${(((h * 60 - AXIS_START_MIN + 1440) % 1440) / AXIS_MIN) * 100}%` }}>
-                    {clockText(h * 60)}
+                {axisTicks(axisLen).map((m) => (
+                  <span key={m} style={{ left: `${(m / axisLen) * 100}%` }}>
+                    {clockText((m + AXIS_START_MIN) % 1440)}
                   </span>
                 ))}
               </span>
@@ -134,7 +145,7 @@ export function SleepPage() {
             <ol className="plain-list nights-rows">
               {[...nights].reverse().map((n) => (
                 <li key={n.day}>
-                  <NightRow night={n} usual={usual} lastMeal={n.block ? lastMealBefore(mealStarts, n.block.start) : undefined} />
+                  <NightRow night={n} axisLen={axisLen} usual={usual} lastMeal={n.block ? lastMealBefore(mealStarts, n.block.start) : undefined} />
                 </li>
               ))}
             </ol>
@@ -242,17 +253,29 @@ function DebtChart({ nights, running }: { nights: readonly Night[]; running: rea
   );
 }
 
-const axisPos = (t: number) => {
-  const m = (minuteOfDay(t) - AXIS_START_MIN + 1440) % 1440;
-  return (Math.min(m, AXIS_MIN) / AXIS_MIN) * 100;
-};
-const minutePos = (m: number) => (Math.min((m - AXIS_START_MIN + 1440) % 1440, AXIS_MIN) / AXIS_MIN) * 100;
+/** Minutes from the axis start (18:00 the evening before `day`) to `t`, by the clock, so a night with a clock change still lines up with the ticks. */
+function axisMinute(t: number, day: string): number {
+  const k = dayKey(new Date(t));
+  const base = k === day ? 1440 : k === addDays(day, -1) ? 0 : k < day ? -Infinity : Infinity;
+  return base + minuteOfDay(t) - AXIS_START_MIN;
+}
 
-/** One night on the 18:00 → 12:00 axis: the usual window, each sleep, the last meal before it. */
-function NightRow({ night: n, usual, lastMeal }: { night: Night; usual?: { bed: number; wake: number }; lastMeal?: number }) {
+/** The axis length: to 12:00, or on to the end of the latest sleep, a whole hour, up to midnight. */
+function axisLength(nights: readonly Night[]): number {
+  let len = AXIS_MIN;
+  for (const n of nights) for (const b of [...(n.block ? [n.block] : []), ...n.naps]) len = Math.max(len, Math.ceil(axisMinute(b.end, n.day) / 60) * 60);
+  return Math.min(len, AXIS_MAX_MIN);
+}
+
+/** One day on the 18:00 → 12:00 (or later) axis: the usual window, each sleep and nap, the last meal before the night. */
+function NightRow({ night: n, axisLen, usual, lastMeal }: { night: Night; axisLen: number; usual?: { bed: number; wake: number }; lastMeal?: number }) {
   const label = dayLabel(n.day);
+  const pos = (t: number) => (Math.max(0, Math.min(axisLen, axisMinute(t, n.day))) / axisLen) * 100;
+  // A clock time on the row: evening times on the day before, the rest on the day itself.
+  const minutePos = (m: number) => ((m >= AXIS_START_MIN ? m - AXIS_START_MIN : m + 1440 - AXIS_START_MIN) / axisLen) * 100;
+  const naps = n.naps.map((b) => t('nights.rowNap', { from: formatTime(b.start), to: formatTime(b.end) })).join(', ');
   const spoken =
-    n.asleep === undefined
+    (n.asleep === undefined
       ? t('nights.rowUnknown', { day: label })
       : t('nights.rowSpoken', {
           day: label,
@@ -260,7 +283,10 @@ function NightRow({ night: n, usual, lastMeal }: { night: Night; usual?: { bed: 
           to: formatTime(n.block!.end),
           hm: hmText(n.asleep),
           diff: signedHm(n.diff!),
-        }) + (lastMeal ? `, ${t('nights.rowMeal', { time: formatTime(lastMeal) })}` : '');
+        })) +
+    (naps ? `, ${naps}` : '') +
+    (lastMeal ? `, ${t('nights.rowMeal', { time: formatTime(lastMeal) })}` : '');
+  const parts = [...(n.block?.parts ?? []), ...n.naps.flatMap((b) => b.parts)];
   return (
     <a className="nights-row" href={href('diary', n.day)} aria-label={spoken}>
       <span className="nights-day small" aria-hidden>
@@ -268,18 +294,13 @@ function NightRow({ night: n, usual, lastMeal }: { night: Night; usual?: { bed: 
       </span>
       <span className="nights-track" aria-hidden>
         {usual && <span className="nights-usual" style={{ left: `${minutePos(usual.bed)}%`, width: `${Math.max(0, minutePos(usual.wake) - minutePos(usual.bed))}%` }} />}
-        {n.block ? (
-          n.block.parts.map((p) => {
-            const a = axisPos(p.start);
-            // A sleep that ran past noon is drawn to the end of the axis.
-            const b = p.end - p.start >= AXIS_MIN * 60_000 ? 100 : Math.max(a, axisPos(p.end));
-            return <span key={p.id} className="nights-sleep" style={{ left: `${a}%`, width: `${Math.max(1, b - a)}%` }} />;
-          })
-        ) : usual ? (
-          <span className="nights-unknown" style={{ left: `${minutePos(usual.bed)}%`, width: `${Math.max(0, minutePos(usual.wake) - minutePos(usual.bed))}%` }} />
-        ) : null}
+        {!n.block && usual && <span className="nights-unknown" style={{ left: `${minutePos(usual.bed)}%`, width: `${Math.max(0, minutePos(usual.wake) - minutePos(usual.bed))}%` }} />}
+        {parts.map((p) => {
+          const a = pos(p.start);
+          return <span key={p.id} className="nights-sleep" style={{ left: `${a}%`, width: `${Math.max(1, pos(p.end) - a)}%` }} />;
+        })}
         {lastMeal !== undefined && (
-          <span className="nights-meal" style={{ left: `${axisPos(lastMeal)}%` }}>
+          <span className="nights-meal" style={{ left: `${pos(lastMeal)}%` }}>
             ◆
           </span>
         )}

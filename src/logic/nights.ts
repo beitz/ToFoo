@@ -14,40 +14,55 @@ const DAY_MIN = 24 * 60;
 export interface Night {
   /** The day the night ended (the morning after). */
   day: string;
-  /** Undefined when nothing was logged: unknown, not zero. */
+  /** Undefined when no night was logged: unknown, not zero. */
   block?: SleepBlock;
-  /** Minutes asleep. */
+  /** Naps that ended on this day (sleeps not part of a night), oldest first. */
+  naps: SleepBlock[];
+  /** Minutes asleep that day, the night and its naps together; undefined without a night. */
   asleep?: number;
   /** Minutes over (+) or under (−) the need. */
   diff?: number;
 }
 
-/** Night blocks by the day they ended; two night blocks ending the same day count as one night. */
-function nightsByDay(records: readonly SleepRecord[]): Map<string, SleepBlock> {
-  const out = new Map<string, SleepBlock>();
-  for (const b of sleepBlocks(records).filter(isNight)) {
+type DaySleep = { night?: SleepBlock; naps: SleepBlock[] };
+
+/**
+ * Every sleep by the day it ended, as in the diary and the calendar (owner's report 2026-10-24: a
+ * midday nap showed in the diary but not here): night blocks ending the same day count as one night,
+ * and naps count to their day too. Only a night makes a day logged, so a day with just a nap stays unknown.
+ */
+function sleepByDay(records: readonly SleepRecord[]): Map<string, DaySleep> {
+  const out = new Map<string, DaySleep>();
+  for (const b of sleepBlocks(records)) {
     const day = dayKey(new Date(b.end));
-    const had = out.get(day);
-    out.set(day, had ? { start: Math.min(had.start, b.start), end: Math.max(had.end, b.end), asleep: had.asleep + b.asleep, parts: [...had.parts, ...b.parts] } : b);
+    const had = out.get(day) ?? { naps: [] };
+    if (!isNight(b)) had.naps.push(b);
+    else if (!had.night) had.night = b;
+    else had.night = { start: Math.min(had.night.start, b.start), end: Math.max(had.night.end, b.end), asleep: had.night.asleep + b.asleep, parts: [...had.night.parts, ...b.parts] };
+    out.set(day, had);
   }
   return out;
 }
+
+/** Milliseconds asleep on a day: the night and its naps; undefined without a night. */
+const dayAsleep = (s: DaySleep | undefined): number | undefined => (s?.night ? s.naps.reduce((n, b) => n + b.asleep, s.night.asleep) : undefined);
 
 /**
  * The last `count` nights, oldest first, ending with last night (today's morning) once it is
  * logged and with the night before otherwise, so a morning not logged yet never shows as a gap.
  */
 export function nightsWindow(records: readonly SleepRecord[], today: string, count: number, needMinutes: number): Night[] {
-  const byDay = nightsByDay(records);
-  const last = byDay.has(today) ? today : addDays(today, -1);
+  const byDay = sleepByDay(records);
+  const last = byDay.get(today)?.night ? today : addDays(today, -1);
   const out: Night[] = [];
   for (let i = count - 1; i >= 0; i--) {
     const day = addDays(last, -i);
-    const block = byDay.get(day);
-    if (!block) out.push({ day });
+    const s = byDay.get(day);
+    const ms = dayAsleep(s);
+    if (ms === undefined) out.push({ day, naps: s?.naps ?? [] });
     else {
-      const asleep = Math.round(block.asleep / MIN);
-      out.push({ day, block, asleep, diff: asleep - needMinutes });
+      const asleep = Math.round(ms / MIN);
+      out.push({ day, block: s!.night, naps: s!.naps, asleep, diff: asleep - needMinutes });
     }
   }
   return out;
@@ -127,7 +142,7 @@ export function spreadOf(minutes: readonly number[], pivot: number): Spread | un
 export const BED_PIVOT = 12 * 60;
 export const WAKE_PIVOT = 0;
 
-/** When the nights started and ended. */
+/** When the nights started and ended; naps leave the usual times alone. */
 export function nightTimes(nights: readonly Night[]): { bed?: Spread; wake?: Spread } {
   const blocks = nights.flatMap((n) => (n.block ? [n.block] : []));
   return {
@@ -142,17 +157,17 @@ export function nightTimes(nights: readonly Night[]): { bed?: Spread; wake?: Spr
   };
 }
 
-/** Average minutes asleep per logged night in each calendar week (Monday first), the last `count` weeks up to today's, oldest first. */
+/** Average minutes asleep (naps included) per logged night in each calendar week (Monday first), the last `count` weeks up to today's, oldest first. */
 export function weeklySleep(records: readonly SleepRecord[], today: string, count: number): Array<{ monday: string; average?: number; nights: number }> {
-  const byDay = nightsByDay(records);
+  const byDay = sleepByDay(records);
   const out: Array<{ monday: string; average?: number; nights: number }> = [];
   const thisMonday = weekStart(today);
   for (let i = count - 1; i >= 0; i--) {
     const monday = addDays(thisMonday, -7 * i);
     const mins: number[] = [];
     for (let j = 0; j < 7; j++) {
-      const b = byDay.get(addDays(monday, j));
-      if (b && addDays(monday, j) <= today) mins.push(b.asleep / MIN);
+      const ms = dayAsleep(byDay.get(addDays(monday, j)));
+      if (ms !== undefined && addDays(monday, j) <= today) mins.push(ms / MIN);
     }
     out.push({ monday, nights: mins.length, ...(mins.length ? { average: Math.round(mins.reduce((a, b) => a + b, 0) / mins.length) } : {}) });
   }

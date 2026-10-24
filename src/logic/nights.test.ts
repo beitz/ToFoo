@@ -14,28 +14,40 @@ const sleep = (startDay: number, sh: number, sm: number, endDay: number, eh: num
 const NEED = 7 * 60;
 
 describe('nights', () => {
-  // 19 → 20: 7 h 30; 20 → 21: two parts (woke up in the night), 6 h in all; 21 → 22 not logged.
+  // 19 → 20: 7 h 30; 20 → 21: two parts (woke up in the night), 6 h in all, and a 40 min nap; 21 → 22 not logged.
   const records = [sleep(19, 23, 0, 20, 6, 30), sleep(20, 23, 30, 21, 2, 0), sleep(21, 2, 30, 21, 6, 0), sleep(21, 14, 0, 21, 14, 40)];
 
-  it('lists the nights by the morning after, unlogged ones as unknown, naps left out', () => {
+  it('lists the nights by the morning after, unlogged ones as unknown, naps counted to their day', () => {
     const nights = nightsWindow(records, '2026-10-22', 3, NEED);
     // Today's night is not logged yet: the window ends yesterday.
     expect(nights.map((x) => x.day)).toEqual(['2026-10-19', '2026-10-20', '2026-10-21']);
     expect(nights[0]!.asleep).toBeUndefined();
     expect(nights[1]!.asleep).toBe(450);
-    expect(nights[2]!.asleep).toBe(360);
-    expect(nights[2]!.diff).toBe(-60);
+    // The night's 6 h and the 40 min nap that afternoon (owner's report 2026-10-24).
+    expect(nights[2]!.asleep).toBe(400);
+    expect(nights[2]!.diff).toBe(-20);
+    expect(nights[2]!.block!.asleep).toBe(360 * 60_000);
+    expect(nights[2]!.naps.map((b) => b.asleep)).toEqual([40 * 60_000]);
     // Once this morning is logged, the window ends today.
     const withToday = nightsWindow([...records, sleep(21, 23, 0, 22, 7, 0)], '2026-10-22', 3, NEED);
     expect(withToday.at(-1)!.day).toBe('2026-10-22');
   });
 
+  it('keeps a day with only a nap unknown, the nap still shown', () => {
+    const nights = nightsWindow([sleep(20, 11, 46, 20, 14, 30)], '2026-10-21', 2, NEED);
+    expect(nights.map((x) => x.day)).toEqual(['2026-10-19', '2026-10-20']);
+    expect(nights[1]!.asleep).toBeUndefined();
+    expect(nights[1]!.naps).toHaveLength(1);
+    // A nap today does not end the window today: last night is not logged.
+    expect(nightsWindow([sleep(21, 11, 46, 21, 14, 30)], '2026-10-21', 1, NEED)[0]!.day).toBe('2026-10-20');
+  });
+
   it('adds up the debt over logged nights only', () => {
     const debt = sleepDebt(nightsWindow(records, '2026-10-22', 3, NEED));
-    expect(debt.balance).toBe(30 - 60);
-    expect(debt.running).toEqual([0, 30, -30]);
+    expect(debt.balance).toBe(30 - 20);
+    expect(debt.running).toEqual([0, 30, 10]);
     expect(debt.logged).toBe(2);
-    expect(debt.average).toBe(405);
+    expect(debt.average).toBe(425);
     expect(sleepDebt(nightsWindow([], '2026-10-22', 3, NEED)).average).toBeUndefined();
   });
 
@@ -56,7 +68,7 @@ describe('nights', () => {
     const weeks = weeklySleep(records, '2026-10-22', 2);
     expect(weeks.map((w) => w.monday)).toEqual(['2026-10-12', '2026-10-19']);
     expect(weeks[0]!.average).toBeUndefined();
-    expect(weeks[1]).toEqual({ monday: '2026-10-19', nights: 2, average: 405 });
+    expect(weeks[1]).toEqual({ monday: '2026-10-19', nights: 2, average: 425 });
   });
 
   it('finds the last meal in the 12 hours before sleep', () => {
