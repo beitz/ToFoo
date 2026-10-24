@@ -133,6 +133,8 @@ describe('insight conversation', () => {
     expect(note).toContain('no days outside it');
     expect(note).toContain('chose not to share their sleep, water');
     expect(insightNote(at(8, 9), overview(data, key(1), key(7)), true)).not.toContain('not to share');
+    expect(insightNote(at(8, 9), overview(data, key(1), key(7)), true, [], true)).toContain('journal entries private');
+    expect(insightNote(at(8, 9), overview(data, key(1), key(7)), true)).not.toContain('private');
   });
 
   it('gives up after too many tool rounds and leaves the conversation as it was', async () => {

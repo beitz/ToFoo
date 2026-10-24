@@ -90,7 +90,8 @@ export function OverviewPage() {
   const plain = perDay(water, days, (r) => r.ml);
   const wat = waterSummary(new Map([...plain.keys()].map((day) => [day, dayWater(day, d.modelEntries, water).totalMl])), target);
   const notes = journal.filter((j) => j.day >= days[0]!);
-  const latest = notes[notes.length - 1];
+  // A private entry's words stay off the overview; it still counts.
+  const latest = notes.filter((n) => !n.private).pop();
   const off = (['sleep', 'activity', 'water', 'weight', 'journal'] as const).filter((k) => !isOn(f, k));
   const offNames = [...(isOn(f, 'fasting') ? [] : [t('overview.fasting')]), ...off.map((k) => t(OFF_NAME[k]))];
 
@@ -153,9 +154,11 @@ export function OverviewPage() {
           {isOn(f, 'weight') && <WeightRow />}
           {isOn(f, 'journal') && (
             <Row to={href('journal')} icon="journal" title={t('journal.title')} strip={strip('journal')}>
-              {!latest
+              {!notes.length
                 ? t('overview.nothingDays')
-                : t('overview.journal', { n: notes.length, text: latest.text.length > SNIPPET ? `${latest.text.slice(0, SNIPPET).trimEnd()}…` : latest.text })}
+                : !latest
+                  ? t('overview.journalCount', { n: notes.length })
+                  : t('overview.journal', { n: notes.length, text: latest.text.length > SNIPPET ? `${latest.text.slice(0, SNIPPET).trimEnd()}…` : latest.text })}
             </Row>
           )}
         </div>

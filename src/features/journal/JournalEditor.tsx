@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { href } from '../../app/router';
 import { t, type MessageKey } from '../../i18n';
 import { JOURNAL_TRANSCRIBE_PROMPT } from '../../ai/transcribe';
+import { Toggle } from '../../ui/controls';
 import { Icon } from '../../ui/Icon';
 import { TimeField } from '../log/TimeField';
 import { RecordingTime } from '../assistant/RecordingTime';
@@ -10,13 +11,15 @@ import { VoiceFailed } from '../assistant/VoiceFailed';
 
 /**
  * Writing a journal entry: plain text (no fields to fill in), the microphone when voice input is
- * set up, and the time, which defaults to now.
+ * set up, the time, which defaults to now, and whether it is private (kept from the AI).
  */
 export function JournalEditor({
   text,
   onText,
   time,
   onTime,
+  isPrivate = false,
+  onPrivate,
   autoFocus,
   onBusy,
 }: {
@@ -24,6 +27,8 @@ export function JournalEditor({
   onText: (update: (old: string) => string) => void;
   time: number;
   onTime: (t: number) => void;
+  isPrivate?: boolean;
+  onPrivate?: (v: boolean) => void;
   autoFocus?: boolean;
   /** Recording or transcribing: saving now would lose what is being said. */
   onBusy?: (busy: boolean) => void;
@@ -90,6 +95,7 @@ export function JournalEditor({
         </p>
       )}
       <TimeField value={time} onChange={onTime} />
+      {onPrivate && <Toggle checked={isPrivate} onChange={onPrivate} label={t('journal.private')} description={t('journal.privateHint')} />}
     </div>
   );
 }

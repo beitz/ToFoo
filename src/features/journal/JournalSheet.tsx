@@ -12,14 +12,17 @@ export function JournalSheet({ entry, defaultTime, onClose }: { entry?: JournalE
   const toast = useToast();
   const [text, setText] = useState(entry?.text ?? '');
   const [time, setTime] = useState(() => entry?.time ?? defaultTime ?? Date.now());
+  const [isPrivate, setPrivate] = useState(!!entry?.private);
   const [busy, setBusy] = useState(false);
   const canSave = !!text.trim() && !busy;
 
   async function save() {
     if (!canSave) return;
-    const fields = { time, day: dayKey(new Date(time)), text: text.trim() };
+    const fields = { time, day: dayKey(new Date(time)), text: text.trim(), ...(isPrivate ? { private: true } : {}) };
     if (entry) {
-      await repo.updateJournal({ ...entry, ...fields });
+      // Unticking drops the mark rather than storing private: false.
+      const { private: _, ...rest } = entry;
+      await repo.updateJournal({ ...rest, ...fields });
       toast(t('journal.updated'), () => repo.restoreJournal(entry));
     } else {
       const added = await repo.addJournal(fields);
@@ -37,7 +40,7 @@ export function JournalSheet({ entry, defaultTime, onClose }: { entry?: JournalE
 
   return (
     <Sheet title={t(entry ? 'journal.editTitle' : 'journal.write')} onClose={onClose}>
-      <JournalEditor text={text} onText={setText} time={time} onTime={setTime} autoFocus={!entry} onBusy={setBusy} />
+      <JournalEditor text={text} onText={setText} time={time} onTime={setTime} isPrivate={isPrivate} onPrivate={setPrivate} autoFocus={!entry} onBusy={setBusy} />
       <div className="sheet-actions">
         {entry && (
           <button className="btn btn-ghost" onClick={() => void remove()}>

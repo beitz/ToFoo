@@ -2477,6 +2477,13 @@ body:has(.composer) .toast-area {
 .journal-time {
   padding-top: 2px;
   font-variant-numeric: tabular-nums;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.journal-private {
+  display: inline-flex;
 }
 .journal-text {
   white-space: pre-wrap;
@@ -2799,6 +2806,12 @@ body:has(.fab-stack) .toast-area {
 }
 .insights-share .radio-row {
   min-height: 44px;
+}
+/* Private journal entries: a tick of their own, under the journal, so they never go by default. */
+.insights-share .insights-share-sub {
+  padding-left: 34px;
+  border-top: 0;
+  gap: 8px;
 }
 .insights-shared {
   margin: 0;

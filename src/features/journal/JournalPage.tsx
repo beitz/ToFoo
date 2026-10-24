@@ -29,15 +29,17 @@ export function JournalPage({ write = false }: { write?: boolean }) {
   const [time, setTime] = useState(() => Date.now());
   // The time follows the clock until the user changes it.
   const [timeSet, setTimeSet] = useState(false);
+  const [isPrivate, setPrivate] = useState(false);
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState<JournalEntry | 'new' | null>(null);
 
   async function save() {
     if (!text.trim() || busy) return;
     const at = timeSet ? time : Date.now();
-    const added = await repo.addJournal({ time: at, day: dayKey(new Date(at)), text: text.trim() });
+    const added = await repo.addJournal({ time: at, day: dayKey(new Date(at)), text: text.trim(), ...(isPrivate ? { private: true } : {}) });
     toast(t('journal.saved'), () => void repo.deleteJournal(added.id));
     setText('');
+    setPrivate(false);
     setTimeSet(false);
     setTime(Date.now());
   }
@@ -86,6 +88,8 @@ export function JournalPage({ write = false }: { write?: boolean }) {
               setTime(v);
               setTimeSet(true);
             }}
+            isPrivate={isPrivate}
+            onPrivate={setPrivate}
             autoFocus
             onBusy={setBusy}
           />
@@ -143,11 +147,19 @@ function YearFold({ year, count, children }: { year: string; count: number; chil
   );
 }
 
-/** One entry: time and text; tap to edit. */
+/** One entry: time and text, a lock when private; tap to edit. */
 export function JournalRow({ entry, onEdit }: { entry: JournalEntry; onEdit: () => void }) {
   return (
     <button className="entry-row journal-row" onClick={onEdit}>
-      <span className="journal-time muted small">{formatTime(entry.time)}</span>
+      <span className="journal-time muted small">
+        {formatTime(entry.time)}
+        {entry.private && (
+          <span className="journal-private" title={t('journal.private')}>
+            <Icon name="lock" size={14} />
+            <span className="visually-hidden">{t('journal.private')}</span>
+          </span>
+        )}
+      </span>
       <span className="journal-text">{entry.text}</span>
       <span className="entry-edit">
         <Icon name="edit" size={16} />

@@ -2452,6 +2452,10 @@
                   },
                   "text": {
                     "type": "string"
+                  },
+                  "private": {
+                    "description": "Kept from the AI unless the user includes private entries",
+                    "type": "boolean"
                   }
                 },
                 "required": [

@@ -80,7 +80,8 @@ export interface DayFacts {
    */
   foodComplete: boolean;
   entries: DayEntry[];
-  journal: Array<{ time: number; text: string }>;
+  /** `private`: the user keeps it from the AI; shareInsightData leaves it out unless they include private entries. */
+  journal: Array<{ time: number; text: string; private?: boolean }>;
   night?: { start: number; end: number };
   activities: ActivityRecord[];
   /** Value per measure id; null = not known that day (not logged, not tracked yet). */
@@ -200,7 +201,7 @@ export function buildInsightData(input: InsightInput): InsightData {
         ...(e.parts.length ? { grams: e.parts.reduce((n, p) => n + p.grams, 0) } : {}),
         supplement: e.isSupplement,
       })),
-      journal: notes.map((n) => ({ time: n.time, text: n.text })),
+      journal: notes.map((n) => ({ time: n.time, text: n.text, ...(n.private ? { private: true } : {}) })),
       ...(night ? { night } : {}),
       activities: acts,
       values,
@@ -437,6 +438,8 @@ export interface Overview {
   foodComplete: number;
   journalEntries: number;
   journalDays: number;
+  /** Of journalEntries, those marked private. */
+  privateJournalEntries: number;
   nights: number;
   activityDays: number;
   waterDays: number;
@@ -449,9 +452,10 @@ export type ShareKind = (typeof SHARE_KINDS)[number];
 /**
  * Only what the user chose to send: the days from `from` to today, and the kinds ticked. The
  * assistant's tools read nothing else, so a day or tracker left out cannot reach Anthropic whatever
- * the model asks for. A kind left out reads as not tracked (unknown), never as zero.
+ * the model asks for. A kind left out reads as not tracked (unknown), never as zero. Private journal
+ * entries stay out unless `privateJournal`: a day with only private ones reads as not mentioned.
  */
-export function shareInsightData(data: InsightData, from: string, kinds: ReadonlySet<ShareKind>): InsightData {
+export function shareInsightData(data: InsightData, from: string, kinds: ReadonlySet<ShareKind>, { privateJournal = false }: { privateJournal?: boolean } = {}): InsightData {
   const first = from > data.first ? from : data.first;
   const hidden = new Set(MEASURES.filter((m) => !kinds.has(m.group)).map((m) => m.id));
   // Water from drinks and food needs the food log too.
@@ -461,6 +465,9 @@ export function shareInsightData(data: InsightData, from: string, kinds: Readonl
   for (const [day, f] of data.days) {
     if (day < first) continue;
     const { night, ...rest } = f;
+    const notes = kinds.has('journal') ? f.journal.filter((n) => privateJournal || !n.private) : [];
+    const values = Object.fromEntries(Object.entries(f.values).map(([id, v]) => [id, hidden.has(id) ? null : v]));
+    if (values.journal_entries !== null && values.journal_entries !== undefined) values.journal_entries = notes.length;
     days.set(day, {
       ...rest,
       ...(kinds.has('sleep') && night ? { night } : {}),
@@ -468,10 +475,10 @@ export function shareInsightData(data: InsightData, from: string, kinds: Readonl
       foodComplete: food && f.foodComplete,
       entries: food ? f.entries : [],
       foodText: food ? f.foodText : ' ',
-      journal: kinds.has('journal') ? f.journal : [],
-      journalText: kinds.has('journal') ? f.journalText : ' ',
+      journal: notes,
+      journalText: notes.length === f.journal.length ? f.journalText : ` ${notes.map((n) => normalize(n.text)).join(' | ')} `,
       activities: kinds.has('activity') ? f.activities : [],
-      values: Object.fromEntries(Object.entries(f.values).map(([id, v]) => [id, hidden.has(id) ? null : v])),
+      values,
       missing: new Set([...f.missing].filter((id) => !hidden.has(id))),
     });
   }
@@ -491,6 +498,7 @@ export function overview(data: InsightData, from: string, to: string): Overview 
     foodComplete: days.filter((f) => f.foodComplete).length,
     journalEntries: days.reduce((n, f) => n + f.journal.length, 0),
     journalDays: days.filter((f) => f.journal.length > 0).length,
+    privateJournalEntries: days.reduce((n, f) => n + f.journal.filter((j) => j.private).length, 0),
     nights: days.filter((f) => f.night).length,
     activityDays: days.filter((f) => f.activities.length > 0).length,
     waterDays: days.filter((f) => (f.values.plain_water ?? 0) > 0).length,
