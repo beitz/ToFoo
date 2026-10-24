@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { takeAsk } from '../../app/ask';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useData } from '../../app/data';
@@ -39,6 +39,8 @@ interface ChatState {
   period: Period;
   /** The kinds of data the user ticked to send; fixed once the chat has started. */
   share: ShareKind[];
+  /** Private journal entries go too: only when the user ticks them for this chat. */
+  privateJournal: boolean;
   conversation: InsightConversation;
   bubbles: Bubble[];
   tokens: ModelTokens;
@@ -146,6 +148,7 @@ function Chat({ apiKey, model }: { apiKey: string; model: AiModel }) {
         period: '3m',
         // Everything that is tracked, as before: the user unticks what they would rather keep.
         share: kinds,
+        privateJournal: false,
         conversation: { messages: [] },
         bubbles: [],
         tokens: {},
@@ -172,7 +175,7 @@ function Chat({ apiKey, model }: { apiKey: string; model: AiModel }) {
   const from = data ? (state.period === 'all' ? data.first : addDays(d.today, -(PERIOD_DAYS[state.period] - 1))) : d.today;
   const ov = data ? overview(data, from, d.today) : undefined;
   // What the assistant's tools can read: only the period and the kinds ticked, enforced here rather than asked of the model.
-  const shared = useMemo(() => (data ? shareInsightData(data, from, new Set(state.share)) : undefined), [data, from, state.share]);
+  const shared = useMemo(() => (data ? shareInsightData(data, from, new Set(state.share), { privateJournal: state.privateJournal }) : undefined), [data, from, state.share, state.privateJournal]);
   const sharedOv = shared ? overview(shared, from, d.today) : undefined;
   const started = state.bubbles.length > 0;
   const ticked = (k: ShareKind) => state.share.includes(k);
@@ -195,7 +198,8 @@ function Chat({ apiKey, model }: { apiKey: string; model: AiModel }) {
     };
     try {
       const notShared = kinds.filter((k) => !before.share.includes(k));
-      const note = insightNote(Date.now(), sharedOv, before.conversation.messages.length === 0, notShared);
+      const privateLeftOut = before.share.includes('journal') && !before.privateJournal && !!ov?.privateJournalEntries;
+      const note = insightNote(Date.now(), sharedOv, before.conversation.messages.length === 0, notShared, privateLeftOut);
       const r = await askInsights(create, model, before.conversation, { text: question, appNote: note }, shared, onUsage);
       recorder.conversation(r.conversation.messages, { system: INSIGHT_SYSTEM, tools: INSIGHT_TOOLS });
       if (r.outcome.kind === 'error') {
@@ -228,7 +232,7 @@ function Chat({ apiKey, model }: { apiKey: string; model: AiModel }) {
   const count: Record<ShareKind, string> = ov
     ? {
         food: t('insights.ovFood', { n: ov.foodComplete, days: ov.days }),
-        journal: t('insights.ovJournal', { n: ov.journalEntries }),
+        journal: t('insights.ovJournal', { n: ov.journalEntries - ov.privateJournalEntries }),
         sleep: t('insights.ovNights', { n: ov.nights }),
         activity: t('insights.ovActivity', { n: ov.activityDays }),
         water: t('insights.ovWater', { n: ov.waterDays }),
@@ -264,9 +268,19 @@ function Chat({ apiKey, model }: { apiKey: string; model: AiModel }) {
                 <fieldset className="insights-share">
                   <legend className="visually-hidden">{t('insights.shareLabel')}</legend>
                   {kinds.map((k) => (
-                    <label key={k} className="radio-row small">
-                      <input type="checkbox" checked={ticked(k)} onChange={(e) => toggle(k, e.target.checked)} /> {count[k]}
-                    </label>
+                    <Fragment key={k}>
+                      <label className="radio-row small">
+                        <input type="checkbox" checked={ticked(k)} onChange={(e) => toggle(k, e.target.checked)} /> {count[k]}
+                      </label>
+                      {/* Private entries only go when ticked here, for this chat (owner's ask, 2026-10-24). */}
+                      {k === 'journal' && ticked('journal') && ov.privateJournalEntries > 0 && (
+                        <label className="radio-row small insights-share-sub">
+                          <input type="checkbox" checked={state.privateJournal} onChange={(e) => setState((s) => ({ ...s, privateJournal: e.target.checked }))} />{' '}
+                          <Icon name="lock" size={16} />
+                          <span>{t(ov.privateJournalEntries === 1 ? 'insights.ovPrivateOne' : 'insights.ovPrivate', { n: ov.privateJournalEntries })}</span>
+                        </label>
+                      )}
+                    </Fragment>
                   ))}
                 </fieldset>
                 {!state.share.length ? <p className="muted small">{t('insights.nothingShared')}</p> : thin && <p className="muted small">{t('insights.thin')}</p>}
@@ -282,7 +296,7 @@ function Chat({ apiKey, model }: { apiKey: string; model: AiModel }) {
             {t('insights.shared', {
               from: formatDay(sharedOv.from, d.today),
               to: formatDay(sharedOv.to, d.today),
-              kinds: state.share.map((k) => t(`insights.kind.${k}`)).join(', '),
+              kinds: state.share.map((k) => (k === 'journal' && state.privateJournal ? t('insights.kind.journalPrivate') : t(`insights.kind.${k}`))).join(', '),
             })}
           </p>
         )}

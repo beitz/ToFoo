@@ -130,6 +130,33 @@ describe('insight day facts', () => {
     expect(all.days.get(key(7))).toEqual(data.days.get(key(7)));
   });
 
+  it('keeps private journal entries out unless the user includes them', () => {
+    const secret: JournalEntry[] = [
+      ...journal,
+      { id: 'p4', schemaVersion: 1, day: key(4), time: at(4, 21), text: 'Kopfschmerzen, private', private: true },
+      { id: 'p5', schemaVersion: 1, day: key(5), time: at(5, 22), text: 'Secret note', private: true },
+    ];
+    const withPrivate = buildInsightData({ ...input, journal: secret });
+    const kinds = new Set(['journal'] as const);
+    expect(overview(withPrivate, key(1), key(10))).toMatchObject({ journalEntries: 6, privateJournalEntries: 2 });
+    const shared = shareInsightData(withPrivate, key(1), kinds);
+    const texts = journalEntries(shared, key(1), key(10), []).map((j) => j.text);
+    expect(texts).not.toContain('Secret note');
+    expect(texts).toHaveLength(4);
+    // A day with only a private entry reads as not mentioned, and its count leaves the private one out.
+    expect(holds(headache, key(4), shared)).toBe(false);
+    expect(shared.days.get(key(4))!.values.journal_entries).toBe(0);
+    expect(shared.days.get(key(5))!.values.journal_entries).toBe(1);
+    expect(shared.days.get(key(5))!.journalText).not.toContain('secret');
+    expect(overview(shared, key(1), key(10))).toMatchObject({ journalEntries: 4, privateJournalEntries: 0 });
+    // Included on purpose: everything as stored.
+    const all = shareInsightData(withPrivate, key(1), kinds, { privateJournal: true });
+    expect(journalEntries(all, key(1), key(10), [])).toHaveLength(6);
+    expect(holds(headache, key(4), all)).toBe(true);
+    // Journal unticked: no entries at all, private or not.
+    expect(journalEntries(shareInsightData(withPrivate, key(1), new Set(['food']), { privateJournal: true }), key(1), key(10), [])).toHaveLength(0);
+  });
+
   it('rejects conditions it cannot check', () => {
     expect(conditionProblem({ kind: 'measure', measure: 'mood', op: '<', value: 3 })).toMatch(/Unknown measure/);
     expect(conditionProblem({ kind: 'journal', words: [' '] })).toMatch(/word/);

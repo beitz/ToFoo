@@ -327,6 +327,8 @@ export interface JournalEntry extends Versioned {
   /** Local calendar day of `time` (YYYY-MM-DD). */
   day: string;
   text: string;
+  /** Private: never sent to the AI unless the user includes private entries for that chat (owner's ask, 2026-10-24). Missing = not private. */
+  private?: boolean;
 }
 
 /**
