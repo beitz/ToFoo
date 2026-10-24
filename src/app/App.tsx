@@ -8,6 +8,7 @@ import { diag, layoutSnapshot } from './diagnostics';
 import { Icon } from '../ui/Icon';
 import { AboutPage } from '../features/about/AboutPage';
 import { SentPage } from '../features/about/SentPage';
+import { VersionsPage } from '../features/about/VersionsPage';
 import { HomePage } from '../features/home/HomePage';
 import { FastShortcut } from '../features/home/FastShortcut';
 import { SleepShortcut } from '../features/sleep/SleepShortcut';
@@ -121,6 +122,7 @@ function Page({ route }: { route: string[] }) {
       }
     case 'about':
       if (b === 'sent') return <SentPage />;
+      if (b === 'versions') return <VersionsPage />;
       return <AboutPage />;
     case 'calendar':
       return <CalendarPage month={b} />;

@@ -119,6 +119,11 @@ function AppVersionInfo() {
         {t('about.built', { when: built })}
       </p>
       <p className="muted small">{t('about.versionHow')}</p>
+      <p>
+        <a className="btn" href={href('about', 'versions')}>
+          {t('about.history')}
+        </a>
+      </p>
       {u.status === 'ready' ? (
         <button type="button" className="btn btn-primary" onClick={applyUpdate}>
           {u.next ? t('version.readyNamed', { v: u.next }) : t('version.ready')} {t('version.tapToLoad')}

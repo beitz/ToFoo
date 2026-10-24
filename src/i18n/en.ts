@@ -3,12 +3,14 @@ import { groupInfoEn } from './groupInfo.en';
 import { homeInfoEn } from './homeInfo.en';
 import { nutrientInfoEn } from './nutrientInfo.en';
 import { effectsEn } from './effects.en';
+import { changesEn } from './changes.en';
 
 export const en = {
   ...nutrientInfoEn,
   ...effectsEn,
   ...groupInfoEn,
   ...homeInfoEn,
+  ...changesEn,
   'app.name': 'ToFoo',
   'app.loadError': 'ToFoo could not start.',
   'diag.title': 'Diagnostics',
@@ -2431,6 +2433,15 @@ export const en = {
   'about.current': 'This is the newest version.',
   'about.downloading': 'Getting the new version…',
   'about.unavailable': 'Updates can only be checked in the installed app or website, not here.',
+  'about.history': 'Version history',
+  'versions.title': 'Version history',
+  'versions.yours': 'You have version {v}.',
+  'versions.view': 'How much to show',
+  'versions.highlights': 'Highlights',
+  'versions.all': 'All changes',
+  'versions.next': 'Coming in the next version',
+  'versions.prLink': 'Version {v}: the change on GitHub',
+  'versions.leftOut': 'Small fixes, plans and work behind the scenes are left out. Versions go up by one with every change, so some numbers are skipped here.',
   'about.dataVersion': 'Food database',
   'sent.title': 'What leaves your phone',
   'sent.intro': 'Everything you log stays on this phone. These are the only times ToFoo sends anything out, each only for a feature you turned on, and only when you use it. Each service gets nothing but what is listed under it.',

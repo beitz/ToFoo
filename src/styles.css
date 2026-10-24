@@ -7733,3 +7733,50 @@ button.link-row {
 .comet-name .gauge-window {
   margin-left: 0;
 }
+
+/* Version history (#/about/versions). */
+.versions-page .segmented {
+  margin: 10px 0 4px;
+}
+.version-day-head {
+  align-items: baseline;
+  gap: 8px;
+}
+.version-day h2 {
+  font-size: 1.02rem;
+  margin: 0;
+}
+.version-range,
+.version-tag {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.version-list {
+  margin: 6px 0 0;
+  padding-left: 1.1rem;
+}
+.version-list li + li {
+  margin-top: 4px;
+}
+.version-list-all {
+  list-style: none;
+  padding-left: 0;
+}
+.version-list-all li {
+  display: grid;
+  grid-template-columns: 4.6rem 1fr;
+  gap: 8px;
+  align-items: baseline;
+}
+.version-list-all li + li {
+  margin-top: 8px;
+}
+.version-tag {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+  /* A taller tap area than the text, without spacing the lines apart. */
+  padding: 12px 0;
+  margin: -12px 0;
+}

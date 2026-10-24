@@ -6,3 +6,5 @@ declare const __APP_VERSION__: string;
 declare const __APP_COMMIT__: string;
 /** ISO time of the build. */
 declare const __APP_BUILT_AT__: string;
+/** Version and merge time (ISO) of every merged pull request, by number; empty without the git history. */
+declare const __APP_RELEASES__: Record<number, { version: string; date: string }>;
