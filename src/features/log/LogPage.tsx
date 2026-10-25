@@ -7,7 +7,7 @@ import { dayKey, formatDay, formatTime } from '../../lib/dates';
 import { search } from '../../foods/search';
 import type { Food } from '../../foods/foodDb';
 import { repo } from '../../storage/repo';
-import type { Batch, CustomFood, FavouriteMeal, FoodRef, LogEntry, Product } from '../../storage/types';
+import type { Batch, CustomFood, FoodRef, LogEntry, Product } from '../../storage/types';
 import { needsCheck, productLabel } from '../../foods/products';
 import { UsdaResults } from './UsdaResults';
 import { OffResults, useOffSearch } from './OffResults';
@@ -26,10 +26,9 @@ import { defaultTimeFor } from './time';
 import { TimeField } from './TimeField';
 import { entryAmount } from './describe';
 import { logMealAgain, mealTitle } from './logAgain';
-import { favouriteAsMeal, favouriteFromMeal, mealSignature, recentMeals } from '../../logic/repeat';
-import { newId } from '../../lib/id';
+import { recentMeals } from '../../logic/repeat';
 import { LogSection } from './LogSection';
-import { FavouriteStar } from './FavouriteButton';
+import { FavouriteMealButton, FavouriteStar, useFavouriteMeals } from './FavouriteButton';
 import { refKey } from '../../lib/refs';
 import { WaterSheet } from '../water/WaterSheet';
 import { loggable } from '../../logic/pantry';
@@ -104,18 +103,8 @@ export function LogPage({ day: dayParam, foodCode }: { day?: string; foodCode?: 
     }
     return out;
   }, [d.settings.favourites, d.foods, d.productsById, d.customFoodsById]);
-  const favouriteMeals = useMemo(
-    () =>
-      (d.settings.favouriteMeals ?? []).map((fav) => {
-        const meal = favouriteAsMeal(fav);
-        return { fav, meal, title: mealTitle(meal) };
-      }),
-    [d.settings.favouriteMeals],
-  );
-  const favouriteBySignature = useMemo(
-    () => new Map(favouriteMeals.map(({ fav, meal }) => [mealSignature(meal, d.batchesById), fav])),
-    [favouriteMeals, d.batchesById],
-  );
+  const { meals: pinnedMeals, pinnedOf, toggle: toggleMeal, unpin: unpinMeal } = useFavouriteMeals();
+  const favouriteMeals = useMemo(() => pinnedMeals.map(({ fav, meal }) => ({ fav, meal, title: mealTitle(meal) })), [pinnedMeals]);
   const recent = useMemo(() => {
     const pinned = new Set(favourites.map((f) => f.key));
     return [...d.recentFoods.entries()]
@@ -182,21 +171,6 @@ export function LogPage({ day: dayParam, foodCode }: { day?: string; foodCode?: 
     setMealTime(entries[entries.length - 1]!.time);
   }
 
-  /** Pin a meal, or unpin it when the same items in the same amounts are already pinned. */
-  function toggleMeal(meal: readonly LogEntry[]) {
-    const pinned = favouriteBySignature.get(mealSignature(meal, d.batchesById));
-    if (pinned) return unpinMeal(pinned);
-    const fav = favouriteFromMeal(meal, newId());
-    void repo.addFavouriteMeal(fav);
-    toast(t('fav.mealPinned'), () => void repo.removeFavouriteMeal(fav.id));
-  }
-
-  function unpinMeal(fav: FavouriteMeal) {
-    const index = (d.settings.favouriteMeals ?? []).findIndex((m) => m.id === fav.id);
-    void repo.removeFavouriteMeal(fav.id);
-    toast(t('fav.mealRemoved'), () => void repo.addFavouriteMeal(fav, index));
-  }
-
   function unpinFood(ref: FoodRef, name: string) {
     void repo.toggleFavourite(ref);
     toast(t('fav.removed', { name }), () => void repo.toggleFavourite(ref));
@@ -234,14 +208,7 @@ export function LogPage({ day: dayParam, foodCode }: { day?: string; foodCode?: 
             <button className="btn btn-primary" onClick={() => navigate()}>
               {t('log.done')}
             </button>
-            {(() => {
-              const pinned = favouriteBySignature.has(mealSignature(addedEntries, d.batchesById));
-              return (
-                <button className={`btn btn-small btn-ghost fav-btn${pinned ? ' on' : ''}`} aria-pressed={pinned} onClick={() => toggleMeal(addedEntries)}>
-                  <Icon name="star" size={18} filled={pinned} /> {t(pinned ? 'fav.mealOn' : 'fav.saveMeal')}
-                </button>
-              );
-            })()}
+            <FavouriteMealButton meal={addedEntries} />
           </div>
         </div>
       )}
@@ -356,7 +323,7 @@ export function LogPage({ day: dayParam, foodCode }: { day?: string; foodCode?: 
               <ul className="result-list">
                 {pastMeals.map((meal) => {
                   const title = mealTitle(meal);
-                  const pinned = favouriteBySignature.has(mealSignature(meal, d.batchesById));
+                  const pinned = !!pinnedOf(meal);
                   return (
                     <li key={meal[0]!.id} className="fav-row">
                       <button className="result" onClick={() => void repeat(meal)}>

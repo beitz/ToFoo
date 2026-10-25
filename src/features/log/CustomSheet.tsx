@@ -4,7 +4,7 @@ import { dayKey, formatDateTime } from '../../lib/dates';
 import { repo } from '../../storage/repo';
 import type { CustomFood, LogEntry } from '../../storage/types';
 import { Field, NumberInput, Sheet } from '../../ui/controls';
-import { FavouriteButton } from './FavouriteButton';
+import { FoodActions } from '../food/FoodActions';
 
 export function CustomSheet({ food, time: initialTime, onClose, onAdded }: { food: CustomFood; day: string; time: number; onClose: () => void; onAdded: (e: LogEntry) => void }) {
   const [servings, setServings] = useState<number | undefined>(1);
@@ -17,7 +17,7 @@ export function CustomSheet({ food, time: initialTime, onClose, onAdded }: { foo
   }
   return (
     <Sheet title={food.name} onClose={onClose}>
-      <FavouriteButton foodRef={{ source: 'custom', id: food.id }} />
+      <FoodActions foodRef={{ source: 'custom', id: food.id }} name={food.name} inSheet />
       <Field label={t('log.servings', { serving: food.servingLabel })}>{(id) => <NumberInput id={id} value={servings} onChange={setServings} min={0} autoFocus />}</Field>
       <p className="muted small">{t('log.atMealTime', { time: formatDateTime(time) })}</p>
       <div className="sheet-actions">

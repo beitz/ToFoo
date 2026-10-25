@@ -31,7 +31,9 @@ import { nutrientType } from '../home/grouping';
 import { GroupInfoButton, groupTitle, hasGroupInfo } from '../info/GroupInfo';
 import { EditEntrySheet } from '../diary/EditEntrySheet';
 import { entryAmount } from '../log/describe';
-import { foodHref } from '../food/links';
+import { foodHref, refOfCode } from '../food/links';
+import { FoodActions } from '../food/FoodActions';
+import { FavouriteMealButton } from '../log/FavouriteButton';
 import { BackButton } from '../../ui/BackButton';
 
 const MACROS = ['PROT625', 'FAT', 'CHO', 'FIBT'];
@@ -124,6 +126,7 @@ export function MealNutrientsPage({ entryId }: { entryId: string }) {
       <p className="muted">
         {formatDay(first.day, d.today)} · <a href={href('diary', first.day)}>{t('mealNutrients.inDiary')}</a>
       </p>
+      <FavouriteMealButton meal={meal} />
       <h2 className="section-title">{t('mealNutrients.items', { n: meal.length })}</h2>
       <div className="card">
         <ul className="plain-list">
@@ -181,6 +184,8 @@ export function EntryNutrientsPage({ entryId, part: partParam }: { entryId: stri
         ? { to: foodTo, icon: 'search', label: t('mealNutrients.food') }
         : undefined;
   const weight = w === 'none' ? undefined : w;
+  // What can be kept for later: a food, product or saved item; a cooked portion is in the kitchen already.
+  const keepRef = ingredient || entry.kind === 'food' ? refOfCode(d, code) : entry.kind === 'custom' && d.customFoodsById.has(entry.customFoodId) ? { source: 'custom' as const, id: entry.customFoodId } : undefined;
   return (
     <section>
       <Header title={ingredient ? ingredient.label : entry.label} />
@@ -210,6 +215,7 @@ export function EntryNutrientsPage({ entryId, part: partParam }: { entryId: stri
           </button>
         )}
       </div>
+      {keepRef && <FoodActions foodRef={keepRef} name={ingredient ? ingredient.label : entry.label} />}
       <ItemSource code={code} entry={entry} />
       {entry.kind === 'drink' && <p className="small notice">{t('mealNutrients.drink')}</p>}
       {parts.length > 0 && (

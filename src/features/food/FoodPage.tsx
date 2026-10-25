@@ -8,13 +8,14 @@ import type { RawValue } from '../../model/types';
 import { StatusMark, symbolOf } from '../../ui/Tile';
 import { NUTRIENTS } from '../../model/nutrients';
 import { Icon } from '../../ui/Icon';
-import { isProductCode, productFood } from '../../foods/products';
+import { isProductCode, productFood, productLabel, productRef } from '../../foods/products';
 import { partSource } from '../../logic/mealNutrients';
 import { ProductInfo, SavedMatchPicker } from '../log/ProductParts';
 import { PieceWeightLine } from '../log/AmountField';
 import { nutrientType } from '../home/grouping';
 import { GroupInfoButton, groupTitle, hasGroupInfo } from '../info/GroupInfo';
 import { BackButton } from '../../ui/BackButton';
+import { FoodActions } from './FoodActions';
 
 /**
  * A food's nutrient profile per 100 g: a BLS food, or a scanned or USDA product (`OFF:<barcode>`,
@@ -42,6 +43,7 @@ export function FoodPage({ code }: { code: string }) {
           {food.nameDe} · {group?.en} · BLS {food.code}
         </p>
       )}
+      <FoodActions foodRef={product ? productRef(product) : { source: 'BLS', version: d.foods.version, code: food.code }} name={product ? productLabel(product) : food.nameEn} />
       <PieceWeightLine code={food.code} product={product} />
       <PortionCard per100={food.per100} />
       <a className="btn btn-primary btn-block" href={href('log', d.today, food.code)}>
