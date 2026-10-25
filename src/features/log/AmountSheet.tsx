@@ -16,7 +16,7 @@ import { AmountField, type Amount } from './AmountField';
 import { ConfidenceField } from './ConfidenceField';
 import { PreparationSelect } from './PreparationSelect';
 import { MatchPicker, ProductInfo, saveProductChoice, useMatchChoice } from './ProductParts';
-import { FavouriteButton } from './FavouriteButton';
+import { FoodActions } from '../food/FoodActions';
 
 /** Saved portion sizes are in backups (src/storage/autoBackup.ts `readSnapshot`). */
 export type PortionHelper = PortionSize;
@@ -70,7 +70,7 @@ export function AmountSheet({ day, time: initialTime, onClose, onAdded, ...targe
 
   return (
     <Sheet title={name} onClose={onClose}>
-      <FavouriteButton foodRef={draft ? productRef(draft) : { source: 'BLS', version: d.foods.version, code: food.code }} />
+      <FoodActions foodRef={draft ? productRef(draft) : { source: 'BLS', version: d.foods.version, code: food.code }} name={name} prepare={draft ? () => saveProductChoice(draft) : undefined} inSheet />
       {draft ? (
         <>
           <ProductInfo product={draft} />

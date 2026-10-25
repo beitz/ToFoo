@@ -42,3 +42,26 @@ test('a food is logged in pieces once its piece weight is known, and the diary s
   await expect(page.getByText('3 pieces · 30 g').first()).toBeVisible();
   expect(errors).toEqual([]);
 });
+
+test('a food logged earlier is pinned and put in the freezer from its diary item', async ({ page }) => {
+  const errors = watchErrors(page);
+  await firstLaunch(page);
+  await logFood(page, 'oat flakes', /^Oat flakes/, '100 g');
+
+  await page.goto('./#/diary');
+  await page.getByRole('link', { name: /Oat flakes/ }).first().click();
+  await page.getByRole('button', { name: 'Add to favourites' }).click();
+  await expect(page.getByRole('button', { name: 'Favourite', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Add to kitchen' }).click();
+  await page.getByRole('radio', { name: 'Freezer' }).click();
+  await page.getByLabel('How much (optional)').fill('500 g');
+  await page.getByRole('button', { name: 'Add to kitchen' }).last().click();
+  // The button now says it is at home, and how much.
+  await expect(page.getByRole('button', { name: /^At home · 500 g/ })).toBeVisible();
+
+  await page.goto('./#/log');
+  await expect(page.locator('#log-favourites').getByText(/^Oat flakes/).first()).toBeVisible();
+  await page.goto('./#/kitchen');
+  await expect(page.getByText(/Oat flakes/).first()).toBeVisible();
+  expect(errors).toEqual([]);
+});

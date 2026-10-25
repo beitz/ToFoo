@@ -1202,6 +1202,17 @@ textarea:focus-visible,
 .fav-btn.on {
   color: var(--accent);
 }
+/* Favourite and Add to kitchen, wherever a food is shown. */
+.food-actions {
+  gap: 4px 16px;
+}
+.kitchen-add .field:first-child {
+  margin-top: 0;
+}
+.kitchen-add-actions {
+  justify-content: flex-end;
+  gap: 8px;
+}
 /* Log screen sections: the heading is the toggle, so sections sit closer than page section titles. */
 .log-section {
   margin-top: 10px;

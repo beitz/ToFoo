@@ -8,6 +8,7 @@
  * scenes and small fixes. A pull request that changes what users see adds its line here in the same PR.
  */
 export const changesEn = {
+  'change.142': 'Add a food to your kitchen or favourites from wherever it is shown: its page, a diary item, a scan; save a whole meal as favourite from its page.',
   'change.141': 'Write in journal in the round button opens the writing box right where you are, instead of the journal page.',
   'change.140': 'Version history on the About page: highlights at a glance, or every change with its version and date.',
   'change.140.major': 'Version history on the About page',
