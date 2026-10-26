@@ -79,24 +79,53 @@ export function leftOf(item: PantryItem, usage: Usage): Left {
   }
   const left: Left = { out: false, low: false };
   if (item.pieces !== undefined) left.pieces = Math.max(0, Math.round((item.pieces - pieces) * 10) / 10);
-  if (item.grams !== undefined) left.grams = Math.max(0, Math.round(item.grams - grams));
+  // To a tenth of a gram: a spice jar is counted in grams too ("8.5 g of 12.5 g", owner's ask 2026-10-26).
+  if (item.grams !== undefined) left.grams = Math.max(0, Math.round((item.grams - grams) * 10) / 10);
   left.out = item.status === 'out' || left.pieces === 0 || left.grams === 0;
   left.low = !left.out && item.status === 'low';
   return left;
 }
 
-/** How much is left, as shown: "2 left", "350 g", "1 l"; '' when there is no amount (just "have it"). */
+/** Grams left as shown: small amounts to a tenth of a gram ("8.5 g"), else like the shopping list ("350 g", "1.2 kg"). */
+export function fmtLeftGrams(g: number): string {
+  if (g < 100) return `${(Math.round(g * 10) / 10).toLocaleString('en-GB')} g`;
+  return fmtShopGrams(g);
+}
+
+/** How much is left, as shown: "2 left", "350 g", "8.5 g", "1 l"; '' when there is no amount (just "have it"). */
 export function leftText(item: PantryItem, left: Left, piecesLeft: (n: number) => string): string {
   if (left.pieces !== undefined) return piecesLeft(left.pieces);
-  if (left.grams !== undefined) return fmtShopGrams(left.grams);
+  if (left.grams !== undefined) return fmtLeftGrams(left.grams);
   return item.amount ?? '';
 }
 
-/** The amount field as it reads for editing: "2", "350 g", "1 l". */
+/** The amount field as it reads for editing: "2", "350 g", "8.5 g", "1 l". */
 export function amountField(item: PantryItem, left: Left): string {
   if (left.pieces !== undefined) return String(left.pieces);
-  if (left.grams !== undefined) return fmtShopGrams(left.grams);
+  if (left.grams !== undefined) return left.grams >= 1000 ? `${left.grams} g` : fmtLeftGrams(left.grams);
   return item.amount ?? '';
+}
+
+/**
+ * The same amount in grams, for something counted in pieces whose pack weight is known (a scanned
+ * spice jar, "12.5 g"): 1 jar becomes "12.5 g", to be corrected to what is really left.
+ */
+export function piecesAsGrams(left: Left, packGrams: number | undefined): number | undefined {
+  if (left.pieces === undefined || !packGrams || !(packGrams > 0)) return undefined;
+  return Math.round(left.pieces * packGrams * 10) / 10;
+}
+
+/** The weight of a whole pack as its label gives it ("12.5 g"); undefined for drinks and packs without one. */
+export function packGrams(product: { quantity?: string; perMl?: boolean } | undefined): number | undefined {
+  return product?.quantity && !product.perMl ? parseAmount(product.quantity).grams : undefined;
+}
+
+/**
+ * How much a scanned pack starts with: one piece, but a spice by its weight when the label gives it,
+ * since a jar is used a few grams at a time and one piece would be gone after the first pot.
+ */
+export function scannedAmount(place: HomePlace, packGrams: number | undefined): { pieces: number } | { grams: number } {
+  return place === 'spices' && packGrams && packGrams > 0 ? { grams: packGrams } : { pieces: 1 };
 }
 
 const PIECES = /^(\d+(?:[.,]\d+)?)\s*(?:x|pcs?|pieces?|packs?|packets?|cans?|tins?|bottles?|jars?|bags?|box|boxes|st|stk|stück|packungen?|dosen?|gläser|glas|flaschen?|beutel)?\.?$/i;
@@ -252,12 +281,13 @@ export function planStock(
   return { put: [...changed.values()], remove: [] };
 }
 
-/** Something the user reported: bought, running low or used up. */
-export type Report = NewPantryItem & { status: 'bought' | 'low' | 'out' };
+/** Something the user reported: bought, counted (this much is left now), running low or used up. */
+export type Report = NewPantryItem & { status: 'bought' | 'left' | 'low' | 'out' };
 
 /**
- * Reports (from the assistant): bought things are put away (planStock); things running low or
- * used up are marked so, and added with that mark when they were not at home yet.
+ * Reports (from the assistant): bought things are put away (planStock); counted things get the
+ * amount said as what is left from now ("only 8.5 g paprika left"), added when not at home yet;
+ * things running low or used up are marked so, and added with that mark when they were not at home yet.
  */
 export function planReports(
   items: readonly PantryItem[],
@@ -273,7 +303,15 @@ export function planReports(
     if (r.status === 'bought' || !r.name.trim()) continue;
     const current = [...changed.values(), ...items.filter((i) => !changed.has(i.id))];
     const same = current.find((i) => sameThing(i, r));
-    if (same) {
+    if (r.status === 'left') {
+      const base: PantryItem = same ?? { id: newId(), schemaVersion, name: r.name.trim(), place: r.place, since: now, addedAt: now };
+      const next = withAmount(base, r, now);
+      // Counted with something there: it is had again; counted at nothing: used up.
+      if ((r.pieces ?? r.grams ?? 1) > 0) delete next.status;
+      else next.status = 'out';
+      if (!next.ref && r.ref) next.ref = r.ref;
+      changed.set(next.id, next);
+    } else if (same) {
       changed.set(same.id, withStatus(same, r.status, changed.has(same.id) ? leftOf(same, new Map()) : left(same), now));
     } else {
       const item: PantryItem = withAmount({ id: newId(), schemaVersion, name: r.name.trim(), place: r.place, since: now, addedAt: now, status: r.status }, r, now);

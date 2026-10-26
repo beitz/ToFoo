@@ -6,7 +6,7 @@ import { search } from '../../foods/search';
 import { productLabel } from '../../foods/products';
 import { newId } from '../../lib/id';
 import { refKey } from '../../lib/refs';
-import { guessPlace, leftOf, leftText, onShoppingList, usageOf, withStatus, type Left } from '../../logic/pantry';
+import { guessPlace, leftOf, packGrams, leftText, onShoppingList, usageOf, withStatus, type Left } from '../../logic/pantry';
 import { planAdd, sectionOfRef, type NewShoppingItem } from '../../logic/shopping';
 import { isOn } from '../../settings/features';
 import { repo, type HomeUndo } from '../../storage/repo';
@@ -44,10 +44,14 @@ export function usePantryFoods() {
     const product = d.productsById.get(refKey(ref));
     return product ? productLabel(product) : undefined;
   };
+  /** The weight of a whole pack as its label gives it ("12.5 g"), for products sold by weight. */
+  const packGramsOf = (ref: FoodRef | undefined): number | undefined => {
+    return ref && ref.source !== 'BLS' && ref.source !== 'custom' ? packGrams(d.productsById.get(refKey(ref))) : undefined;
+  };
   /** A thing at home as a shopping list line, sorted like the list sorts it. */
   const asShopping = (item: Pick<PantryItem, 'name' | 'ref'>, shopping: readonly ShoppingItem[]): NewShoppingItem =>
     item.ref ? { name: item.name, ref: item.ref, section: sectionOfRef(item.ref, matchOf) } : typed(item.name, shopping);
-  return { placeOf, nameOfRef, asShopping };
+  return { placeOf, nameOfRef, asShopping, packGramsOf };
 }
 
 /**

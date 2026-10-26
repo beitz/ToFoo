@@ -3,8 +3,8 @@ import { useData } from '../../app/data';
 import { href } from '../../app/router';
 import { t } from '../../i18n';
 import { newId } from '../../lib/id';
-import { onShoppingList, planReports, type Report } from '../../logic/pantry';
-import { amountText, planAdd } from '../../logic/shopping';
+import { fmtLeftGrams, onShoppingList, planReports, type Report } from '../../logic/pantry';
+import { planAdd } from '../../logic/shopping';
 import { isOn } from '../../settings/features';
 import { repo } from '../../storage/repo';
 import { CURRENT_SCHEMA_VERSION } from '../../storage/types';
@@ -42,7 +42,7 @@ export function HomeCard({ card, toast, onLogged, register }: CardProps<Extract<
       // Products looked up in the chat are kept, so the things can be logged later.
       for (const [i, it] of home.items.entries()) if (it.product && !off.has(i)) await repo.saveProduct(it.product);
       const undo = await repo.changeHome((pantry, shopping) => {
-        const listed = shoppingOn ? chosen.filter((r) => r.status !== 'bought' && !onShoppingList(r, shopping)) : [];
+        const listed = shoppingOn ? chosen.filter((r) => (r.status === 'low' || r.status === 'out') && !onShoppingList(r, shopping)) : [];
         return {
           pantry: planReports(pantry, chosen, now, newId, CURRENT_SCHEMA_VERSION, left),
           ...(listed.length ? { shopping: planAdd(shopping, listed.map((r) => asShopping(r, shopping)), now, newId, CURRENT_SCHEMA_VERSION) } : {}),
@@ -80,7 +80,7 @@ export function HomeCard({ card, toast, onLogged, register }: CardProps<Extract<
     else next.add(i);
     setOff(next);
   };
-  const statusText = (r: Report) => (r.status === 'low' ? t('pantry.cardLow') : r.status === 'out' ? t('pantry.cardOut') : t('pantry.cardBought'));
+  const statusText = (r: Report) => (r.status === 'low' ? t('pantry.cardLow') : r.status === 'out' ? t('pantry.cardOut') : r.status === 'left' ? t('pantry.cardLeft') : t('pantry.cardBought'));
 
   return (
     <div className="card proposal">
@@ -105,7 +105,7 @@ export function HomeCard({ card, toast, onLogged, register }: CardProps<Extract<
                   {statusText(r)} · {placeName(r.place)}
                 </span>
               </span>
-              <span className="muted small shop-amount">{r.pieces !== undefined ? t('pantry.pieces', { n: r.pieces }) : amountText(r)}</span>
+              <span className="muted small shop-amount">{r.pieces !== undefined ? t('pantry.pieces', { n: r.pieces }) : r.grams !== undefined ? fmtLeftGrams(r.grams) : (r.amount ?? '')}</span>
             </button>
           </li>
         ))}

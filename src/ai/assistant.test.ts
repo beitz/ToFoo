@@ -780,6 +780,11 @@ describe('at home', () => {
     });
   });
 
+  it('takes a counted amount as what is left, and needs the amount for it', () => {
+    expect(validateHomeProposal({ items: [{ name: 'Paprika', amount: '8,5 g', status: 'left' }] }, db)).toEqual({ ok: true, proposal: { items: [{ name: 'Paprika', grams: 8.5, status: 'left' }] } });
+    expect(validateHomeProposal({ items: [{ name: 'Paprika', status: 'left' }] }, db)).toMatchObject({ ok: false, error: expect.stringContaining('needs the amount') });
+  });
+
   it('marks foods at home in search results', () => {
     const r = runSearchFoods({ queries: ['Nougat'] }, { ...ctx, pantry: new Set(['BLS:S450000']) });
     expect(r.text).toContain('[at home]');
