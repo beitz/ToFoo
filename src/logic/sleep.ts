@@ -66,6 +66,45 @@ export function sleepBlocks(records: readonly SleepRecord[]): SleepBlock[] {
 
 export const isNight = (b: SleepBlock): boolean => b.asleep >= NIGHT_MIN_MS;
 
+/** A day's sleep: the night that ended on it (if any) and its naps, oldest first. */
+export type DaySleep = { night?: SleepBlock; naps: SleepBlock[] };
+
+/**
+ * Every sleep by the day it ended, as in the diary and the calendar (owner's report 2026-10-24: a
+ * midday nap showed in the diary but not here): night blocks ending the same day count as one night,
+ * and naps count to their day too. Only a night makes a day logged, so a day with just a nap stays unknown.
+ */
+export function sleepByDay(records: readonly SleepRecord[]): Map<string, DaySleep> {
+  const out = new Map<string, DaySleep>();
+  for (const b of sleepBlocks(records)) {
+    const day = dayKey(new Date(b.end));
+    const had = out.get(day) ?? { naps: [] };
+    if (!isNight(b)) had.naps.push(b);
+    else if (!had.night) had.night = b;
+    else had.night = { start: Math.min(had.night.start, b.start), end: Math.max(had.night.end, b.end), asleep: had.night.asleep + b.asleep, parts: [...had.night.parts, ...b.parts] };
+    out.set(day, had);
+  }
+  return out;
+}
+
+/**
+ * Waking up within a stretch of sleep: how often and for how long in all, from the gaps between its
+ * parts (overlapping parts leave no gap).
+ */
+export function wakeUps(b: SleepBlock): { count: number; awake: number } {
+  let count = 0;
+  let awake = 0;
+  let end: number | undefined;
+  for (const p of [...b.parts].sort((x, y) => x.start - y.start)) {
+    if (end !== undefined && p.start > end) {
+      count++;
+      awake += p.start - end;
+    }
+    end = end === undefined ? p.end : Math.max(end, p.end);
+  }
+  return { count, awake };
+}
+
 /** The latest finished sleep that ended by `now`. */
 function lastFinished(records: readonly SleepRecord[], now: number): Finished | undefined {
   return finished(records)

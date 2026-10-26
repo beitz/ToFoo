@@ -89,6 +89,21 @@ export const INSIGHT_TOOLS: BetaTool[] = [
       additionalProperties: false,
     },
   },
+  {
+    name: 'daily_table',
+    description:
+      'The values of some measures on every day of a period, one compact row per day (day, then one column per measure). Costs far more than the other tools: only for a deep look, when the user asks for day-by-day values, spikes or the full data.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        from: DAY,
+        to: DAY,
+        measures: { type: 'array', items: { type: 'string' }, description: 'Measure ids; days × measures at most 5000.' },
+      },
+      required: ['from', 'to', 'measures'],
+      additionalProperties: false,
+    },
+  },
 ];
 
 const GROUP_TITLE: Record<MeasureGroup, string> = {
@@ -116,7 +131,8 @@ Tools for this:
 - read_journal: the journal entries of a period, all or those containing given words.
 - count_days: on how many of the days where the group conditions hold (e.g. the night before was short) the outcome conditions held too (e.g. the journal mentions a headache), against the other days, with a chance check.
 - compare_measures: a measure (sleep, energy, a nutrient, …) on the group days against the other days, or over all days of a period.
-- day_details: everything logged on given days, to look at them closely or show them to the user.
+- day_details: everything logged on given days, to look at them closely or show them to the user, including each sleep of a night with the wake-ups between them.
+- daily_table: day-by-day values of chosen measures over a period. Only when the user asks for a deep look, day-by-day values, spikes or the full data, never for everyday questions, as it costs many times more. From it you may name single days and spikes you see; counts, averages and chance checks still come from count_days and compare_measures.
 
 Conditions: journal (words in that day's journal entries), food (words in the names of the foods and dishes logged that day, English or German), measure (a measure compared with a number), weekday, status (the food log status of the day), or habit (one of the user's habits was kept that day; the habits are listed in the app's note when the user shares them). offset moves a condition in time: -1 checks the day before the day being counted, 1 the day after. span widens it to several days ending at the offset day: it holds if it holds on any of them (a measure: its average over them). negate reverses it. All conditions in a list must hold. Give every field of a condition (empty lists, "", 0, false and span 1 where they do not apply). Words match parts of words, ignoring case and accents, so use stems and both languages: ["kopfschm", "kopfweh", "headache", "migr"]. Read the journal first to see which words the user actually uses.
 
@@ -128,7 +144,7 @@ Only what the user chose to share is there: the period and the kinds of data (fo
 Unknown stays unknown: a day whose food log is not complete, or a tracker before its first record, cannot be told and is left out of a comparison, never counted as zero or "no". Days without a journal entry count as "not mentioned" once the user has started the journal. The tool results say how many days were left out; mention it when it is many.
 
 How to look for patterns:
-- Start with read_journal over the period (unless the question is not about the journal), then see what recurs (symptoms, energy, mood, sleep complaints, digestion) and what might go with it. Compare several candidates at once, with several tool calls in one response: sleep the night before; alcohol and coffee (food words such as "kaffee", "coffee", "espresso", "cola") the same day and the day before; late, early or skipped meals; energy, protein, sugar, fibre; particular foods in the one or two days before; activity; water; the weekday. Delayed effects matter: try offset -1, and spans of 2 or 3 days where it makes sense.
+- Start with read_journal over the period (unless the question is not about the journal), then see what recurs (symptoms, energy, mood, sleep complaints, digestion) and what might go with it. Compare several candidates at once, with several tool calls in one response: sleep the night before (its length, and waking up in the night: wake_ups, awake_minutes); alcohol and coffee (food words such as "kaffee", "coffee", "espresso", "cola") the same day and the day before; late, early or skipped meals; energy, protein, sugar, fibre; particular foods in the one or two days before; activity; water; the weekday. Delayed effects matter: try offset -1, and spans of 2 or 3 days where it makes sense.
 - With one person and a few weeks of data many patterns are chance. The chance check says how often a split at least this uneven turns up by chance alone: under ${CHANCE_PATTERN * 100} % is worth mentioning as a possible pattern, ${CHANCE_PATTERN * 100} to ${CHANCE_HINT * 100} % is at most a hint, above that there is no clear pattern. The more comparisons you try, the more look striking by luck, so say roughly how many you looked at, and prefer patterns that are both lopsided and rest on more days.
 - Each finding gives the pattern with the counts and days the tools gave ("headache on 4 of the 6 days after less than 6 h of sleep, on 3 of the other 25"), and the chance check in plain words. These are possible patterns, never causes: no medical advice or diagnoses. If something sounds like it needs a doctor (a symptom that keeps coming back or gets worse), say once, briefly, that it is worth checking with one.
 - If the data is too thin for the question (few days logged, the outcome on only one or two days), say so plainly and say what to log to answer it later.

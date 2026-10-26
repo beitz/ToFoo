@@ -51,6 +51,29 @@ describe('insight day facts', () => {
     expect(v).toMatchObject({ sleep_hours: 7, bedtime: 23, wake_time: 7, nap_minutes: 0 });
   });
 
+  it('counts how often and how long someone was awake in the night', () => {
+    const split: SleepRecord[] = [
+      { id: 'a', schemaVersion: 1, day: key(2), start: at(1, 23), end: at(2, 1, 30) },
+      { id: 'b', schemaVersion: 1, day: key(2), start: at(2, 2, 30), end: at(2, 4) },
+      { id: 'c', schemaVersion: 1, day: key(2), start: at(2, 4, 20), end: at(2, 7) },
+    ];
+    const d = buildInsightData({ ...input, sleep: split }).days.get(key(2))!;
+    expect(d.values).toMatchObject({ wake_ups: 2, awake_minutes: 80 });
+    expect(d.night!.parts).toHaveLength(3);
+    // A night in one piece: no wake-ups, which is a real zero, not unknown.
+    expect(data.days.get(key(2))!.values).toMatchObject({ wake_ups: 0, awake_minutes: 0 });
+    expect(data.days.get(key(10))!.values.wake_ups).toBeNull();
+  });
+
+  it('keeps both halves of a night split by 3 h or more awake (owner 2026-10-26)', () => {
+    const split: SleepRecord[] = [
+      { id: 'a', schemaVersion: 1, day: key(2), start: at(1, 21), end: at(2, 1) },
+      { id: 'b', schemaVersion: 1, day: key(2), start: at(2, 4, 30), end: at(2, 8) },
+    ];
+    const d = buildInsightData({ ...input, sleep: split }).days.get(key(2))!;
+    expect(d.values).toMatchObject({ sleep_hours: 7.5, bedtime: 21, wake_time: 8, wake_ups: 1, awake_minutes: 210, nap_minutes: 0 });
+  });
+
   it('derives sleep, meals, alcohol and nutrients per day, and leaves unknown days unknown', () => {
     const d3 = data.days.get(key(3))!;
     expect(d3.values.sleep_hours).toBe(5);

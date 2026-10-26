@@ -4,13 +4,13 @@
  * average in an answer comes from the app. Pure: tested in insights.test.ts.
  */
 import { normalize } from '../foods/search';
-import { addDays, dayKey, dayRange, parseDay } from '../lib/dates';
+import { addDays, dayRange, parseDay } from '../lib/dates';
 import { NUTRIENTS } from '../model/nutrients';
 import { groupMeals, type DailyTotals } from '../model/simulate';
 import type { DayStatus, ModelEntry } from '../model/types';
 import type { ActivityRecord, Habit, HabitKind, JournalEntry, SleepRecord, WaterRecord } from '../storage/types';
 import { habitDay, habitStart, type HabitData } from './habits';
-import { isNight, sleepBlocks } from './sleep';
+import { sleepByDay, wakeUps } from './sleep';
 
 export interface InsightInput {
   /** The model's days, aligned with `daily` (src/app/data.tsx). */
@@ -45,9 +45,11 @@ const OWN_MEASURES: MeasureDef[] = [
   { id: 'meals', group: 'food', name: 'Meals', unit: '', decimals: 0, about: 'number of meals (entries close together are one meal; supplements not counted)' },
   { id: 'first_meal', group: 'food', name: 'First meal', unit: 'h', decimals: 1, about: 'clock time of the first meal in hours, 7.5 = 07:30' },
   { id: 'last_meal', group: 'food', name: 'Last meal', unit: 'h', decimals: 1, about: 'clock time of the last meal in hours, 21.25 = 21:15' },
-  { id: 'sleep_hours', group: 'sleep', name: 'Sleep', unit: 'h', decimals: 1, about: 'hours asleep in the night that ended on this day (the night before it); sleeps less than 3 h apart are one night, their times added up' },
+  { id: 'sleep_hours', group: 'sleep', name: 'Sleep', unit: 'h', decimals: 1, about: 'hours asleep in the night that ended on this day (the night before it), time awake in between not counted; sleeps less than 3 h apart, and all sleeps of 3 h or more ending on the same day, are one night' },
   { id: 'bedtime', group: 'sleep', name: 'Fell asleep', unit: 'h', decimals: 1, about: 'clock time of first falling asleep that night, counted from the evening before: 23.5 = 23:30, 24.5 = 00:30' },
   { id: 'wake_time', group: 'sleep', name: 'Woke up', unit: 'h', decimals: 1, about: 'clock time of last waking up from that night, 7.25 = 07:15' },
+  { id: 'wake_ups', group: 'sleep', name: 'Woken in the night', unit: '', decimals: 0, about: 'times woken up and logged as awake between first falling asleep and last waking up that night' },
+  { id: 'awake_minutes', group: 'sleep', name: 'Awake in the night', unit: 'min', decimals: 0, about: 'minutes awake between first falling asleep and last waking up that night, all wake-ups together' },
   { id: 'nap_minutes', group: 'sleep', name: 'Naps', unit: 'min', decimals: 0, about: 'minutes of sleeps that ended on this day and are not part of a night (less than 3 h of sleep in all)' },
   { id: 'activity_minutes', group: 'activity', name: 'Activity', unit: 'min', decimals: 0, about: 'minutes of all logged activities' },
   { id: 'hard_minutes', group: 'activity', name: 'Moderate or hard activity', unit: 'min', decimals: 0, about: 'minutes of activities marked moderate or hard' },
@@ -85,7 +87,10 @@ export interface DayFacts {
   entries: DayEntry[];
   /** `private`: the user keeps it from the AI; shareInsightData leaves it out unless they include private entries. */
   journal: Array<{ time: number; text: string; private?: boolean }>;
-  night?: { start: number; end: number };
+  /** The night that ended on this day: first falling asleep, last waking up, and each sleep in it (wake-ups are the gaps). */
+  night?: { start: number; end: number; parts: Array<{ start: number; end: number }> };
+  /** Sleeps that ended on this day and are not part of a night. */
+  naps: Array<{ start: number; end: number }>;
   activities: ActivityRecord[];
   /** Value per measure id; null = not known that day (not logged, not tracked yet). */
   values: Record<string, number | null>;
@@ -133,12 +138,8 @@ export function buildInsightData(input: InsightInput): InsightData {
   const entriesByDay = new Map<string, ModelEntry[]>();
   for (const e of input.entries) entriesByDay.set(e.dayKey, [...(entriesByDay.get(e.dayKey) ?? []), e]);
   const journal = byDay(input.journal);
-  // A night with waking up in between is one night, on the day it ended; the parts of shorter blocks are naps.
-  const blocksByDay = new Map<string, ReturnType<typeof sleepBlocks>>();
-  for (const b of sleepBlocks(input.sleep)) {
-    const k = dayKey(new Date(b.end));
-    blocksByDay.set(k, [...(blocksByDay.get(k) ?? []), b]);
-  }
+  // A night with waking up in between is one night, on the day it ended, as on the sleep page; the parts of shorter blocks are naps.
+  const sleep = sleepByDay(input.sleep);
   const activities = byDay(input.activities);
   const water = byDay(input.water);
   // A tracker counts as in use from its first record on: before that its days are unknown, after it an empty day is a real zero.
@@ -183,12 +184,16 @@ export function buildInsightData(input: InsightInput): InsightData {
     values.first_meal = foodComplete && meals.length ? clockHours(meals[0]![0]!.time) : null;
     values.last_meal = foodComplete && meals.length ? clockHours(meals[meals.length - 1]![0]!.time) : null;
 
-    const blocks = blocksByDay.get(day) ?? [];
-    const night = blocks.filter(isNight).sort((a, b) => b.asleep - a.asleep)[0];
-    values.sleep_hours = night ? night.asleep / HOUR : null;
-    values.bedtime = night ? (clockHours(night.start) < 12 ? clockHours(night.start) + 24 : clockHours(night.start)) : null;
-    values.wake_time = night ? clockHours(night.end) : null;
-    values.nap_minutes = tracked('sleep', day) ? blocks.filter((b) => !isNight(b)).reduce((n, b) => n + b.asleep / 60_000, 0) : null;
+    const { night: block, naps = [] } = sleep.get(day) ?? {};
+    const woke = block ? wakeUps(block) : undefined;
+    values.sleep_hours = block ? block.asleep / HOUR : null;
+    values.bedtime = block ? (clockHours(block.start) < 12 ? clockHours(block.start) + 24 : clockHours(block.start)) : null;
+    values.wake_time = block ? clockHours(block.end) : null;
+    values.wake_ups = woke ? woke.count : null;
+    values.awake_minutes = woke ? woke.awake / 60_000 : null;
+    values.nap_minutes = tracked('sleep', day) ? naps.reduce((n, b) => n + b.asleep / 60_000, 0) : null;
+    const span = (p: { start: number; end: number }) => ({ start: p.start, end: p.end });
+    const night = block ? { start: block.start, end: block.end, parts: [...block.parts].sort((a, b) => a.start - b.start).map(span) } : undefined;
 
     const acts = [...(activities.get(day) ?? [])].sort((a, b) => a.time - b.time);
     const actMinutes = (f: (a: ActivityRecord) => boolean) => (tracked('activity', day) ? acts.filter(f).reduce((n, a) => n + a.minutes, 0) : null);
@@ -225,6 +230,7 @@ export function buildInsightData(input: InsightInput): InsightData {
       })),
       journal: notes.map((n) => ({ time: n.time, text: n.text, ...(n.private ? { private: true } : {}) })),
       ...(night ? { night } : {}),
+      naps: naps.map((b) => ({ start: b.start, end: b.end })),
       activities: acts,
       values,
       missing,
@@ -509,6 +515,7 @@ export function shareInsightData(data: InsightData, from: string, kinds: Readonl
     days.set(day, {
       ...rest,
       ...(kinds.has('sleep') && night ? { night } : {}),
+      naps: kinds.has('sleep') ? f.naps : [],
       status: food ? f.status : 'unknown',
       foodComplete: food && f.foodComplete,
       entries: food ? f.entries : [],
