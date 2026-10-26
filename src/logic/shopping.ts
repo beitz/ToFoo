@@ -78,13 +78,15 @@ const COMMON_WORDS: Array<[ShopSection, string]> = [
   ['meat', 'chicken beef pork mince ham bacon sausage sausages salami turkey fish salmon tuna shrimp prawns hähnchen huhn rind schwein hack hackfleisch wurst würstchen schinken fisch lachs thunfisch'],
   ['bakery', 'bread roll rolls bun buns toast baguette croissant croissants cake brot brötchen kuchen'],
   ['dry', 'rice pasta spaghetti noodles oats muesli granola cereal flour lentils beans chickpeas nuts almonds walnuts hazelnuts seeds quinoa couscous bulgur reis nudeln haferflocken müsli mehl linsen bohnen kichererbsen nüsse mandeln'],
-  ['pantry', 'oil vinegar salt spices sugar honey jam chocolate ketchup mustard mayonnaise mayo sauce stock broth cocoa öl essig salz zucker honig marmelade schokolade senf gewürze brühe'],
+  ['pantry', 'oil vinegar salt spices sugar honey jam chocolate ketchup mustard mayonnaise mayo sauce stock broth cocoa öl essig salz zucker honig marmelade schokolade senf gewürze brühe cumin cinnamon nutmeg turmeric cardamom oregano marjoram caraway juniper allspice saffron zimt kreuzkümmel kümmel kurkuma muskat muskatnuss majoran lorbeer lorbeerblatt lorbeerblätter nelken gewürznelken kardamom wacholder wacholderbeeren piment sternanis safran'],
   ['drinks', 'water juice coffee tea beer wine soda cola lemonade wasser saft kaffee tee bier wein'],
   ['other', 'toilet paper soap detergent shampoo toothpaste sponges foil tissues klopapier toilettenpapier spülmittel seife waschmittel zahnpasta'],
 ];
 /** Two words that together name something else than their last word. */
 const COMMON_PAIRS: Array<[string, ShopSection]> = [
   ['peanut butter', 'pantry'],
+  ['bay leaf', 'pantry'],
+  ['bay leaves', 'pantry'],
   ['sweet potatoes', 'produce'],
   ['coconut milk', 'pantry'],
   ['ice cream', 'other'],

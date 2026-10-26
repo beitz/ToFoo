@@ -35,8 +35,14 @@ export function usePantryFoods() {
   const d = useData();
   const { typed } = useShopFoods();
   const matchOf = (ref: FoodRef): string | undefined => (ref.source === 'BLS' ? ref.code : ref.source === 'custom' ? undefined : d.productsById.get(refKey(ref))?.match?.code);
-  /** Where a new thing is kept: its words, its food, common shopping words, then the food database. */
-  const placeOf = (name: string, ref?: FoodRef): HomePlace => guessPlace(name, ref ? matchOf(ref) : undefined, () => search(d.searchIndex, name, { limit: 15, boost: d.searchBoost }));
+  /**
+   * Where a new thing is kept: its words, its food, common shopping words, then the food database.
+   * A product goes by its own name, not its label with the brand last ("Lorbeerblätter · Ostmann").
+   */
+  const placeOf = (name: string, ref?: FoodRef): HomePlace => {
+    const words = (ref && ref.source !== 'BLS' && ref.source !== 'custom' ? d.productsById.get(refKey(ref))?.name : undefined) ?? name;
+    return guessPlace(words, ref ? matchOf(ref) : undefined, () => search(d.searchIndex, words, { limit: 15, boost: d.searchBoost }));
+  };
   /** The current name of a food, for showing which food an item is. */
   const nameOfRef = (ref: FoodRef): string | undefined => {
     if (ref.source === 'BLS') return d.foods.byCode.get(ref.code)?.nameEn;
