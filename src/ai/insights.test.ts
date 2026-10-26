@@ -3,9 +3,12 @@ import type * as Beta from '@anthropic-ai/sdk/resources/beta/messages/messages';
 import { dayRange } from '../lib/dates';
 import { buildInsightData, overview } from '../logic/insights';
 import type { DayStatus, ModelEntry } from '../model/types';
-import type { CreateMessage } from './assistant';
-import { askInsights, fmtChance, fmtMeasure, insightNote, insightParams, runInsightTool } from './insights';
+import { buildIndex } from '../foods/search';
+import { appNote, emptyConversation, requestParams, sendMessage, type CreateMessage } from './assistant';
+import { fmtChance, fmtMeasure, runInsightTool, shareNote } from './insights';
 import { INSIGHT_TOOLS } from './insightsPrompt';
+import { toolsFor } from './prompt';
+import type { ToolContext } from './tools';
 
 const at = (day: number, h: number, m = 0) => new Date(2026, 9, day, h, m).getTime();
 const key = (day: number) => `2026-10-${String(day).padStart(2, '0')}`;
@@ -114,10 +117,10 @@ describe('insight tools', () => {
     expect(runInsightTool('day_details', { days: [key(3)] }, habits).text).toContain('habits: Floss not kept');
     expect(runInsightTool('count_days', { from: key(1), to: key(7), group: [cond({ kind: 'habit', habit: 'Stretch' })], outcome: [headache] }, habits).text).toBe('"Stretch" is not one of the shared habits ("Floss").');
     expect(runInsightTool('count_days', { from: key(1), to: key(7), group: [cond({ kind: 'habit', habit: 'Floss' })], outcome: [headache] }, data).text).toBe('The user shared no habits.');
-    const note = insightNote(at(8, 9), overview(habits, key(1), key(7)), true, [], false, habits.habits);
+    const note = shareNote(overview(habits, key(1), key(7)), [], false, habits.habits);
     expect(note).toContain('habits answered on 3 days');
     expect(note).toContain('"Floss" (to do)');
-    expect(insightNote(at(8, 9), overview(data, key(1), key(7)), true)).not.toContain('habit');
+    expect(shareNote(overview(data, key(1), key(7)))).not.toContain('habit');
   });
 
   it('formats measures and chances', () => {
@@ -130,19 +133,24 @@ describe('insight tools', () => {
   });
 });
 
-describe('insight conversation', () => {
-  it('runs the tools the model asks for and returns the answer with the checks behind it', async () => {
+describe('patterns in the assistant chat (Include my data)', () => {
+  const ctx: ToolContext = { db: { byCode: new Map(), groups: {} }, index: buildIndex([]), insights: data };
+  const note = (share?: string) => appNote({ now: at(8, 9), day: key(8), today: key(8), logged: [], open: [], barcodes: [], ...(share ? { share } : {}) });
+
+  it('runs the pattern tools the model asks for and returns the answer with the checks behind it', async () => {
     const { create, requests } = scripted(
       reply([toolUse('t1', 'read_journal', { from: key(1), to: key(7), words: [] })], 'tool_use'),
       reply([text('Comparing.'), toolUse('t2', 'count_days', { from: key(1), to: key(7), group: [shortNight], outcome: [headache] }), toolUse('t3', 'compare_measures', { from: key(1), to: key(7), group: [headache], measures: ['alcohol'] })], 'tool_use'),
       reply([text('Headache on 2 of 2 days after a short night.')], 'end_turn'),
     );
-    const note = insightNote(at(8, 9), overview(data, key(1), key(7)), true);
-    const r = await askInsights(create, 'claude-opus-5-5', { messages: [] }, { text: 'Look for patterns', appNote: note }, data);
+    const share = shareNote(overview(data, key(1), key(7)));
+    const r = await sendMessage(create, 'claude-opus-5-5', emptyConversation(), { text: 'Look for patterns', images: [], appNote: note(share) }, ctx);
     expect(r.outcome).toMatchObject({ kind: 'reply', text: 'Headache on 2 of 2 days after a short night.' });
     expect(r.outcome.kind === 'reply' && r.outcome.checks.map((c) => c.kind)).toEqual(['count', 'compare']);
     expect(requests).toHaveLength(3);
-    expect(requests[0]!.tools!.map((t) => ('name' in t ? t.name : ''))).toEqual(INSIGHT_TOOLS.map((t) => t.name));
+    const names = requests[0]!.tools!.map((t) => ('name' in t ? t.name : ''));
+    for (const t of INSIGHT_TOOLS) expect(names).toContain(t.name);
+    expect(requests[0]!.output_config).toEqual({ effort: 'high' });
     const first = requests[0]!.messages[0]!.content as Beta.BetaTextBlockParam[];
     expect(first[1]!.text).toContain('Period chosen by the user: 2026-10-01 to 2026-10-07 (7 days)');
     expect(first[1]!.text).toContain('food log complete on 7 days');
@@ -151,27 +159,41 @@ describe('insight conversation', () => {
     expect(r.conversation.messages).toHaveLength(6);
   });
 
+  it('offers no pattern tools without data included, and says how to include it', async () => {
+    const { create, requests } = scripted(reply([text('Hi')], 'end_turn'));
+    const { insights: _, ...without } = ctx;
+    const r = await sendMessage(create, 'claude-opus-5-5', emptyConversation(), { text: 'Do I sleep worse after coffee?', images: [] }, without);
+    expect(r.outcome).toEqual({ kind: 'reply', text: 'Hi', checks: [] });
+    const names = requests[0]!.tools!.map((t) => ('name' in t ? t.name : ''));
+    expect(names).not.toContain('read_journal');
+    expect(requests[0]!.output_config).toEqual({ effort: 'medium' });
+    expect(requests[0]!.system).toContain('Include my data');
+    // A pattern tool the model calls anyway reads nothing.
+    const sneaky = scripted(reply([toolUse('t1', 'read_journal', { from: key(1), to: key(7), words: [] })], 'tool_use'), reply([text('Cannot.')], 'end_turn'));
+    await sendMessage(sneaky.create, 'claude-opus-5-5', emptyConversation(), { text: 'Read my journal', images: [] }, without);
+    expect((sneaky.requests[1]!.messages.at(-1)!.content as Beta.BetaToolResultBlockParam[])[0]).toMatchObject({ is_error: true, content: 'Unknown tool read_journal.' });
+  });
+
+  it('keeps what was shared with the conversation, so a reopened chat stays the same', async () => {
+    const shared = { from: key(1), kinds: ['food' as const, 'journal' as const], privateJournal: false };
+    const r = await sendMessage(scripted(reply([text('Ok')], 'end_turn')).create, 'claude-opus-5-5', { ...emptyConversation(), shared }, { text: 'hi', images: [] }, ctx);
+    expect(r.conversation.shared).toEqual(shared);
+  });
+
   it('tells the model what the user chose not to share', () => {
-    const note = insightNote(at(8, 9), overview(data, key(1), key(7)), true, ['sleep', 'water']);
-    expect(note).toContain('no days outside it');
-    expect(note).toContain('chose not to share their sleep, water');
-    expect(insightNote(at(8, 9), overview(data, key(1), key(7)), true)).not.toContain('not to share');
-    expect(insightNote(at(8, 9), overview(data, key(1), key(7)), true, [], true)).toContain('journal entries private');
-    expect(insightNote(at(8, 9), overview(data, key(1), key(7)), true)).not.toContain('private');
+    const o = overview(data, key(1), key(7));
+    expect(shareNote(o, ['sleep', 'water'])).toContain('no days outside it');
+    expect(shareNote(o, ['sleep', 'water'])).toContain('chose not to share their sleep, water');
+    expect(shareNote(o)).not.toContain('not to share');
+    expect(shareNote(o, [], true)).toContain('journal entries private');
+    expect(shareNote(o)).not.toContain('private');
   });
 
-  it('gives up after too many tool rounds and leaves the conversation as it was', async () => {
-    const loop = Array.from({ length: 16 }, (_, i) => reply([toolUse(`t${i}`, 'read_journal', { from: key(1), to: key(7), words: [] })], 'tool_use'));
-    const { create } = scripted(...loop);
-    const r = await askInsights(create, 'claude-opus-5-5', { messages: [] }, { text: 'Why?', appNote: '(Now.)' }, data);
-    expect(r.outcome).toEqual({ kind: 'error', reason: 'tooManySteps' });
-    expect(r.conversation.messages).toEqual([]);
-  });
-
-  it('asks for more effort and keeps the prompt stable for caching', () => {
-    const a = insightParams('claude-opus-5-5', []);
-    expect(a.output_config).toEqual({ effort: 'high' });
-    expect(insightParams('claude-haiku-5-5', []).system).toBe(a.system);
-    expect('fallbacks' in insightParams('claude-haiku-5-5', [])).toBe(false);
+  it('keeps the strict grammar as it was: the pattern tools are checked by the app', () => {
+    const tools = toolsFor({ insights: true }) as Array<{ name: string; strict?: boolean }>;
+    expect(tools.filter((t) => INSIGHT_TOOLS.some((x) => x.name === t.name)).every((t) => !t.strict)).toBe(true);
+    // Missing fields of a condition take their defaults rather than failing.
+    expect(runInsightTool('count_days', { from: key(1), to: key(7), group: [{ kind: 'measure', measure: 'sleep_hours', op: '<', value: 7 }], outcome: [{ kind: 'journal', words: ['headache'] }] }, data).ok).toBe(true);
+    expect(requestParams('claude-opus-5-5', [], { insights: true }).system).toBe(requestParams('claude-haiku-5-5', [], { insights: true }).system);
   });
 });

@@ -107,7 +107,7 @@ describe('sendMessage', () => {
     const after = await sendMessage(next.create, 'claude-opus-5-5', conversation, { text: 'it was two', images: [] }, ctx);
     const last = next.requests[0]!.messages.at(-1)!.content as Beta.BetaContentBlockParam[];
     expect(last.map((b) => b.type)).toEqual(['tool_result', 'text']);
-    expect(after.outcome).toEqual({ kind: 'reply', text: 'Two rolls then?' });
+    expect(after.outcome).toEqual({ kind: 'reply', text: 'Two rolls then?', checks: [] });
     expect(after.conversation.pendingResults).toEqual([]);
   });
 
@@ -130,7 +130,7 @@ describe('sendMessage', () => {
     const result = (api.requests[1]!.messages[2]!.content as Beta.BetaToolResultBlockParam[])[0]!;
     expect(result.is_error).toBe(true);
     expect(String(result.content)).toContain('Unknown code NOPE');
-    expect(outcome).toEqual({ kind: 'reply', text: 'Let me search first.' });
+    expect(outcome).toEqual({ kind: 'reply', text: 'Let me search first.', checks: [] });
   });
 
   it('reports refusals and runaway tool loops instead of looping forever', async () => {

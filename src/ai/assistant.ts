@@ -8,6 +8,8 @@ import type * as Beta from '@anthropic-ai/sdk/resources/beta/messages/messages';
 import { systemPromptFor, toolsFor, type PromptSources } from './prompt';
 import { usageOf, type ModelTokens } from './pricing';
 import { fmtLocalDateTime } from './photoTime';
+import { INSIGHT_TOOL_NAMES, runInsightTool, type Check } from './insights';
+import type { ShareKind } from '../logic/insights';
 import {
   runLookupBarcode,
   runSearchFoods,
@@ -97,6 +99,15 @@ export interface Conversation {
   batches?: number;
   /** User messages with photos, each with the cards proposed after it (see retirePhotos). */
   photoTurns?: PhotoTurn[];
+  /** The data the user included in this chat (Include my data); fixed once sent, so the chat can be reopened with it. */
+  shared?: SharedData;
+}
+
+/** What the user chose to share for a chat: from this day to today, these kinds, private journal entries or not. */
+export interface SharedData {
+  from: string;
+  kinds: ShareKind[];
+  privateJournal: boolean;
 }
 
 /** A user message with photos (its index in messages) and the cards proposed after it, until the next one. */
@@ -167,11 +178,13 @@ export type ShownPortion = PortionProposal & { id: string };
 /** A cooked batch as shown: with its card id (B1, B2, …). */
 export type ShownBatch = BatchProposal & { id: string };
 
+/** `checks`: the comparisons the app computed for the answer (pattern tools), shown under it. */
 export type TurnOutcome =
-  | { kind: 'reply'; text: string }
+  | { kind: 'reply'; text: string; checks: Check[] }
   | {
       kind: 'proposal';
       text: string;
+      checks: Check[];
       proposals: ShownProposal[];
       notes: ShownNote[];
       sleeps: ShownSleep[];
@@ -202,7 +215,8 @@ export function requestParams(model: AiModel, messages: Beta.BetaMessageParam[],
     tools: toolsFor(sources),
     messages,
     cache_control: { type: 'ephemeral' },
-    output_config: { effort: 'medium' },
+    // Looking for patterns is the kind of reasoning worth more effort; only with the user's data included.
+    output_config: { effort: sources.insights ? 'high' : 'medium' },
     // Server-side fallback is offered for Opus and Sonnet, not Haiku.
     ...(model === 'claude-haiku-5-5' ? {} : { betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' as const }),
   };
@@ -276,7 +290,9 @@ export async function sendMessage(
   let recipes = conversation.recipes ?? 0;
   let portions = conversation.portions ?? 0;
   let batches = conversation.batches ?? 0;
-  const done = (outcome: TurnOutcome, pendingResults: Beta.BetaToolResultBlockParam[] = []) => ({ conversation: { messages, pendingResults, cards, notes, sleeps, activities, waters, ketones, weights, habits, lists, homes, recipes, portions, batches, photoTurns }, outcome });
+  const checks: Check[] = [];
+  const shared = conversation.shared ? { shared: conversation.shared } : {};
+  const done = (outcome: TurnOutcome, pendingResults: Beta.BetaToolResultBlockParam[] = []) => ({ conversation: { messages, pendingResults, cards, notes, sleeps, activities, waters, ketones, weights, habits, lists, homes, recipes, portions, batches, photoTurns, ...shared }, outcome });
 
   for (let step = 0; step < MAX_STEPS; step++) {
     const res = await create(requestParams(model, messages, sources));
@@ -289,7 +305,7 @@ export async function sendMessage(
     if (res.stop_reason === 'pause_turn') continue;
 
     const uses = res.content.filter((b): b is Beta.BetaToolUseBlock => b.type === 'tool_use');
-    if (uses.length === 0) return done({ kind: 'reply', text: textOf(res.content) });
+    if (uses.length === 0) return done({ kind: 'reply', text: textOf(res.content), checks });
 
     const results: Beta.BetaToolResultBlockParam[] = [];
     const proposals: Array<{ id: string; proposal: Proposal }> = [];
@@ -427,6 +443,11 @@ export async function sendMessage(
           rejected = true;
           results.push({ type: 'tool_result', tool_use_id: use.id, content: r.error, is_error: true });
         }
+      } else if (INSIGHT_TOOL_NAMES.has(use.name) && ctx.insights) {
+        // Reads only the data the user included (already cut to their period and ticked kinds).
+        const r = runInsightTool(use.name, use.input, ctx.insights);
+        if (r.ok && r.check) checks.push(r.check);
+        results.push({ type: 'tool_result', tool_use_id: use.id, content: r.text, is_error: !r.ok });
       } else {
         results.push({ type: 'tool_result', tool_use_id: use.id, content: `Unknown tool ${use.name}.`, is_error: true });
       }
@@ -490,6 +511,7 @@ export async function sendMessage(
         {
           kind: 'proposal',
           text: textOf(res.content),
+          checks,
           proposals: shown,
           notes: shownNotes,
           sleeps: shownSleeps,
@@ -596,8 +618,9 @@ const HABIT_KIND_NOTE: Record<HabitInfo['kind'], string> = { do: 'do', avoid: 'a
  * The app's note on each user message: the current time and the chat's day (so "yesterday" and
  * photo times can be placed), cards already logged or still open, barcodes read from photos, and
  * whether the text was dictated. In the recipe editor: what the recipe already has instead of the day.
+ * `share`: on the message the user first includes their data with, what it holds (shareNote).
  */
-export function appNote(o: { now: number; day: string; today: string; logged: string[]; open: string[]; barcodes: string[]; dictated?: boolean; recipe?: RecipeSoFar; habits?: readonly HabitInfo[] }): string {
+export function appNote(o: { now: number; day: string; today: string; logged: string[]; open: string[]; barcodes: string[]; dictated?: boolean; recipe?: RecipeSoFar; habits?: readonly HabitInfo[]; share?: string }): string {
   const parts = [`Now: ${fmtLocalDateTime(o.now)}.`];
   if (o.dictated) parts.push('The text was spoken and turned into text by a speech model: expect misheard words, especially food and brand names, and corrections the user made while talking.');
   if (o.recipe) {
@@ -609,5 +632,6 @@ export function appNote(o: { now: number; day: string; today: string; logged: st
   if (o.open.length) parts.push(`Cards still open: ${o.open.join(', ')}.`);
   if (o.barcodes.length) parts.push(`Barcodes the app read from the photos: ${o.barcodes.join(', ')}.`);
   if (o.habits?.length) parts.push(`The user's habits: ${o.habits.map((h) => `"${h.name}" (${HABIT_KIND_NOTE[h.kind]})`).join(', ')}.`);
+  if (o.share) parts.push(o.share);
   return `(${parts.join(' ')})`;
 }

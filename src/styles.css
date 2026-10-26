@@ -1757,8 +1757,8 @@ details.tree details {
   margin: 4px 0 12px;
 }
 .assistant-page {
-  /* Room for the composer, which sits above the bottom navigation. */
-  padding-bottom: 80px;
+  /* Room for the composer, which sits above the bottom navigation and grows with the data panel. */
+  padding-bottom: max(80px, calc(var(--composer-h, 0px) + 16px));
 }
 .chat {
   display: flex;
@@ -2840,6 +2840,67 @@ body:has(.fab-stack) .toast-area {
 .insights-share .radio-row {
   min-height: 44px;
 }
+/* Include my data: a chip by the message box, opening to the period and tick boxes. */
+.data-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.875rem;
+  text-align: left;
+  cursor: pointer;
+}
+.data-chip > .grow {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.data-chip-on {
+  border-color: var(--accent);
+}
+.data-chip-on > svg:first-child {
+  color: var(--accent);
+}
+.data-panel-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  /* Tall content scrolls inside, so the message box and Look for patterns stay in reach. */
+  max-height: 34vh;
+  overflow-y: auto;
+  padding: 8px 2px 2px;
+}
+.data-panel > .btn {
+  width: 100%;
+  margin-top: 8px;
+}
+.data-panel-note {
+  margin: 6px 0 0;
+}
+.data-chip-turn {
+  transform: rotate(90deg);
+}
+.data-chip-turn-up {
+  transform: rotate(-90deg);
+}
+.data-panel-body p {
+  margin: 0;
+}
+.data-shared {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.data-shared > svg {
+  flex: none;
+}
 /* Private journal entries: a tick of their own, under the journal, so they never go by default. */
 .insights-share .insights-share-sub {
   padding-left: 34px;
@@ -2884,6 +2945,13 @@ body:has(.fab-stack) .toast-area {
 .insights-days {
   gap: 6px;
   margin-top: 6px;
+}
+/* Chips in a row, not list rows: no rule or row padding between them. */
+.insights-days > li {
+  padding: 0;
+}
+.insights-days > li + li {
+  border-top: 0;
 }
 .insights-day {
   border-radius: var(--radius-sm);
