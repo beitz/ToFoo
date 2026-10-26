@@ -36,6 +36,7 @@ import { CameFromCard } from './CameFromCard';
 import { FillsBest } from './FillsBest';
 import { UptakeCard, uptakeVaries } from './UptakeCard';
 import { EffectCard } from './EffectCard';
+import { hasLadder, LevelLadder } from './LevelLadder';
 
 export function NutrientPage({ id, context }: { id: string; context?: SplitContext }) {
   const d = useData();
@@ -124,7 +125,7 @@ export function NutrientPage({ id, context }: { id: string; context?: SplitConte
       {fills && <FillsBest id={id} recommended={req.recommended} />}
 
       <div className="card fold-group" data-tour="nutrient.why">
-        <NutrientInfo id={id} />
+        <NutrientInfo id={id} r={r} />
         <a className="fold-row why-link" href={href('nutrient', id, 'why')}>
           <Icon name="question" size={18} />
           <span className="grow">{t('nutrient.whyLink', { value: shown })}</span>
@@ -522,8 +523,9 @@ export function BigTile({ r, noData, showRange }: { r: NutrientResult; noData: b
 /**
  * What the nutrient does and what too little / too much means, folded (design 2026-10-22: the page
  * stays short; each opens on a tap), with the source under each. Rows of one card since 2026-10-23.
+ * Too little and too much are one ladder since 2026-10-26 (info-only nutrients keep the two rows).
  */
-function NutrientInfo({ id }: { id: string }) {
+function NutrientInfo({ id, r }: { id: string; r: NutrientResult }) {
   const key = infoId(id);
   const group = nutrientType(id);
   const source = NUTRIENT_INFO_SOURCES[key];
@@ -553,17 +555,21 @@ function NutrientInfo({ id }: { id: string }) {
         </>
       ),
     },
-    {
-      icon: 'info',
-      title: t('nutrient.tooLittleTitle'),
-      body: <p>{text('low')}</p>,
-    },
-    {
-      icon: 'warning',
-      title: t('nutrient.tooMuchTitle'),
-      body: <p>{text('high')}</p>,
-    },
   ];
+  const ladder = hasLadder(r);
+  if (!ladder)
+    folds.push(
+      {
+        icon: 'info',
+        title: t('nutrient.tooLittleTitle'),
+        body: <p>{text('low')}</p>,
+      },
+      {
+        icon: 'warning',
+        title: t('nutrient.tooMuchTitle'),
+        body: <p>{text('high')}</p>,
+      },
+    );
   return (
     <>
       {folds.map((f) => (
@@ -580,6 +586,7 @@ function NutrientInfo({ id }: { id: string }) {
           </div>
         </details>
       ))}
+      {ladder && <LevelLadder id={id} r={r} />}
     </>
   );
 }

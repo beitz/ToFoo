@@ -7794,3 +7794,237 @@ button.link-row {
   padding: 12px 0;
   margin: -12px 0;
 }
+
+/* From too little to too much: the ladder at the bottom of a nutrient page (2026-10-26). */
+.ladder-open {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.ladder-intro {
+  margin: 0 0 8px;
+}
+.ladder {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+/* The amount scale: a stripe down the left, most at the top; each step has its own name and status
+   mark, so the colours are only a second cue. */
+.rung {
+  --zone: var(--ok);
+  position: relative;
+  padding-left: 22px;
+}
+.rung::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 10px;
+  background: var(--zone);
+}
+.ladder > .rung:first-child::before {
+  border-radius: 6px 6px 0 0;
+}
+.ladder > .rung:last-child::before {
+  border-radius: 0 0 6px 6px;
+}
+.rung + .rung {
+  border-top: 1px solid var(--border);
+}
+.rung-farOver {
+  --zone: var(--high);
+}
+.rung-over {
+  --zone: color-mix(in srgb, var(--high) 45%, transparent);
+}
+.rung-plenty {
+  --zone: color-mix(in srgb, var(--ok) 35%, transparent);
+}
+.rung-enough {
+  --zone: var(--ok);
+}
+.rung-bitLow {
+  --zone: color-mix(in srgb, var(--warn) 55%, transparent);
+}
+.rung-low {
+  --zone: color-mix(in srgb, var(--low) 55%, transparent);
+}
+.rung-none {
+  --zone: var(--low);
+}
+.rung-here::after {
+  /* A notch on the scale next to your step. */
+  content: '';
+  position: absolute;
+  left: 10px;
+  top: 12px;
+  border: 6px solid transparent;
+  border-left-color: var(--text);
+}
+.rung-fold > summary,
+.rung-static {
+  display: grid;
+  gap: 2px;
+  padding: 8px 0;
+  min-height: 44px;
+  list-style: none;
+  cursor: default;
+}
+.rung-fold > summary {
+  cursor: pointer;
+}
+.rung-fold > summary::-webkit-details-marker {
+  display: none;
+}
+.rung-fold[open] > summary .rung-top > svg:last-child {
+  transform: rotate(180deg);
+}
+.rung-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.rung-top > svg {
+  flex: none;
+}
+.rung-name {
+  flex: none;
+  font-weight: 650;
+  color: var(--text);
+}
+.rung-amt {
+  margin-left: auto;
+  min-width: 0;
+  text-align: right;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+.rung-top > svg:last-child {
+  flex: none;
+  color: var(--text-muted);
+}
+.rung-you {
+  flex: none;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--bg);
+  background: var(--text);
+  border-radius: 999px;
+  padding: 0 8px;
+  line-height: 1.5;
+}
+.rung-line {
+  color: var(--text);
+}
+.rung-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+}
+.rung-meta .sev-dots {
+  margin-top: 0;
+}
+.rung-body {
+  display: grid;
+  gap: 10px;
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+.rung-body p {
+  margin: 0;
+}
+.rung-label {
+  margin: 0 0 4px;
+  font-size: 0.7rem;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.sign-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sign-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px 3px 7px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+}
+.sign-chip svg {
+  flex: none;
+  color: var(--accent);
+}
+.onset-strip {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  position: relative;
+  margin: 0;
+  padding: 14px 0 0;
+  list-style: none;
+}
+.onset-strip::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 5px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--border);
+}
+.onset-strip li {
+  position: relative;
+  text-align: center;
+  color: var(--text-faint);
+}
+.onset-strip li.hit {
+  color: var(--text);
+  font-weight: 650;
+}
+.onset-strip li.hit::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: -14px;
+  width: 11px;
+  height: 11px;
+  margin-left: -5.5px;
+  border-radius: 50%;
+  background: var(--text);
+}
+.rung-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.rung-row > svg {
+  flex: none;
+  margin-top: 1px;
+  color: var(--text-muted);
+}
+.rung-sources a {
+  color: inherit;
+}
+.ladder-note {
+  margin: 8px 0 0;
+}

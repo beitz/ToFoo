@@ -8,6 +8,8 @@
  * scenes and small fixes. A pull request that changes what users see adds its line here in the same PR.
  */
 export const changesEn = {
+  'change.145': 'Every nutrient page has "From too little to too much": each step from almost none to far too much, what it does, how serious and how fast, where it shows, with sources, and where you are.',
+  'change.145.major': 'From too little to too much, on every nutrient page',
   'change.144': 'Kitchen finds spices the food database lacks (bay leaves, cinnamon, nutmeg…) as packaged products, and a name typed without a match is kept and filed with the spices.',
   'change.143': 'Kitchen counts grams to a tenth ("8.5 g"); a scanned spice jar starts at its weight, and the assistant understands "only 8.5 g left".',
   'change.142': 'Add a food to your kitchen or favourites from wherever it is shown: its page, a diary item, a scan; save a whole meal as favourite from its page.',
