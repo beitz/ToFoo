@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Product } from '../storage/types';
 import type { BlsFile } from './blsTypes';
 import { buildFoodDb } from './foodDb';
-import { foodSourceKind, needsCheck, productFood, productLabel } from './products';
+import { foodSourceKind, labelValues, needsCheck, productFood, productLabel } from './products';
 import { resolveEntry, type ResolveContext } from '../logic/resolve';
 
 const bls: BlsFile = {
@@ -45,6 +45,42 @@ describe('products as foods', () => {
     expect(f.per100).toMatchObject({ ENERCC: 632, FAT: 48, MG: 90, VITB12: null, SE: 4 });
     // Selenium keeps its CoFID estimate mark ("C"), so it stays as uncertain as in the BLS food.
     expect(f.provenance).toMatchObject({ ENERCC: 'B', FAT: 'B', MG: 'U', VITB12: '-', SE: 'C' });
+  });
+
+  it('scales borrowed parts to the label: fatty acids to its fat, amino acids to its protein', () => {
+    // Chicken fat (BLS Q830000, rounded) as the similar food of a ready meal with 7.1 g fat.
+    const fatDb = buildFoodDb({
+      ...bls,
+      nutrients: ['FAT', 'FASAT', 'F18:2CN6', 'PROT625', 'LYS', 'MET', 'CYSTE', 'VITE'].map((id) => ({ id, nameEn: id, nameDe: id, unit: 'g' })),
+      foods: [
+        ['Q830000', 'Hühnerfett', 'Chicken fat', [100, 29, 26, 't', 't', null, null, 1.3], 'AAAAAAAA'],
+        ['Z000000', 'Ohne Fett', 'Fat-free', [0, 0, 0, 10, 0.8, 0.2, 0.1, 0], 'AAAAAAAA'],
+      ],
+    });
+    const meal: Product = { ...giotto, per100: { FAT: 7.1, FASAT: 3.9, PROT625: 5.3 }, match: { version: '4.0', code: 'Q830000' } };
+    const f = productFood(meal, fatDb);
+    // Unsaturated parts to fat minus saturates: 26 × 3.2 / 71, not 26 g in a meal with 7.1 g fat.
+    expect(f.per100['F18:2CN6']).toBeCloseTo((26 * 3.2) / 71);
+    expect(f.provenance['F18:2CN6']).toBe('U');
+    expect(f.per100.FASAT).toBe(3.9);
+    // Protein in traces only says nothing about the amino acids of 5.3 g; vitamins are not parts of a label value.
+    expect(f.per100.LYS).toBeNull();
+    expect(f.per100.SAA).toBeNull();
+    expect(f.per100.VITE).toBe(1.3);
+    // A fat-free food says nothing about the fatty acids of a fatty product, and amino acids follow protein.
+    const g = productFood({ ...meal, per100: { FAT: 7.1, PROT625: 5 }, match: { version: '4.0', code: 'Z000000' } }, fatDb);
+    expect(g.per100['F18:2CN6']).toBeNull();
+    expect(g.provenance['F18:2CN6']).toBe('-');
+    expect(g.per100.LYS).toBeCloseTo(0.4);
+    expect(g.per100.SAA).toBeCloseTo(0.15);
+    expect(productFood({ ...meal, per100: { FAT: 0 }, match: { version: '4.0', code: 'Z000000' } }, fatDb).per100['F18:2CN6']).toBe(0);
+  });
+
+  it('reads zeros saved from Open Food Facts for vitamins and minerals as not on the label', () => {
+    const saved: Product = { ...giotto, per100: { ENERCC: 632, FAT: 48, MG: 0 }, match: { version: '4.0', code: 'S610000' } };
+    expect(labelValues(saved)).toEqual({ ENERCC: 632, FAT: 48 });
+    expect(productFood(saved, foods).per100.MG).toBe(90);
+    expect(labelValues({ ...saved, source: 'USDA' }).MG).toBe(0);
   });
 
   it('leaves everything off the label missing without a match', () => {

@@ -4,7 +4,7 @@ import { href } from '../../app/router';
 import { useToast } from '../../app/toast';
 import { t } from '../../i18n';
 import type { Food } from '../../foods/foodDb';
-import { hasOwnMicros, productLabel, productPageUrl } from '../../foods/products';
+import { hasOwnMicros, labelValues, productLabel, productPageUrl } from '../../foods/products';
 import { initialChoice, rankMatches, withChoice, type MatchChoice } from '../../foods/productMatch';
 import { search } from '../../foods/search';
 import { fmtAmount, fmtNumber } from '../../lib/format';
@@ -21,7 +21,7 @@ const SUGGESTIONS = 6;
 
 /** Brand, pack size, a link to the source page, and the label (or USDA) values. */
 export function ProductInfo({ product }: { product: Product }) {
-  const p = product.per100;
+  const p = labelValues(product);
   const own = hasOwnMicros(product);
   const shown = LABEL_ORDER.filter((id) => p[id] !== undefined);
   const more = Object.keys(p).filter((id) => !LABEL_ORDER.includes(id) && id !== 'NA').length;
@@ -61,7 +61,7 @@ export function MatchPicker({ product, choice, onChange, linked }: { product: Pr
   const options = useMemo(() => {
     const keys = query.trim()
       ? search(d.searchIndex, query, { limit: SUGGESTIONS, boost: d.searchBoost }).map((r) => r.key)
-      : rankMatches(product, d.searchIndex, d.searchBoost)
+      : rankMatches(product, d.searchIndex, d.foods, d.searchBoost)
           .slice(0, SUGGESTIONS)
           .map((r) => r.key);
     return keys.map((k) => d.foods.byCode.get(k)).filter((f): f is Food => !!f);

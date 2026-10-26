@@ -149,14 +149,20 @@ const singular = (w: string) => (w.endsWith('ies') ? `${w.slice(0, -3)}y` : w.sl
  * Loose search for matching a product to a similar food: tokens may go unmatched, and a name
  * scores by how many of them it covers (squared, so covering most of them wins over one exact
  * word). Used where the query is a category or product name, not something the user typed.
+ * With `rare`, each word counts by how few names contain it (1 for a word in one name, down to
+ * 1/4 for one in all), so "goreng" (2 foods) outweighs "chicken" (hundreds), also across queries.
  */
-export function looseSearch(index: SearchIndex, query: string, opts: { limit?: number; boost?: (key: string) => number } = {}): Array<{ key: string; score: number }> {
+export function looseSearch(
+  index: SearchIndex,
+  query: string,
+  opts: { limit?: number; boost?: (key: string) => number; rare?: boolean } = {},
+): Array<{ key: string; score: number }> {
   const tokens = words(normalize(query));
   if (!tokens.length) return [];
-  const scored: Array<{ key: string; score: number; len: number }> = [];
+  const hitsPerItem: Array<{ it: Indexed; s: number[] }> = [];
+  const df = tokens.map(() => 0);
   for (const it of index.items) {
-    let total = 0;
-    let hits = 0;
+    let s: number[] | undefined;
     for (let i = 0; i < tokens.length; i++) {
       // Product names mix languages, so each word may hit the English or the German name.
       // Category names are plural ("Chocolates"); typo-level hits are left out ("candies" is not "candied").
@@ -166,14 +172,28 @@ export function looseSearch(index: SearchIndex, query: string, opts: { limit?: n
       const head = tok.slice(0, 3);
       if (!it.en.includes(head) && !it.de.includes(head)) continue;
       const forms = tok.length > 3 && tok.endsWith('s') ? [tok, singular(tok)] : [tok];
-      let s = 0;
-      for (const f of forms) s = Math.max(s, tokenScore(f, it.enWords, it.en, last), 0.8 * tokenScore(f, it.deWords, it.de, last));
-      if (s < 4) continue;
-      hits++;
-      total += s;
+      let best = 0;
+      for (const f of forms) best = Math.max(best, tokenScore(f, it.enWords, it.en, last), 0.8 * tokenScore(f, it.deWords, it.de, last));
+      if (best < 4) continue;
+      (s ??= tokens.map(() => 0))[i] = best;
+      df[i]!++;
     }
-    if (!hits) continue;
-    const covered = hits / tokens.length;
+    if (s) hitsPerItem.push({ it, s });
+  }
+  // Inverse document frequency.
+  const n = index.items.length;
+  const weight = df.map((d) => (opts.rare ? 0.25 + (0.75 * Math.log((n + 1) / (d + 1))) / Math.log(n + 1) : 1));
+  const allWeight = weight.reduce((a, b) => a + b, 0);
+  const scored: Array<{ key: string; score: number; len: number }> = [];
+  for (const { it, s } of hitsPerItem) {
+    let total = 0;
+    let covered = 0;
+    s.forEach((v, i) => {
+      if (!v) return;
+      total += v * weight[i]!;
+      covered += weight[i]!;
+    });
+    covered /= allWeight;
     const rest = it.enWords.filter((w) => !tokens.some((t) => w.startsWith(t) || stem(w) === stem(t)) && !/^[0-9.%]+$/.test(w));
     const plain = rest.every((w) => PLAIN_WORDS.has(w)) ? 1.4 : 1;
     let score = total * covered * covered * plain * (1 + 2 / (2 + it.enWords.length));

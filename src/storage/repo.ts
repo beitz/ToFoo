@@ -323,13 +323,14 @@ export function createRepo(db: ToFooDB) {
         await db.products.put({ ...rest, ...pairOf(pair), schemaVersion: v });
       });
     },
-    /** Store the app's own picks, for products that still have no similar food and no "label only". */
+    /** Store the app's own picks, for products with no similar food or only an earlier pick of the app's, and no "label only". */
     async setAutoMatches(picks: ReadonlyArray<{ id: string; match: NonNullable<Product['match']> }>): Promise<number> {
       return db.transaction('rw', db.products, async () => {
         let n = 0;
         for (const { id, match } of picks) {
           const p = await db.products.get(id);
-          if (!p || p.match || p.labelOnly) continue;
+          // Never over the user's own choice (made while the picks were worked out).
+          if (!p || (p.match && !p.match.auto) || p.labelOnly) continue;
           await db.products.put({ ...p, match: { ...match, auto: true }, schemaVersion: v });
           n++;
         }

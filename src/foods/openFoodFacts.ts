@@ -81,6 +81,15 @@ export const NUTRIMENT_IDS: Readonly<Record<string, string>> = {
 
 const FROM_GRAMS: Record<string, number> = { g: 1, mg: 1e3, µg: 1e6 };
 
+/**
+ * What an EU label always states (energy, fat, saturates, carbohydrate, sugars, protein, salt;
+ * Regulation (EU) No 1169/2011, Art. 30(1)) and fibre, where 0 is a real amount. Vitamins and
+ * minerals may only be stated in a significant amount (Annex XIII Part A.2), so a 0 for one of
+ * them is a form field left at zero, not a label value: kept as missing, never as zero.
+ */
+const ZERO_IS_REAL = new Set(['ENERCC', 'FAT', 'FASAT', 'CHO', 'SUGAR', 'PROT625', 'NA', 'FIBT']);
+export const isUndeclaredZero = (id: string, v: number) => v === 0 && !ZERO_IS_REAL.has(id);
+
 /** kJ per kcal (thermochemical calorie), for labels that give only kJ. */
 export const KJ_PER_KCAL = 4.184;
 /**
@@ -140,7 +149,7 @@ export function parseNutriments(nutriments: unknown): Record<string, number> {
       const kj = num(n['energy-kj_100g']);
       if (kj !== undefined) v = kj / KJ_PER_KCAL;
     }
-    if (v === undefined || v < 0) continue;
+    if (v === undefined || v < 0 || isUndeclaredZero(id, v)) continue;
     if (unit === 'kcal') {
       if (v <= MAX_KCAL_PER_100G) out[id] = v;
       continue;

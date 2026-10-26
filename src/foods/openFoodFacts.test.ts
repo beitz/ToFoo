@@ -67,6 +67,12 @@ describe('parsing Open Food Facts products', () => {
     expect(parseNutriments(undefined)).toEqual({});
   });
 
+  it('reads a 0 for a vitamin or mineral as not on the label, a 0 for what labels always state as real', () => {
+    // YOUCOOK Butter Chicken (4260334165158, fetched 2026-10-26): ten minerals and vitamins at 0.
+    const n = parseNutriments({ fat_100g: 7.1, sugars_100g: 0, salt_100g: 0, sodium_100g: 0, fiber_100g: 0, iron_100g: 0, zinc_100g: 0, 'vitamin-c_100g': 0, calcium_100g: 0.02 });
+    expect(n).toEqual({ FAT: 7.1, SUGAR: 0, NA: 0, FIBT: 0, CA: 20 });
+  });
+
   it('uses kJ when kcal is missing', () => {
     expect(parseNutriments({ 'energy-kj_100g': 418.4 }).ENERCC).toBeCloseTo(100);
   });

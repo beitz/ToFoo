@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import type { Product } from '../storage/types';
 import type { BlsFile } from './blsTypes';
 import { buildFoodDb, groupSearchBoost } from './foodDb';
-import { autoMatches, bestMatch, initialChoice, withChoice, wantsAutoMatch } from './productMatch';
+import { autoMatches, bestMatch, initialChoice, macroSimilarity, withChoice, wantsAutoMatch } from './productMatch';
 import { buildIndex } from './search';
 
 const product = (name: string, brand: string, categories: string[], extra: Partial<Product> = {}): Product => ({
@@ -26,7 +26,7 @@ describe.runIf(existsSync(file))('pairing products with a similar BLS food', () 
   const index = buildIndex(db.foods.map((f) => ({ key: f.code, nameEn: f.nameEn, nameDe: f.nameDe })));
   const boost = (key: string) => groupSearchBoost(key.charAt(0));
   const best = (p: Product) => {
-    const code = bestMatch(p, index, boost);
+    const code = bestMatch(p, index, db, boost);
     return code ? db.byCode.get(code)!.nameEn : undefined;
   };
 
@@ -40,6 +40,27 @@ describe.runIf(existsSync(file))('pairing products with a similar BLS food', () 
     expect(best(product('Tofu natur', 'Taifun', ['Plant-based foods', 'Legumes', 'Meat alternatives', 'Tofu']))).toBe('Tofu');
   });
 
+  it('checks the label against the candidates, so ready meals get a dish, not chicken fat', () => {
+    // Real Open Food Facts products (fetched 2026-10-26); before, the first three got "Chicken fat".
+    const meal = (name: string, categories: string[], per100: Product['per100']) => best(product(name, '', categories, { per100 }));
+    const chicken = ['Meals', 'Meats and their products', 'Meals with meat', 'poultry-meals', 'Meals with chicken'];
+    expect(meal('Indian Style Butter Chicken mit Huhn', [...chicken, 'Butter chicken'], { ENERCC: 144, FAT: 7.1, PROT625: 5.3, CHO: 14.1 })).not.toMatch(/fat/i);
+    expect(meal('Mildes Hähnchen Curry', [...chicken, 'Chicken curry'], { FAT: 5.7, PROT625: 7.7, CHO: 8.5 })).toMatch(/curry/i);
+    expect(meal('Culinea Nasi Goreng', ['Frozen foods', 'Meals', 'Rice dishes', 'poultry-meals', 'Meals with chicken', 'Microwave meals', 'Nasi goreng'], { FAT: 2.5, PROT625: 5.5, CHO: 13.5 })).toMatch(/^Nasi Goreng/);
+    expect(meal('Chili Con Carne', ['Meals', 'Meats and their products', 'Meals with meat', 'Chili con carne'], { FAT: 2.3, PROT625: 6.3, CHO: 10.2 })).toMatch(/^Chilli con carne/);
+    expect(meal('Linseneintopf', ['Canned foods', 'Meals', 'Soups', 'Canned meals', 'Canned soups'], { FAT: 0.8, PROT625: 3.4, CHO: 8.6 })).toMatch(/^Lentil stew/);
+    expect(meal('Erbsensuppe', ['Meals', 'Soups'], { FAT: 1.6, PROT625: 2.5, CHO: 7.4 })).toMatch(/^Pea soup/);
+    // Plain foods keep their match when the label fits.
+    expect(meal('Thunfisch im eigenen Saft', ['Seafood', 'Fishes', 'Canned fishes', 'Tunas', 'Canned tunas'], { FAT: 0.9, PROT625: 27.8, CHO: 0 })).toBe('Tuna canned, drained');
+  });
+
+  it('compares fat, protein and carbohydrate', () => {
+    expect(macroSimilarity({ FAT: 7.1, PROT625: 5.3, CHO: 14.1 }, { FAT: 100, PROT625: 't', CHO: 0 })).toBeCloseTo(1 - 112.3 / 126.5);
+    expect(macroSimilarity({ FAT: 1, PROT625: 2, CHO: 3 }, { FAT: 1, PROT625: 2, CHO: 3 })).toBe(1);
+    // Too little to compare: no say.
+    expect(macroSimilarity({ ENERCC: 500 }, { FAT: 1, PROT625: 2 })).toBe(1);
+  });
+
   it('picks nothing when nothing fits well enough', () => {
     expect(best(product('Whey Protein Vanilla', 'ESN', ['Dietary supplements', 'Bodybuilding supplements', 'Protein powders']))).toBeUndefined();
     expect(best(product('Protein Pudding Schoko', 'Ehrmann', []))).toBeUndefined();
@@ -50,9 +71,12 @@ describe.runIf(existsSync(file))('pairing products with a similar BLS food', () 
     const chosen = product('Pralinen', '', ['Pralines'], { id: 'OFF:2', match: { version: '4.0', code: 'S610000' } });
     const labelOnly = product('Pralinen', '', ['Pralines'], { id: 'OFF:3', labelOnly: true });
     const usda = product('Pralines', '', ['Pralines'], { id: 'USDA:4', source: 'USDA', usdaType: 'SR Legacy' });
-    expect([giotto, chosen, labelOnly, usda].map(wantsAutoMatch)).toEqual([true, false, false, false]);
-    const picks = autoMatches([giotto, chosen, labelOnly, usda], index, '4.0', boost);
-    expect(picks).toHaveLength(1);
+    // The app's own unchecked pick is looked at again (a better matcher replaces old guesses), but only changes when the pick does.
+    const oldGuess = product('GiOTTO Haselnuss', 'Ferrero', ['Pralines'], { id: 'OFF:5', match: { version: '4.0', code: 'Q830000', auto: true } });
+    const sameGuess = { ...giotto, id: 'OFF:6', match: { version: '4.0', code: bestMatch(giotto, index, db, boost)!, auto: true as const } };
+    expect([giotto, chosen, labelOnly, usda, oldGuess].map(wantsAutoMatch)).toEqual([true, false, false, false, true]);
+    const picks = autoMatches([giotto, chosen, labelOnly, usda, oldGuess, sameGuess], index, db, boost);
+    expect(picks.map((p) => p.id)).toEqual([giotto.id, oldGuess.id]);
     expect(picks[0]).toMatchObject({ id: giotto.id, match: { version: '4.0' } });
   });
 
