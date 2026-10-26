@@ -1,5 +1,6 @@
 import { parseDay } from '../lib/dates';
 import type { ActivityRecord, AskDays, Intensity, SleepRecord, WaterRecord } from '../storage/types';
+import { activityKey } from './activity';
 import { isoWeekday } from './habits';
 import { minuteOfDay } from './nights';
 import { usualTimes } from './sleep';
@@ -90,6 +91,7 @@ export interface FrequentActivity {
   name?: string;
   outside: boolean;
   intensity?: Intensity;
+  compendium?: string;
   sunSkin?: ActivityRecord['sunSkin'];
   /** Usual length and start (minutes after midnight): medians of the times it was logged. */
   minutes: number;
@@ -98,16 +100,18 @@ export interface FrequentActivity {
 }
 
 /**
- * The activities logged most often in the last 60 days before `day`, as one-tap picks: the same kind,
- * name and inside/outside count as one, with their usual length and start time. Ties go to the most recent.
+ * The activities logged most often in the last 60 days (`days`) before `day`, as one-tap picks: the
+ * same kind, name, Compendium row and inside/outside count as one (activityKey), with their usual
+ * length and start time. Ties go to the most recent. `withDay` counts `day` itself too (the activity
+ * sheet's Recent list, where today's walk already counts).
  */
-export function frequentActivities(records: readonly ActivityRecord[], day: string, n = 4): FrequentActivity[] {
+export function frequentActivities(records: readonly ActivityRecord[], day: string, n = 4, { days = RECENT_DAYS, withDay = false } = {}): FrequentActivity[] {
   const from = parseDay(day);
-  from.setDate(from.getDate() - RECENT_DAYS);
+  from.setDate(from.getDate() - days);
   const groups = new Map<string, ActivityRecord[]>();
   for (const r of records) {
-    if (r.day >= day || r.time < from.getTime()) continue;
-    const key = `${r.kind}|${(r.name ?? '').trim().toLowerCase()}|${r.outside}`;
+    if ((withDay ? r.day > day : r.day >= day) || r.time < from.getTime()) continue;
+    const key = activityKey(r);
     groups.set(key, [...(groups.get(key) ?? []), r]);
   }
   return [...groups.values()]
@@ -119,6 +123,7 @@ export function frequentActivities(records: readonly ActivityRecord[], day: stri
           name: latest.name,
           outside: latest.outside,
           intensity: latest.intensity,
+          compendium: latest.compendium,
           sunSkin: latest.sunSkin,
           minutes: median(rs.map((r) => r.minutes)),
           startMinute: median(rs.map((r) => minuteOfDay(r.time))),

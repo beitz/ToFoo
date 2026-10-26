@@ -4,7 +4,7 @@ import { ToFooDB } from './db';
 import { createRepo } from './repo';
 import { planAdd, planClear } from '../logic/shopping';
 import { leftOf, planStock, usageOf } from '../logic/pantry';
-import type { FavouriteMeal, Recipe } from './types';
+import type { FavouriteActivity, FavouriteMeal, Recipe } from './types';
 
 let n = 0;
 const fresh = async () => {
@@ -244,6 +244,18 @@ describe('repository', () => {
     const b = await fresh();
     await b.restore(await repo.snapshot());
     expect((await b.getSettings())!.favouriteMeals).toEqual([meal('a'), meal('b'), meal('c')]);
+  });
+
+  it('pins favourite activities, puts a removed one back in place, and keeps them in backups', async () => {
+    const repo = await fresh();
+    const fav = (id: string): FavouriteActivity => ({ id, kind: 'walk', name: id, minutes: 30, outside: true });
+    for (const id of ['a', 'b', 'c']) await repo.addFavouriteActivity(fav(id));
+    await repo.removeFavouriteActivity('b');
+    expect((await repo.getSettings())!.favouriteActivities!.map((a) => a.id)).toEqual(['a', 'c']);
+    await repo.addFavouriteActivity(fav('b'), 1);
+    const b = await fresh();
+    await b.restore(await repo.snapshot());
+    expect((await b.getSettings())!.favouriteActivities).toEqual([fav('a'), fav('b'), fav('c')]);
   });
 
   it('keeps saved chats out of backups, and deletes them with their photos and recordings (undoable)', async () => {

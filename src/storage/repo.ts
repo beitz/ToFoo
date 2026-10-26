@@ -18,6 +18,7 @@ import {
   type DayStatusRecord,
   type FoodPortionSizes,
   type PortionSize,
+  type FavouriteActivity,
   type FavouriteMeal,
   type FoodRef,
   type Fast,
@@ -163,6 +164,22 @@ export function createRepo(db: ToFooDB) {
       await db.transaction('rw', db.settings, async () => {
         const s = (await db.settings.get('settings')) ?? defaultSettings();
         await db.settings.put({ ...s, favouriteMeals: (s.favouriteMeals ?? []).filter((m) => m.id !== id), id: 'settings', schemaVersion: v });
+      });
+    },
+
+    /** Pin an activity in the activity sheet, at `index` (undo puts it back where it was) or at the end. */
+    async addFavouriteActivity(fav: FavouriteActivity, index?: number): Promise<void> {
+      await db.transaction('rw', db.settings, async () => {
+        const s = (await db.settings.get('settings')) ?? defaultSettings();
+        const list = (s.favouriteActivities ?? []).filter((a) => a.id !== fav.id);
+        list.splice(index ?? list.length, 0, fav);
+        await db.settings.put({ ...s, favouriteActivities: list, id: 'settings', schemaVersion: v });
+      });
+    },
+    async removeFavouriteActivity(id: string): Promise<void> {
+      await db.transaction('rw', db.settings, async () => {
+        const s = (await db.settings.get('settings')) ?? defaultSettings();
+        await db.settings.put({ ...s, favouriteActivities: (s.favouriteActivities ?? []).filter((a) => a.id !== id), id: 'settings', schemaVersion: v });
       });
     },
 

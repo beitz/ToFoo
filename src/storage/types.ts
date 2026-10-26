@@ -151,6 +151,8 @@ export interface Settings extends Versioned {
   favourites?: FoodRef[];
   /** Whole meals pinned to the top of the log screen; one tap logs them again. */
   favouriteMeals?: FavouriteMeal[];
+  /** Activities pinned in the activity sheet; one tap fills the sheet with them. */
+  favouriteActivities?: FavouriteActivity[];
   /** Log screen sections the user closed (true) or opened (false), by section key; unset = open. */
   logCollapsed?: Record<string, boolean>;
   /** Recipe ideas: diet, likes, kitchen, time, batch size, in the user's words (guidance for the assistant, not a filter). */
@@ -179,6 +181,9 @@ export interface FavouriteMeal {
   id: string;
   items: FavouriteMealItem[];
 }
+
+/** A pinned activity: what it is and how it usually goes, without when (owner's ask 2026-10-26: the same activity again and again). */
+export type FavouriteActivity = Pick<ActivityRecord, 'id' | 'kind' | 'name' | 'minutes' | 'intensity' | 'compendium' | 'outside' | 'sunSkin'>;
 
 export type FavouriteMealItem = DistributiveOmit<LogEntry, 'id' | 'schemaVersion' | 'time' | 'day'> & { offsetMinutes: number };
 

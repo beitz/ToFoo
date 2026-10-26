@@ -169,7 +169,7 @@ function ActivityChoices({ day }: { day: string }) {
           const label = `${p.name || t(`activity.kind.${p.kind}` as MessageKey)} · ${t('catchUp.minutes', { m: p.minutes })}`;
           const add = async () => {
             const time = atDayMinute(day, p.startMinute);
-            const added = await repo.addActivity({ kind: p.kind, name: p.name, time, day, minutes: p.minutes, intensity: p.intensity, outside: p.outside, sunSkin: p.sunSkin });
+            const added = await repo.addActivity({ kind: p.kind, name: p.name, time, day, minutes: p.minutes, intensity: p.intensity, ...(p.compendium ? { compendium: p.compendium } : {}), outside: p.outside, sunSkin: p.sunSkin });
             toast(t('activity.saved'), () => void repo.deleteActivity(added.id));
           };
           return (

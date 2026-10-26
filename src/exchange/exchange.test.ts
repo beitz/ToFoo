@@ -22,6 +22,10 @@ const snapshot: Snapshot = {
         ],
       },
     ],
+    favouriteActivities: [
+      { id: 'fa1', kind: 'walk', name: 'Commute', minutes: 30, intensity: 'moderate', compendium: '17270', outside: true, sunSkin: 'faceHands' },
+      { id: 'fa2', kind: 'strength', minutes: 45, outside: false },
+    ],
     logCollapsed: { saved: true },
     potGrams: 1200,
   },
