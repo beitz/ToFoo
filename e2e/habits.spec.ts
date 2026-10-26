@@ -23,6 +23,10 @@ test('habits: add them, tick today on Home, answer a day on the habit page', asy
   const errors = watchErrors(page);
   await firstLaunch(page);
   await turnOnHabits(page);
+  // With none made yet, Home still shows the row, with a way to add the first one.
+  await page.goto('./#/');
+  await page.getByRole('link', { name: 'Add your first habit' }).click();
+  await expect(page).toHaveURL(/#\/habits\/new$/);
   await addHabit(page, 'Floss');
   await addHabit(page, 'Alcohol', 'Avoid');
   await addHabit(page, 'Exercise', 'Minutes');

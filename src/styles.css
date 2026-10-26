@@ -8229,6 +8229,16 @@ button.link-row {
   font: inherit;
   cursor: pointer;
 }
+.habit-card-add {
+  flex: 1;
+  flex-direction: row;
+  gap: 6px;
+  border-top-color: var(--accent);
+  border-style: dashed;
+  color: var(--accent);
+  font-weight: 600;
+  text-decoration: none;
+}
 .habit-card.dim {
   opacity: 0.6;
 }
