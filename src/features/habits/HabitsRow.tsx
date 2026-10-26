@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { useData } from '../../app/data';
 import { href } from '../../app/router';
 import { t } from '../../i18n';
@@ -6,13 +6,15 @@ import { weekStart } from '../../lib/periods';
 import { habitDay, habitWeek, isDue, type HabitData } from '../../logic/habits';
 import type { Habit } from '../../storage/types';
 import { Icon } from '../../ui/Icon';
-import { HabitActivitySheet, markText, MarkGlyph, habitStyle, useAnswer } from './HabitParts';
+import { HabitActivitySheet, markText, MarkGlyph, habitStyle, quickText, useAnswer, useQuickLog } from './HabitParts';
 import { useHabits } from './useHabits';
 
 /**
  * Today's habits on Home (owner's design, 2026-10-26): one small card per habit in a row that scrolls
  * sideways, and "All" fixed at its end for the habits page. A tap answers a do or avoid habit for today
- * (done, or had some; a second tap clears it), with undo; a minutes habit opens the activity sheet.
+ * (done, or had some; a second tap clears it), with undo; a minutes habit opens the activity sheet,
+ * or with "One tap logs it" logs its activity at once (each tap one more, with undo; owner's ask
+ * 2026-10-26, a walk to work and back) and opens the sheet on a long press.
  * With Habits on and none made yet, the row still shows, with a card that adds the first one, so the
  * switch in Settings leads somewhere (owner's ask, 2026-10-26).
  */
@@ -20,7 +22,9 @@ export function HabitsRow() {
   const d = useData();
   const habits = useHabits();
   const answer = useAnswer();
+  const quickLog = useQuickLog();
   const [logging, setLogging] = useState<Habit>();
+  const press = useLongPress((h) => setLogging(h));
   if (!habits) return null;
   if (!habits.active.length)
     return (
@@ -39,7 +43,8 @@ export function HabitsRow() {
   const shown = [...habits.active].sort((a, b) => Number(!isDue(a.goal, d.today)) - Number(!isDue(b.goal, d.today)));
 
   const tap = (h: Habit) => {
-    if (h.kind === 'minutes') return setLogging(h);
+    if (press.fired()) return;
+    if (h.kind === 'minutes') return h.quick ? void quickLog(h) : setLogging(h);
     const did = data.answers.get(h.id)?.get(d.today);
     void answer(h, d.today, did === undefined ? true : null);
   };
@@ -50,7 +55,15 @@ export function HabitsRow() {
         {shown.map((h) => {
           const v = cardValue(h, data);
           return (
-            <button key={h.id} role="listitem" className={v.dim ? 'habit-card dim' : 'habit-card'} style={habitStyle(h)} onClick={() => tap(h)} aria-label={`${h.name}: ${v.spoken}`}>
+            <button
+              key={h.id}
+              role="listitem"
+              className={v.dim ? 'habit-card dim' : 'habit-card'}
+              style={habitStyle(h)}
+              onClick={() => tap(h)}
+              {...(h.kind === 'minutes' && h.quick ? press.handlers(h) : {})}
+              aria-label={`${h.name}: ${v.spoken}${h.quick ? `; ${t('habits.spoken.quick', { what: quickText(h.quick) })}` : ''}`}
+            >
               <span className="habit-card-name" aria-hidden>
                 {h.name}
               </span>
@@ -68,6 +81,40 @@ export function HabitsRow() {
       {logging && <HabitActivitySheet habit={logging} day={d.today} onClose={() => setLogging(undefined)} />}
     </div>
   );
+}
+
+const LONG_PRESS_MS = 450;
+
+/**
+ * Long press on a card: after under half a second (before Android's own long-press menu) the action runs and the click that follows is swallowed.
+ * The context menu a long press opens on Android is turned off for these cards only.
+ */
+function useLongPress(action: (h: Habit) => void) {
+  const timer = useRef<number>(undefined);
+  const done = useRef(false);
+  const cancel = () => window.clearTimeout(timer.current);
+  return {
+    handlers: (h: Habit) => ({
+      onPointerDown: () => {
+        done.current = false;
+        cancel();
+        timer.current = window.setTimeout(() => {
+          done.current = true;
+          action(h);
+        }, LONG_PRESS_MS);
+      },
+      onPointerUp: cancel,
+      onPointerLeave: cancel,
+      onPointerCancel: cancel,
+      onContextMenu: (e: { preventDefault: () => void }) => e.preventDefault(),
+    }),
+    /** Whether the click now arriving ends a long press (then it does nothing). */
+    fired: () => {
+      const was = done.current;
+      done.current = false;
+      return was;
+    },
+  };
 }
 
 /** What a card shows: today's mark, or the week's count for a weekly goal, or today's minutes. */

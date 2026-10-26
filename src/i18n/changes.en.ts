@@ -8,6 +8,7 @@
  * scenes and small fixes. A pull request that changes what users see adds its line here in the same PR.
  */
 export const changesEn = {
+  'change.153': 'Minutes habits can log their activity with one tap: set "One tap logs it" (say, a 30-minute walk), tap the Home card after each walk, and long press to change it first.',
   'change.151': 'Settings → Reminders → Ask about yesterday: choose per thing (meals, sleep, activity, water, habits) whether to ask every day, on set weekdays or never. A day left out no longer counts as not logged.',
   'change.150': 'One assistant for logging and patterns: "Include my data" by the message box lets it look at your journal, sleep and past days only when you tick them; Look for patterns opens it ticked, and you can type your own question there too.',
   'change.150.major': 'Look for patterns inside the one assistant',

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Habit, HabitDay } from '../storage/types';
-import { answersByHabit, habitDay, habitRun, habitStart, habitsDaySummary, habitTally, habitWeek, isDue, isoWeekday, openHabitsOn, type HabitActivityLike, type HabitData } from './habits';
+import { answersByHabit, habitDay, habitRun, habitStart, habitsDaySummary, habitTally, habitWeek, isDue, isoWeekday, openHabitsOn, quickActivity, type HabitActivityLike, type HabitData } from './habits';
 
 const key = (day: number) => `2026-10-${String(day).padStart(2, '0')}`;
 const made = (day: number) => new Date(2026, 9, day, 9).getTime();
@@ -182,5 +182,25 @@ describe('fill-in and calendar', () => {
   it('sums up a day', () => {
     const d: HabitData = { ...data([]), answers: answersByHabit([{ habitId: 'h', day: key(25), did: true }, { habitId: 'a', day: key(25), did: true }]) };
     expect(habitsDaySummary([floss, alcohol, stretch, run, old], key(25), d)).toEqual({ kept: 1, missed: 1, open: 1 });
+  });
+});
+
+describe('one tap logs it', () => {
+  it('logs the preset ending now, on the day it started, with the sun only when outside', () => {
+    const now = new Date(2026, 9, 26, 8, 40).getTime();
+    expect(quickActivity({ kind: 'walk', name: ' Commute ', minutes: 30, intensity: 'easy', outside: true, sun: true }, now, 'faceHands')).toEqual({
+      kind: 'walk',
+      name: 'Commute',
+      time: new Date(2026, 9, 26, 8, 10).getTime(),
+      day: '2026-10-26',
+      minutes: 30,
+      intensity: 'easy',
+      outside: true,
+      sunSkin: 'faceHands',
+    });
+    const late = quickActivity({ kind: 'run', minutes: 45, intensity: 'hard', outside: false, sun: true }, new Date(2026, 9, 27, 0, 15).getTime(), 'faceHands');
+    expect(late).toMatchObject({ day: '2026-10-26', outside: false });
+    expect(late).not.toHaveProperty('sunSkin');
+    expect(late).not.toHaveProperty('name');
   });
 });

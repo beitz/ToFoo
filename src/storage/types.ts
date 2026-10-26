@@ -397,6 +397,17 @@ export interface HabitActivity {
  * A habit (docs/SPEC.md, "Habits"): something to do or avoid, answered per day in `habitDays`, or
  * minutes of activity read from the activity log (nothing stored per day then).
  */
+/** The activity one tap logs (owner's ask 2026-10-26: "walk 30 min" to and from work, tapped twice a day). */
+export interface HabitQuickLog {
+  kind: ActivityKind;
+  name?: string;
+  minutes: number;
+  intensity: Intensity;
+  outside: boolean;
+  /** When outside: counts toward the vitamin D sun estimate (face and hands), like the activity sheet's switch. */
+  sun: boolean;
+}
+
 export interface Habit extends Versioned {
   id: string;
   /** Kept short by the user so it fits a Home card. */
@@ -408,6 +419,8 @@ export interface Habit extends Versioned {
   minutes?: number;
   /** Minutes habits: which activities count; empty = any activity. */
   activities?: HabitActivity[];
+  /** Minutes habits with "One tap logs it": a tap on the Home card logs this activity, ending at the tap. */
+  quick?: HabitQuickLog;
   /** Position on Home and the habits page. */
   order: number;
   /** Off Home and out of the questions, history kept. */
