@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { buildFoodDb, groupSearchBoost } from './foodDb';
-import { buildIndex, normalize, search } from './search';
+import { buildIndex, looseSearch, normalize, search } from './search';
 import type { BlsFile } from './blsTypes';
 
 describe('normalize', () => {
@@ -42,5 +42,14 @@ describe.runIf(existsSync(file))('search on BLS', () => {
     const target = plain[10]!;
     const boosted = search(index, 'milk', { limit: 5, recent: new Map([[target.key, 1]]) });
     expect(boosted.findIndex((r) => r.key === target.key)).toBeLessThan(10);
+  });
+
+  it('weighs rare words over common ones when asked', () => {
+    // "goreng" is in two names, "chicken" in hundreds: the dish wins, not a plain chicken food.
+    const loose = (q: string, rare: boolean) => db.byCode.get(looseSearch(index, q, { limit: 1, rare })[0]!.key)!.nameEn;
+    expect(loose('chicken goreng', true)).toMatch(/Goreng/);
+    const ratio = (q: string) => looseSearch(index, q, { limit: 1, rare: true })[0]!.score / looseSearch(index, q, { limit: 1 })[0]!.score;
+    expect(ratio('goreng')).toBeGreaterThan(0.9);
+    expect(ratio('chicken')).toBeLessThan(0.6);
   });
 });

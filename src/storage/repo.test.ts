@@ -116,6 +116,11 @@ describe('repository', () => {
     // The app pairs only products with neither a match nor "label only".
     expect(await repo.setAutoMatches([giotto, goldbaeren].map((p) => ({ id: p.id, match: { version: '4.0', code: 'S610000' } })))).toBe(1);
     expect((await repo.getProduct(giotto.id))!.match).toEqual({ version: '4.0', code: 'S610000', auto: true });
+    // A better pick replaces the app's own unchecked one, never the user's choice.
+    expect(await repo.setAutoMatches([{ id: giotto.id, match: { version: '4.0', code: 'S361000' } }])).toBe(1);
+    await repo.setProductMatch(giotto.id, { match: { version: '4.0', code: 'S610000' } });
+    expect(await repo.setAutoMatches([{ id: giotto.id, match: { version: '4.0', code: 'S361000' } }])).toBe(0);
+    await repo.setProductMatch(giotto.id, { match: { version: '4.0', code: 'S610000', auto: true } });
     await repo.saveProduct({ ...goldbaeren, fetchedAt: 2 });
     expect(await repo.getProduct(goldbaeren.id)).toMatchObject({ labelOnly: true, fetchedAt: 2 });
     // A chosen food replaces "label only".

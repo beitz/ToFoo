@@ -220,7 +220,7 @@ export function DataProvider({ children, fallback }: { children: ReactNode; fall
     const todo = productList.filter((p) => wantsAutoMatch(p) && !triedMatch.current.has(p.id));
     if (!todo.length) return;
     for (const p of todo) triedMatch.current.add(p.id);
-    const picks = autoMatches(todo, searchIndex, foods.version, (key) => groupSearchBoost(key.charAt(0)));
+    const picks = autoMatches(todo, searchIndex, foods, (key) => groupSearchBoost(key.charAt(0)));
     if (picks.length) void repo.setAutoMatches(picks);
   }, [initialised, foods, searchIndex, productList]);
 
