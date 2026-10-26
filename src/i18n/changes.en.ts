@@ -8,6 +8,8 @@
  * scenes and small fixes. A pull request that changes what users see adds its line here in the same PR.
  */
 export const changesEn = {
+  'change.150': 'One assistant for logging and patterns: "Include my data" by the message box lets it look at your journal, sleep and past days only when you tick them; Look for patterns opens it ticked, and you can type your own question there too.',
+  'change.150.major': 'Look for patterns inside the one assistant',
   'change.147': '"What it does" on nutrient pages shows its roles as tiles, where it is found and quick facts (does the body make it, how much is taken up, how much survives boiling). Energy now shows where you are on its steps too.',
   'change.145': 'Every nutrient page has "From too little to too much": each step from almost none to far too much, what it does, how serious and how fast, where it shows, with sources, and where you are.',
   'change.145.major': 'From too little to too much, on every nutrient page',
