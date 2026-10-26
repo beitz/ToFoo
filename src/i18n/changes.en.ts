@@ -8,6 +8,7 @@
  * scenes and small fixes. A pull request that changes what users see adds its line here in the same PR.
  */
 export const changesEn = {
+  'change.155': 'A clearer habit form: activity habits are now the kind "Activity", the activity is picked once, the details of a one-tap activity fold into one line, and the form shows how the Home card will look and what a tap does.',
   'change.154': 'Activities now count in the energy you burn, from the 2024 Compendium of Physical Activities: "+220 kcal" on each activity, pick the exact activity (football, yoga…) from 1,111, and an Energy burned card on the Energy page. Your energy target stays as it is. When your log and weight disagree, the Weight page offers what your weight says you burn, to take over with one tap.',
   'change.154.major': 'Energy burned by activities, corrected by your weight',
   'change.153': 'Minutes habits can log their activity with one tap: set "One tap logs it" (say, a 30-minute walk), tap the Home card after each walk, and long press to change it first.',
