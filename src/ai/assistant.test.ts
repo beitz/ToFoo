@@ -3,7 +3,7 @@ import type * as Beta from '@anthropic-ai/sdk/resources/beta/messages/messages';
 import type { Food } from '../foods/foodDb';
 import { buildIndex } from '../foods/search';
 import { appNote, emptyConversation, requestParams, retirePhotos, sendMessage, textOf, type CreateMessage } from './assistant';
-import { describeFood, validateBatchProposal, validatePortionProposal, MAX_INGREDIENT_GRAMS, MAX_ITEM_GRAMS, runCheckRecipe, runListRecipes, validateRecipeProposal, validateIngredientsProposal, runLookupBarcode, runSearchFoods, runSearchProducts, runSearchUsda, validateJournalProposal, validateProposal, validateSleepProposal, validateActivityProposal, validateWaterProposal, validateKetoneProposal, validateWeightProposal, validateShoppingProposal, validateHomeProposal, type ProductTools, type ToolContext } from './tools';
+import { describeFood, validateBatchProposal, validatePortionProposal, MAX_INGREDIENT_GRAMS, MAX_ITEM_GRAMS, runCheckRecipe, runListRecipes, validateRecipeProposal, validateIngredientsProposal, runLookupBarcode, runSearchFoods, runSearchProducts, runSearchUsda, validateJournalProposal, validateProposal, validateSleepProposal, validateActivityProposal, validateWaterProposal, validateKetoneProposal, validateWeightProposal, validateHabitsProposal, validateShoppingProposal, validateHomeProposal, type ProductTools, type ToolContext } from './tools';
 import type { Product } from '../storage/types';
 import type { FindResult } from '../foods/findProduct';
 
@@ -713,6 +713,69 @@ describe('weight', () => {
     expect(validateWeightProposal({ kg: 80, day: '2026-10-24', replaces: '' }, now)).toMatchObject({ ok: false });
     expect(validateWeightProposal({ kg: 80, day: '23.10.2026', replaces: '' }, now)).toMatchObject({ ok: false });
     expect(validateWeightProposal({ kg: 80, day: '2026-10-23', replaces: 'G1' }, now)).toEqual({ ok: true, proposal: { kg: 80, day: '2026-10-23', replaces: 'G1' } });
+  });
+});
+
+describe('habits', () => {
+  const now = new Date(2026, 9, 26, 9, 0).getTime();
+  const habits = [
+    { id: 'h1', name: 'Floss', kind: 'do' as const },
+    { id: 'h2', name: 'Alcohol', kind: 'avoid' as const },
+    { id: 'h3', name: 'Exercise', kind: 'minutes' as const },
+  ];
+
+  it('offers propose_habits only with habits, not strict, never in the recipe editor', () => {
+    const tool = (sources: Parameters<typeof requestParams>[2]) => (requestParams('claude-opus-5-5', [], sources).tools ?? []).find((t) => 'name' in t && t.name === 'propose_habits') as { strict?: boolean } | undefined;
+    expect(tool({})).toBeUndefined();
+    expect(tool({ habits: true, recipe: true })).toBeUndefined();
+    expect(tool({ habits: true })!.strict).toBeUndefined();
+    expect(String(requestParams('claude-opus-5-5', [], { habits: true }).system)).toContain('not answered is not "no"');
+  });
+
+  it('shows one habit card with the answers', async () => {
+    const api = scripted(reply([toolUse('t', 'propose_habits', { answers: [{ habit: 'floss', day: '', did: true }, { habit: 'Alcohol', day: '2026-10-25', did: false }], replaces: '' })], 'tool_use'));
+    const { conversation, outcome } = await sendMessage(api.create, 'claude-opus-5-5', emptyConversation(), { text: 'flossed, no alcohol yesterday', images: [] }, { ...ctx, now, habits });
+    expect(outcome.kind === 'proposal' && outcome.habits).toEqual([
+      {
+        id: 'T1',
+        answers: [
+          { habitId: 'h1', name: 'Floss', day: '2026-10-26', did: true },
+          { habitId: 'h2', name: 'Alcohol', day: '2026-10-25', did: false },
+        ],
+      },
+    ]);
+    expect(conversation.habits).toBe(1);
+  });
+
+  it('checks the answers: known do or avoid habits, days not in the future, each once', () => {
+    expect(validateHabitsProposal({ answers: [{ habit: 'Stretch', day: '', did: true }], replaces: '' }, habits, now)).toMatchObject({ ok: false, error: expect.stringContaining('"Floss", "Alcohol"') });
+    expect(validateHabitsProposal({ answers: [{ habit: 'Exercise', day: '', did: true }], replaces: '' }, habits, now)).toMatchObject({ ok: false, error: expect.stringContaining('propose_activity') });
+    expect(validateHabitsProposal({ answers: [{ habit: 'Floss', day: '2026-10-27', did: true }], replaces: '' }, habits, now)).toMatchObject({ ok: false });
+    expect(validateHabitsProposal({ answers: [{ habit: 'Floss', day: '26.10.2026', did: true }], replaces: '' }, habits, now)).toMatchObject({ ok: false });
+    expect(validateHabitsProposal({ answers: [], replaces: '' }, habits, now)).toMatchObject({ ok: false });
+    expect(
+      validateHabitsProposal(
+        {
+          answers: [
+            { habit: 'Floss', day: '', did: true },
+            { habit: 'Floss', day: '2026-10-26', did: false },
+          ],
+          replaces: '',
+        },
+        habits,
+        now,
+      ),
+    ).toMatchObject({ ok: false, error: expect.stringContaining('twice') });
+    expect(validateHabitsProposal({ answers: [{ habit: 'Floss', day: '2026-10-25', did: false }], replaces: 'T1' }, habits, now)).toEqual({
+      ok: true,
+      proposal: { answers: [{ habitId: 'h1', name: 'Floss', day: '2026-10-25', did: false }], replaces: 'T1' },
+    });
+  });
+
+  it("lists the habits in the app's note", () => {
+    expect(appNote({ now, day: '2026-10-26', today: '2026-10-26', logged: [], open: [], barcodes: [], habits })).toContain(
+      'The user\'s habits: "Floss" (do), "Alcohol" (avoid), "Exercise" (minutes of activity, from the activity log).',
+    );
   });
 });
 
