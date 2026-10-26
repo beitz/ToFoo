@@ -3766,6 +3766,9 @@ button.week-row:focus-visible {
 .pantry-hint {
   margin-top: 1.5rem;
 }
+.pantry-not-listed {
+  margin: -2px 0 8px;
+}
 .pantry-food {
   gap: 8px;
   min-height: 44px;

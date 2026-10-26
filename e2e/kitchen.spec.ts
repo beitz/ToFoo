@@ -78,3 +78,43 @@ test('a scanned spice jar is counted in exact grams', async ({ page }) => {
   await expect(row).toContainText('8.5 g');
   expect(errors).toEqual([]);
 });
+
+// Bay leaves are not in the BLS (owner's search for "Lorbeerblatt", 2026-10-26); Open Food Facts has jars of them.
+const BAY = {
+  code: '4002674102215',
+  status: 'success',
+  product: {
+    code: '4002674102215',
+    product_name: 'Lorbeerblätter',
+    brands: 'Ostmann',
+    quantity: '5 g',
+    categories_tags_en: ['Condiments', 'Spices', 'Bay leaves'],
+    nutriments: { 'energy-kcal_100g': 313, fat_100g: 8.4, carbohydrates_100g: 48.7, proteins_100g: 7.6, salt_100g: 0.06 },
+    last_modified_t: 1787068844,
+  },
+};
+
+test('a spice missing from the food database is found as a product, or kept by its name', async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.route('https://world.openfoodfacts.org/api/v3/product/**', (route) => route.fulfill({ json: BAY }));
+  await firstLaunch(page);
+
+  // Without Open Food Facts: nothing matches, the app says the name works on its own, and it goes with the spices.
+  await page.goto('./#/kitchen');
+  const add = page.getByPlaceholder('Add what you bought');
+  await add.fill('Wacholderbeeren');
+  await expect(page.getByText(/Not in the food lists/)).toBeVisible();
+  await page.getByRole('button', { name: 'Add', exact: true }).click();
+  const main = page.locator('main');
+  await expect(main.locator('.home-row', { hasText: 'Wacholderbeeren' })).toBeVisible();
+
+  // With it: the bundled product list offers the jar, and picking it counts the jar's grams.
+  await page.goto('./#/settings');
+  await page.getByText('Food sources').click();
+  await page.getByRole('switch', { name: /^Open Food Facts lookup/ }).click();
+  await page.goto('./#/kitchen');
+  await add.fill('Lorbeerblatt');
+  await page.getByRole('button', { name: /^Lorbeerblätter.*Ostmann/ }).click();
+  await expect(main.locator('.home-row', { hasText: 'Lorbeerblätter' })).toContainText('5 g');
+  expect(errors).toEqual([]);
+});

@@ -131,6 +131,13 @@ describe('where things are kept', () => {
     expect(placeFromWords('vanilla yogurt')).toBeUndefined();
   });
 
+  it('knows spices the food database lacks (owner typed "Lorbeerblatt", 2026-10-26)', () => {
+    for (const name of ['Lorbeerblatt', 'Lorbeerblätter', 'bay leaves', 'Bay leaf', 'Wacholderbeeren', 'Piment', 'Sternanis', 'Gewürznelken', 'juniper', 'saffron']) {
+      expect(placeFromWords(name), name).toBe('spices');
+    }
+    expect(placeFromWords('lettuce leaves')).toBeUndefined();
+  });
+
   it('then the food it is, common shopping words, and the database', () => {
     expect(guessPlace('Giotto', 'S100000', () => [])).toBe('cupboard');
     expect(guessPlace('Eggs', undefined, () => [])).toBe('fridge');

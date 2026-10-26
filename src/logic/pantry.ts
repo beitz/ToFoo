@@ -163,7 +163,7 @@ export function fromShopping(line: Pick<ShoppingItem, 'name' | 'ref' | 'grams' |
 // Words that tell where something is kept, in English and German, before its food group does.
 const FREEZER_WORDS = new Set(['frozen', 'tk', 'tiefkuhl', 'tiefgekuhlt', 'tiefgefroren', 'gefroren', 'eis', 'speiseeis', 'icecream']);
 const SPICE_WORDS = new Set(
-  'spice spices pepper salt cumin cinnamon oregano thyme rosemary nutmeg turmeric cardamom cloves vanilla marjoram caraway coriander chili chilli powder seasoning gewurz gewurze pfeffer salz zimt kreuzkummel kummel kurkuma muskat muskatnuss thymian rosmarin majoran lorbeer lorbeerblatter nelken kardamom vanille pulver'.split(' '),
+  'spice spices pepper salt cumin cinnamon oregano thyme rosemary nutmeg turmeric cardamom cloves vanilla marjoram caraway coriander chili chilli powder seasoning juniper allspice saffron anise fenugreek gewurz gewurze pfeffer salz zimt kreuzkummel kummel kurkuma muskat muskatnuss thymian rosmarin majoran lorbeer lorbeerblatt lorbeerblatter nelken nelke gewurznelken kardamom vanille pulver wacholder wacholderbeeren piment sternanis anis safran bockshornklee'.split(' '),
 );
 
 /**
@@ -177,6 +177,7 @@ export function placeFromWords(name: string): HomePlace | undefined {
   const last = words[words.length - 1] ?? '';
   // Peppers that are vegetables.
   if (last === 'pepper' && ['bell', 'sweet', 'red', 'green', 'yellow'].includes(words[words.length - 2] ?? '')) return undefined;
+  if ((last === 'leaf' || last === 'leaves') && words[words.length - 2] === 'bay') return 'spices';
   if (SPICE_WORDS.has(last) || last.endsWith('pulver') || last.endsWith('gewurz')) return 'spices';
   return undefined;
 }
