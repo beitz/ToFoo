@@ -294,12 +294,22 @@ export interface Product extends Versioned, ProductData {
   source: ProductSource;
   /** USDA only: which FoodData Central data type the food comes from. */
   usdaType?: UsdaDataType;
-  /** `auto`: picked by the app (src/foods/productMatch.ts), not checked by the user yet. */
-  match?: { version: string; code: string; auto?: true };
+  /**
+   * `auto`: picked by the app (src/foods/productMatch.ts), not checked by the user yet. `parts`: a
+   * ready meal built from its ingredient list, BLS foods by percent of the product; `code` is then
+   * the biggest part, so code that knows only one similar food still has a sensible one.
+   */
+  match?: { version: string; code: string; auto?: true; parts?: MixPart[] };
   /** The user chose no similar food: only the source's own values count. */
   labelOnly?: true;
   /** When the label values were fetched (epoch ms). */
   fetchedAt: number;
+}
+
+/** One BLS food of a product built from its ingredients, as percent of the product. */
+export interface MixPart {
+  code: string;
+  share: number;
 }
 
 /** Saved manual items and supplements. Nutrient amounts per serving. */

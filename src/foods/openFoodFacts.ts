@@ -34,6 +34,21 @@ export interface ProductData {
   categories: string[];
   /** When the product was last edited on Open Food Facts (epoch ms). */
   lastModified?: number;
+  /** The ingredient list, top level, in label order (for building a ready meal from BLS foods); absent if fetched before 2026-10-26. */
+  ingredients?: ProductIngredient[];
+}
+
+/**
+ * One ingredient as Open Food Facts reads the list: its taxonomy id ("en:rice"; unknown words keep
+ * their language, "de:gegart"), the text as printed, and its share of the product in percent: the
+ * label's own figure (`declared`), else Open Food Facts' estimate from the list's order and the
+ * declared ones.
+ */
+export interface ProductIngredient {
+  id: string;
+  text: string;
+  percent: number;
+  declared?: true;
 }
 
 /**
@@ -115,6 +130,7 @@ export const FIELDS = [
   'product_quantity_unit',
   'categories_tags_en',
   'last_modified_t',
+  'ingredients',
 ].join(',');
 
 /** Digits only; null if it cannot be a barcode. GTIN lengths (8, 12, 13, 14) must have a valid check digit. */
@@ -161,6 +177,21 @@ export function parseNutriments(nutriments: unknown): Record<string, number> {
   return out;
 }
 
+/** The top level of Open Food Facts' parsed ingredient list; an empty list when the product has none. */
+export function parseIngredients(raw: unknown): ProductIngredient[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.flatMap((r): ProductIngredient[] => {
+    const i = (r ?? {}) as Record<string, unknown>;
+    const id = str(i.id);
+    // Allergens are marked _like this_ in the list.
+    const text = str(i.text)?.replace(/_/g, '').trim();
+    const declared = num(i.percent);
+    const percent = declared ?? num(i.percent_estimate);
+    if (!id || !text || percent === undefined || !(percent >= 0) || percent > 100) return [];
+    return [{ id, text, percent, ...(declared !== undefined ? { declared: true as const } : {}) }];
+  });
+}
+
 /** Turn an Open Food Facts product object into ProductData; null if it has no usable name. */
 export function parseProduct(raw: unknown, fallbackCode = ''): ProductData | null {
   const p = (raw ?? {}) as Record<string, unknown>;
@@ -187,6 +218,7 @@ export function parseProduct(raw: unknown, fallbackCode = ''): ProductData | nul
     ...(str(p.product_quantity_unit)?.toLowerCase() === 'ml' || str(p.nutrition_data_per) === '100ml' ? { perMl: true } : {}),
     categories,
     ...(lastModified ? { lastModified: lastModified * 1000 } : {}),
+    ingredients: parseIngredients(p.ingredients),
   };
 }
 

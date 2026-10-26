@@ -4,13 +4,15 @@ import { href } from '../../app/router';
 import { useToast } from '../../app/toast';
 import { t } from '../../i18n';
 import type { Food } from '../../foods/foodDb';
-import { hasOwnMicros, labelValues, productLabel, productPageUrl } from '../../foods/products';
-import { initialChoice, rankMatches, withChoice, type MatchChoice } from '../../foods/productMatch';
+import { findProduct } from '../../foods/findProduct';
+import { hasOwnMicros, labelValues, mixedFood, productLabel, productPageUrl } from '../../foods/products';
+import { ingredientMix, initialChoice, mixDetail, rankMatches, wantsAutoMatch, withChoice, type MatchChoice } from '../../foods/productMatch';
 import { search } from '../../foods/search';
 import { fmtAmount, fmtNumber } from '../../lib/format';
 import { NUTRIENT_BY_ID } from '../../model/nutrients';
 import { repo } from '../../storage/repo';
-import type { Product } from '../../storage/types';
+import type { MixPart, Product } from '../../storage/types';
+import { isOn } from '../../settings/features';
 import { Icon } from '../../ui/Icon';
 
 /** Label nutrients shown first, in label order; the rest are counted. */
@@ -18,6 +20,8 @@ const LABEL_ORDER = ['ENERCC', 'FAT', 'FASAT', 'CHO', 'SUGAR', 'FIBT', 'PROT625'
 /** Labels give salt in g; BLS tracks sodium in mg (salt = sodium × 2.5). */
 const SALT_G_PER_SODIUM_MG = 2.5 / 1000;
 const SUGGESTIONS = 6;
+/** A ready meal's biggest parts shown before "All n". */
+const MIX_ROWS = 4;
 
 /** Brand, pack size, a link to the source page, and the label (or USDA) values. */
 export function ProductInfo({ product }: { product: Product }) {
@@ -50,7 +54,7 @@ export function ProductInfo({ product }: { product: Product }) {
   );
 }
 
-/** Choose the BLS food whose vitamins and minerals stand in for what the label (or USDA) lacks. */
+/** Choose the BLS food whose vitamins and minerals stand in for what the label (or USDA) lacks, or a ready meal's ingredients. */
 export function MatchPicker({ product, choice, onChange, linked }: { product: Product; choice: MatchChoice; onChange: (c: MatchChoice) => void; linked?: boolean }) {
   const d = useData();
   // USDA generic foods have their own vitamins and minerals, so the picker starts closed.
@@ -66,6 +70,12 @@ export function MatchPicker({ product, choice, onChange, linked }: { product: Pr
           .map((r) => r.key);
     return keys.map((k) => d.foods.byCode.get(k)).filter((f): f is Food => !!f);
   }, [query, product, d.searchIndex, d.searchBoost, d.foods]);
+  const mix = useMemo(() => ingredientMix(product, d.foods), [product, d.foods]);
+  const pick = (c: MatchChoice) => {
+    onChange(c);
+    setOpen(false);
+    setQuery('');
+  };
 
   return (
     <div className="field match-picker">
@@ -73,7 +83,13 @@ export function MatchPicker({ product, choice, onChange, linked }: { product: Pr
       <div className="row-between">
         <span>
           {match ? (
-            linked ? <a href={href('food', match.code)}>{match.nameEn}</a> : match.nameEn
+            choice.parts ? (
+              t('match.mixName', { n: choice.parts.length })
+            ) : linked ? (
+              <a href={href('food', match.code)}>{match.nameEn}</a>
+            ) : (
+              match.nameEn
+            )
           ) : (
             <span className="muted">{t(!choice.auto ? 'match.labelOnly' : own ? 'usda.matchNone' : 'match.noneFound')}</span>
           )}
@@ -84,15 +100,17 @@ export function MatchPicker({ product, choice, onChange, linked }: { product: Pr
           </button>
         )}
       </div>
+      {choice.parts && <MixList product={product} parts={choice.parts} linked={linked} />}
       {match && choice.auto && !open && (
         <div className="row-between match-auto">
           <span className="muted small">{t('match.auto')}</span>
-          <button className="btn btn-small btn-secondary" onClick={() => onChange({ food: match, auto: false })}>
+          <button className="btn btn-small btn-secondary" onClick={() => onChange({ ...choice, auto: false })}>
             {t('match.confirm')}
           </button>
         </div>
       )}
-      <div className="field-hint">{t(own ? 'usda.matchHint' : 'off.matchHint')}</div>
+      <div className="field-hint">{t(choice.parts ? 'match.mixHint' : own ? 'usda.matchHint' : 'off.matchHint')}</div>
+      {linked && product.source === 'OFF' && product.ingredients === undefined && !choice.parts && <FetchIngredients product={product} />}
       {open && (
         <>
           <div className="search-box">
@@ -101,16 +119,23 @@ export function MatchPicker({ product, choice, onChange, linked }: { product: Pr
           </div>
           {!query.trim() && options.length > 0 && <p className="muted small">{t(product.source === 'USDA' ? 'usda.matchSuggested' : 'off.matchSuggested')}</p>}
           <ul className="result-list">
-            {options.map((f) => (
-              <li key={f.code}>
+            {!query.trim() && mix && (
+              <li>
                 <button
-                  className={`result${match?.code === f.code ? ' on' : ''}`}
+                  className={`result${choice.parts ? ' on' : ''}`}
                   onClick={() => {
-                    onChange({ food: f, auto: false });
-                    setOpen(false);
-                    setQuery('');
+                    const food = d.foods.byCode.get(mix[0]!.code);
+                    if (food) pick({ food, parts: mix, auto: false });
                   }}
                 >
+                  <span className="result-name">{t('match.mixOption', { n: mix.length })}</span>
+                  <span className="muted small">{mix.slice(0, 3).map((p) => d.foods.byCode.get(p.code)?.nameEn).join(', ')}…</span>
+                </button>
+              </li>
+            )}
+            {options.map((f) => (
+              <li key={f.code}>
+                <button className={`result${match?.code === f.code && !choice.parts ? ' on' : ''}`} onClick={() => pick({ food: f, auto: false })}>
                   <span className="result-name">{f.nameEn}</span>
                   <span className="muted small">
                     {f.nameDe} · {d.foods.groups[f.group]?.en}
@@ -130,6 +155,82 @@ export function MatchPicker({ product, choice, onChange, linked }: { product: Pr
           </button>
         </>
       )}
+    </div>
+  );
+}
+
+/** A ready meal's BLS foods with their share and the ingredients they stand for, what was left out, and how its energy compares with the label. */
+function MixList({ product, parts, linked }: { product: Product; parts: MixPart[]; linked?: boolean }) {
+  const d = useData();
+  const [all, setAll] = useState(false);
+  const { rows, leftOut } = mixDetail(product, parts);
+  const shown = all ? rows : rows.slice(0, MIX_ROWS);
+  const mix = mixedFood(parts, d.foods);
+  const kcal = mix?.per100.ENERCC;
+  const label = labelValues(product).ENERCC;
+  return (
+    <div className="mix-list">
+      <p className="small muted">{t('match.mixTitle')}</p>
+      <ul className="small">
+        {shown.map((r) => {
+          const name = d.foods.byCode.get(r.code)?.nameEn ?? r.code;
+          return (
+            <li key={r.code}>
+              <span className="mix-share">{fmtNumber(r.share, r.share < 10 ? 1 : 0)} %</span>
+              <span>
+                {linked ? <a href={href('food', r.code)}>{name}</a> : name}
+                {r.texts.length > 0 && <span className="muted"> · {r.texts.join(', ')}</span>}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+      {rows.length > MIX_ROWS && (
+        <button className="btn btn-small btn-ghost" onClick={() => setAll(!all)} aria-expanded={all}>
+          {all ? t('match.mixFewer') : t('match.mixAll', { n: rows.length })}
+        </button>
+      )}
+      {all && leftOut.texts.length > 0 && <p className="small muted">{t('match.mixLeftOut', { pct: `${fmtNumber(leftOut.percent, 0)} %`, names: leftOut.texts.join(', ') })}</p>}
+      {typeof kcal === 'number' && label !== undefined && <p className="small muted">{t('match.mixEnergy', { mix: fmtNumber(kcal, 0), label: fmtNumber(label, 0) })}</p>}
+    </div>
+  );
+}
+
+/**
+ * Products saved before ingredient lists were kept: one tap asks Open Food Facts for it (only with
+ * the lookup on), then the app's own unchecked pick becomes the mix when one fits.
+ */
+function FetchIngredients({ product }: { product: Product }) {
+  const d = useData();
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState('');
+  if (!isOn(d.settings.features, 'openFoodFacts')) return null;
+  async function fetchList() {
+    setBusy(true);
+    setNote('');
+    const r = await findProduct(product.code, { refresh: true });
+    setBusy(false);
+    if (r.kind !== 'found') {
+      setNote(r.kind === 'error' ? r.detail : t('match.fetchNone'));
+      return;
+    }
+    // Saving keeps the pairing; the label values come fresh, as when a product is logged again.
+    const saved = await repo.saveProduct(r.product);
+    const parts = ingredientMix(saved, d.foods);
+    if (!saved.ingredients?.length) setNote(t('match.fetchNone'));
+    else if (!parts) setNote(t('match.fetchNoMix'));
+    else if (wantsAutoMatch(saved)) {
+      await repo.setAutoMatches([{ id: saved.id, match: { version: d.foods.version, code: parts[0]!.code, parts } }]);
+      toast(t('match.saved', { name: productLabel(saved), food: t('match.mixName', { n: parts.length }) }));
+    } else toast(t('match.fetchChoose'));
+  }
+  return (
+    <div className="mix-fetch">
+      <button className="btn btn-small btn-secondary" disabled={busy} onClick={() => void fetchList()}>
+        {t('match.fetchIngredients')}
+      </button>
+      <p className="small muted">{note || t('match.fetchIngredientsHint')}</p>
     </div>
   );
 }
@@ -161,12 +262,13 @@ export function SavedMatchPicker({ product }: { product: Product }) {
   const d = useData();
   const toast = useToast();
   const food = product.match ? d.foods.byCode.get(product.match.code) : undefined;
-  const choice: MatchChoice = food ? { food, auto: !!product.match?.auto } : { auto: !product.labelOnly };
+  const choice: MatchChoice = food ? { food, ...(product.match?.parts ? { parts: product.match.parts } : {}), auto: !!product.match?.auto } : { auto: !product.labelOnly };
   async function change(c: MatchChoice) {
     const before: Pick<Product, 'match' | 'labelOnly'> = { ...(product.match ? { match: product.match } : {}), ...(product.labelOnly ? { labelOnly: true as const } : {}) };
     await repo.setProductMatch(product.id, withChoice(product, c, d.foods.version));
     const name = productLabel(product);
-    toast(c.food ? t('match.saved', { name, food: c.food.nameEn }) : t('match.savedNone', { name }), () => repo.setProductMatch(product.id, before));
+    const what = c.parts ? t('match.mixName', { n: c.parts.length }) : c.food?.nameEn;
+    toast(what ? t('match.saved', { name, food: what }) : t('match.savedNone', { name }), () => repo.setProductMatch(product.id, before));
   }
   return <MatchPicker key={product.id} product={product} choice={choice} onChange={(c) => void change(c)} linked />;
 }

@@ -13,7 +13,7 @@
  */
 import { DERIVED } from '../model/nutrients';
 import type { RawValue } from '../model/types';
-import type { FoodRef, Product, ProductSource } from '../storage/types';
+import type { FoodRef, MixPart, Product, ProductSource } from '../storage/types';
 import { COFID_PROVENANCE } from './blsTypes';
 import { sumDerived, type Food, type FoodDb } from './foodDb';
 import { isUndeclaredZero, productUrl } from './openFoodFacts';
@@ -96,6 +96,37 @@ function scaleToLabel(per100: Record<string, RawValue>, label: Record<string, nu
   }
 }
 
+/**
+ * A ready meal's BLS foods mixed by their share of it, per 100 g: what the ingredient list says it
+ * is made of. A value missing in any part is missing in the mix (missing is not zero); traces count
+ * as none. The biggest part's group stands for the whole (it drives the iron estimates).
+ */
+export function mixedFood(parts: readonly MixPart[], foods: Pick<FoodDb, 'byCode'>): Food | undefined {
+  const found = parts.flatMap((p) => {
+    const food = foods.byCode.get(p.code);
+    return food ? [{ food, share: p.share }] : [];
+  });
+  const total = found.reduce((a, p) => a + p.share, 0);
+  if (!found.length || total <= 0) return undefined;
+  const per100: Record<string, RawValue> = {};
+  const provenance: Record<string, string> = {};
+  for (const id of new Set(found.flatMap((p) => Object.keys(p.food.per100)))) {
+    let sum: number | null = 0;
+    for (const { food, share } of found) {
+      const v = food.per100[id];
+      if (v === null || v === undefined) {
+        sum = null;
+        break;
+      }
+      sum += ((v === 't' ? 0 : v) * share) / total;
+    }
+    per100[id] = sum;
+    provenance[id] = sum === null ? '-' : found.some((p) => p.food.provenance[id] === COFID_PROVENANCE) ? COFID_PROVENANCE : BORROWED_PROVENANCE;
+  }
+  const biggest = found.reduce((a, b) => (b.share > a.share ? b : a));
+  return { code: biggest.food.code, nameEn: biggest.food.nameEn, nameDe: biggest.food.nameDe, group: biggest.food.group, per100, provenance };
+}
+
 // Stable objects per product record and food list, so the model's per-food caches keep working.
 const cache = new WeakMap<Product, { foods: Pick<FoodDb, 'byCode'>; food: Food }>();
 
@@ -103,7 +134,7 @@ const cache = new WeakMap<Product, { foods: Pick<FoodDb, 'byCode'>; food: Food }
 export function productFood(product: Product, foods: Pick<FoodDb, 'byCode'>): Food {
   const hit = cache.get(product);
   if (hit && hit.foods === foods) return hit.food;
-  const match = product.match ? foods.byCode.get(product.match.code) : undefined;
+  const match = product.match?.parts ? mixedFood(product.match.parts, foods) : product.match ? foods.byCode.get(product.match.code) : undefined;
   const per100: Record<string, RawValue> = {};
   const provenance: Record<string, string> = {};
   if (match) {

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Product } from '../storage/types';
 import type { BlsFile } from './blsTypes';
 import { buildFoodDb } from './foodDb';
-import { foodSourceKind, labelValues, needsCheck, productFood, productLabel } from './products';
+import { foodSourceKind, labelValues, mixedFood, needsCheck, productFood, productLabel } from './products';
 import { resolveEntry, type ResolveContext } from '../logic/resolve';
 
 const bls: BlsFile = {
@@ -74,6 +74,28 @@ describe('products as foods', () => {
     expect(g.per100.LYS).toBeCloseTo(0.4);
     expect(g.per100.SAA).toBeCloseTo(0.15);
     expect(productFood({ ...meal, per100: { FAT: 0 }, match: { version: '4.0', code: 'Z000000' } }, fatDb).per100['F18:2CN6']).toBe(0);
+  });
+
+  it('mixes the BLS foods of a ready meal by share, missing in any part stays missing', () => {
+    const mixDb = buildFoodDb({
+      ...bls,
+      foods: [
+        ['C352032', 'Reis', 'White rice boiled', [117, 0.3, 10, null, 4], 'AAAAC'],
+        ['V416100', 'Huhn', 'Chicken breast fillet, raw', [109, 1, 30, 0.3, 't'], 'AAAAC'],
+      ],
+    });
+    const f = mixedFood([{ code: 'C352032', share: 75 }, { code: 'V416100', share: 25 }], mixDb)!;
+    expect(f.per100.ENERCC).toBeCloseTo(0.75 * 117 + 0.25 * 109);
+    expect(f.per100.MG).toBeCloseTo(0.75 * 10 + 0.25 * 30);
+    expect(f.per100.VITB12).toBeNull();
+    expect(f.per100.SE).toBeCloseTo(3);
+    expect(f.provenance).toMatchObject({ MG: 'U', VITB12: '-', SE: 'C' });
+    expect(f.group).toBe('C');
+    // As a product: label values win, the rest comes from the mix.
+    const meal = productFood({ ...giotto, per100: { ENERCC: 144, FAT: 7.1 }, match: { version: '4.0', code: 'C352032', parts: [{ code: 'C352032', share: 75 }, { code: 'V416100', share: 25 }] } }, mixDb);
+    expect(meal.per100).toMatchObject({ ENERCC: 144, FAT: 7.1 });
+    expect(meal.per100.MG).toBeCloseTo(15);
+    expect(mixedFood([{ code: 'nope', share: 100 }], mixDb)).toBeUndefined();
   });
 
   it('reads zeros saved from Open Food Facts for vitamins and minerals as not on the label', () => {

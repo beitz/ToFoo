@@ -210,10 +210,30 @@ export const productSchema = z
     perMl: z.boolean().optional(),
     categories: z.array(z.string()),
     lastModified: z.number().optional(),
-    match: z
-      .object({ version: z.string(), code: blsRef.shape.code, auto: z.literal(true).optional().describe('Picked by the app, not checked by the user yet') })
+    ingredients: z
+      .array(
+        z.object({
+          id: z.string().describe('Open Food Facts ingredient taxonomy id, e.g. "en:rice"'),
+          text: z.string().describe('As printed on the label'),
+          percent: z.number().min(0).max(100).describe('Share of the product: the label\'s own figure, else Open Food Facts\' estimate'),
+          declared: z.literal(true).optional().describe('The percent is printed on the label'),
+        }),
+      )
       .optional()
-      .describe('BLS food that supplies the nutrients the source lacks'),
+      .describe('Open Food Facts only: the ingredient list, top level, in label order; empty when it has none, absent when fetched before it was kept'),
+    match: z
+      .object({
+        version: z.string(),
+        code: blsRef.shape.code.describe('The similar BLS food; with parts, the biggest of them'),
+        auto: z.literal(true).optional().describe('Picked by the app, not checked by the user yet'),
+        parts: z
+          .array(z.object({ code: blsRef.shape.code, share: z.number().positive().max(100).describe('Percent of the product') }))
+          .min(1)
+          .optional()
+          .describe('A ready meal built from its ingredient list: BLS foods by share, mixed per 100 g, instead of one similar food'),
+      })
+      .optional()
+      .describe('BLS food (or foods) that supplies the nutrients the source lacks'),
     labelOnly: z.literal(true).optional().describe('The user chose no similar food: only the values from the source count'),
     fetchedAt: z.number(),
   })

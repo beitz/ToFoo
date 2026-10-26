@@ -5,9 +5,10 @@
  * plus "Bio Haferflocken" lands on Oat flakes rather than on sweetened cereal flakes.
  */
 import type { RawValue } from '../model/types';
-import type { Product } from '../storage/types';
+import type { MixPart, Product } from '../storage/types';
 import type { Food, FoodDb } from './foodDb';
-import { hasOwnMicros } from './products';
+import { ingredientFoods } from './ingredientFoods';
+import { hasOwnMicros, mixedFood } from './products';
 import { looseSearch, normalize, type SearchIndex } from './search';
 
 /** Words that say nothing about which food it is. */
@@ -110,6 +111,86 @@ export function bestMatch(product: MatchInput, index: SearchIndex, foods: Pick<F
   return top && top.score >= MIN_SCORE ? top.key : undefined;
 }
 
+/** Share of the ingredient list (by weight) the mix must know, so the unknown rest stays small. */
+const MIX_COVERED = 0.7;
+
+/**
+ * A product built from its ingredient list: each ingredient Open Food Facts recognised and
+ * src/foods/ingredientFoods.ts knows becomes its BLS food at its share of the pack, the shares of
+ * the known ones scaled up to 100 %. Rice, pasta and pulses come raw or cooked, whichever brings the
+ * mix's energy closer to the label (biggest first): "Reis 42 %" in a meal with 144 kcal is cooked
+ * rice. Undefined when less than 70 % of the list is known, or the mix's fat, protein and
+ * carbohydrate do not fit the label.
+ */
+export function ingredientMix(product: Pick<Product, 'ingredients' | 'per100'>, foods: Pick<FoodDb, 'byCode'>): MixPart[] | undefined {
+  const list = (product.ingredients ?? []).filter((i) => i.percent > 0);
+  const all = list.reduce((a, i) => a + i.percent, 0);
+  const known = list.flatMap((i) => {
+    const pair = ingredientFoods(i.id);
+    return pair && pair.every((c) => foods.byCode.has(c)) ? [{ pair, percent: i.percent, cooked: false }] : [];
+  });
+  const sum = known.reduce((a, i) => a + i.percent, 0);
+  if (!all || sum / all < MIX_COVERED) return undefined;
+  const kcal = (code: string) => amount(foods.byCode.get(code)!.per100.ENERCC) ?? 0;
+  const energy = () => known.reduce((a, i) => a + (kcal(i.pair[i.cooked ? 1 : 0]) * i.percent) / sum, 0);
+  const target = product.per100.ENERCC;
+  for (const i of [...known].sort((a, b) => b.percent - a.percent)) {
+    if (i.pair[0] === i.pair[1]) continue;
+    if (target === undefined) {
+      // Without the label's energy, a ready meal is eaten as sold: cooked.
+      i.cooked = true;
+      continue;
+    }
+    const before = Math.abs(energy() - target);
+    i.cooked = true;
+    if (Math.abs(energy() - target) >= before) i.cooked = false;
+  }
+  const byCode = new Map<string, number>();
+  for (const i of known) {
+    const code = i.pair[i.cooked ? 1 : 0];
+    byCode.set(code, (byCode.get(code) ?? 0) + (i.percent / sum) * 100);
+  }
+  const parts = [...byCode].map(([code, share]) => ({ code, share: Math.round(share * 10) / 10 })).filter((p) => p.share > 0);
+  parts.sort((a, b) => b.share - a.share);
+  const mix = mixedFood(parts, foods);
+  return mix && macroSimilarity(product.per100, mix.per100) >= FIT ? parts : undefined;
+}
+
+/** For showing a mix: each part with the ingredients it stands for, and what the mix left out (as percent of the list). */
+export function mixDetail(
+  product: Pick<Product, 'ingredients'>,
+  parts: readonly MixPart[],
+): { rows: Array<MixPart & { texts: string[] }>; leftOut: { texts: string[]; percent: number } } {
+  const list = product.ingredients ?? [];
+  const all = list.reduce((a, i) => a + i.percent, 0);
+  const rows = parts.map((p) => ({ ...p, texts: list.filter((i) => ingredientFoods(i.id)?.includes(p.code)).map((i) => i.text) }));
+  const out = list.filter((i) => !ingredientFoods(i.id));
+  const percent = all ? (out.reduce((a, i) => a + i.percent, 0) / all) * 100 : 0;
+  return { rows, leftOut: { texts: out.map((i) => i.text), percent } };
+}
+
+/** A pairing as the app works it out: one similar food, or a ready meal's BLS foods by share (`code` = the biggest). */
+export type Pairing = { code: string; parts?: MixPart[] };
+
+/**
+ * What the app pairs a product with by itself: the mix from its ingredient list for a dish (or
+ * when no single food fits as well), else the best single food; undefined when neither fits.
+ */
+export function bestPairing(product: MatchInput & Pick<Product, 'ingredients'>, index: SearchIndex, foods: Pick<FoodDb, 'byCode'>, boost?: (key: string) => number): Pairing | undefined {
+  const code = bestMatch(product, index, foods, boost);
+  const label = product.per100;
+  const parts = label ? ingredientMix({ ingredients: product.ingredients, per100: label }, foods) : undefined;
+  if (parts) {
+    const dish = product.categories.some((c) => DISH.test(c));
+    const single = code && label ? macroSimilarity(label, foods.byCode.get(code)!.per100) : 0;
+    const mix = macroSimilarity(label!, mixedFood(parts, foods)!.per100);
+    if (dish || mix > single) return { code: parts[0]!.code, parts };
+  }
+  return code ? { code } : undefined;
+}
+
+const sameParts = (a?: readonly MixPart[], b?: readonly MixPart[]) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+
 /**
  * Products the app pairs by itself: no similar food yet or only its own unchecked pick (so a
  * better matcher replaces its old guesses), "label only" not chosen, not a USDA generic food.
@@ -122,38 +203,41 @@ export function autoMatches(
   index: SearchIndex,
   foods: Pick<FoodDb, 'byCode' | 'version'>,
   boost?: (key: string) => number,
-): Array<{ id: string; match: { version: string; code: string } }> {
+): Array<{ id: string; match: NonNullable<Product['match']> }> {
   return products.flatMap((p) => {
     if (!wantsAutoMatch(p)) return [];
-    const code = bestMatch(p, index, foods, boost);
-    return code && code !== p.match?.code ? [{ id: p.id, match: { version: foods.version, code } }] : [];
+    const pick = bestPairing(p, index, foods, boost);
+    if (!pick || (pick.code === p.match?.code && sameParts(pick.parts, p.match?.parts))) return [];
+    return [{ id: p.id, match: { version: foods.version, ...pick } }];
   });
 }
 
 /**
  * The similar food while a product is being logged or edited. `food` undefined means none:
  * `auto` then says whether the app found nothing (true) or the user chose "label values only".
+ * With `parts`, the product is built from its ingredients and `food` is the biggest of them.
  */
 export interface MatchChoice {
   food?: Food;
+  parts?: MixPart[];
   auto: boolean;
+}
+
+function choiceOf(pick: Pairing | undefined, foods: Pick<FoodDb, 'byCode'>, auto: boolean): MatchChoice {
+  const food = pick ? foods.byCode.get(pick.code) : undefined;
+  return food ? { food, ...(pick?.parts ? { parts: pick.parts } : {}), auto } : { auto: true };
 }
 
 /** Start from the saved choice, else the app's pick. */
 export function initialChoice(product: Product, foods: Pick<FoodDb, 'byCode'>, index: SearchIndex, boost?: (key: string) => number): MatchChoice {
-  if (product.match) {
-    const food = foods.byCode.get(product.match.code);
-    return food ? { food, auto: !!product.match.auto } : { auto: true };
-  }
+  if (product.match) return choiceOf(product.match, foods, !!product.match.auto);
   if (product.labelOnly || hasOwnMicros(product)) return { auto: !product.labelOnly };
-  const code = bestMatch(product, index, foods, boost);
-  const food = code ? foods.byCode.get(code) : undefined;
-  return food ? { food, auto: true } : { auto: true };
+  return choiceOf(bestPairing(product, index, foods, boost), foods, true);
 }
 
 /** The product as it will be saved with this choice. */
 export function withChoice(product: Product, choice: MatchChoice, version: string): Product {
   const { match: _m, labelOnly: _l, ...rest } = product;
-  if (choice.food) return { ...rest, match: { version, code: choice.food.code, ...(choice.auto ? { auto: true as const } : {}) } };
+  if (choice.food) return { ...rest, match: { version, code: choice.food.code, ...(choice.parts ? { parts: choice.parts } : {}), ...(choice.auto ? { auto: true as const } : {}) } };
   return choice.auto ? rest : { ...rest, labelOnly: true };
 }

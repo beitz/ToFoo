@@ -2486,8 +2486,41 @@
                   "lastModified": {
                     "type": "number"
                   },
+                  "ingredients": {
+                    "description": "Open Food Facts only: the ingredient list, top level, in label order; empty when it has none, absent when fetched before it was kept",
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "description": "Open Food Facts ingredient taxonomy id, e.g. \"en:rice\""
+                        },
+                        "text": {
+                          "type": "string",
+                          "description": "As printed on the label"
+                        },
+                        "percent": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 100,
+                          "description": "Share of the product: the label's own figure, else Open Food Facts' estimate"
+                        },
+                        "declared": {
+                          "description": "The percent is printed on the label",
+                          "type": "boolean",
+                          "const": true
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "text",
+                        "percent"
+                      ]
+                    }
+                  },
                   "match": {
-                    "description": "BLS food that supplies the nutrients the source lacks",
+                    "description": "BLS food (or foods) that supplies the nutrients the source lacks",
                     "type": "object",
                     "properties": {
                       "version": {
@@ -2495,12 +2528,37 @@
                       },
                       "code": {
                         "type": "string",
-                        "pattern": "^[A-Z][0-9A-Z]{6}$"
+                        "pattern": "^[A-Z][0-9A-Z]{6}$",
+                        "description": "The similar BLS food; with parts, the biggest of them"
                       },
                       "auto": {
                         "description": "Picked by the app, not checked by the user yet",
                         "type": "boolean",
                         "const": true
+                      },
+                      "parts": {
+                        "description": "A ready meal built from its ingredient list: BLS foods by share, mixed per 100 g, instead of one similar food",
+                        "minItems": 1,
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "code": {
+                              "type": "string",
+                              "pattern": "^[A-Z][0-9A-Z]{6}$"
+                            },
+                            "share": {
+                              "type": "number",
+                              "exclusiveMinimum": 0,
+                              "maximum": 100,
+                              "description": "Percent of the product"
+                            }
+                          },
+                          "required": [
+                            "code",
+                            "share"
+                          ]
+                        }
                       }
                     },
                     "required": [

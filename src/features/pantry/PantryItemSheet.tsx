@@ -16,6 +16,7 @@ import { BarcodeSheet } from '../log/BarcodeSheet';
 import { FoodPicker, type PickedFood } from '../log/FoodPicker';
 import { useShopping } from '../shopping/useShopping';
 import { placeName, useListPantry, useMarkPantry, usePantryFoods, usePantryLeft } from './usePantry';
+import { pairingName } from '../food/pairingName';
 
 type Status = 'have' | 'low' | 'out';
 
@@ -184,7 +185,7 @@ function SourceLine({ foodRef }: { foodRef: FoodRef }) {
   const d = useData();
   const product = foodRef.source === 'OFF' || foodRef.source === 'USDA' ? d.productsById.get(refKey(foodRef)) : undefined;
   const match = product?.match;
-  const matchName = match && (d.foods.byCode.get(match.code)?.nameEn ?? match.code);
+  const matchName = match && pairingName(match, d.foods);
   return (
     <p className="small muted pantry-source">
       <FoodSourceTag foodRef={foodRef} product={product} />{' '}

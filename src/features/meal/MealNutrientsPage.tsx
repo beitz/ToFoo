@@ -35,6 +35,7 @@ import { foodHref, refOfCode } from '../food/links';
 import { FoodActions } from '../food/FoodActions';
 import { FavouriteMealButton } from '../log/FavouriteButton';
 import { BackButton } from '../../ui/BackButton';
+import { pairingName } from '../food/pairingName';
 
 const MACROS = ['PROT625', 'FAT', 'CHO', 'FIBT'];
 
@@ -499,7 +500,14 @@ function ItemSource({ code, entry }: { code?: string; entry: LogEntry }) {
         <p>
           {match ? (
             <>
-              {t(generic ? 'source.gapsFrom' : 'source.restFrom')} <a href={href('food', match.code)}>{match.nameEn}</a> <span className="muted">(BLS {match.code})</span>
+              {t(generic ? 'source.gapsFrom' : 'source.restFrom')}{' '}
+              {product.match?.parts ? (
+                <a href={href('food', product.id)}>{pairingName(product.match, d.foods)}</a>
+              ) : (
+                <>
+                  <a href={href('food', match.code)}>{match.nameEn}</a> <span className="muted">(BLS {match.code})</span>
+                </>
+              )}
               {product.match?.auto && <span className="muted"> · {t('match.autoShort')}</span>} · <a href={href('food', product.id)}>{t('off.matchChange')}</a>
             </>
           ) : (

@@ -1266,6 +1266,29 @@ textarea:focus-visible,
   gap: 8px;
   margin-top: 4px;
 }
+/* A ready meal built from its ingredients: one line per BLS food, share first so the column lines up. */
+.mix-list ul {
+  list-style: none;
+  margin: 4px 0;
+  padding: 0;
+}
+.mix-list li {
+  display: flex;
+  gap: 8px;
+  padding: 2px 0;
+}
+.mix-share {
+  flex: none;
+  width: 3.5em;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+.mix-fetch {
+  margin-top: 8px;
+}
+.mix-fetch p {
+  margin: 4px 0 0;
+}
 .fav-star {
   color: var(--text-muted);
 }
