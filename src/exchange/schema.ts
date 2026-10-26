@@ -285,9 +285,10 @@ export const habitSchema = z
         z.object({ type: z.literal('daily') }),
         z.object({ type: z.literal('weekdays'), days: z.array(z.number().int().min(1).max(7)).min(1).describe('1 = Monday … 7 = Sunday') }),
         z.object({ type: z.literal('perWeek'), times: z.number().int().min(1).max(7) }),
+        z.object({ type: z.literal('none') }).describe('Tracked without a target (do and minutes habits): never due, no run'),
       ])
       .describe('When it is due; for an avoid habit a maximum (never, never on these days, at most n days a week)'),
-    minutes: z.number().positive().optional(),
+    minutes: z.number().positive().optional().describe('Minutes habits: the day\'s total that counts as kept; missing with no target (any minutes count)'),
     activities: z.array(z.object({ kind: activityKind, name: z.string().optional() })).optional().describe('Activities that count toward a minutes habit; empty or missing = any'),
     quick: z
       .object({

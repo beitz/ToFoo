@@ -39,8 +39,9 @@ export function HabitsRow() {
       </div>
     );
   const { data } = habits;
-  // Habits not due today go to the end.
-  const shown = [...habits.active].sort((a, b) => Number(!isDue(a.goal, d.today)) - Number(!isDue(b.goal, d.today)));
+  // Habits not due today go to the end; one without a target is never due but always there to tap.
+  const later = (h: Habit) => Number(h.goal.type !== 'none' && !isDue(h.goal, d.today));
+  const shown = [...habits.active].sort((a, b) => later(a) - later(b));
 
   const tap = (h: Habit) => {
     if (press.fired()) return;
@@ -120,6 +121,12 @@ function useLongPress(action: (h: Habit) => void) {
 /** What a card shows: today's mark, or the week's count for a weekly goal, or today's minutes. */
 function cardValue(h: Habit, data: HabitData): { text: ReactNode; spoken: string; dim: boolean } {
   const today = habitDay(h, data.today, data);
+  // No target: today's minutes, or done / not yet (an empty ring, never greyed as "not due").
+  if (h.goal.type === 'none') {
+    if (h.kind === 'minutes') return { text: `${today.minutes ?? 0}′`, spoken: t('habits.spoken.minutesToday', { m: today.minutes ?? 0 }), dim: false };
+    const mark = today.mark === 'off' ? 'open' : today.mark;
+    return { text: <MarkGlyph mark={mark} />, spoken: markText(h, mark), dim: false };
+  }
   if (h.goal.type === 'perWeek') {
     const w = habitWeek(h, weekStart(data.today), data);
     const done = today.mark === 'kept' ? <MarkGlyph mark="kept" /> : null;

@@ -391,7 +391,8 @@ export type HabitColour = (typeof HABIT_COLOURS)[number];
  * days (weeks Monday to Sunday). For an avoid habit the same goals read as a maximum: never, never on
  * these days, at most n days a week.
  */
-export type HabitGoal = { type: 'daily' } | { type: 'weekdays'; days: number[] } | { type: 'perWeek'; times: number };
+/** `none`: tracked without a target (do and minutes habits only; owner's ask 2026-10-26): never due, never missed, no run. */
+export type HabitGoal = { type: 'daily' } | { type: 'weekdays'; days: number[] } | { type: 'perWeek'; times: number } | { type: 'none' };
 
 /** An activity that counts toward a minutes habit: a kind, and the user's own name when it must match too. */
 export interface HabitActivity {

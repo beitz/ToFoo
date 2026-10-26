@@ -91,10 +91,13 @@ function fieldsOf(d: Draft): { ok: true; fields: Omit<Habit, 'id' | 'schemaVersi
   } else if (d.goalType === 'perWeek') {
     if (!d.times || !Number.isInteger(d.times) || d.times < 1 || d.times > maxTimes) return { ok: false, problem: d.kind === 'avoid' ? 'habits.problem.timesAvoid' : 'habits.problem.times' };
     goal = { type: 'perWeek', times: d.times };
-  } else goal = { type: 'daily' };
+  } else if (d.goalType === 'none' && d.kind !== 'avoid') goal = { type: 'none' };
+  else goal = { type: 'daily' };
   if (d.kind !== 'minutes') return { ok: true, fields: { name, colour: d.colour, kind: d.kind, goal } };
-  if (!d.minutes || d.minutes <= 0 || d.minutes > 16 * 60) return { ok: false, problem: 'habits.problem.minutes' };
-  const fields = { name, colour: d.colour, kind: 'minutes' as const, goal, minutes: Math.round(d.minutes), activities: d.activities };
+  // Without a target there are no minutes to reach: any minutes count.
+  const target = goal.type !== 'none';
+  if (target && (!d.minutes || d.minutes <= 0 || d.minutes > 16 * 60)) return { ok: false, problem: 'habits.problem.minutes' };
+  const fields = { name, colour: d.colour, kind: 'minutes' as const, goal, ...(target && d.minutes ? { minutes: Math.round(d.minutes) } : {}), activities: d.activities };
   if (!d.quickOn) return { ok: true, fields };
   const q = d.quick;
   if (!q.minutes || q.minutes <= 0 || q.minutes > MAX_ACTIVITY_MINUTES) return { ok: false, problem: 'habits.problem.quickMinutes' };
@@ -176,8 +179,10 @@ function EditorForm({ habit, all, activityOn }: { habit: Habit | undefined; all:
   }
 
   const goalLabels: Record<GoalType, MessageKey> = avoid
-    ? { daily: 'habits.goal.never', weekdays: 'habits.editor.notOnDays', perWeek: 'habits.editor.atMost' }
-    : { daily: 'habits.goal.daily', weekdays: 'habits.editor.onDays', perWeek: 'habits.editor.timesWeek' };
+    ? { daily: 'habits.goal.never', weekdays: 'habits.editor.notOnDays', perWeek: 'habits.editor.atMost', none: 'habits.goal.none' }
+    : { daily: 'habits.goal.daily', weekdays: 'habits.editor.onDays', perWeek: 'habits.editor.timesWeek', none: 'habits.goal.none' };
+  // Avoiding something always has a limit; tracking without one is "Do" with no target.
+  const goalTypes: GoalType[] = avoid ? ['daily', 'weekdays', 'perWeek'] : ['daily', 'weekdays', 'perWeek', 'none'];
   const position = habit ? all.findIndex((h) => h.id === habit.id) : -1;
   const sunOn = isOn(d.settings.features, 'sunVitaminD');
   // The one-tap activity is one the habit counts: its picks, or any activity when it counts all.
@@ -220,7 +225,7 @@ function EditorForm({ habit, all, activityOn }: { habit: Habit | undefined; all:
           <Segmented<HabitKind>
             label={t('habits.editor.kind')}
             value={draft.kind}
-            onChange={(kind) => set({ kind, times: kind === 'avoid' && (draft.times ?? 0) > 6 ? 6 : draft.times })}
+            onChange={(kind) => set({ kind, times: kind === 'avoid' && (draft.times ?? 0) > 6 ? 6 : draft.times, ...(kind === 'avoid' && draft.goalType === 'none' ? { goalType: 'daily' as const } : {}) })}
             options={HABIT_KINDS.filter((k) => k !== 'minutes' || activityOn || draft.kind === 'minutes').map((k) => ({ value: k, label: t(`habits.kind.${k}` as MessageKey) }))}
           />
           <div className="field-hint">{t(`habits.kindHint.${draft.kind}` as MessageKey)}</div>
@@ -229,7 +234,9 @@ function EditorForm({ habit, all, activityOn }: { habit: Habit | undefined; all:
 
         {draft.kind === 'minutes' && (
           <>
-            <Field label={t('habits.editor.minutes')}>{(id) => <NumberInput id={id} value={draft.minutes} onChange={(minutes) => set({ minutes })} suffix="min" min={0} />}</Field>
+            {draft.goalType !== 'none' && (
+              <Field label={t('habits.editor.minutes')}>{(id) => <NumberInput id={id} value={draft.minutes} onChange={(minutes) => set({ minutes })} suffix="min" min={0} />}</Field>
+            )}
             <div className="field">
               <span className="field-label">{t('habits.editor.activities')}</span>
               <div className="chips">
@@ -317,7 +324,7 @@ function EditorForm({ habit, all, activityOn }: { habit: Habit | undefined; all:
             label={t('habits.editor.goal')}
             value={draft.goalType}
             onChange={(goalType) => set({ goalType })}
-            options={(['daily', 'weekdays', 'perWeek'] as const).map((g) => ({ value: g, label: t(goalLabels[g]) }))}
+            options={goalTypes.map((g) => ({ value: g, label: t(goalLabels[g]) }))}
           />
         </div>
         {draft.goalType === 'weekdays' && (
@@ -390,7 +397,7 @@ function detailsText(q: Draft['quick'], sunOn: boolean): string {
 function Preview({ draft }: { draft: Draft }) {
   const weekly = draft.goalType === 'perWeek';
   const value =
-    weekly && draft.kind === 'avoid' ? t('habits.card.max', { n: 0, max: draft.times ?? 0 }) : weekly ? `0/${draft.times ?? 0}` : draft.kind === 'minutes' ? `0/${draft.minutes ?? 0}′` : <MarkGlyph mark="open" />;
+    weekly && draft.kind === 'avoid' ? t('habits.card.max', { n: 0, max: draft.times ?? 0 }) : weekly ? `0/${draft.times ?? 0}` : draft.kind === 'minutes' ? (draft.goalType === 'none' ? '0′' : `0/${draft.minutes ?? 0}′`) : <MarkGlyph mark="open" />;
   const q = draft.quick;
   const tap =
     draft.kind !== 'minutes'

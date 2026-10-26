@@ -185,6 +185,31 @@ describe('fill-in and calendar', () => {
   });
 });
 
+describe('no target', () => {
+  const track = habit({ goal: { type: 'none' } });
+  const walks = habit({ kind: 'minutes', name: 'Walk', goal: { type: 'none' }, activities: [{ kind: 'walk' }] });
+  const d = data([[20, true], [21, false]], 26, { activities: [act(22, 25, 'walk'), act(23, 40, 'run')] });
+
+  it('is never due: unanswered days are off, never open or missed', () => {
+    expect(isDue({ type: 'none' }, key(26))).toBe(false);
+    expect(habitDay(track, key(20), d).mark).toBe('kept');
+    expect(habitDay(track, key(21), d).mark).toBe('missed');
+    expect(habitDay(track, key(22), d).mark).toBe('off');
+    expect(openHabitsOn([track], key(22), d)).toEqual([]);
+  });
+
+  it('counts any minutes of the picked activities, and no minutes as nothing', () => {
+    expect(habitDay(walks, key(22), d)).toEqual({ mark: 'kept', minutes: 25 });
+    expect(habitDay(walks, key(23), d).mark).toBe('off');
+  });
+
+  it('has no run, counts its days, and stays out of the calendar summary', () => {
+    expect(habitRun(track, d)).toEqual({ unit: 'days', current: 0, longest: 0 });
+    expect(habitTally(walks, d).kept).toBe(1);
+    expect(habitsDaySummary([track, walks], key(22), d)).toEqual({ kept: 0, missed: 0, open: 0 });
+  });
+});
+
 describe('one tap logs it', () => {
   it('logs the preset ending now, on the day it started, with the sun only when outside', () => {
     const now = new Date(2026, 9, 26, 8, 40).getTime();

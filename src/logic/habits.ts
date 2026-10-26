@@ -38,8 +38,9 @@ export function isoWeekday(day: string): number {
   return ((parseDay(day).getDay() + 6) % 7) + 1;
 }
 
-/** Whether the habit asks for an answer on `day` (a weekly goal may be met on any day). */
+/** Whether the habit asks for an answer on `day` (a weekly goal may be met on any day; one without a target never does). */
 export function isDue(goal: HabitGoal, day: string): boolean {
+  if (goal.type === 'none') return false;
   return goal.type !== 'weekdays' || goal.days.includes(isoWeekday(day));
 }
 
@@ -95,7 +96,8 @@ export function habitDay(h: Habit, day: string, data: HabitData, start = habitSt
   if (day < start || day > data.today) return { mark: 'off' };
   if (h.kind === 'minutes') {
     const minutes = habitMinutes(h, data.activities, day);
-    if (minutes >= (h.minutes ?? 0)) return { mark: 'kept', minutes };
+    // Without a target any minutes count.
+    if (minutes >= (h.minutes ?? 1)) return { mark: 'kept', minutes };
     if (!isDue(h.goal, day)) return { mark: 'off', minutes };
     // Another activity that day, or "No activity", answers it; nothing at all leaves it open.
     const answered = minutes > 0 || data.noActivity.has(day) || data.activities.some((a) => a.day === day);
@@ -172,6 +174,7 @@ export const RUN_FORGIVE_EVERY = 7;
  * don't break it while still open (yesterday can be filled in). Answering a past day later repairs it.
  */
 export function habitRun(h: Habit, data: HabitData): HabitRun {
+  if (h.goal.type === 'none') return { unit: 'days', current: 0, longest: 0 };
   const start = habitStart(h, data);
   const steps: Step[] = [];
   if (h.goal.type === 'perWeek') {
@@ -201,7 +204,7 @@ export function habitRun(h: Habit, data: HabitData): HabitRun {
   return { unit: h.goal.type === 'perWeek' ? 'weeks' : 'days', current, longest };
 }
 
-/** How often it was kept: days this month for a daily goal, weeks of the last 8 for a weekly one. */
+/** How often it was kept: days this month for a daily goal, weeks of the last 8 for a weekly one; without a target, of = kept (the days it was done). */
 export interface HabitTally {
   unit: 'days' | 'weeks';
   kept: number;
@@ -263,7 +266,8 @@ export interface HabitsDaySummary {
 export function habitsDaySummary(habits: readonly Habit[], day: string, data: HabitData): HabitsDaySummary {
   const out: HabitsDaySummary = { kept: 0, missed: 0, open: 0 };
   for (const h of habits) {
-    if (h.archived) continue;
+    // The calendar counts goals; a habit without a target is on its own page.
+    if (h.archived || h.goal.type === 'none') continue;
     const { mark } = habitDay(h, day, data);
     if (mark === 'kept') out.kept++;
     else if (mark === 'missed') out.missed++;

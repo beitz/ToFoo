@@ -8,6 +8,7 @@
  * scenes and small fixes. A pull request that changes what users see adds its line here in the same PR.
  */
 export const changesEn = {
+  'change.156': 'Habits can have no target: pick "No target" for something you just want to track. It is never asked about or counted as missed, and its Home card shows what you did today (an activity: the minutes so far).',
   'change.155': 'A clearer habit form: activity habits are now the kind "Activity", the activity is picked once, the details of a one-tap activity fold into one line, and the form shows how the Home card will look and what a tap does.',
   'change.154': 'Activities now count in the energy you burn, from the 2024 Compendium of Physical Activities: "+220 kcal" on each activity, pick the exact activity (football, yoga…) from 1,111, and an Energy burned card on the Energy page. Your energy target stays as it is. When your log and weight disagree, the Weight page offers what your weight says you burn, to take over with one tap.',
   'change.154.major': 'Energy burned by activities, corrected by your weight',
