@@ -57,3 +57,37 @@ test('habits: add them, tick today on Home, answer a day on the habit page', asy
   await expect(page.getByText(/^Floss: Done\.$/)).toBeVisible();
   expect(errors).toEqual([]);
 });
+
+test('habits: one tap logs the preset activity, again and again, and long press changes it first', async ({ page }) => {
+  const errors = watchErrors(page);
+  await firstLaunch(page);
+  await turnOnHabits(page);
+  await page.goto('./#/habits/new');
+  await page.getByLabel('Name').fill('Commute');
+  await page.getByRole('radio', { name: 'Minutes' }).click();
+  await page.getByLabel('Minutes a day').fill('60');
+  await page.getByRole('switch', { name: /^One tap logs it/ }).click();
+  await page.getByLabel('Minutes per tap').fill('30');
+  await page.getByRole('button', { name: 'Save' }).click();
+  await expect(page.getByRole('button', { name: 'Log Walk 30 min' })).toBeVisible();
+
+  // Home: each tap logs a 30-minute walk ending now; two make the day's 60.
+  await page.goto('./#/');
+  const card = page.getByRole('list', { name: 'Habits' }).getByRole('listitem', { name: /^Commute:/ });
+  await expect(card).toHaveAccessibleName(/^Commute: 0 of 60 minutes today; tap logs Walk 30 min/);
+  await card.click();
+  await expect(page.getByText('Walk 30 min logged: 30 of 60 min today.')).toBeVisible();
+  await expect(card).toHaveAccessibleName(/^Commute: 30 of 60 minutes today/);
+  await card.click();
+  await expect(card).toHaveAccessibleName(/^Commute: reached/);
+
+  // A long press opens the activity sheet with the preset instead of logging.
+  const box = (await card.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.waitForTimeout(700);
+  await page.mouse.up();
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await expect(page.getByRole('dialog').getByLabel('How long')).toHaveValue('30');
+  expect(errors).toEqual([]);
+});

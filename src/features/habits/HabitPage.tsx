@@ -6,7 +6,7 @@ import { addMonths, formatMonth, monthGrid, weekStart } from '../../lib/periods'
 import { habitDay, habitRun, habitStart, habitTally, habitWeek, TALLY_WEEKS } from '../../logic/habits';
 import { BackButton } from '../../ui/BackButton';
 import { Icon } from '../../ui/Icon';
-import { activitiesText, DaySheet, goalText, habitStyle, markText, MarkGlyph, shownMark, weekdayName } from './HabitParts';
+import { activitiesText, DaySheet, goalText, HabitActivitySheet, habitStyle, markText, MarkGlyph, quickText, shownMark, useQuickLog, weekdayName } from './HabitParts';
 import { runText, tallyUnit, useHabit } from './HabitsPage';
 
 /**
@@ -17,6 +17,8 @@ export function HabitPage({ id }: { id: string }) {
   const found = useHabit(id);
   const [month, setMonth] = useState<string>();
   const [day, setDay] = useState<string>();
+  const [changing, setChanging] = useState(false);
+  const quickLog = useQuickLog();
   if (!found) return null;
   const { habit: h, data } = found;
   if (!h)
@@ -61,6 +63,16 @@ export function HabitPage({ id }: { id: string }) {
         <p className="small">
           {runText(run)} · {runText(run, 'longest')}
         </p>
+        {h.quick && !h.archived && (
+          <div className="sheet-actions">
+            <button className="btn" onClick={() => setChanging(true)}>
+              {t('habits.quickChange')}
+            </button>
+            <button className="btn btn-primary" onClick={() => void quickLog(h)} aria-label={t('habits.quickLog', { what: quickText(h.quick) })}>
+              <Icon name="plus" size={16} /> {quickText(h.quick)}
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="card">
@@ -137,6 +149,7 @@ export function HabitPage({ id }: { id: string }) {
         </div>
       )}
       {day && <DaySheet habit={h} day={day} onClose={() => setDay(undefined)} />}
+      {changing && <HabitActivitySheet habit={h} day={data.today} onClose={() => setChanging(false)} />}
     </section>
   );
 }

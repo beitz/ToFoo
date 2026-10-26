@@ -284,6 +284,17 @@ export const habitSchema = z
       .describe('When it is due; for an avoid habit a maximum (never, never on these days, at most n days a week)'),
     minutes: z.number().positive().optional(),
     activities: z.array(z.object({ kind: activityKind, name: z.string().optional() })).optional().describe('Activities that count toward a minutes habit; empty or missing = any'),
+    quick: z
+      .object({
+        kind: activityKind,
+        name: z.string().optional(),
+        minutes: z.number().positive(),
+        intensity: z.enum(['easy', 'moderate', 'hard']),
+        outside: z.boolean(),
+        sun: z.boolean().describe('When outside: counts toward the vitamin D sun estimate'),
+      })
+      .optional()
+      .describe('Minutes habits with "One tap logs it": the activity a tap on its Home card logs, ending at the tap'),
     order: z.number(),
     archived: z.boolean().optional(),
     createdAt: z.number(),
