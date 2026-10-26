@@ -15,6 +15,7 @@ import type { ModelEntry } from '../model/types';
 import { currentWeight, explicitDayStatus, firstModelDay, resolveEntry, sunByDay, activeFast } from '../logic/resolve';
 import { activitySun } from '../logic/activity';
 import { measuredStores } from '../logic/lab';
+import { slowWindow } from '../../model/parameters';
 
 /** Longest history the model simulates (performance guard). */
 const MAX_MODEL_DAYS = 730;
@@ -125,6 +126,7 @@ export function computeAppData({ today, foods, searchIndex, profile, settings, r
       imputeUnlogged: isOn(f, 'fillUnloggedDays'),
       shortWindowDays: settings.shortWindowDays,
       longWindowDays: settings.longWindowDays,
+      slowWindowDays: slowWindow.value,
       mealWindowMinutes: settings.mealWindowMinutes,
     },
     sunByDay: sunByDay(days, profile, [...sunEntries, ...(isOn(f, 'activity') ? activitySun(activities) : [])]),

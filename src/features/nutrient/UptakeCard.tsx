@@ -30,7 +30,9 @@ export function UptakeCard({ id, need }: { id: string; need: number }) {
   const r = d.model.nutrients.get(id);
   const [picked, setPicked] = useState<string | null>(null);
   if (!def || !r) return null;
-  const days = uptakeDays(d.modelDays, d.model.daily, d.model.dayStatus, id, r.windowDays);
+  // Bars keep the charts' usual span, also where the average spans more (omega-3, vitamin E: 8 weeks).
+  const span = Math.min(r.windowDays, d.settings.longWindowDays);
+  const days = uptakeDays(d.modelDays, d.model.daily, d.model.dayStatus, id, span);
   if (!days.some((x) => x.eaten !== undefined)) return null;
   const top = Math.max(need, ...days.map((x) => x.takenUp ?? 0)) * 1.1 || 1;
   // The numbers of one day at a time (a row of numbers per bar did not fit 14 days on a phone):
@@ -53,6 +55,7 @@ export function UptakeCard({ id, need }: { id: string; need: number }) {
         <InfoButton title={t('uptake.title')}>
           <p>{t('uptake.info', { unit: def.unit, need: fmtAmount(id, need) })}</p>
           {id === 'VITD' && <p>{t('uptake.vitDSun')}</p>}
+          {span < r.windowDays && <p>{t('window.chartSpan', { n: span, days: r.windowDays })}</p>}
         </InfoButton>
       </div>
       <p className="uptake-readout small" aria-live="polite">

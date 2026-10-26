@@ -127,7 +127,12 @@ export type StorageModel =
       capacity: Valued<Range> & { bySex?: { male: Range; female: Range } };
     }
   | { kind: 'tankDays'; capacityDays: Valued<Range> }
-  | { kind: 'rolling'; window: 'short' | 'long' };
+  /**
+   * Averaged over a window of days. 'short' and 'long' are set in Settings; 'slow' is for nutrients the
+   * body evens out over weeks to months, with the research behind it in `basis`.
+   */
+  | { kind: 'rolling'; window: 'short' | 'long' }
+  | { kind: 'rolling'; window: 'slow'; basis: Cited };
 
 export type Preparation = 'asListed' | 'raw' | 'boiled' | 'steamed' | 'baked' | 'fried';
 export type Storage = 'fresh' | 'fridge' | 'freezer';

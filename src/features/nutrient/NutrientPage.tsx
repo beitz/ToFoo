@@ -11,7 +11,7 @@ import { logTrust, trustReasons } from '../../../model/log-trust';
 import { storeTrendOf, trendOf, type Trend } from '../../model/trend';
 import { isOn } from '../../settings/features';
 import { infoId, NUTRIENT_INFO_SOURCES } from '../../i18n/nutrientInfo.en';
-import { storeAhead, tileTop, windowDays, type WindowDay } from '../../logic/nutrientPage';
+import { storeAhead, tileTop, weekMarks, windowDays, type WindowDay } from '../../logic/nutrientPage';
 import { InfoButton } from '../../ui/InfoButton';
 import { AskChips } from '../../ui/AskChips';
 import { LineChart } from '../../ui/LineChart';
@@ -39,6 +39,7 @@ import { EffectCard } from './EffectCard';
 import { EnergyBurnCard } from './EnergyBurnCard';
 import { hasLadder, LevelLadder } from './LevelLadder';
 import { WhatItDoes } from './WhatItDoes';
+import { HowOftenChip, WindowWhy } from './HowOften';
 
 export function NutrientPage({ id, context }: { id: string; context?: SplitContext }) {
   const d = useData();
@@ -286,6 +287,7 @@ function Hero({ r, noData, showRange, whyLabel }: { r: NutrientResult; noData: b
             <Icon name="hourglass" size={14} /> {t('tank.lasts', { time: `~${fmtDuration(store.storeDays.central)}` })}
           </span>
         )}
+        {req && req.recommended > 0 && <HowOftenChip id={id} recommended={req.recommended} />}
         {store?.measuredOn && (
           <span className="chip">
             <Icon name="drop" size={14} /> {t('nutrient.chipMeasured', { day: formatDay(store.measuredOn, d.today) })}
@@ -339,6 +341,7 @@ function HeroNotes({ r, noData, trend, weekText }: { r: NutrientResult; noData: 
               ? t('nutrient.infoExplain', { days: r.windowDays })
               : t('nutrient.rollingExplain', { days: r.windowDays })}
       </p>
+      {!store && <WindowWhy id={id} />}
       {trend && (
         <p>
           <span aria-hidden>{trendArrows(trend)}</span>{' '}
@@ -409,7 +412,7 @@ function HeroNotes({ r, noData, trend, weekText }: { r: NutrientResult; noData: 
               left: r.leftOutDays,
             })
           : t('nutrient.knownDays', { known: r.knownDays, days: r.windowDays })}{' '}
-        {t('nutrient.dotsLegend')}
+        {t(r.windowDays > d.settings.longWindowDays ? 'nutrient.weeksLegend' : 'nutrient.dotsLegend')}
       </p>
       {r.missingDataDays > 0 && <p>{t('nutrient.missingData', { n: r.missingDataDays })}</p>}
       {!noData && isUnsure(store?.statusSpan ?? r.statusSpan) && <p>{t('nutrient.unsureExplain')}</p>}
@@ -429,14 +432,22 @@ function HeroNotes({ r, noData, trend, weekText }: { r: NutrientResult; noData: 
  * no data. An early reading says how many of its window's days there are so far ("5 of 14 days so far").
  */
 function DayDots({ days, early }: { days: WindowDay[]; early?: { days: number; of: number } | null }) {
+  const d = useData();
   if (!days.length) return null;
   const known = days.filter((x) => x.dot === 'known').length;
+  // A window longer than the charts' usual span (omega-3's 8 weeks) gets one mark per week, drawn
+  // wider than a day's dot, so the row stays one line on a phone.
+  const weeks = days.length > d.settings.longWindowDays ? weekMarks(days) : null;
   return (
-    <p className="day-dots" role="img" aria-label={t('nutrient.dotsSpoken', { n: days.length, known })}>
-      {days.map((x) => (
-        <span key={x.day} className={`day-dot day-dot-${x.dot}${x.missing ? ' day-dot-missing' : ''}`} />
+    <p
+      className="day-dots"
+      role="img"
+      aria-label={weeks ? t('nutrient.weeksSpoken', { n: weeks.length, days: days.length, known }) : t('nutrient.dotsSpoken', { n: days.length, known })}
+    >
+      {(weeks ?? days).map((x) => (
+        <span key={x.day} className={`day-dot day-dot-${x.dot}${x.missing ? ' day-dot-missing' : ''}${weeks ? ' day-dot-week' : ''}`} />
       ))}
-      <span className="small muted">{early ? t('nutrient.earlySoFar', early) : t('nutrient.dotsDays', { n: days.length })}</span>
+      <span className="small muted">{early ? t('nutrient.earlySoFar', early) : weeks ? t('nutrient.dotsWeeks', { n: weeks.length }) : t('nutrient.dotsDays', { n: days.length })}</span>
     </p>
   );
 }

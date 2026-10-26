@@ -5678,8 +5678,25 @@ a.contributor-link > span:first-child {
   background: none;
   border: 2px solid var(--warn);
 }
+/* One mark per week for a long window: wider than a day's dot, so the two never read alike. */
+.day-dot-week {
+  width: 16px;
+  border-radius: 5px;
+}
 .day-dots .small {
   margin-left: 4px;
+}
+/* "How often": example foods with the days 100 g covers, each a link to the food. */
+.often-list li + li {
+  border-top: 1px solid var(--border);
+}
+.often-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  color: inherit;
+  text-decoration: none;
 }
 /* An amount against its reference: bar to scale, reference as a mark. */
 .amount-bar {

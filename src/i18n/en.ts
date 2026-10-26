@@ -5,6 +5,7 @@ import { nutrientInfoEn } from './nutrientInfo.en';
 import { effectsEn } from './effects.en';
 import { ladderEn } from './ladder.en';
 import { doesEn } from './does.en';
+import { howOftenEn } from './howOften.en';
 import { changesEn } from './changes.en';
 
 export const en = {
@@ -12,6 +13,7 @@ export const en = {
   ...effectsEn,
   ...ladderEn,
   ...doesEn,
+  ...howOftenEn,
   ...groupInfoEn,
   ...homeInfoEn,
   ...changesEn,
@@ -2129,6 +2131,9 @@ export const en = {
   'nutrient.whyLink': 'How is {value} worked out?',
   'nutrient.heroInfo': 'How to read the {name} numbers',
   'nutrient.dotsDays': '{n} days',
+  'nutrient.dotsWeeks': '{n} weeks',
+  'nutrient.weeksSpoken': 'Average of the last {n} weeks, {known} of {days} days logged',
+  'nutrient.weeksLegend': 'The marks under the number are these weeks, one each: filled = every day logged, faint = some days filled in from recent days, dashed = left out, ringed = some food that week had no data for this nutrient.',
   'nutrient.dotsSpoken': 'Average of the last {n} days, {known} of them logged',
   'nutrient.dotsLegend': 'The dots under the number are these days, one each: filled = logged, faint = filled in from recent days, dashed = left out, ringed = some food that day had no data for this nutrient.',
   'nutrient.barEaten': '{amount} eaten',
@@ -2301,7 +2306,7 @@ export const en = {
   'settings.shortWindow': 'Short average',
   'settings.longWindow': 'Long average',
   'settings.days': 'days',
-  'settings.windowHint': 'Rolling-average nutrients use the short or the long window.',
+  'settings.windowHint': 'Rolling-average nutrients use the short or the long window. Omega-3, the other essential fats and vitamin E use 8 weeks, set from research on how slowly the body evens them out.',
   'settings.backupDays': 'Backup reminder after',
   'settings.appearance': 'Appearance',
   'settings.theme': 'Theme',
@@ -2589,6 +2594,7 @@ export const en = {
   'tour.nutrient.hero': 'How you are doing with this nutrient, and where it is heading.',
   'tour.nutrient.burn': 'What you burned yesterday and today, activities included, next to what you ate.',
   'tour.nutrient.trust': 'How well a food log can see this nutrient at all.',
+  'tour.nutrient.often': 'How often the food guidelines say to eat what gives it.',
   'tour.nutrient.sources': 'Where it came from: which foods and meals gave you the most.',
   'tour.nutrient.fills': 'Foods that fill it best, ones you ate before first.',
   'tour.nutrient.why': 'The science behind it, with sources, when you want it.',

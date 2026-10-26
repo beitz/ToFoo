@@ -152,6 +152,21 @@ export function windowDays(
   return out;
 }
 
+/**
+ * A long window's days as weeks, oldest first, counted back from the newest day (so the oldest week may be
+ * short): known when no day was filled in, left out when every day was, ringed when any day had a food
+ * without data.
+ */
+export function weekMarks(days: readonly WindowDay[]): WindowDay[] {
+  const out: WindowDay[] = [];
+  for (let end = days.length; end > 0; end -= 7) {
+    const week = days.slice(Math.max(0, end - 7), end);
+    const dot: WindowDot = week.every((x) => x.dot === 'leftOut') ? 'leftOut' : week.some((x) => x.dot === 'estimated') ? 'estimated' : 'known';
+    out.unshift({ day: week[0]!.day, dot, missing: week.some((x) => x.missing) });
+  }
+  return out;
+}
+
 /** Heights the need tile can grow to (multiples of the need), so values over 100 % keep their size. */
 const TILE_TOPS = [1, 1.5, 2, 3];
 const TILE_MAX = 3;
