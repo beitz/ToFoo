@@ -90,6 +90,7 @@ export function ProfilePage() {
           />
           <div className="field-hint">
             {t('profile.activityHint')}
+            {isOn(d.settings.features, 'activity') && isOn(d.settings.features, 'activityEnergy') && ` ${t('profile.activityHintLogged')}`}
             {!p.activity && ` ${t('profile.defaultUsed')}`}
           </div>
         </div>

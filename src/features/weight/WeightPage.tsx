@@ -14,6 +14,7 @@ import { InfoButton } from '../../ui/InfoButton';
 import { fmtKcal10, fmtKg, fmtKgChange } from './format';
 import { useWeight } from './useWeight';
 import { deleteWeighIn, saveWeighIn } from './weighIns';
+import { repo } from '../../storage/repo';
 
 const WINDOWS = ['30', '90', '365'] as const;
 type Window = (typeof WINDOWS)[number];
@@ -188,6 +189,32 @@ function WeightChart({ points, from, to }: { points: readonly TrendPoint[]; from
 
 const pct5 = (share: number) => Math.round((share * 100) / 5) * 5;
 
+/**
+ * The other reading of a log outside the range (owner's ask, 2026-10-26: a tap to accept): if the log
+ * is complete, the weight says what was burned, and one tap makes that the energy estimate from now on.
+ */
+function MeasuredBurn({ burnKcal, measured }: { burnKcal: number; measured: NonNullable<Extract<LogCheck, { measured?: unknown }>['measured']> }) {
+  const d = useData();
+  const toast = useToast();
+  const kcal = fmtKcal10(measured.kcal.central);
+  return (
+    <div className="measured-burn" data-tour="weight.measured">
+      <p>{t('weight.measured', { kcal, low: fmtKcal10(measured.kcal.low), high: fmtKcal10(measured.kcal.high), now: fmtKcal10(burnKcal) })}</p>
+      <button
+        className="btn btn-small btn-secondary"
+        onClick={async () => {
+          const before = d.profile.energyCorrection;
+          await repo.updateProfile({ energyCorrection: { factor: Math.round(measured.factor * 1000) / 1000, day: d.today } });
+          toast(t('weight.measuredUsed', { kcal }), () => repo.updateProfile({ energyCorrection: before }));
+        }}
+      >
+        {t('weight.useMeasured', { kcal })}
+      </button>
+      <p className="small muted">{t('weight.measuredHint')}</p>
+    </div>
+  );
+}
+
 /** Is the food log about complete? What the weight says was eaten against what was logged. */
 function LogCheckCard({ check }: { check: LogCheck }) {
   const w = weightCheck.window.value;
@@ -232,8 +259,12 @@ function LogCheckCard({ check }: { check: LogCheck }) {
               <span className="muted small block">{t('weight.range', { low: fmtKcal10(check.eatenKcal.low), high: fmtKcal10(check.eatenKcal.high) })}</span>
             </dd>
           </dl>
-          <p className="small muted">{t('weight.checkBasis', { n: check.loggedDays, of: w.days, burn: fmtKcal10(check.burnKcal) })}</p>
+          <p className="small muted">
+            {t('weight.checkBasis', { n: check.loggedDays, of: w.days, burn: fmtKcal10(check.burnKcal) })}
+            {check.activityKcal > 0 && ` ${t('weight.checkActivities', { kcal: fmtKcal10(check.activityKcal) })}`}
+          </p>
           {check.state === 'low' && <p className="small">{t('weight.lowHint')}</p>}
+          {check.measured && <MeasuredBurn burnKcal={check.burnKcal} measured={check.measured} />}
         </>
       )}
     </div>

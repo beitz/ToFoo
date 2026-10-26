@@ -93,6 +93,7 @@ export const TOURS: Record<TourId, Tour> = {
   nutrient: {
     steps: [
       { target: 'nutrient.hero', text: 'tour.nutrient.hero' },
+      { target: 'nutrient.burn', text: 'tour.nutrient.burn' },
       { target: 'nutrient.trust', text: 'tour.nutrient.trust' },
       { target: 'nutrient.sources', text: 'tour.nutrient.sources' },
       { target: 'nutrient.fills', text: 'tour.nutrient.fills' },
@@ -104,6 +105,7 @@ export const TOURS: Record<TourId, Tour> = {
     steps: [
       { target: 'weight.trend', text: 'tour.weight.trend' },
       { target: 'weight.check', text: 'tour.weight.check' },
+      { target: 'weight.measured', text: 'tour.weight.measured' },
     ],
   },
   habits: {

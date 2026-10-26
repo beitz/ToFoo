@@ -102,7 +102,7 @@ export function computeAppData({ today, foods, searchIndex, profile, settings, r
   const customFoodsById = new Map(customFoods.map((c) => [c.id, c]));
   const weight = currentWeight(profile);
   const requirements = resolveRequirements(
-    { birthYear: profile.birthYear, sex: profile.sex, weightKg: weight, activity: profile.activity, phytate: profile.phytate, menstruation: profile.menstruation, energyTargetKcal: profile.energyTargetKcal, nutrientTargets: profile.nutrientTargets },
+    { birthYear: profile.birthYear, sex: profile.sex, weightKg: weight, activity: profile.activity, phytate: profile.phytate, menstruation: profile.menstruation, energyTargetKcal: profile.energyTargetKcal, nutrientTargets: profile.nutrientTargets, energyFactor: profile.energyCorrection?.factor },
     Number(today.slice(0, 4)),
   );
   const productsById = new Map(productList.map((p) => [p.id, p]));

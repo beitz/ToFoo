@@ -8,6 +8,7 @@ import { BackButton } from '../../ui/BackButton';
 import { Icon } from '../../ui/Icon';
 import { ActivitySheet } from '../activity/ActivitySheet';
 import { activityName } from '../activity/ActivityForm';
+import { useAddsText } from '../activity/useBurn';
 import { hmText } from '../sleep/format';
 import { DayBars, MissingDays, useMissingDays, WindowSwitch, type Window } from './TrackerParts';
 
@@ -25,6 +26,7 @@ export function ActivityPage() {
   const missing = useMissingDays('activity', days);
   const entries = d.activities.filter((a) => a.day >= days[0]!).sort((a, b) => b.time - a.time);
   const top = Math.max(60, ...minutes.values());
+  const adds = useAddsText();
 
   return (
     <section>
@@ -86,6 +88,7 @@ export function ActivityPage() {
                   <span className="entry-label">
                     {activityName(a)} · {t('tracker.minutes', { m: a.minutes })}
                     {a.outside ? ` · ${t('tracker.outsideShort')}` : ''}
+                    {adds(a) ? ` · ${adds(a)}` : ''}
                   </span>
                   <span className="muted small">
                     {formatDay(a.day, d.today)}, {formatTime(a.time)}

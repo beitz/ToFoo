@@ -8,6 +8,7 @@ import { ACTIVITY_KINDS, INTENSITIES, type ActivityKind, type ActivityRecord, ty
 import { Field, NumberInput, Segmented, Toggle } from '../../ui/controls';
 import { TimeField } from '../log/TimeField';
 import { SkinSelect } from '../settings/SkinSelect';
+import { CountsAs } from './CountsAs';
 
 /** An activity being entered or checked: like a record, with the amount possibly still empty. */
 export interface ActivityDraft {
@@ -16,6 +17,8 @@ export interface ActivityDraft {
   time: number;
   minutes: number | undefined;
   intensity: Intensity;
+  /** The 2024 Adult Compendium row picked for it; undefined: the row for its kind and effort. */
+  compendium?: string;
   outside: boolean;
   /** Counts toward the sun estimate (when outside). */
   sun: boolean;
@@ -26,7 +29,7 @@ export interface ActivityDraft {
 export const DEFAULT_ACTIVITY_SKIN: SkinExposure = 'faceHands';
 
 export function draftOf(a: ActivityRecord): ActivityDraft {
-  return { kind: a.kind, name: a.name ?? '', time: a.time, minutes: a.minutes, intensity: a.intensity ?? 'moderate', outside: a.outside, sun: !!a.sunSkin, skin: a.sunSkin ?? DEFAULT_ACTIVITY_SKIN };
+  return { kind: a.kind, name: a.name ?? '', time: a.time, minutes: a.minutes, intensity: a.intensity ?? 'moderate', ...(a.compendium ? { compendium: a.compendium } : {}), outside: a.outside, sun: !!a.sunSkin, skin: a.sunSkin ?? DEFAULT_ACTIVITY_SKIN };
 }
 
 /** The record fields of a draft, or a problem to show instead. */
@@ -43,6 +46,7 @@ export function recordOf(d: ActivityDraft, now = Date.now()): { ok: true; fields
       time: d.time,
       minutes: Math.round(d.minutes),
       intensity: d.intensity,
+      ...(d.compendium ? { compendium: d.compendium } : {}),
       outside: d.outside,
       ...(d.outside && d.sun ? { sunSkin: d.skin } : {}),
     },
@@ -66,7 +70,8 @@ export function ActivityForm({ draft, onChange }: { draft: ActivityDraft; onChan
         label={t('activity.what')}
         className="segmented-grid"
         value={draft.kind}
-        onChange={(kind) => set({ kind })}
+        // A row picked for another kind would no longer fit.
+        onChange={(kind) => set({ kind, compendium: undefined })}
         options={ACTIVITY_KINDS.map((k) => ({ value: k, label: t(`activity.kind.${k}` as MessageKey) }))}
       />
       <Field label={t('activity.name')}>
@@ -80,6 +85,7 @@ export function ActivityForm({ draft, onChange }: { draft: ActivityDraft; onChan
         onChange={(intensity) => set({ intensity })}
         options={INTENSITIES.map((i) => ({ value: i, label: t(`activity.intensity.${i}` as MessageKey) }))}
       />
+      <CountsAs draft={draft} onChange={onChange} />
       <Toggle checked={draft.outside} onChange={(outside) => set({ outside })} label={t('activity.outside')} />
       {draft.outside && sunOn && (
         <>

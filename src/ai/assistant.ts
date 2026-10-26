@@ -14,6 +14,7 @@ import {
   runLookupBarcode,
   runSearchFoods,
   runSearchProducts,
+  runSearchActivities,
   runSearchUsda,
   sourcesOf,
   validateJournalProposal,
@@ -394,6 +395,9 @@ export async function sendMessage(
           rejected = true;
           results.push({ type: 'tool_result', tool_use_id: use.id, content: r.error, is_error: true });
         }
+      } else if (use.name === 'search_activities' && sources.activity) {
+        const r = runSearchActivities(use.input);
+        results.push({ type: 'tool_result', tool_use_id: use.id, content: r.text, is_error: !r.ok });
       } else if (use.name === 'propose_activity' && sources.activity) {
         const r = validateActivityProposal(use.input, ctx.now);
         if (r.ok) activitiesProposed.push({ id: use.id, proposal: r.proposal });

@@ -35,7 +35,7 @@ export function ActivitySheet({
     const fields = { ...r.fields, day: dayKey(new Date(r.fields.time)) };
     if (activity) {
       // Optional fields left out of `fields` must not survive from the old record.
-      const { name: _n, sunSkin: _s, ...kept } = activity;
+      const { name: _n, sunSkin: _s, compendium: _c, ...kept } = activity;
       await repo.updateActivity({ ...kept, ...fields });
       toast(t('activity.updated'), () => repo.restoreActivity(activity));
     } else {

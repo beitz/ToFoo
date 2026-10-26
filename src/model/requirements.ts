@@ -16,6 +16,8 @@ export interface ModelProfile {
   energyTargetKcal?: number;
   /** Own daily targets per nutrient id, for the nutrients in OWN_TARGETS. */
   nutrientTargets?: Record<string, OwnTarget>;
+  /** Correction of the estimate the user accepted from their weight (Weight page): estimate × this. */
+  energyFactor?: number;
 }
 
 /** A user-set daily amount for one nutrient, in its BLS unit: per kg body weight or per day. */
@@ -48,6 +50,8 @@ export interface EnergyEstimate {
   kcal: number;
   reeKcal: number;
   pal: number;
+  /** Correction from the weight, 1 when none: kcal = resting × PAL × factor. */
+  factor: number;
 }
 
 export const PROFILE_DEFAULTS = {
@@ -128,15 +132,16 @@ function amountFor(spec: AmountSpec, sex: Sex | undefined, group: AgeGroup, ctx:
 
 /**
  * Energy need from age, sex, weight and activity: resting energy expenditure (Müller et al. 2004,
- * the equation behind the DGE guide values) × PAL. An unset sex takes the lower value, like the table.
+ * the equation behind the DGE guide values) × PAL, × the correction the user accepted from their
+ * weight. An unset sex takes the lower value, like the table.
  */
-export function estimateEnergyNeed(sex: Sex | undefined, ageYears: number, weightKg: number, activity: ActivityLevel): EnergyEstimate {
+export function estimateEnergyNeed(sex: Sex | undefined, ageYears: number, weightKg: number, activity: ActivityLevel, factor = 1): EnergyEstimate {
   const c = energyNeed.ree.value;
   const reeFor = (s: Sex) => (c.weightKg * weightKg + (s === 'male' ? c.male : 0) + c.ageYears * ageYears + c.intercept) * energyNeed.kcalPerMJ;
   const reeKcal = sex ? reeFor(sex) : Math.min(reeFor('male'), reeFor('female'));
   const pal = energyNeed.pal.value[activity];
   const step = energyNeed.roundToKcal;
-  return { kcal: Math.round((reeKcal * pal) / step) * step, reeKcal: Math.round(reeKcal / step) * step, pal };
+  return { kcal: Math.round((reeKcal * pal * factor) / step) * step, reeKcal: Math.round(reeKcal / step) * step, pal, factor };
 }
 
 /** The own target for a nutrient, if the user set a usable one and the nutrient allows that kind. */
@@ -167,7 +172,7 @@ export function resolveRequirements(profile: ModelProfile, currentYear: number):
   const ctx = { weightKg, activity, phytate, menstruation, energyKcal: 0 };
   const guideKcal = energyRef ? amountFor(energyRef.amount, profile.sex, ageGroup, ctx) : 2000;
   // The estimate needs the person's own age and weight; with defaults the DGE table is the better guess.
-  const estimate = profile.birthYear && profile.weightKg ? estimateEnergyNeed(profile.sex, currentYear - profile.birthYear, weightKg, activity) : undefined;
+  const estimate = profile.birthYear && profile.weightKg ? estimateEnergyNeed(profile.sex, currentYear - profile.birthYear, weightKg, activity, profile.energyFactor && profile.energyFactor > 0 ? profile.energyFactor : 1) : undefined;
   const own = profile.energyTargetKcal && profile.energyTargetKcal > 0 ? profile.energyTargetKcal : undefined;
   const energy: EnergyTarget = own
     ? { kcal: own, basis: 'own', estimate, guideKcal }

@@ -12,7 +12,8 @@
     "test:watch": "vitest",
     "e2e": "playwright test",
     "typecheck": "tsc",
-    "schema": "tsx scripts/gen-schema.ts"
+    "schema": "tsx scripts/gen-schema.ts",
+    "compendium": "tsx scripts/compendium.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.135.0",
