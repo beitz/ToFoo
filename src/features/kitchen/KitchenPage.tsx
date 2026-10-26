@@ -12,12 +12,14 @@ import type { Batch, HomePlace, PantryItem } from '../../storage/types';
 import { Icon } from '../../ui/Icon';
 import { AskChips } from '../../ui/AskChips';
 import { formatDay } from '../../lib/dates';
+import { refKey } from '../../lib/refs';
 import { useShopping } from '../shopping/useShopping';
 import { ShoppingAdd } from '../shopping/ShoppingAdd';
 import { PutAwaySheet } from '../pantry/PutAwaySheet';
 import { PantryItemSheet } from '../pantry/PantryItemSheet';
 import { leftLabel, placeName, usePantry, usePantryLeft } from '../pantry/usePantry';
 import { SettingsButton } from '../../ui/SettingsButton';
+import { FoodSourceTag } from '../food/FoodSourceTag';
 import { PantryAdd } from './PantryAdd';
 
 const PLACE_ICON: Record<HomePlace, string> = { fridge: 'fridge', freezer: 'snow', cupboard: 'pantry', spices: 'leaf' };
@@ -253,21 +255,28 @@ function PotRow({ batch, portions, place }: { batch: Batch; portions: number; pl
   );
 }
 
-/** One thing at home: its name, running low or used up in words, and how much is left. */
+/**
+ * One thing at home: its name, where its numbers come from (a small tag: BLS, Open Food Facts paired
+ * with BLS or label only…), running low or used up in words, and how much is left.
+ */
 function Row({ item, left, onList, onEdit }: { item: PantryItem; left: Left; onList: boolean; onEdit: () => void }) {
+  const d = useData();
   const amount = leftLabel(item, left);
   const status = left.out ? t('pantry.out') : left.low ? t('pantry.low') : '';
   return (
     <button className={`home-row${left.out ? ' out' : ''}`} onClick={onEdit}>
       <span className="shop-text">
         <span className="shop-name">{item.name}</span>
-        {status && (
-          <span className="small home-status">
-            {left.low && <Icon name="alert" size={14} />}
-            {status}
-            {onList && ` · ${t('pantry.onList')}`}
-          </span>
-        )}
+        <span className="small kitchen-meta">
+          <FoodSourceTag foodRef={item.ref} product={item.ref && d.productsById.get(refKey(item.ref))} />
+          {status && (
+            <span className="home-status">
+              {left.low && <Icon name="alert" size={14} />}
+              {status}
+              {onList && ` · ${t('pantry.onList')}`}
+            </span>
+          )}
+        </span>
       </span>
       {amount && !left.out && <span className="shop-amount">{amount}</span>}
       <Icon name="chevron" size={16} />

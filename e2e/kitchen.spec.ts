@@ -65,6 +65,8 @@ test('a scanned spice jar is counted in exact grams', async ({ page }) => {
   await page.getByRole('button', { name: 'Look up' }).click();
   const row = page.locator('.home-row', { hasText: 'Paprika edelsüß' });
   await expect(row).toContainText('12.5 g');
+  // A small tag says it is an Open Food Facts product, paired with a BLS food or by its label alone.
+  await expect(row).toContainText(/OFF (\+ BLS|· label only)/);
 
   // Counted again as one jar, then back to grams with one tap, then what is really left.
   await row.click();
@@ -106,7 +108,7 @@ test('a spice missing from the food database is found as a product, or kept by i
   await expect(page.getByText(/Not in the food lists/)).toBeVisible();
   await page.getByRole('button', { name: 'Add', exact: true }).click();
   const main = page.locator('main');
-  await expect(main.locator('.home-row', { hasText: 'Wacholderbeeren' })).toBeVisible();
+  await expect(main.locator('.home-row', { hasText: 'Wacholderbeeren' })).toContainText('No food linked');
 
   // With it: the bundled product list offers the jar, and picking it counts the jar's grams.
   await page.goto('./#/settings');

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Product } from '../storage/types';
 import type { BlsFile } from './blsTypes';
 import { buildFoodDb } from './foodDb';
-import { needsCheck, productFood, productLabel } from './products';
+import { foodSourceKind, needsCheck, productFood, productLabel } from './products';
 import { resolveEntry, type ResolveContext } from '../logic/resolve';
 
 const bls: BlsFile = {
@@ -106,5 +106,24 @@ describe('products as foods', () => {
     expect(fromUsda.parts[0]!.per100.ENERCC).toBe(500);
     const unknown = resolveEntry({ id: '2', schemaVersion: 1, time: 0, day: '2026-10-16', confidence: 'A', label: 'x', kind: 'food', ref: { source: 'OFF', code: '1' }, grams: 1, preparation: 'asListed' }, ctx);
     expect(unknown).toBeNull();
+  });
+});
+
+describe('foodSourceKind', () => {
+  const off = { code: '1', source: 'OFF' } as const;
+  const usda = { code: '2', source: 'USDA' } as const;
+  it('says whether a product is paired with a BLS food or counts its label only', () => {
+    expect(foodSourceKind(undefined)).toBe('none');
+    expect(foodSourceKind({ source: 'BLS', version: '4.0', code: 'C131000' })).toBe('bls');
+    expect(foodSourceKind({ source: 'custom', id: 'x' })).toBe('custom');
+    expect(foodSourceKind(off, { source: 'OFF', match: { version: '4.0', code: 'S610000', auto: true } })).toBe('offBls');
+    expect(foodSourceKind(off, { source: 'OFF' })).toBe('offLabel');
+    expect(foodSourceKind(off)).toBe('off');
+  });
+  it('keeps USDA generic foods apart from branded ones without a pairing', () => {
+    expect(foodSourceKind(usda, { source: 'USDA', usdaType: 'Foundation' })).toBe('usda');
+    expect(foodSourceKind(usda, { source: 'USDA', usdaType: 'Branded' })).toBe('usdaLabel');
+    expect(foodSourceKind(usda, { source: 'USDA', usdaType: 'Branded', match: { version: '4.0', code: 'S610000' } })).toBe('usdaBls');
+    expect(foodSourceKind(usda)).toBe('usda');
   });
 });

@@ -30,6 +30,21 @@ export const hasOwnMicros = (p: Pick<Product, 'source' | 'usdaType'>) => p.sourc
 /** A pairing the user has not looked at: picked by the app, or none found (and "label only" not chosen). */
 export const needsCheck = (p: Pick<Product, 'source' | 'usdaType' | 'match' | 'labelOnly'>) => !hasOwnMicros(p) && (p.match ? !!p.match.auto : !p.labelOnly);
 
+/**
+ * Where a food's numbers come from, in short, for the small tag on things in the kitchen and on
+ * the assistant's At home cards (owner's ask 2026-10-26: "is this from Open Food Facts? is it
+ * linked with BLS?"). `off`/`usda` alone: a product not saved on this phone, so its pairing is unknown.
+ */
+export type FoodSourceKind = 'bls' | 'offBls' | 'offLabel' | 'off' | 'usda' | 'usdaBls' | 'usdaLabel' | 'custom' | 'none';
+export function foodSourceKind(ref: FoodRef | undefined, product?: Pick<Product, 'source' | 'usdaType' | 'match'>): FoodSourceKind {
+  if (!ref) return 'none';
+  if (ref.source === 'BLS') return 'bls';
+  if (ref.source === 'custom') return 'custom';
+  if (ref.source === 'OFF') return !product ? 'off' : product.match ? 'offBls' : 'offLabel';
+  if (!product) return 'usda';
+  return product.match ? 'usdaBls' : hasOwnMicros(product) ? 'usda' : 'usdaLabel';
+}
+
 /** The food's page at its source. */
 export const productPageUrl = (p: Pick<Product, 'source' | 'code'>) => (p.source === 'USDA' ? usdaFoodUrl(p.code) : productUrl(p.code));
 
