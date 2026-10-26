@@ -8,6 +8,7 @@
  * scenes and small fixes. A pull request that changes what users see adds its line here in the same PR.
  */
 export const changesEn = {
+  'change.162': 'Look for patterns now takes an open look at your data and tells you what stands out most: trends, standout days, changes in routine or connections.',
   'change.161': 'Look for patterns now sees when you wake up in the night (how often, how long awake), keeps both halves of a night with a long wake-up, and can go through your data day by day when you ask for a deep look.',
   'change.160': 'Kitchen: a bin on the Used up card clears everything used up in one tap, with undo.',
   'change.159': 'Kitchen: marking something running low or used up no longer puts it on the shopping list by itself, and the list no longer offers things eaten up. Its sheet has Add to shopping list for when you want it there.',
