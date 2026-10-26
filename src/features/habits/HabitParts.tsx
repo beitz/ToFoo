@@ -58,6 +58,7 @@ export function weekdayName(n: number, style: 'short' | 'narrow' = 'short'): str
 /** "Every day", "Mon, Wed, Fri", "2× a week"; for avoid habits "Never", "Not on Mon, Fri", "At most 2 days a week". */
 export function goalText(h: Pick<Habit, 'kind' | 'goal' | 'minutes'>): string {
   const g = h.goal;
+  if (g.type === 'none') return t('habits.goal.none');
   const days = g.type === 'weekdays' ? [...g.days].sort().map((n) => weekdayName(n)).join(', ') : '';
   const when =
     h.kind === 'avoid'
@@ -101,7 +102,8 @@ export function useQuickLog() {
     const rec = quickActivity(h.quick, Date.now(), DEFAULT_ACTIVITY_SKIN);
     const added = await repo.addActivity(rec);
     const m = habitMinutes(h, d.activities, rec.day) + rec.minutes;
-    toast(t('habits.quickLogged', { what: quickText(h.quick), m, of: h.minutes ?? 0 }), () => void repo.deleteActivity(added.id));
+    const text = h.minutes ? t('habits.quickLogged', { what: quickText(h.quick), m, of: h.minutes }) : t('habits.quickLoggedTotal', { what: quickText(h.quick), m });
+    toast(text, () => void repo.deleteActivity(added.id));
   };
 }
 

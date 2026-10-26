@@ -48,7 +48,11 @@ export function HabitPage({ id }: { id: string }) {
         </a>
       </header>
       <div className="card tracker-hero" data-tour="habits.summary">
-        {tally.of ? (
+        {h.goal.type === 'none' ? (
+          <p>
+            <span className="tracker-big">{tally.kept}</span> <span className="muted">{t(tally.kept === 1 ? 'habits.tally.day1' : 'habits.tally.days')}</span>
+          </p>
+        ) : tally.of ? (
           <p>
             <span className="tracker-big">{t('habits.tally.count', { n: tally.kept, of: tally.of })}</span> <span className="muted">{tallyUnit(tally)}</span>
           </p>
@@ -60,9 +64,11 @@ export function HabitPage({ id }: { id: string }) {
           {h.kind === 'minutes' && ` · ${activitiesText(h.activities)}`}
           {h.archived && ` · ${t('habits.isArchived')}`}
         </p>
-        <p className="small">
-          {runText(run)} · {runText(run, 'longest')}
-        </p>
+        {h.goal.type !== 'none' && (
+          <p className="small">
+            {runText(run)} · {runText(run, 'longest')}
+          </p>
+        )}
         {h.quick && !h.archived && (
           <div className="sheet-actions">
             <button className="btn" onClick={() => setChanging(true)}>
@@ -118,7 +124,7 @@ export function HabitPage({ id }: { id: string }) {
                     aria-label={`${date}: ${markText(h, shownMark(h, s.mark))}${value ? `, ${t('tracker.minutes', { m: s.minutes ?? 0 })}` : ''}`}
                   >
                     <span className="calendar-num">{num}</span>
-                    {value && s.mark !== 'kept' ? <span className="habit-day-minutes">{value}</span> : <MarkGlyph mark={shownMark(h, s.mark)} />}
+                    {value && (s.mark !== 'kept' || h.goal.type === 'none') ? <span className="habit-day-minutes">{value}</span> : <MarkGlyph mark={shownMark(h, s.mark)} />}
                   </button>
                 );
               })}

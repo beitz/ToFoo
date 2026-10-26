@@ -93,3 +93,28 @@ test('habits: one tap logs the preset activity, again and again, and long press 
   await expect(page.getByRole('dialog').getByLabel('How long')).toHaveValue('30');
   expect(errors).toEqual([]);
 });
+
+test('habits: one without a target is never asked about, and its card shows what was done today', async ({ page }) => {
+  const errors = watchErrors(page);
+  await firstLaunch(page);
+  await turnOnHabits(page);
+  await page.goto('./#/habits/new');
+  await page.getByLabel('Name').fill('Walks');
+  await page.getByRole('radio', { name: 'Activity' }).click();
+  await page.getByRole('button', { name: 'Walk', exact: true }).click();
+  await page.getByRole('radio', { name: 'No target' }).click();
+  // No target: no minutes to reach.
+  await expect(page.getByLabel('Minutes a day')).toHaveCount(0);
+  await page.getByRole('switch', { name: /^One tap on Home logs it/ }).click();
+  await page.getByLabel('Minutes per tap').fill('20');
+  await page.getByRole('button', { name: 'Save' }).click();
+  await expect(page.getByText('No target', { exact: false }).first()).toBeVisible();
+
+  await page.goto('./#/');
+  const card = page.getByRole('list', { name: 'Habits' }).getByRole('listitem', { name: /^Walks:/ });
+  await expect(card).toHaveAccessibleName(/^Walks: 0 minutes today/);
+  await card.click();
+  await expect(page.getByText('Walk 20 min logged: 20 min today.')).toBeVisible();
+  await expect(card).toHaveAccessibleName(/^Walks: 20 minutes today/);
+  expect(errors).toEqual([]);
+});

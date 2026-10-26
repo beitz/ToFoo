@@ -76,7 +76,7 @@ function HabitRow({ habit: h, data }: { habit: Habit; data: HabitData }) {
         ))}
       </span>
       <span className="muted small">
-        {tallyText(tally)}
+        {h.goal.type === 'none' ? (tally.kept === 1 ? t('habits.tally.tracked1') : t('habits.tally.tracked', { n: tally.kept })) : tallyText(tally)}
         {run.current > 1 && ` · ${runText(run)}`}
       </span>
     </a>

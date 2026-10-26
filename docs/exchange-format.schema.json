@@ -3071,11 +3071,25 @@
                           "type",
                           "times"
                         ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "const": "none"
+                          }
+                        },
+                        "required": [
+                          "type"
+                        ],
+                        "description": "Tracked without a target (do and minutes habits): never due, no run"
                       }
                     ],
                     "description": "When it is due; for an avoid habit a maximum (never, never on these days, at most n days a week)"
                   },
                   "minutes": {
+                    "description": "Minutes habits: the day's total that counts as kept; missing with no target (any minutes count)",
                     "type": "number",
                     "exclusiveMinimum": 0
                   },
