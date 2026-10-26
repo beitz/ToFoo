@@ -78,7 +78,7 @@ test('habits: one tap logs the preset activity, again and again, and long press 
   const card = page.getByRole('list', { name: 'Habits' }).getByRole('listitem', { name: /^Commute:/ });
   await expect(card).toHaveAccessibleName(/^Commute: 0 of 60 minutes today; tap logs Walk 30 min/);
   await card.click();
-  await expect(page.getByText('Walk 30 min logged: 30 of 60 min today.')).toBeVisible();
+  await expect(page.getByText('Walk 30 min added to Activities · Commute 30/60′')).toBeVisible();
   await expect(card).toHaveAccessibleName(/^Commute: 30 of 60 minutes today/);
   await card.click();
   await expect(card).toHaveAccessibleName(/^Commute: reached/);
@@ -91,6 +91,13 @@ test('habits: one tap logs the preset activity, again and again, and long press 
   await page.mouse.up();
   await expect(page.getByRole('dialog')).toBeVisible();
   await expect(page.getByRole('dialog').getByLabel('How long')).toHaveValue('30');
+  await page.keyboard.press('Escape');
+
+  // The walks are activities: the Activities page says which habit each counted for, and the habit page lists them.
+  await page.goto('./#/activity');
+  await expect(page.getByRole('link', { name: 'Commute' }).first()).toBeVisible();
+  await page.getByRole('link', { name: 'Commute' }).first().click();
+  await expect(page.getByRole('heading', { name: 'Today · 60/60′' })).toBeVisible();
   expect(errors).toEqual([]);
 });
 
@@ -114,7 +121,7 @@ test('habits: one without a target is never asked about, and its card shows what
   const card = page.getByRole('list', { name: 'Habits' }).getByRole('listitem', { name: /^Walks:/ });
   await expect(card).toHaveAccessibleName(/^Walks: 0 minutes today/);
   await card.click();
-  await expect(page.getByText('Walk 20 min logged: 20 min today.')).toBeVisible();
+  await expect(page.getByText('Walk 20 min added to Activities · Walks 20′ today')).toBeVisible();
   await expect(card).toHaveAccessibleName(/^Walks: 20 minutes today/);
   expect(errors).toEqual([]);
 });

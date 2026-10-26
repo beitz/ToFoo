@@ -9,6 +9,8 @@
  */
 export const changesEn = {
   'change.157': 'The activity sheet starts with your favourite and most frequent activities of the last four weeks: one tap fills in the activity, minutes, effort and outside. Tap the star to keep one as a favourite.',
+  'change.158': 'Habits and activities are told apart: a new habit asks who answers it (you, or your activities), activity habits show the activity mark on Home, each activity says which habits it counts for, and an activity habit page lists the activities that counted today.',
+  'change.158.major': 'Clear line between habits and activities',
   'change.156': 'Habits can have no target: pick "No target" for something you just want to track. It is never asked about or counted as missed, and its Home card shows what you did today (an activity: the minutes so far).',
   'change.155': 'A clearer habit form: activity habits are now the kind "Activity", the activity is picked once, the details of a one-tap activity fold into one line, and the form shows how the Home card will look and what a tap does.',
   'change.154': 'Activities now count in the energy you burn, from the 2024 Compendium of Physical Activities: "+220 kcal" on each activity, pick the exact activity (football, yoga…) from 1,111, and an Energy burned card on the Energy page. Your energy target stays as it is. When your log and weight disagree, the Weight page offers what your weight says you burn, to take over with one tap.',

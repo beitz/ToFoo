@@ -220,15 +220,37 @@ function EditorForm({ habit, all, activityOn }: { habit: Habit | undefined; all:
             ))}
           </div>
         </div>
+        {/* Who answers it: you (do, avoid) or your activities (owner's ask 2026-10-26: habits and activities blended together). */}
         <div className="field">
-          <span className="field-label">{t('habits.editor.kind')}</span>
-          <Segmented<HabitKind>
-            label={t('habits.editor.kind')}
-            value={draft.kind}
-            onChange={(kind) => set({ kind, times: kind === 'avoid' && (draft.times ?? 0) > 6 ? 6 : draft.times, ...(kind === 'avoid' && draft.goalType === 'none' ? { goalType: 'daily' as const } : {}) })}
-            options={HABIT_KINDS.filter((k) => k !== 'minutes' || activityOn || draft.kind === 'minutes').map((k) => ({ value: k, label: t(`habits.kind.${k}` as MessageKey) }))}
-          />
-          <div className="field-hint">{t(`habits.kindHint.${draft.kind}` as MessageKey)}</div>
+          <span className="field-label" id="habit-kind-label">
+            {t('habits.editor.kind')}
+          </span>
+          <div className="habit-kinds" role="radiogroup" aria-labelledby="habit-kind-label">
+            {HABIT_KINDS.filter((k) => k !== 'minutes' || activityOn || draft.kind === 'minutes').map((kind) => (
+              <button
+                key={kind}
+                type="button"
+                role="radio"
+                aria-checked={draft.kind === kind}
+                aria-labelledby={`habit-kind-${kind}`}
+                aria-describedby={`habit-kind-${kind}-hint`}
+                className={draft.kind === kind ? 'habit-kind on' : 'habit-kind'}
+                onClick={() => set({ kind, times: kind === 'avoid' && (draft.times ?? 0) > 6 ? 6 : draft.times, ...(kind === 'avoid' && draft.goalType === 'none' ? { goalType: 'daily' as const } : {}) })}
+              >
+                <span className="habit-kind-mark" aria-hidden>
+                  {kind === 'minutes' ? <Icon name="activity" size={18} /> : kind === 'do' ? '✓' : '✗'}
+                </span>
+                <span className="habit-kind-text">
+                  <span id={`habit-kind-${kind}`} className="habit-kind-name">
+                    {t(`habits.kind.${kind}` as MessageKey)}
+                  </span>
+                  <span id={`habit-kind-${kind}-hint`} className="muted small">
+                    {t(`habits.kindHint.${kind}` as MessageKey)}
+                  </span>
+                </span>
+              </button>
+            ))}
+          </div>
         </div>
         {!activityOn && draft.kind !== 'minutes' && <p className="muted small">{t('habits.editor.minutesNeedActivity')}</p>}
 

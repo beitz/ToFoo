@@ -7,6 +7,7 @@ import type { ActivityRecord } from '../../storage/types';
 import { BackButton } from '../../ui/BackButton';
 import { Icon } from '../../ui/Icon';
 import { ActivitySheet } from '../activity/ActivitySheet';
+import { CountsFor, useCountsFor } from '../habits/CountsFor';
 import { activityName } from '../activity/ActivityForm';
 import { useAddsText } from '../activity/useBurn';
 import { hmText } from '../sleep/format';
@@ -27,6 +28,7 @@ export function ActivityPage() {
   const entries = d.activities.filter((a) => a.day >= days[0]!).sort((a, b) => b.time - a.time);
   const top = Math.max(60, ...minutes.values());
   const adds = useAddsText();
+  const countsFor = useCountsFor();
 
   return (
     <section>
@@ -97,6 +99,7 @@ export function ActivityPage() {
                     <Icon name="edit" size={16} />
                   </span>
                 </button>
+                <CountsFor habits={countsFor(a)} />
               </li>
             ))}
           </ul>

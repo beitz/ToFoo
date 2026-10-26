@@ -28,6 +28,7 @@ import { SleepSheet } from '../sleep/SleepSheet';
 import { spanText } from '../sleep/format';
 import { useAddsText } from '../activity/useBurn';
 import { ActivitySheet } from '../activity/ActivitySheet';
+import { CountsFor, useCountsFor } from '../habits/CountsFor';
 import { activityName } from '../activity/ActivityForm';
 import { useActivities } from '../activity/useActivities';
 import { WaterCard } from '../water/WaterCard';
@@ -66,6 +67,7 @@ export function DiaryPage({ day: dayParam }: { day?: string }) {
   // An activity being edited, or 'new' for one being added.
   const [activitySheet, setActivitySheet] = useState<ActivityRecord | 'new' | null>(null);
   const adds = useAddsText();
+  const countsFor = useCountsFor();
   const waterOn = isOn(d.settings.features, 'water');
   const water = useWater(day) ?? [];
   const [waterSheet, setWaterSheet] = useState<WaterRecord | null>(null);
@@ -212,6 +214,7 @@ export function DiaryPage({ day: dayParam }: { day?: string }) {
                 <Icon name="edit" size={16} />
               </span>
             </button>
+            <CountsFor habits={countsFor(item.activity)} />
             <a className="meal-foot" href={href('activity')}>
               <Icon name="activity" size={16} />
               <span className="grow">{t('diary.allActivities')}</span>

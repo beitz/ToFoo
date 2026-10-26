@@ -8527,3 +8527,79 @@ button.link-row {
 .measured-burn > p:first-child {
   margin-top: 0;
 }
+
+/* Habits and activities (owner's ask 2026-10-26): who answers a habit, and what an activity counts for. */
+.habit-card-value > svg {
+  margin-right: 3px;
+  vertical-align: -1px;
+  color: var(--text-muted);
+}
+.habit-kinds {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.habit-kind {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: 8px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.habit-kind.on {
+  border: 2px solid var(--accent);
+}
+.habit-kind-mark {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 2px solid var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+}
+.habit-kind.on .habit-kind-mark {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.habit-kind-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.habit-kind-name {
+  font-weight: 700;
+}
+.counts-for {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  padding: 0 12px 6px;
+}
+.counts-for-habit {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-size: 0.85rem;
+  font-weight: 650;
+  color: var(--hc);
+  text-decoration: none;
+}
+.counts-for-habit::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: var(--hc);
+}
