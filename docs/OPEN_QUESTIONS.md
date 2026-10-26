@@ -14,7 +14,7 @@ Questions and assumptions that need an answer or a better source. Each model val
 
 ## For the user to decide (proposals in place)
 
-- [ ] **Tank vs rolling average.** Proposed tanks: B12, vitamin A, vitamin D, iron, folate, iodine. Zinc is a rolling average (no mobilisable store). Everything else is rolling: 7-day window for energy, macronutrients, amino acids, B vitamins, sodium, potassium; 14-day window for vitamins C/E/K, calcium, magnesium, phosphorus, trace elements, essential fatty acids.
+- [ ] **Tank vs rolling average.** Proposed tanks: B12, vitamin A, vitamin D, iron, folate, iodine. Zinc is a rolling average (no mobilisable store). Everything else is rolling: 7-day window for energy, macronutrients, amino acids, B vitamins, sodium, potassium; 14-day window for vitamin C, calcium, magnesium, phosphorus, trace elements. Reviewed 2026-10-26: omega-3, linoleic and alpha-linolenic acid and vitamin E moved to an 8-week window and vitamin K to 7 days, each with a source; the other lengths are still a proposal (vitamin C, zinc and calcium could be argued either way).
 - [ ] **Default visible nutrients:** all (as in the spec). Chromium has weak evidence and might be hidden by default.
 - [ ] **Status thresholds:** tanks low < 20 %, getting low < 40 %; rolling averages and slow-store balances low < 70 %, getting low < 90 % of the requirement.
 - [ ] **Trend arrows** (`trendDisplay` in model/parameters.ts, display choices): 7-day lookback, at least 3 days of history, arrows by days to the next status line (3 ≤ 7 days, 2 ≤ 30 days, else 1), steady below 2 points per week. Above an upper limit the limit line is approximated as value ÷ (intake ÷ UL). Revisit once there is real usage.

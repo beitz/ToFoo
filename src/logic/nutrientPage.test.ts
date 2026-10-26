@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { DailyTotals, MealSummary } from '../model/simulate';
 import type { ModelEntry } from '../model/types';
-import { cameFrom, contributorsOver, periodDays, storeAhead, tileTop, timesEaten, uptakeDays, windowDays } from './nutrientPage';
+import { cameFrom, contributorsOver, periodDays, storeAhead, tileTop, timesEaten, uptakeDays, weekMarks, windowDays, type WindowDay } from './nutrientPage';
 
 const totals = (intake: number, absorbed: number, missing = false): DailyTotals => ({
   absorbed: {
@@ -186,5 +186,18 @@ describe('nutrient page numbers', () => {
     ]);
     expect(periodDays(['2026-10-01'], ['2026-10-01'], days, daily, 'FE', { kind: 'limit', ref: 20 })[0]!.value).toBe(0.5);
     expect(periodDays(['2026-10-01'], ['2026-10-01'], days, daily, 'FE', { kind: 'info' })[0]!.value).toBe(10);
+  });
+});
+
+describe('weekMarks', () => {
+  const day = (i: number, dot: WindowDay['dot'] = 'known', missing = false): WindowDay => ({ day: `2026-01-${String(i + 1).padStart(2, '0')}`, dot, missing });
+  it('groups a long window into weeks counted back from the newest day', () => {
+    const days = Array.from({ length: 17 }, (_, i) => day(i, i === 12 ? 'estimated' : 'known', i === 1));
+    const weeks = weekMarks(days);
+    // 17 days: a short oldest week (3 days), then two full ones.
+    expect(weeks.map((w) => w.day)).toEqual(['2026-01-01', '2026-01-04', '2026-01-11']);
+    expect(weeks.map((w) => w.dot)).toEqual(['known', 'known', 'estimated']);
+    expect(weeks.map((w) => w.missing)).toEqual([true, false, false]);
+    expect(weekMarks(Array.from({ length: 7 }, (_, i) => day(i, 'leftOut')))[0]!.dot).toBe('leftOut');
   });
 });

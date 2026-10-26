@@ -115,7 +115,9 @@ test('habits: one without a target is never asked about, and its card shows what
   await page.getByRole('switch', { name: /^One tap on Home logs it/ }).click();
   await page.getByLabel('Minutes per tap').fill('20');
   await page.getByRole('button', { name: 'Save' }).click();
-  await expect(page.getByText('No target', { exact: false }).first()).toBeVisible();
+  // Wait for the habit's own page: the editor also says "No target", and leaving before Save has opened
+  // the habit page let that late navigation win over the goto below (flaky on CI).
+  await expect(page.getByText('No target · Walk, from Activities')).toBeVisible();
 
   await page.goto('./#/');
   const card = page.getByRole('list', { name: 'Habits' }).getByRole('listitem', { name: /^Walks:/ });

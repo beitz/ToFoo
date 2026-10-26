@@ -556,15 +556,36 @@ describe('simulation', () => {
   });
 
   it('marks a line whose window is not full yet as an early reading', () => {
-    // Five finished days and today: EPA + DHA averages over 14 days, thiamin over 7.
+    // Five finished days and today: EPA + DHA averages over 8 weeks, vitamin C over 14 days, thiamin over 7.
     const d = days('2026-01-01', 6);
-    const entries = d.map((day, i) => manual(`e${i}`, day, 12, { 'F20:5CN3': 0.1, THIA: 1000, FE: 10 }));
+    const entries = d.map((day, i) => manual(`e${i}`, day, 12, { 'F20:5CN3': 0.1, THIA: 1000, VITC: 100, FE: 10 }));
     const res = simulate(baseInput(d, entries)).nutrients;
-    expect(earlyReading(res.get('EPADHA')!)).toEqual({ days: 5, of: 14 });
+    expect(earlyReading(res.get('EPADHA')!)).toEqual({ days: 5, of: 56 });
+    expect(earlyReading(res.get('VITC')!)).toEqual({ days: 5, of: 14 });
     expect(earlyReading(res.get('THIA')!)).toEqual({ days: 5, of: 7 });
     expect(earlyReading(res.get('FE')!)).toBeNull(); // a store reads its fill level instead
-    const full = simulate(baseInput(days('2026-01-01', 15), [])).nutrients.get('EPADHA')!;
+    const full = simulate(baseInput(days('2026-01-01', 57), [])).nutrients.get('EPADHA')!;
     expect(earlyReading(full)).toBeNull();
+  });
+
+  it('averages the slow nutrients over the slow window: fatty fish every few weeks still counts', () => {
+    // 12 weeks; 2,000 mg EPA + DHA (about 100 g herring, BLS 4.0) every third Monday, nothing else.
+    const d = days('2026-01-05', 84);
+    const entries = d.filter((_, i) => i % 21 === 0).map((day, i) => manual(`f${i}`, day, 12, { EPADHA: 2 }));
+    const res = simulate(baseInput(d, entries)).nutrients;
+    const epadha = res.get('EPADHA')!;
+    expect(epadha.windowLength).toBe(56);
+    // The last 56 finished days (days 27–82) hold two meals.
+    expect(epadha.averageIntake).toBeCloseTo((2 * 2) / 56, 6);
+    // Once the window is full, the 8-week average never drops to nothing between meals; a 14-day one would.
+    const after = (r: typeof epadha) => r.history.slice(56).map((h) => h.central);
+    expect(Math.min(...after(epadha))).toBeGreaterThan(0);
+    const twoWeeks = simulate(baseInput(d, entries, { settings: { ...DEFAULT_MODEL_SETTINGS, slowWindowDays: 14 } })).nutrients.get('EPADHA')!;
+    expect(Math.min(...after(twoWeeks))).toBe(0);
+    expect(res.get('VITE')!.windowLength).toBe(56);
+    expect(res.get('F18:2CN6')!.windowLength).toBe(56);
+    expect(res.get('F18:3CN3')!.windowLength).toBe(56);
+    expect(res.get('VITK')!.windowLength).toBe(7);
   });
 
   it('without imputation: today alone, still empty, has no data yet', () => {

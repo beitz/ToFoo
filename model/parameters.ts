@@ -281,7 +281,8 @@ export const storage: Record<string, StorageModel> = {
     },
   },
 
-  // Rolling averages. 'short' = default 7 days, 'long' = default 14 days (both set in Settings).
+  // Rolling averages. 'short' = default 7 days, 'long' = default 14 days (both set in Settings),
+  // 'slow' = `slowWindow` below, for what the body evens out over months (reviewed 2026-10-26).
   ENERCC: { kind: 'rolling', window: 'short' },
   PROT625: { kind: 'rolling', window: 'short' },
   FAT: { kind: 'rolling', window: 'short' },
@@ -289,9 +290,24 @@ export const storage: Record<string, StorageModel> = {
   SUGAR: { kind: 'rolling', window: 'short' },
   FIBT: { kind: 'rolling', window: 'short' },
   FASAT: { kind: 'rolling', window: 'short' },
-  'F18:2CN6': { kind: 'rolling', window: 'long' },
-  'F18:3CN3': { kind: 'rolling', window: 'long' },
-  EPADHA: { kind: 'rolling', window: 'long' },
+  'F18:2CN6': { kind: 'rolling', window: 'slow', basis: {
+    source: 'Dayton S et al. (1966): Composition of lipids in human serum and adipose tissue during prolonged feeding of a diet high in unsaturated fat. J Lipid Res 7:103–111; Baylin A et al. (2002): Adipose tissue biomarkers of fatty acid intake. Am J Clin Nutr 76:750–757',
+    url: 'https://pubmed.ncbi.nlm.nih.gov/5900208/',
+    confidence: 'medium',
+    note: 'Checked (abstracts, 2026-10-26). Dayton: body-fat linoleic acid followed a diet change with "a half-time of 680 days". Baylin: body-fat 18:2 correlates with intake (r = 0.58), so the body holds a long-term reserve; blood follows over weeks.',
+  } },
+  'F18:3CN3': { kind: 'rolling', window: 'slow', basis: {
+    source: 'Baylin A et al. (2002): Adipose tissue biomarkers of fatty acid intake. Am J Clin Nutr 76:750–757; Hodson L et al. (2008): Fatty acid composition of adipose tissue and blood in humans and its use as a biomarker of dietary intake. Prog Lipid Res 47:348–380',
+    url: 'https://pubmed.ncbi.nlm.nih.gov/12324287/',
+    confidence: 'medium',
+    note: 'Checked (abstracts, 2026-10-26). Body-fat 18:3 n-3 reflects long-term intake (r = 0.34, Baylin); Hodson reviews blood and body-fat fatty acids as markers of intake over weeks (blood) to years (fat).',
+  } },
+  EPADHA: { kind: 'rolling', window: 'slow', basis: {
+    source: 'Katan MB et al. (1997): Kinetics of the incorporation of dietary fatty acids into serum cholesteryl esters, erythrocyte membranes, and adipose tissue: an 18-month controlled study. J Lipid Res 38:2012–2022',
+    url: 'https://pubmed.ncbi.nlm.nih.gov/9374124/',
+    confidence: 'medium',
+    note: 'Checked (abstract, 2026-10-26): EPA in red blood cells "showed a half-life of 28 days; a steady state was reached after 180 days"; serum reflects "the past week or two, erythrocytes over the past month or two, and adipose tissue over a period of years". Eight weeks is two red-cell half-lives. Arterburn 2006 (PMID 16841856): limited storage in body fat, so a continued supply is needed.',
+  } },
   HIS: { kind: 'rolling', window: 'short' },
   ILE: { kind: 'rolling', window: 'short' },
   LEU: { kind: 'rolling', window: 'short' },
@@ -301,8 +317,14 @@ export const storage: Record<string, StorageModel> = {
   THR: { kind: 'rolling', window: 'short' },
   TRP: { kind: 'rolling', window: 'short' },
   VAL: { kind: 'rolling', window: 'short' },
-  VITE: { kind: 'rolling', window: 'long' },
-  VITK: { kind: 'rolling', window: 'long' },
+  VITE: { kind: 'rolling', window: 'slow', basis: {
+    source: 'Handelman GJ et al. (1994): Human adipose alpha-tocopherol and gamma-tocopherol kinetics during and after 1 y of alpha-tocopherol supplementation. Am J Clin Nutr 59:1025–1032',
+    url: 'https://pubmed.ncbi.nlm.nih.gov/8172086/',
+    confidence: 'low',
+    note: 'Checked (abstract, 2026-10-26): body-fat vitamin E changed slowly and fell "only gradually" after a year of supplements; "≥ 2 y are required" for a new steady state. So the body keeps a large reserve; the model uses the same eight weeks as the fats rather than years, so a lasting change still shows.',
+  } },
+  // Short: the liver holds little and loses it within days (Usui 1990, below).
+  VITK: { kind: 'rolling', window: 'short' },
   THIA: { kind: 'rolling', window: 'short' },
   RIBF: { kind: 'rolling', window: 'short' },
   NIAEQ: { kind: 'rolling', window: 'short' },
@@ -325,11 +347,32 @@ export const storage: Record<string, StorageModel> = {
   MO: { kind: 'rolling', window: 'long' },
 };
 
+/**
+ * Length of the 'slow' window. Eight weeks follows omega-3 in red blood cells (half-life 28 days, Katan 1997:
+ * two half-lives show three quarters of a lasting change); the other slow nutrients share it, so one
+ * length covers what blood shows over weeks without hiding a change for the years body fat takes.
+ */
+export const slowWindow: Valued<number> = {
+  value: 56,
+  source: 'Katan MB et al. (1997), J Lipid Res 38:2012–2022: EPA in red blood cells, half-life 28 days',
+  url: 'https://pubmed.ncbi.nlm.nih.gov/9374124/',
+  confidence: 'medium',
+  note: 'Days. Reviewed 2026-10-26 with the owner: what makes most sense for the status; charts keep their usual 14-day span.',
+};
+
+/** Why vitamin K uses the short window. */
+export const vitaminKTurnover: Cited = {
+  source: 'Usui Y et al. (1990): Vitamin K concentrations in the plasma and liver of surgical patients. Am J Clin Nutr 51:846–852',
+  url: 'https://pubmed.ncbi.nlm.nih.gov/2333843/',
+  confidence: 'medium',
+  note: 'Checked (abstract, 2026-10-26): liver phylloquinone fell from 28 to 6.8 pmol/g after 3 days of a low-vitamin-K diet; plasma "decreased rapidly". The body bridges days, not weeks, so the 7-day window fits better than 14.',
+};
+
 export const storageNotes: Cited = {
   source: 'Modelling choice (docs/SPEC.md "Two kinds of nutrient")',
   confidence: 'assumption',
   note:
-    'Zinc is a rolling average because the body has no mobilisable zinc store (EFSA 2014). Vitamin C (body pool ~1.5 g, weeks) and vitamin E/K use the long window. Window lengths per nutrient are a proposal.',
+    'Zinc is a rolling average because the body has no mobilisable zinc store (EFSA 2014). Vitamin C (body pool ~1.5 g, weeks) uses the long window. Reviewed 2026-10-26: omega-3, linoleic and alpha-linolenic acid and vitamin E moved to the slow window (sources on each), vitamin K to the short one (vitaminKTurnover). The other window lengths are a proposal.',
 };
 
 /** Reference body weights for scaling tank capacities. */

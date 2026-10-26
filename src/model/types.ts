@@ -63,6 +63,8 @@ export interface ModelSettings {
   imputeUnlogged: boolean;
   shortWindowDays: number;
   longWindowDays: number;
+  /** The 'slow' window: from research (model/parameters.ts `slowWindow`), not a setting. */
+  slowWindowDays: number;
   mealWindowMinutes: number;
 }
 
@@ -73,6 +75,7 @@ export const DEFAULT_MODEL_SETTINGS: ModelSettings = {
   imputeUnlogged: false,
   shortWindowDays: 7,
   longWindowDays: 14,
+  slowWindowDays: 56,
   mealWindowMinutes: 120,
 };
 

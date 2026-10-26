@@ -6,7 +6,7 @@ import { nutrientParams, referenceWeightKg, slowStore, startingLevels, statusThr
 import { absorbIronParts, absorbMeal, drinkTimingWeight, ironStatusFactor, type MealComposition } from './absorption';
 import { entryIntake, isCoffee, isTea, TRACKED_IDS, type EntryIntake } from './intake';
 import { MODEL_NUTRIENT_IDS } from './nutrients';
-import type { Range, Scenario, Sex } from './paramTypes';
+import type { Range, Scenario, Sex, StorageModel } from './paramTypes';
 import { SCENARIOS } from './paramTypes';
 import type { ResolvedRequirements } from './requirements';
 import type { DayStatus, ModelEntry, ModelSettings } from './types';
@@ -313,6 +313,12 @@ export function spanOf(kind: GaugeKind | 'tank', value: Range, ulRatio: number |
   return { low: classify(kind, value.low, ulRatio, known), high: classify(kind, value.high, ulRatio, known) };
 }
 
+/** Days a nutrient's average spans: its rolling window; stores and the rest use the long one. */
+export function windowLengthOf(model: StorageModel | undefined, settings: Pick<ModelSettings, 'shortWindowDays' | 'longWindowDays' | 'slowWindowDays'>): number {
+  if (model?.kind !== 'rolling') return settings.longWindowDays;
+  return model.window === 'short' ? settings.shortWindowDays : model.window === 'slow' ? settings.slowWindowDays : settings.longWindowDays;
+}
+
 export function simulate(input: SimulationInput): SimulationResult {
   const { days, requirements: req, settings } = input;
   const dayIndex = new Map(days.map((d, i) => [d, i]));
@@ -336,7 +342,7 @@ export function simulate(input: SimulationInput): SimulationResult {
   const mealDrinks = meals.map((m) => (drinkMealSet.has(m) ? { tea: 0, coffee: 0 } : drinkWeights(m[0]!.time, drinks)));
 
   // ── 1. Daily totals per scenario ──
-  const contribFrom = days.length - Math.max(settings.shortWindowDays, settings.longWindowDays) - 1;
+  const contribFrom = days.length - Math.max(settings.shortWindowDays, settings.longWindowDays, settings.slowWindowDays) - 1;
   const totals = {} as Record<Scenario, DayTotals[]>;
   const contrib = days.map(() => new Map<string, Record<string, number>>()); // central: day → label → absorbed
   const mealSummaries: MealSummary[] = [];
@@ -400,8 +406,7 @@ export function simulate(input: SimulationInput): SimulationResult {
     const slow = isTank && fullDays >= slowStore.minDays.value;
     const kind: GaugeKind = isInfo ? 'info' : r!.limitOnly ? 'limit' : 'rolling';
     const hasStore = isTank && kind === 'rolling';
-    const windowDays =
-      model?.kind === 'rolling' && model.window === 'short' ? settings.shortWindowDays : settings.longWindowDays;
+    const windowDays = windowLengthOf(model, settings);
 
     // Daily inflow (absorbed) per scenario, with imputation for unknown / partial days.
     const inflow = {} as Record<Scenario, number[]>;
