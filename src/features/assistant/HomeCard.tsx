@@ -1,21 +1,26 @@
 import { useMemo, useState } from 'react';
+import { useData } from '../../app/data';
 import { href } from '../../app/router';
 import { t } from '../../i18n';
 import { newId } from '../../lib/id';
+import { refKey } from '../../lib/refs';
 import { fmtLeftGrams, planReports, type Report } from '../../logic/pantry';
 import { repo } from '../../storage/repo';
 import { CURRENT_SCHEMA_VERSION } from '../../storage/types';
 import { Icon } from '../../ui/Icon';
+import { FoodSourceTag } from '../food/FoodSourceTag';
 import { placeName, usePantryFoods, usePantryLeft } from '../pantry/usePantry';
 import { useRegister, type Card, type CardProps, type Undo } from './cards';
 import { ChangeButton, DoneRow } from './CardFrame';
 
 /**
  * Things for At home the assistant proposes (H1, …): what was bought (put away, adding to what is
- * there), and what runs low or is used up (marked so; the shopping list is left to the user), each tickable.
+ * there), and what runs low or is used up (marked so; the shopping list is left to the user), each tickable,
+ * with a small tag for where its numbers come from (BLS, Open Food Facts paired or label only, no food).
  */
 export function HomeCard({ card, toast, onLogged, register }: CardProps<Extract<Card, { kind: 'home' }>>) {
   const { home } = card;
+  const d = useData();
   const left = usePantryLeft();
   const { placeOf } = usePantryFoods();
   const reports = useMemo(
@@ -90,8 +95,11 @@ export function HomeCard({ card, toast, onLogged, register }: CardProps<Extract<
               </span>
               <span className="shop-text">
                 <span className="shop-name">{r.name}</span>
-                <span className="muted small">
-                  {statusText(r)} · {placeName(r.place)}
+                <span className="muted small kitchen-meta">
+                  <FoodSourceTag foodRef={r.ref} product={home.items[i]?.product ?? (r.ref && d.productsById.get(refKey(r.ref)))} />
+                  <span>
+                    {statusText(r)} · {placeName(r.place)}
+                  </span>
                 </span>
               </span>
               <span className="muted small shop-amount">{r.pieces !== undefined ? t('pantry.pieces', { n: r.pieces }) : r.grams !== undefined ? fmtLeftGrams(r.grams) : (r.amount ?? '')}</span>

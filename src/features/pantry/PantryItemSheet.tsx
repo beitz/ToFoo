@@ -2,13 +2,15 @@ import { useState } from 'react';
 import { useData } from '../../app/data';
 import { useToast } from '../../app/toast';
 import { t } from '../../i18n';
-import { productLabel, productRef } from '../../foods/products';
+import { hasOwnMicros, productLabel, productRef } from '../../foods/products';
+import { refKey } from '../../lib/refs';
 import { amountField, fmtLeftGrams, leftOf, onShoppingList, piecesAsGrams, stockAmount, withAmount } from '../../logic/pantry';
 import { isOn } from '../../settings/features';
 import { repo } from '../../storage/repo';
 import { HOME_PLACES, type FoodRef, type HomePlace, type PantryItem } from '../../storage/types';
 import { Field, Segmented, Sheet } from '../../ui/controls';
 import { Icon } from '../../ui/Icon';
+import { FoodSourceTag } from '../food/FoodSourceTag';
 import { refHref } from '../food/links';
 import { BarcodeSheet } from '../log/BarcodeSheet';
 import { FoodPicker, type PickedFood } from '../log/FoodPicker';
@@ -143,16 +145,19 @@ export function PantryItemSheet({ item, onClose }: { item: PantryItem; onClose: 
           </Field>
           <Field label={t('pantry.food')} hint={t('pantry.foodHint')}>
             {(id) => (
-              <div className="row-between pantry-food" id={id}>
-                {ref && ref === item.ref && refHref(d, ref) ? (
-                  <a href={refHref(d, ref)}>{nameOfRef(ref) ?? item.name}</a>
-                ) : (
-                  <span className={ref ? '' : 'muted'}>{ref ? (nameOfRef(ref) ?? item.name) : t('pantry.noFood')}</span>
-                )}
-                <button className="btn btn-small btn-ghost" onClick={() => setPicking('search')}>
-                  {ref ? t('pantry.changeFood') : t('pantry.chooseFood')}
-                </button>
-              </div>
+              <>
+                <div className="row-between pantry-food" id={id}>
+                  {ref && ref === item.ref && refHref(d, ref) ? (
+                    <a href={refHref(d, ref)}>{nameOfRef(ref) ?? item.name}</a>
+                  ) : (
+                    <span className={ref ? '' : 'muted'}>{ref ? (nameOfRef(ref) ?? item.name) : t('pantry.noFood')}</span>
+                  )}
+                  <button className="btn btn-small btn-ghost" onClick={() => setPicking('search')}>
+                    {ref ? t('pantry.changeFood') : t('pantry.chooseFood')}
+                  </button>
+                </div>
+                {ref && <SourceLine foodRef={ref} />}
+              </>
             )}
           </Field>
           <Field label={t('pantry.name')}>{(id) => <input id={id} value={name} onChange={(e) => setName(e.target.value)} />}</Field>
@@ -167,5 +172,27 @@ export function PantryItemSheet({ item, onClose }: { item: PantryItem; onClose: 
         </>
       )}
     </Sheet>
+  );
+}
+
+/**
+ * Under the food: its source tag and, for a packaged product, which BLS food its vitamins and
+ * minerals come from (or that only the label counts), so a pairing that does not fit stands out.
+ * The product's page, one tap away on its name, is where the pairing is changed.
+ */
+function SourceLine({ foodRef }: { foodRef: FoodRef }) {
+  const d = useData();
+  const product = foodRef.source === 'OFF' || foodRef.source === 'USDA' ? d.productsById.get(refKey(foodRef)) : undefined;
+  const match = product?.match;
+  const matchName = match && (d.foods.byCode.get(match.code)?.nameEn ?? match.code);
+  return (
+    <p className="small muted pantry-source">
+      <FoodSourceTag foodRef={foodRef} product={product} />{' '}
+      {matchName
+        ? `${t('recipes.microsFromLine', { name: matchName })}${match.auto ? ` (${t('match.autoShort')})` : ''}`
+        : product && !hasOwnMicros(product)
+          ? t('source.noMatch')
+          : ''}
+    </p>
   );
 }

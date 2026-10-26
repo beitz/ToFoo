@@ -3847,11 +3847,26 @@ button.week-row:focus-visible {
   color: var(--warn);
 }
 /* Used up: dimmed and said in words (never colour alone). */
+/* Under a thing's name: where its numbers come from, then running low or used up. */
+.kitchen-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 8px;
+  margin-top: 2px;
+}
+/* No food linked: no numbers at all, so the tag is dashed (and says so in words). */
+.source-tag-none {
+  border-style: dashed;
+}
 .home-row.out .shop-name {
   color: var(--text-muted);
 }
 .home-row.out .home-status {
   color: var(--text-muted);
+}
+.pantry-source {
+  margin: 0.25rem 0 0;
 }
 .pantry-hint {
   margin-top: 1.5rem;
