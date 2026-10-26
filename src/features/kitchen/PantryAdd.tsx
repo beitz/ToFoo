@@ -11,11 +11,16 @@ import { isOn } from '../../settings/features';
 import { repo } from '../../storage/repo';
 import { CURRENT_SCHEMA_VERSION, type HomePlace, type Product } from '../../storage/types';
 import { Icon } from '../../ui/Icon';
-import { BarcodeSheet } from '../log/BarcodeSheet';
+import { BarcodeSheet, LOOKUP_ERRORS } from '../log/BarcodeSheet';
+import { useOffSearch } from '../log/OffResults';
+import { findProduct } from '../../foods/findProduct';
+import type { OffListing } from '../../foods/offIndex';
 import { usePantry, usePantryFoods, usePantryLeft } from '../pantry/usePantry';
 
 /** Foods and products from the database offered while typing, after things already at home. */
 const FOOD_SUGGESTIONS = 3;
+
+type Looking = { code: string; error?: undefined } | { code: string; error: string; detail?: string } | null;
 
 /**
  * Type (or scan) what was bought, with suggestions from what is at home, products and the food
@@ -31,6 +36,7 @@ export function PantryAdd({ place, autoFocus, placeholder }: { place?: HomePlace
   const { placeOf } = usePantryFoods();
   const [text, setText] = useState('');
   const [scanning, setScanning] = useState(false);
+  const [looking, setLooking] = useState<Looking>(null);
   const offOn = isOn(d.settings.features, 'openFoodFacts');
 
   const entry = parseStock(text);
@@ -50,29 +56,55 @@ export function PantryAdd({ place, autoFocus, placeholder }: { place?: HomePlace
       .filter((f): f is Food => !!f && !known.some((k) => k.ref?.source === 'BLS' && k.ref.code === f.code))
       .slice(0, FOOD_SUGGESTIONS);
   }, [q, known, d.searchIndex, d.recentFoods, d.searchBoost, d.foods]);
+  // Packaged products sold in Germany: most spices (bay leaves, cinnamon, nutmeg) are not in the
+  // BLS but are on Open Food Facts (owner's search for "Lorbeerblatt", 2026-10-26).
+  const offSearch = useOffSearch(q, offOn, foods);
+  const offHits = offSearch.hits.slice(0, FOOD_SUGGESTIONS);
+
+  /** The amount typed with the name ("2", "500 g", "1 l"), if any. */
+  const typedAmount = (): Pick<NewPantryItem, 'pieces' | 'grams' | 'amount'> | undefined => {
+    if (entry.pieces !== undefined) return { pieces: entry.pieces };
+    if (entry.grams !== undefined) return { grams: entry.grams };
+    if (entry.amount) return { amount: entry.amount };
+    return undefined;
+  };
 
   async function add(item: Omit<NewPantryItem, 'place'> & { place?: HomePlace }) {
-    const withAmount: NewPantryItem = { ...item, place: item.place ?? place ?? placeOf(item.name, item.ref) };
-    if (entry.pieces !== undefined) withAmount.pieces = entry.pieces;
-    else if (entry.grams !== undefined) withAmount.grams = entry.grams;
-    else if (entry.amount) withAmount.amount = entry.amount;
+    const withAmount: NewPantryItem = { ...item, place: item.place ?? place ?? placeOf(item.name, item.ref), ...typedAmount() };
     const undo = await repo.changeHome((pantry) => ({ pantry: planStock(pantry, [withAmount], Date.now(), newId, CURRENT_SCHEMA_VERSION, left) }));
     setText('');
     toast(t('pantry.added', { name: withAmount.name }), () => repo.undoHome(undo));
   }
 
-  async function addProduct(product: Product) {
+  /** A scanned or picked product; an amount typed with the name wins over the pack's. */
+  async function addProduct(product: Product, amount = typedAmount()) {
     setScanning(false);
     const saved = await repo.saveProduct(product);
     const name = productLabel(saved);
     const ref = productRef(saved);
-    const where = place ?? placeOf(name, ref);
-    const item: NewPantryItem = { name, ref, place: where, ...scannedAmount(where, packGrams(saved)) };
+    // By the product's own name: it may not be in the live list of products yet.
+    const where = place ?? placeOf(saved.name, ref);
+    const item: NewPantryItem = { name, ref, place: where, ...(amount ?? scannedAmount(where, packGrams(saved))) };
     const undo = await repo.changeHome((pantry) => ({ pantry: planStock(pantry, [item], Date.now(), newId, CURRENT_SCHEMA_VERSION, left) }));
+    setText('');
     toast(t('pantry.added', { name }), () => repo.undoHome(undo));
   }
 
-  const showSuggestions = q !== '' && known.length + products.length + foods.length > 0;
+  /** A product from the bundled Open Food Facts list: its label values are fetched by barcode, as a scan would. */
+  async function pickListed(row: OffListing) {
+    if (looking && !looking.error) return;
+    setLooking({ code: row.code });
+    const r = await findProduct(row.code);
+    if (r.kind === 'found') {
+      setLooking(null);
+      await addProduct(r.product);
+    } else if (r.kind === 'notFound') setLooking({ code: row.code, error: t('offList.notFound') });
+    else setLooking({ code: row.code, error: t(LOOKUP_ERRORS[r.reason]), ...(r.detail ? { detail: r.detail } : {}) });
+  }
+
+  const showSuggestions = q !== '' && known.length + products.length + foods.length + offHits.length > 0;
+  // Nothing matched anywhere: say that the typed name works on its own (owner's search for "Lorbeerblatt").
+  const notListed = q.length >= 3 && !showSuggestions && offSearch.status !== 'loading';
   const hint = placeholder ?? t('pantry.addPlaceholder');
 
   return (
@@ -124,8 +156,32 @@ export function PantryAdd({ place, autoFocus, placeholder }: { place?: HomePlace
               </button>
             </li>
           ))}
+          {offHits.map((row) => {
+            const here = looking?.code === row.code ? looking : null;
+            return (
+              <li key={`off:${row.code}`}>
+                <button className="result" onClick={() => void pickListed(row)} aria-busy={!!here && !here.error}>
+                  <span className="result-name">{row.name}</span>
+                  <span className="muted small">{here && !here.error ? t('offList.looking') : [row.brand, row.quantity, 'Open Food Facts'].filter(Boolean).join(' · ')}</span>
+                </button>
+                {here?.error && (
+                  <p className="notice small" role="alert">
+                    <Icon name="alert" size={16} /> {here.error}
+                    {here.detail && <span className="muted small block error-detail">{t('off.error.detail', { detail: here.detail })}</span>}
+                  </p>
+                )}
+              </li>
+            );
+          })}
         </ul>
       )}
+      {offSearch.status === 'error' && (
+        <p className="notice small" role="alert">
+          <Icon name="alert" size={16} /> {t('offList.loadFailed')}
+          <span className="muted small block error-detail">{t('off.error.detail', { detail: offSearch.detail })}</span>
+        </p>
+      )}
+      {notListed && <p className="muted small pantry-not-listed">{t('pantry.notListed', { name: q })}</p>}
       {scanning && <BarcodeSheet onFound={(p) => void addProduct(p)} onClose={() => setScanning(false)} />}
     </>
   );

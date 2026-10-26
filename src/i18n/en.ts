@@ -1155,6 +1155,7 @@ export const en = {
   'pantry.addPlaceholder': 'Add what you bought',
   'pantry.suggestions': 'Suggestions',
   'pantry.alreadyHere': 'At home: add more',
+  'pantry.notListed': 'Not in the food lists. Add keeps “{name}” by its name: it can be counted and go on the shopping list, but has no nutrients.',
   'pantry.empty': 'Nothing here yet. Add what you bought: ready meals and foods to log with one tap later, spices to see when they run low. An amount is optional: "lasagne 2", "500 g oats", "cumin".',
   'pantry.piecesLeft': '{n} left',
   'pantry.pieces': '{n} pcs',

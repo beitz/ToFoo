@@ -36,6 +36,13 @@ describe('sorting a typed name', () => {
     expect(commonSection('Rucola')).toBeUndefined();
   });
 
+  it('puts spices the food database lacks with the spices', () => {
+    for (const name of ['Lorbeerblatt', 'Lorbeerblätter', 'bay leaves', 'Wacholderbeeren', 'Zimt', 'Muskatnuss', 'Kreuzkümmel', 'Gewürznelken']) {
+      expect(commonSection(name), name).toBe('pantry');
+    }
+    expect(commonSection('garlic cloves')).not.toBe('pantry');
+  });
+
   it('otherwise goes by database foods that name every word, never by composite dishes', () => {
     const hit = (key: string, nameEn: string) => ({ key, nameEn, nameDe: '' });
     expect(sectionFromFoods('rocket', [hit('X100000', 'Rocket soup'), hit('G100000', 'Rocket raw'), hit('G100100', 'Rocket steamed')])).toBe('produce');
