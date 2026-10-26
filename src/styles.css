@@ -8250,6 +8250,28 @@ button.link-row {
   padding-left: 12px;
   border-left: 3px solid var(--hc);
 }
+.habit-quick-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.habit-quick-more > summary {
+  color: var(--text-muted);
+}
+.habit-sun {
+  align-items: center;
+  gap: 4px;
+}
+/* The new-habit form's picture of the Home card (it is not tappable there). */
+.habit-preview {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.habit-preview .habit-card {
+  cursor: default;
+}
 .habit-card.dim {
   opacity: 0.6;
 }
