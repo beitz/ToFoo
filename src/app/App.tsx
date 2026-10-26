@@ -42,7 +42,6 @@ import { DiagnosticsPage } from '../features/settings/DiagnosticsPage';
 import { SavedChatsPage } from '../features/settings/SavedChatsPage';
 import { ProductsPage } from '../features/settings/ProductsPage';
 import { BackupPage, ExclusionsPage, NutrientVisibilityPage, SavedPage, StartPage } from '../features/settings/MorePages';
-import { InsightsPage } from '../features/insights/InsightsPage';
 import { FirstLaunch } from '../features/onboarding/FirstLaunch';
 import { TourHost } from '../features/tour/TourHost';
 import { FastPage } from '../features/fast/FastPage';
@@ -70,7 +69,8 @@ function Page({ route }: { route: string[] }) {
     case 'journal':
       return <JournalPage key={b ?? ''} write={b === 'new'} />;
     case 'insights':
-      return <InsightsPage />;
+      // Look for patterns: the assistant with "Include my data" open and ticked.
+      return <AssistantPage key="insights" patterns />;
     case 'shopping':
       return <ShoppingPage />;
     case 'athome':

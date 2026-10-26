@@ -5,6 +5,7 @@
  */
 import type { BetaTool, BetaToolUnion, BetaWebSearchTool20250305 } from '@anthropic-ai/sdk/resources/beta/messages/messages';
 import { ACTIVITY_KINDS, INTENSITIES } from '../storage/types';
+import { INSIGHT_GUIDE, INSIGHT_TOOLS } from './insightsPrompt';
 import { FORGOTTEN as FORGOTTEN_KINDS, PREPARATIONS } from './tools';
 
 const GENERIC_NOTE = `say so in assumptions (e.g. "generic hazelnut praline, not the label values")`;
@@ -75,7 +76,12 @@ export interface PromptSources {
   ideas?: boolean;
   /** "Ask about forgotten foods" on: meal cards carry ask_about. */
   forgotten?: boolean;
+  /** The user included some of their data in this chat (Include my data): the pattern tools read it. */
+  insights?: boolean;
 }
+
+// Without Include my data the chat sees none of the user's days, and should say how to share them.
+const NO_DATA = `- Their data: you cannot see the user's journal, sleep, activity, water or past days. If they ask about those or about patterns in their days, say they can tap "Include my data" above the message box (it needs Patterns on in Settings → AI assistant), tick what to share and ask again.`;
 
 // Forgotten foods (docs/SPEC.md, "Forgotten foods"): logs come out short mostly from what is
 // easy to leave out; the app asks on the card with tap answers instead of a question in text.
@@ -140,7 +146,7 @@ Style: brief, friendly, plain text (no headings or tables). Answer in the langua
 
 function systemPrompt(sources: PromptSources): string {
   if (sources.recipe) return recipeSystemPrompt(sources);
-  const { off = false, usda = false, webSearch = false, journal = false, sleep = false, activity = false, water = false, ketones = false, weight = false, habits = false, shopping = false, pantry = false, recipes = false, ideas = false, forgotten = false } = sources;
+  const { off = false, usda = false, webSearch = false, journal = false, sleep = false, activity = false, water = false, ketones = false, weight = false, habits = false, shopping = false, pantry = false, recipes = false, ideas = false, forgotten = false, insights = false } = sources;
   const extra = [
     off && ' Packaged products can also be looked up by barcode in Open Food Facts.',
     usda && ' Foods the BLS lacks can be searched in USDA FoodData Central.',
@@ -155,6 +161,7 @@ function systemPrompt(sources: PromptSources): string {
     pantry && ' The user can also tell you what they bought or what runs low at home.',
     recipes && ' The user can also save recipes they cooked and change recipes in their recipe book.',
     ideas && ' You can also suggest recipes that fit their nutrient gaps, and improvements to their recipes.',
+    insights && ' The user also shared some of their own data with you, to look for patterns in it.',
   ]
     .filter(Boolean)
     .join('');
@@ -177,14 +184,15 @@ ${forgotten ? `${FORGOTTEN}\n` : ''}- Amounts: use what the user said, label wei
 - assumptions: short phrases the user should see, e.g. "ate about a quarter of the shared pot".
 
 ${recipes ? '- Questions: when the user just asks something (about their food, the app, nutrition), answer briefly in text. Numbers about their nutrients come only from tools.\n' : ''}- General knowledge: when you answer from general knowledge rather than from the app's tools (what a nutrient does, what research says), say so, and name where it comes from (the DGE, EFSA, the WHO, a well-known review) only when you are sure; never make up a study, a link or a number. Values for foods and their nutrients come from the app, never from you.
+${insights ? '' : `${NO_DATA}\n`}
 
-Style: brief, friendly, plain text (no headings or tables). Answer in the language the user writes in.`;
+${insights ? `\n${INSIGHT_GUIDE}\n\n` : ''}Style: brief, friendly, plain text (no headings or tables). Answer in the language the user writes in.`;
 }
 
-const key = ({ off = false, usda = false, webSearch = false, journal = false, sleep = false, activity = false, water = false, ketones = false, weight = false, habits = false, shopping = false, pantry = false, recipe = false, recipes = false, ideas = false, forgotten = false }: PromptSources) =>
+const key = ({ off = false, usda = false, webSearch = false, journal = false, sleep = false, activity = false, water = false, ketones = false, weight = false, habits = false, shopping = false, pantry = false, recipe = false, recipes = false, ideas = false, forgotten = false, insights = false }: PromptSources) =>
   recipe
     ? `r${off ? 1 : 0}${usda ? 1 : 0}${off && webSearch ? 1 : 0}`
-    : `${off ? 1 : 0}${usda ? 1 : 0}${off && webSearch ? 1 : 0}${journal ? 1 : 0}${sleep ? 1 : 0}${activity ? 1 : 0}${water ? 1 : 0}${ketones ? 1 : 0}${shopping ? 1 : 0}${pantry ? 1 : 0}${recipes ? 1 : 0}${recipes && ideas ? 1 : 0}${forgotten ? 1 : 0}${weight ? 1 : 0}${habits ? 1 : 0}`;
+    : `${off ? 1 : 0}${usda ? 1 : 0}${off && webSearch ? 1 : 0}${journal ? 1 : 0}${sleep ? 1 : 0}${activity ? 1 : 0}${water ? 1 : 0}${ketones ? 1 : 0}${shopping ? 1 : 0}${pantry ? 1 : 0}${recipes ? 1 : 0}${recipes && ideas ? 1 : 0}${forgotten ? 1 : 0}${weight ? 1 : 0}${habits ? 1 : 0}${insights ? 1 : 0}`;
 const prompts = new Map<string, string>();
 const toolSets = new Map<string, BetaToolUnion[]>();
 
@@ -272,7 +280,7 @@ export const WEB_SEARCH_TOOL: BetaWebSearchTool20250305 = {
   user_location: { type: 'approximate', country: 'DE' },
 };
 
-function tools({ off = false, usda = false, webSearch = false, journal = false, sleep = false, activity = false, water = false, ketones = false, weight = false, habits = false, shopping = false, pantry = false, recipe = false, recipes = false, ideas = false, forgotten = false }: PromptSources): BetaToolUnion[] {
+function tools({ off = false, usda = false, webSearch = false, journal = false, sleep = false, activity = false, water = false, ketones = false, weight = false, habits = false, shopping = false, pantry = false, recipe = false, recipes = false, ideas = false, forgotten = false, insights = false }: PromptSources): BetaToolUnion[] {
   const withProducts = off || usda;
   const codeHelp = off && usda ? 'BLS code from search_foods, or an OFF: or USDA: code from lookup_barcode, search_usda or search_foods.' : off ? 'BLS code from search_foods, or OFF: product code from lookup_barcode or search_foods.' : usda ? 'BLS code from search_foods, or USDA: code from search_usda or search_foods.' : 'BLS code from search_foods.';
   const items = {
@@ -376,6 +384,7 @@ function tools({ off = false, usda = false, webSearch = false, journal = false, 
     ...(pantry ? [proposeHome(codeHelp)] : []),
     ...(recipes ? [LIST_RECIPES, proposeRecipe(items, ideas), proposePortion(changeItems), proposeBatch(changeItems)] : []),
     ...(recipes && ideas ? [NUTRIENT_GAPS, checkRecipe(items)] : []),
+    ...(insights ? INSIGHT_TOOLS : []),
   ];
 }
 

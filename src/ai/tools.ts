@@ -27,6 +27,7 @@ import type { Preparation } from '../model/paramTypes';
 import type { RawValue } from '../model/types';
 import type { SkinExposure } from '../model/sun';
 import { excludedFoods, type RecipeInfo } from '../logic/recipeIdeas';
+import type { InsightData } from '../logic/insights';
 import { stockAmount } from '../logic/pantry';
 import { ACTIVITY_KINDS, HOME_PLACES, INTENSITIES, type ActivityKind, type FoodRef, type HabitKind, type HomePlace, type Ingredient, type Intensity, type KetoneType, type Product, type Profile } from '../storage/types';
 
@@ -461,6 +462,11 @@ export interface ToolContext {
   recipes?: RecipeTools;
   /** "Ask about forgotten foods" on: meal cards ask about what logs most often miss. */
   forgotten?: boolean;
+  /**
+   * The data the user included in this chat (Include my data), already cut to the period and the
+   * kinds they ticked by shareInsightData: the pattern tools read nothing else.
+   */
+  insights?: InsightData;
 }
 
 /** The recipe book as the assistant may read it, and the app's numbers for ideas. */
@@ -483,7 +489,7 @@ export interface IdeaTools {
 }
 
 /** Which online sources the assistant is offered (decides the prompt and tool variant). */
-export function sourcesOf(ctx: Pick<ToolContext, 'products' | 'journal' | 'sleep' | 'activity' | 'water' | 'ketones' | 'weight' | 'habits' | 'shopping' | 'pantry' | 'recipe' | 'recipes' | 'forgotten'>): {
+export function sourcesOf(ctx: Pick<ToolContext, 'products' | 'journal' | 'sleep' | 'activity' | 'water' | 'ketones' | 'weight' | 'habits' | 'shopping' | 'pantry' | 'recipe' | 'recipes' | 'forgotten' | 'insights'>): {
   off: boolean;
   usda: boolean;
   webSearch: boolean;
@@ -500,10 +506,11 @@ export function sourcesOf(ctx: Pick<ToolContext, 'products' | 'journal' | 'sleep
   recipes: boolean;
   ideas: boolean;
   forgotten: boolean;
+  insights: boolean;
 } {
   const { products } = ctx;
   const online = { off: !!products?.find, usda: !!products?.searchUsda, webSearch: !!products?.find && !!products.webSearch };
-  if (ctx.recipe) return { ...online, journal: false, sleep: false, activity: false, water: false, ketones: false, weight: false, habits: false, shopping: false, pantry: false, recipe: true, recipes: false, ideas: false, forgotten: false };
+  if (ctx.recipe) return { ...online, journal: false, sleep: false, activity: false, water: false, ketones: false, weight: false, habits: false, shopping: false, pantry: false, recipe: true, recipes: false, ideas: false, forgotten: false, insights: false };
   return {
     ...online,
     journal: !!ctx.journal,
@@ -519,6 +526,7 @@ export function sourcesOf(ctx: Pick<ToolContext, 'products' | 'journal' | 'sleep
     recipes: !!ctx.recipes,
     ideas: !!ctx.recipes?.ideas,
     forgotten: !!ctx.forgotten,
+    insights: !!ctx.insights,
   };
 }
 

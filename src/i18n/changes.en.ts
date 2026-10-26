@@ -9,6 +9,8 @@
  */
 export const changesEn = {
   'change.151': 'Settings → Reminders → Ask about yesterday: choose per thing (meals, sleep, activity, water, habits) whether to ask every day, on set weekdays or never. A day left out no longer counts as not logged.',
+  'change.150': 'One assistant for logging and patterns: "Include my data" by the message box lets it look at your journal, sleep and past days only when you tick them; Look for patterns opens it ticked, and you can type your own question there too.',
+  'change.150.major': 'Look for patterns inside the one assistant',
   'change.149': 'Tell the assistant which habits you kept ("flossed, no alcohol yesterday") and check them on one card; Patterns can now compare your habits with everything else, if you tick Habits.',
   'change.148': 'Habits: things to do or avoid, daily, on set days or a few times a week, or minutes of exercise from your activities. Tick today on Home, see each habit\'s month and run, and answer yesterday\'s on the fill-in page. Switch it on under Settings → What you track.',
   'change.148.major': 'Habits, with a row of cards on Home',

@@ -1,9 +1,8 @@
 /**
- * Insights conversation (docs/SPEC.md, "Insights"): the model reads the journal and asks the app
- * for counts and averages; the app answers from src/logic/insights.ts. The API call is injected so
- * the loop can be tested without a network.
+ * The pattern tools of the assistant (docs/SPEC.md, "Insights"), there when the user includes their
+ * data in a chat: the model reads the journal and asks the app for counts and averages; the app
+ * answers from src/logic/insights.ts, reading only the data the user chose to share.
  */
-import type * as Beta from '@anthropic-ai/sdk/resources/beta/messages/messages';
 import { z } from 'zod';
 import { parseDay } from '../lib/dates';
 import { fmtNumber } from '../lib/format';
@@ -24,43 +23,20 @@ import {
   type ShareKind,
   type Stats,
 } from '../logic/insights';
-import type { AiModel, CreateMessage } from './assistant';
-import { textOf } from './assistant';
-import { INSIGHT_SYSTEM, INSIGHT_TOOLS, WEEKDAYS } from './insightsPrompt';
-import { fmtLocalDateTime } from './photoTime';
-import { usageOf, type ModelTokens } from './pricing';
+import { INSIGHT_TOOLS, WEEKDAYS } from './insightsPrompt';
 
-/** Tool rounds per question: reading the journal, then a few rounds of comparisons and a closer look. */
-const MAX_STEPS = 16;
+/** The pattern tools' names, which the assistant's loop hands to runInsightTool. */
+export const INSIGHT_TOOL_NAMES: ReadonlySet<string> = new Set(INSIGHT_TOOLS.map((t) => t.name));
+
 const MAX_MEASURES = 8;
 const MAX_DETAIL_DAYS = 31;
 /** Journal entries per read: a few months of daily notes; more would crowd out the comparisons. */
 const MAX_JOURNAL_ENTRIES = 400;
 
-export interface InsightConversation {
-  messages: Beta.BetaMessageParam[];
-}
-
 /** One comparison the app computed in a turn, shown under the answer so its numbers can be checked. */
 export type Check =
   | { kind: 'count'; from: string; to: string; group: Condition[]; outcome: Condition[]; result: CountResult }
   | { kind: 'compare'; from: string; to: string; group: Condition[]; measures: string[]; result: CompareResult };
-
-export type InsightOutcome = { kind: 'reply'; text: string; checks: Check[] } | { kind: 'error'; reason: 'refusal' | 'tooLong' | 'tooManySteps' };
-
-export function insightParams(model: AiModel, messages: Beta.BetaMessageParam[]): Beta.MessageCreateParamsNonStreaming {
-  return {
-    model,
-    max_tokens: 32000,
-    system: INSIGHT_SYSTEM,
-    tools: INSIGHT_TOOLS,
-    messages,
-    cache_control: { type: 'ephemeral' },
-    // Looking for patterns is the kind of reasoning worth more effort; it runs only when asked.
-    output_config: { effort: 'high' },
-    ...(model === 'claude-haiku-5-5' ? {} : { betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' as const }),
-  };
-}
 
 const dayKey = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Days are "YYYY-MM-DD".');
 const conditionInput = z.object({
@@ -266,15 +242,14 @@ const KIND_NAME: Record<ShareKind, string> = { food: 'food log', journal: 'journ
 const HABIT_KIND_TEXT: Record<InsightData['habits'][number]['kind'], string> = { do: 'to do', avoid: 'to avoid', minutes: 'minutes of activity, from the activity log' };
 
 /**
- * The app's note with the first question: the period, what its data consists of, and what the user
- * chose not to share. `privateLeftOut`: the period has private journal entries the user kept back.
+ * The app's note on the message the user first shares their data with: the period, what its data
+ * consists of, and what the user chose not to share. `privateLeftOut`: the period has private
+ * journal entries the user kept back.
  */
-export function insightNote(now: number, o: Overview, first: boolean, notShared: readonly ShareKind[] = [], privateLeftOut = false, habits: InsightData['habits'] = []): string {
-  if (!first) return `(Now: ${fmtLocalDateTime(now)}.)`;
+export function shareNote(o: Overview, notShared: readonly ShareKind[] = [], privateLeftOut = false, habits: InsightData['habits'] = []): string {
   const s = o.status;
-  const parts = [
-    `Now: ${fmtLocalDateTime(now)}.`,
-    `Period chosen by the user: ${o.from} to ${o.to} (${o.days} days); the app shares no days outside it, so if the user asks about other days, say they can choose a longer period in a new chat.`,
+  return [
+    `The user included their data from now on. Period chosen by the user: ${o.from} to ${o.to} (${o.days} days); the app shares no days outside it, so if the user asks about other days, say they can choose a longer period in a new chat.`,
     ...(notShared.length
       ? [`The user chose not to share their ${notShared.map((k) => KIND_NAME[k]).join(', ')}: the tools have no data for it, so draw no conclusions about it; if the question needs it, say they can tick it in a new chat.`]
       : []),
@@ -288,41 +263,5 @@ export function insightNote(now: number, o: Overview, first: boolean, notShared:
         ]
       : []),
     "Today's food log counts as incomplete until the day is over.",
-  ];
-  return `(${parts.join(' ')})`;
-}
-
-/**
- * Send one question (or follow-up) and run the model until it answers. Returns the updated
- * conversation and the answer with every comparison the app computed for it.
- */
-export async function askInsights(
-  create: CreateMessage,
-  model: AiModel,
-  conversation: InsightConversation,
-  question: { text: string; appNote: string },
-  data: InsightData,
-  onUsage?: (tokens: ModelTokens) => void,
-): Promise<{ conversation: InsightConversation; outcome: InsightOutcome }> {
-  const messages = [...conversation.messages, { role: 'user' as const, content: [{ type: 'text' as const, text: question.text.trim() }, { type: 'text' as const, text: question.appNote }] }];
-  const checks: Check[] = [];
-  const done = (outcome: InsightOutcome) => ({ conversation: { messages }, outcome });
-  for (let step = 0; step < MAX_STEPS; step++) {
-    const res = await create(insightParams(model, messages));
-    onUsage?.(usageOf(res, model));
-    messages.push({ role: 'assistant', content: res.content });
-    if (res.stop_reason === 'refusal') return done({ kind: 'error', reason: 'refusal' });
-    if (res.stop_reason === 'max_tokens' || res.stop_reason === 'model_context_window_exceeded') return done({ kind: 'error', reason: 'tooLong' });
-    if (res.stop_reason === 'pause_turn') continue;
-    const uses = res.content.filter((b): b is Beta.BetaToolUseBlock => b.type === 'tool_use');
-    if (uses.length === 0) return done({ kind: 'reply', text: textOf(res.content), checks });
-    const results: Beta.BetaToolResultBlockParam[] = uses.map((use) => {
-      const r = runInsightTool(use.name, use.input, data);
-      if (r.ok && r.check) checks.push(r.check);
-      return { type: 'tool_result', tool_use_id: use.id, content: r.text, is_error: !r.ok };
-    });
-    messages.push({ role: 'user', content: results });
-  }
-  // The conversation ends on tool results the model never answered: drop the turn so a retry starts clean.
-  return { conversation, outcome: { kind: 'error', reason: 'tooManySteps' } };
+  ].join(' ');
 }

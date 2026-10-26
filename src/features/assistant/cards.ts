@@ -3,6 +3,7 @@ import type { useToast } from '../../app/toast';
 import type { RecipeSoFar, ShownActivity, ShownBatch, ShownIngredients, ShownNote, ShownPortion, ShownProposal, ShownHome, ShownRecipe, ShownShopping, ShownSleep, ShownWater, ShownKetone, ShownWeight, ShownHabits } from '../../ai/assistant';
 import type { ProposedItem } from '../../ai/tools';
 import type { AudioClip } from '../../ai/chatRecord';
+import type { Check } from '../../ai/insights';
 import { t } from '../../i18n';
 import { formatTime } from '../../lib/dates';
 import { fmtKg } from '../weight/format';
@@ -103,12 +104,16 @@ export function cardTitle(c: Card): string {
   }
 }
 
-/** A chat bubble; an answer with several cards is one 'pages' bubble, its cards shown as pages. */
+/**
+ * A chat bubble; an answer with several cards is one 'pages' bubble, its cards shown as pages.
+ * 'checks': the app's own numbers behind a pattern answer, right under it.
+ */
 export type Bubble =
   | { role: 'user'; text: string; previews: string[]; audio?: AudioClip[] }
   | { role: 'assistant'; text: string }
   | { role: 'card'; id: string }
-  | { role: 'pages'; key: number; text: string; ids: string[] };
+  | { role: 'pages'; key: number; text: string; ids: string[] }
+  | { role: 'checks'; checks: Check[] };
 
 /** Undoes one saved card. */
 export type Undo = () => Promise<void>;
