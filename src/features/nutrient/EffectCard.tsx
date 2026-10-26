@@ -14,6 +14,7 @@ import { Icon } from '../../ui/Icon';
 import { statusLabel } from '../../ui/status';
 import { StatusMark } from '../../ui/Tile';
 import { contributorHref } from './CameFromCard';
+import { hasLadder, openLadder } from './LevelLadder';
 
 /** Biggest sources named under "Most of yours came from" when a level is too high. */
 const TOP_SOURCES = 3;
@@ -84,6 +85,11 @@ export function EffectCard({ r }: { r: NutrientResult }) {
           <a className="level-link" href={href('nutrient', r.id, 'foods')}>
             {t('levels.fillsBest')} <Icon name="chevron" size={14} />
           </a>
+        )}
+        {hasLadder(r) && (
+          <button type="button" className="level-link ladder-open" onClick={openLadder}>
+            {t('ladder.seeAll')} <Icon name="chevron" size={14} />
+          </button>
         )}
         {sources.length > 0 && (
           <div className="muted level-sources">
