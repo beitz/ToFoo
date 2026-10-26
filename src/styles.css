@@ -8239,6 +8239,17 @@ button.link-row {
   font-weight: 600;
   text-decoration: none;
 }
+.habit-card {
+  -webkit-touch-callout: none;
+  user-select: none;
+}
+.habit-quick {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-left: 12px;
+  border-left: 3px solid var(--hc);
+}
 .habit-card.dim {
   opacity: 0.6;
 }

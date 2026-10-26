@@ -3104,6 +3104,51 @@
                       ]
                     }
                   },
+                  "quick": {
+                    "description": "Minutes habits with \"One tap logs it\": the activity a tap on its Home card logs, ending at the tap",
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "walk",
+                          "run",
+                          "cycling",
+                          "strength",
+                          "other"
+                        ]
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "minutes": {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      "intensity": {
+                        "type": "string",
+                        "enum": [
+                          "easy",
+                          "moderate",
+                          "hard"
+                        ]
+                      },
+                      "outside": {
+                        "type": "boolean"
+                      },
+                      "sun": {
+                        "type": "boolean",
+                        "description": "When outside: counts toward the vitamin D sun estimate"
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "minutes",
+                      "intensity",
+                      "outside",
+                      "sun"
+                    ]
+                  },
                   "order": {
                     "type": "number"
                   },

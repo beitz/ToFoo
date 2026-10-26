@@ -3,13 +3,13 @@ import { useData } from '../../app/data';
 import { useToast } from '../../app/toast';
 import { t, type MessageKey } from '../../i18n';
 import { formatDay, parseDay } from '../../lib/dates';
-import { activityCounts, type HabitMark } from '../../logic/habits';
+import { activityCounts, habitMinutes, quickActivity, type HabitMark } from '../../logic/habits';
 import { repo } from '../../storage/repo';
-import type { Habit, HabitActivity } from '../../storage/types';
+import type { Habit, HabitActivity, HabitQuickLog } from '../../storage/types';
 import { Sheet } from '../../ui/controls';
 import { atDayMinute } from '../../logic/catchUp';
 import { ActivitySheet } from '../activity/ActivitySheet';
-import { activityName } from '../activity/ActivityForm';
+import { activityName, DEFAULT_ACTIVITY_SKIN } from '../activity/ActivityForm';
 
 /** The habit's colour for its name and marks (it tells habits apart, never status). */
 export const habitStyle = (h: Pick<Habit, 'colour'>) => ({ '--hc': `var(--habit-${h.colour})` }) as CSSProperties;
@@ -89,20 +89,37 @@ export function useAnswer() {
   };
 }
 
-/** The activity sheet for a minutes habit: its first activity and its minutes filled in, the others as chips. */
+/** "Walk 30 min": what one tap logs. */
+export const quickText = (q: HabitQuickLog) => t('habits.quickWhat', { name: activityName(q), m: q.minutes });
+
+/** Log a habit's one-tap activity now, with undo; the toast says where the day's total stands. */
+export function useQuickLog() {
+  const d = useData();
+  const toast = useToast();
+  return async (h: Habit) => {
+    if (!h.quick) return;
+    const rec = quickActivity(h.quick, Date.now(), DEFAULT_ACTIVITY_SKIN);
+    const added = await repo.addActivity(rec);
+    const m = habitMinutes(h, d.activities, rec.day) + rec.minutes;
+    toast(t('habits.quickLogged', { what: quickText(h.quick), m, of: h.minutes ?? 0 }), () => void repo.deleteActivity(added.id));
+  };
+}
+
+/**
+ * The activity sheet for a minutes habit: its one-tap activity, else its first activity and its
+ * minutes, filled in; the others as chips. Starts when the preset would (it ends now) for today.
+ */
 export function HabitActivitySheet({ habit: h, day, onClose }: { habit: Habit; day: string; onClose: () => void }) {
   const d = useData();
   const picks = h.activities ?? [];
   const patch = (p: HabitActivity) => ({ kind: p.kind, name: p.name ?? '' });
-  const time = day === d.today ? Date.now() : atDayMinute(day, 12 * 60);
-  return (
-    <ActivitySheet
-      defaultTime={time}
-      onClose={onClose}
-      initial={{ ...(picks[0] ? patch(picks[0]) : {}), minutes: h.minutes, outside: picks[0]?.kind === 'walk' || picks[0]?.kind === 'run' || picks[0]?.kind === 'cycling' }}
-      presets={picks.map((p) => ({ label: activityName(p), patch: patch(p) }))}
-    />
-  );
+  const q = h.quick;
+  const minutes = q?.minutes ?? h.minutes ?? 30;
+  const time = day === d.today ? Date.now() - (q ? minutes * 60_000 : 0) : atDayMinute(day, 12 * 60);
+  const initial = q
+    ? { kind: q.kind, name: q.name ?? '', minutes, intensity: q.intensity, outside: q.outside, sun: q.sun }
+    : { ...(picks[0] ? patch(picks[0]) : {}), minutes, outside: picks[0]?.kind === 'walk' || picks[0]?.kind === 'run' || picks[0]?.kind === 'cycling' };
+  return <ActivitySheet defaultTime={time} onClose={onClose} initial={initial} presets={picks.map((p) => ({ label: activityName(p), patch: patch(p) }))} />;
 }
 
 /** Answer or change one day of a habit: two answers and "Not answered" for do and avoid, the day's activities for minutes. */

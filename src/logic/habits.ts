@@ -1,6 +1,7 @@
 import { addDays, dayKey, parseDay } from '../lib/dates';
 import { weekStart } from '../lib/periods';
-import type { ActivityRecord, Habit, HabitDay, HabitGoal } from '../storage/types';
+import type { ActivityRecord, Habit, HabitDay, HabitGoal, HabitQuickLog } from '../storage/types';
+import type { SkinExposure } from '../model/sun';
 
 /**
  * Habits (docs/SPEC.md, "Habits", owner's ask 2026-10-26): what each day means for a habit, how a
@@ -55,6 +56,25 @@ export function activityCounts(h: Pick<Habit, 'activities'>, a: Pick<ActivityRec
   if (!picks.length) return true;
   const name = a.name?.trim().toLowerCase();
   return picks.some((p) => p.kind === a.kind && (!p.name || p.name.trim().toLowerCase() === name));
+}
+
+/**
+ * The activity one tap on a "One tap logs it" card logs: the preset, ending at the tap (the user taps
+ * when the walk is over), on the day it started.
+ */
+export function quickActivity(q: HabitQuickLog, now: number, skin: SkinExposure): Omit<ActivityRecord, 'id' | 'schemaVersion'> {
+  const time = now - q.minutes * 60_000;
+  const name = q.name?.trim();
+  return {
+    kind: q.kind,
+    ...(name ? { name } : {}),
+    time,
+    day: dayKey(new Date(time)),
+    minutes: Math.round(q.minutes),
+    intensity: q.intensity,
+    outside: q.outside,
+    ...(q.outside && q.sun ? { sunSkin: skin } : {}),
+  };
 }
 
 /** Minutes of matching activity on a day, all sessions together (owner's pick: the day's total). */
