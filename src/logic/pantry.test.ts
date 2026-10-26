@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Batch, FoodRef, LogEntry, PantryItem, ShoppingItem } from '../storage/types';
-import { byPlace, fromShopping, guessPlace, leftOf, leftText, loggable, onShoppingList, pantrySuggestions, parseStock, placeFromWords, placeOfCode, planReports, planStock, stockAmount, toBuy, usageOf, withAmount, withStatus } from './pantry';
+import { amountField, byPlace, fromShopping, guessPlace, leftOf, leftText, loggable, packGrams, piecesAsGrams, scannedAmount, onShoppingList, pantrySuggestions, parseStock, placeFromWords, placeOfCode, planReports, planStock, stockAmount, toBuy, usageOf, withAmount, withStatus } from './pantry';
 
 const bls = (code: string): FoodRef => ({ source: 'BLS', version: '4.0', code });
 const lasagne: FoodRef = { source: 'OFF', code: '4001' };
@@ -56,6 +56,37 @@ describe('what is left', () => {
     expect(text(item({ name: 'b', grams: 1500 }))).toBe('1.5 kg');
     expect(text(item({ name: 'c', amount: '1 l' }))).toBe('1 l');
     expect(text(item({ name: 'd' }))).toBe('');
+  });
+
+  it('counts a spice jar to a tenth of a gram, and reads it back that way', () => {
+    // Owner's case (2026-10-26): 8.5 g left of a 12.5 g Ostmann jar, then 2 g cooked into a pot.
+    const paprika = { source: 'OFF', code: '4002674044201' } as const;
+    const jar = item({ name: 'Ostmann Paprika', ref: paprika, place: 'spices', ...stockAmount('8,5 g') });
+    expect(jar.grams).toBe(8.5);
+    const none = usageOf([], []);
+    expect(leftText(jar, leftOf(jar, none), piecesLeft)).toBe('8.5 g');
+    expect(amountField(jar, leftOf(jar, none))).toBe('8.5 g');
+    const cooked = usageOf([], [pot(paprika, 2.3, 200)]);
+    expect(leftOf(jar, cooked)).toMatchObject({ grams: 6.2, out: false });
+    expect(leftText(jar, leftOf(jar, cooked), piecesLeft)).toBe('6.2 g');
+    expect(leftText(item({ name: 'Salt', grams: 12 }), leftOf(item({ name: 'Salt', grams: 12 }), none), piecesLeft)).toBe('12 g');
+    expect(leftText(item({ name: 'Oats', grams: 350.4 }), leftOf(item({ name: 'Oats', grams: 350.4 }), none), piecesLeft)).toBe('350 g');
+  });
+
+  it('turns jars into grams when the pack weight is known', () => {
+    expect(packGrams({ quantity: '12,5 g' })).toBe(12.5);
+    expect(packGrams({ quantity: '1 l', perMl: true })).toBeUndefined();
+    expect(packGrams({ quantity: '500 ml', perMl: true })).toBeUndefined();
+    expect(packGrams(undefined)).toBeUndefined();
+    expect(piecesAsGrams({ pieces: 2, out: false, low: false }, 12.5)).toBe(25);
+    expect(piecesAsGrams({ grams: 8, out: false, low: false }, 12.5)).toBeUndefined();
+    expect(piecesAsGrams({ pieces: 1, out: false, low: false }, undefined)).toBeUndefined();
+  });
+
+  it('starts a scanned spice at its pack weight, anything else at one piece', () => {
+    expect(scannedAmount('spices', 12.5)).toEqual({ grams: 12.5 });
+    expect(scannedAmount('spices', undefined)).toEqual({ pieces: 1 });
+    expect(scannedAmount('freezer', 400)).toEqual({ pieces: 1 });
   });
 });
 
@@ -166,6 +197,28 @@ describe('reports from the assistant', () => {
       ['Lasagne', undefined, 2],
       ['Cumin', 'low', undefined],
       ['Olive oil', 'out', undefined],
+    ]);
+  });
+
+  it('sets what is left from now when the user counted it, and adds it when not at home yet', () => {
+    const none = usageOf([], []);
+    const jar = item({ name: 'Paprika', place: 'spices', pieces: 1, status: 'low' });
+    const { put } = planReports(
+      [jar],
+      [
+        { name: 'paprika', place: 'spices', grams: 8.5, status: 'left' },
+        { name: 'Yogurt', place: 'fridge', pieces: 2, status: 'left' },
+        { name: 'Cumin', place: 'spices', pieces: 0, status: 'left' },
+      ],
+      500,
+      id,
+      1,
+      (i) => leftOf(i, none),
+    );
+    expect(put.map((i) => [i.name, i.status, i.pieces, i.grams, i.since])).toEqual([
+      ['Paprika', undefined, undefined, 8.5, 500],
+      ['Yogurt', undefined, 2, undefined, 500],
+      ['Cumin', 'out', 0, undefined, 500],
     ]);
   });
 });

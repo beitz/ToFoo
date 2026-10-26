@@ -84,7 +84,7 @@ const SHOPPING = (recipes: boolean) =>
 // At home (docs/SPEC.md, "At home"): what was bought, with the food it is when it will be eaten,
 // so it can be logged with one tap and counted down; the app guesses the place.
 const PANTRY = (off: boolean) =>
-  `- At home: the user keeps a list of what they have at home (foods, ready meals, spices). When they tell you what they bought ("I bought two lasagne, oats and cumin", a photo of the shopping) or that something is running low or used up ("the paprika is nearly empty", "out of olive oil"), call propose_home: one item per thing, named as they would say it ("Lasagne", "Oat flakes", "Cumin"); status bought, low or used_up; amount only when they said it or the photo shows it, a count as a plain number ("2") or a weight in g or kg ("500 g"); place (fridge, freezer, cupboard, spices) only when they said, else empty and the app chooses. For things they will eat or cook with, give the food's code from search_foods${off ? ' (or the product from lookup_barcode when a barcode is readable)' : ''}, so they can log it later with one tap and the app counts it down; spices and non-food need none. Search results marked [at home] are what the user has: when they eat such a food, use that code in the meal. Things bought are not a meal: log nothing for them. Only when the user says so. To change an open card, call it again with the complete list and replaces set to its id (H1, H2, …).`;
+  `- At home: the user keeps a list of what they have at home (foods, ready meals, spices). When they tell you what they bought ("I bought two lasagne, oats and cumin", a photo of the shopping) how much of something is left ("only 8.5 g paprika left", "two yogurts left"), or that something is running low or used up ("the paprika is nearly empty", "out of olive oil"), call propose_home: one item per thing, named as they would say it ("Lasagne", "Oat flakes", "Cumin"); status bought (adds to what is there), left (the amount replaces what the app had), low or used_up; amount only when they said it or the photo shows it, a count as a plain number ("2") or a weight in g or kg ("500 g", "8.5 g"); place (fridge, freezer, cupboard, spices) only when they said, else empty and the app chooses. For things they will eat or cook with, give the food's code from search_foods${off ? ' (or the product from lookup_barcode when a barcode is readable)' : ''}, so they can log it later with one tap and the app counts it down; spices and non-food need none. Search results marked [at home] are what the user has: when they eat such a food, use that code in the meal. Things bought are not a meal: log nothing for them. Only when the user says so. To change an open card, call it again with the complete list and replaces set to its id (H1, H2, …).`;
 
 // Recipes in the main chat (docs/SPEC.md, "One assistant"): the same pot rules as in the recipe
 // editor, but the result is a recipe for the book, new or changed.
@@ -644,7 +644,7 @@ function proposeShopping(recipes: boolean): BetaTool {
 function proposeHome(codeHelp: string): BetaTool {
   return {
     name: 'propose_home',
-    description: 'Show the user things bought, running low or used up for their At home list, as a card for the user to check and confirm; nothing is saved until they do. The app adds amounts bought to what is at home and puts things running low on the shopping list. After a correction, call it again with the complete list and replaces set to the card id.',
+    description: 'Show the user things bought, counted, running low or used up for their At home list, as a card for the user to check and confirm; nothing is saved until they do. The app adds amounts bought to what is at home, sets counted amounts as what is left now, and puts things running low on the shopping list. After a correction, call it again with the complete list and replaces set to the card id.',
     // Not strict: see STRICT_NESTED. The app validates the input itself and sends errors back.
     input_schema: {
       type: 'object',
@@ -656,9 +656,9 @@ function proposeHome(codeHelp: string): BetaTool {
             properties: {
               name: { type: 'string', description: 'What it is, as the user would say it, e.g. "Lasagne".' },
               code: { type: 'string', description: `For something eaten or cooked with: ${codeHelp} Empty for spices and non-food.` },
-              amount: { type: 'string', description: 'Only if said or shown: a count as a plain number ("2") or a weight ("500 g"); empty otherwise.' },
+              amount: { type: 'string', description: 'Only if said or shown: a count as a plain number ("2") or a weight ("500 g", "8.5 g"); empty otherwise. Required for status left.' },
               place: { type: 'string', enum: ['', 'fridge', 'freezer', 'cupboard', 'spices'], description: 'Only if the user said; empty lets the app choose.' },
-              status: { type: 'string', enum: ['bought', 'low', 'used_up'] },
+              status: { type: 'string', enum: ['bought', 'left', 'low', 'used_up'], description: 'bought: amount adds to what is there; left: amount is what is left now.' },
             },
             required: ['name', 'status'],
           },

@@ -6,7 +6,7 @@ import { newId } from '../../lib/id';
 import { search } from '../../foods/search';
 import { productLabel, productRef } from '../../foods/products';
 import type { Food } from '../../foods/foodDb';
-import { pantrySuggestions, parseStock, planStock, type NewPantryItem } from '../../logic/pantry';
+import { packGrams, pantrySuggestions, parseStock, planStock, scannedAmount, type NewPantryItem } from '../../logic/pantry';
 import { isOn } from '../../settings/features';
 import { repo } from '../../storage/repo';
 import { CURRENT_SCHEMA_VERSION, type HomePlace, type Product } from '../../storage/types';
@@ -66,7 +66,8 @@ export function PantryAdd({ place, autoFocus, placeholder }: { place?: HomePlace
     const saved = await repo.saveProduct(product);
     const name = productLabel(saved);
     const ref = productRef(saved);
-    const item: NewPantryItem = { name, ref, place: place ?? placeOf(name, ref), pieces: 1 };
+    const where = place ?? placeOf(name, ref);
+    const item: NewPantryItem = { name, ref, place: where, ...scannedAmount(where, packGrams(saved)) };
     const undo = await repo.changeHome((pantry) => ({ pantry: planStock(pantry, [item], Date.now(), newId, CURRENT_SCHEMA_VERSION, left) }));
     toast(t('pantry.added', { name }), () => repo.undoHome(undo));
   }

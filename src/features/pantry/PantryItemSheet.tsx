@@ -3,7 +3,7 @@ import { useData } from '../../app/data';
 import { useToast } from '../../app/toast';
 import { t } from '../../i18n';
 import { productLabel, productRef } from '../../foods/products';
-import { amountField, leftOf, stockAmount, withAmount } from '../../logic/pantry';
+import { amountField, fmtLeftGrams, leftOf, piecesAsGrams, stockAmount, withAmount } from '../../logic/pantry';
 import { repo } from '../../storage/repo';
 import { HOME_PLACES, type FoodRef, type HomePlace, type PantryItem } from '../../storage/types';
 import { Field, Segmented, Sheet } from '../../ui/controls';
@@ -22,7 +22,7 @@ export function PantryItemSheet({ item, onClose }: { item: PantryItem; onClose: 
   const d = useData();
   const toast = useToast();
   const left = usePantryLeft()(item);
-  const { nameOfRef } = usePantryFoods();
+  const { nameOfRef, packGramsOf } = usePantryFoods();
   const mark = useMarkPantry();
   const startAmount = amountField(item, left);
   const startStatus: Status = left.out ? 'out' : left.low ? 'low' : 'have';
@@ -78,6 +78,11 @@ export function PantryItemSheet({ item, onClose }: { item: PantryItem; onClose: 
     onClose();
   }
 
+  // Counted in jars or packs whose weight is known: one tap counts it in grams instead, to be
+  // corrected to what is really left (owner's ask 2026-10-26: 8.5 g left of a 12.5 g spice jar).
+  const typed = stockAmount(amount);
+  const asGrams = piecesAsGrams({ out: false, low: false, ...(typed.pieces !== undefined ? { pieces: typed.pieces } : {}) }, packGramsOf(ref));
+
   if (picking === 'scan') return <BarcodeSheet onFound={(product) => void pick({ product })} onClose={() => setPicking('search')} />;
 
   return (
@@ -91,8 +96,15 @@ export function PantryItemSheet({ item, onClose }: { item: PantryItem; onClose: 
             <Segmented label={t('pantry.status')} value={status} onChange={setStatus} options={[{ value: 'have', label: t('pantry.have') }, { value: 'low', label: t('pantry.low') }, { value: 'out', label: t('pantry.out') }]} />
           </div>
           <Field label={t('pantry.amount')} hint={t('pantry.amountHint')}>
-            {(id) => <input id={id} value={amount} placeholder={t('pantry.amountPlaceholder')} onChange={(e) => changeAmount(e.target.value)} />}
+            {(id) => <input id={id} value={amount} placeholder={t('pantry.amountPlaceholder')} onChange={(e) => changeAmount(e.target.value)}/>}
           </Field>
+          {asGrams !== undefined && asGrams > 0 && (
+            <div className="chips pantry-in-grams">
+              <button className="chip" onClick={() => changeAmount(fmtLeftGrams(asGrams))}>
+                {t('pantry.inGrams', { grams: fmtLeftGrams(asGrams) })}
+              </button>
+            </div>
+          )}
           <Field label={t('pantry.place')}>
             {(id) => (
               <select id={id} value={place} onChange={(e) => setPlace(e.target.value as HomePlace)}>

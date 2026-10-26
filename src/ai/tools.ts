@@ -287,7 +287,7 @@ export interface HomeProposedItem {
   amount?: string;
   /** Where it is kept; missing: the app guesses. */
   place?: HomePlace;
-  status: 'bought' | 'low' | 'out';
+  status: 'bought' | 'left' | 'low' | 'out';
 }
 
 /** Things bought, running low or used up that the assistant proposes for At home, for the user to check. */
@@ -797,7 +797,7 @@ export function validateShoppingProposal(input: unknown, recipes: readonly Pick<
   return { ok: true, proposal: { items: items.map((i) => ({ name: i.name, ...(i.amount ? { amount: i.amount } : {}) })), recipes: chosen, ...(replaces ? { replaces } : {}) } };
 }
 
-const HOME_STATUS: Record<string, HomeProposedItem['status']> = { '': 'bought', bought: 'bought', low: 'low', used_up: 'out' };
+const HOME_STATUS: Record<string, HomeProposedItem['status']> = { '': 'bought', bought: 'bought', left: 'left', low: 'low', used_up: 'out' };
 
 /** Check a `propose_home` call: names, known codes, places and statuses. */
 export function validateHomeProposal(input: unknown, db: Pick<FoodDb, 'byCode'> & { version?: string }, products?: ProductTools): { ok: true; proposal: HomeProposal } | { ok: false; error: string } {
@@ -829,7 +829,8 @@ export function validateHomeProposal(input: unknown, db: Pick<FoodDb, 'byCode'> 
     }
     const status = HOME_STATUS[it.status?.trim() ?? ''];
     if (status) item.status = status;
-    else problems.push(`${name}: status "${it.status}" is not bought, low or used_up.`);
+    else problems.push(`${name}: status "${it.status}" is not bought, left, low or used_up.`);
+    if (status === 'left' && item.pieces === undefined && item.grams === undefined) problems.push(`${name}: status left needs the amount that is left ("8.5 g", "2"); for nothing left use used_up.`);
     items.push(item);
   }
   if (items.length === 0) problems.push('Nothing to save: give items.');
