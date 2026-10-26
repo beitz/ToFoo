@@ -1297,6 +1297,7 @@ export const en = {
   'habits.all': 'All habits',
   'habits.allShort': 'All',
   'habits.add': 'Habit',
+  'habits.addFirst': 'Add your first habit',
   'habits.empty': 'No habits yet.',
   'habits.emptyHint': 'Add something you want to do ("Floss", "Stretch 3× a week"), avoid ("Alcohol", at most 2 days a week) or minutes of exercise read from your activities. Each gets a small card on Home to tick.',
   'habits.keyLine': '✓ kept · ✗ not kept · ○ not answered · – not due; for a weekly goal a dot is a day that didn\'t count. A day you didn\'t answer stays open, never "not done"; one missed or open day in 7 doesn\'t end a run.',

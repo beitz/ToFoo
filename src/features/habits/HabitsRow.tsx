@@ -13,13 +13,27 @@ import { useHabits } from './useHabits';
  * Today's habits on Home (owner's design, 2026-10-26): one small card per habit in a row that scrolls
  * sideways, and "All" fixed at its end for the habits page. A tap answers a do or avoid habit for today
  * (done, or had some; a second tap clears it), with undo; a minutes habit opens the activity sheet.
+ * With Habits on and none made yet, the row still shows, with a card that adds the first one, so the
+ * switch in Settings leads somewhere (owner's ask, 2026-10-26).
  */
 export function HabitsRow() {
   const d = useData();
   const habits = useHabits();
   const answer = useAnswer();
   const [logging, setLogging] = useState<Habit>();
-  if (!habits?.active.length) return null;
+  if (!habits) return null;
+  if (!habits.active.length)
+    return (
+      <div className="habits-row" data-tour="home.habits">
+        <a className="habit-card habit-card-add" href={href('habits', 'new')}>
+          <Icon name="plus" size={18} /> {t('habits.addFirst')}
+        </a>
+        <a className="habits-all" href={href('habits')} aria-label={t('habits.all')}>
+          <Icon name="repeat" size={18} />
+          <span aria-hidden>{t('habits.allShort')}</span>
+        </a>
+      </div>
+    );
   const { data } = habits;
   // Habits not due today go to the end.
   const shown = [...habits.active].sort((a, b) => Number(!isDue(a.goal, d.today)) - Number(!isDue(b.goal, d.today)));
