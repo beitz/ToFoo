@@ -8,6 +8,7 @@
  * scenes and small fixes. A pull request that changes what users see adds its line here in the same PR.
  */
 export const changesEn = {
+  'change.149': 'Tell the assistant which habits you kept ("flossed, no alcohol yesterday") and check them on one card; Patterns can now compare your habits with everything else, if you tick Habits.',
   'change.148': 'Habits: things to do or avoid, daily, on set days or a few times a week, or minutes of exercise from your activities. Tick today on Home, see each habit\'s month and run, and answer yesterday\'s on the fill-in page. Switch it on under Settings → What you track.',
   'change.148.major': 'Habits, with a row of cards on Home',
   'change.147': '"What it does" on nutrient pages shows its roles as tiles, where it is found and quick facts (does the body make it, how much is taken up, how much survives boiling). Energy now shows where you are on its steps too.',
