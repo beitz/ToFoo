@@ -54,9 +54,9 @@ export function CalendarPage({ month: monthParam }: { month?: string }) {
   const layers = useMemo(
     () =>
       sleep && water && journal && skipped && habits !== undefined
-        ? dayLayers({ days, today: d.today, dayStatus: d.model.dayStatus, sleep, activities: d.activities, water, journal, skipped, habits: habits ?? undefined })
+        ? dayLayers({ days, today: d.today, dayStatus: d.model.dayStatus, sleep, activities: d.activities, water, journal, skipped, habits: habits ?? undefined, askDays: d.settings.askDays })
         : undefined,
-    [days, d.today, d.model.dayStatus, sleep, d.activities, water, journal, skipped, habits],
+    [days, d.today, d.model.dayStatus, sleep, d.activities, water, journal, skipped, habits, d.settings.askDays],
   );
   const counts: Record<string, number> = {};
   for (const day of weeks.flat()) {

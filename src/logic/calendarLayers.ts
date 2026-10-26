@@ -1,6 +1,6 @@
 import type { DayStatus } from '../model/types';
-import type { ActivityRecord, Habit, JournalEntry, SleepRecord, WaterRecord } from '../storage/types';
-import type { CatchUpKind } from './catchUp';
+import type { ActivityRecord, AskDays, Habit, JournalEntry, SleepRecord, WaterRecord } from '../storage/types';
+import { asksOn, type CatchUpKind } from './catchUp';
 import { habitsDaySummary, type HabitData, type HabitsDaySummary } from './habits';
 
 /**
@@ -14,7 +14,7 @@ export type Layer = (typeof LAYERS)[number];
 /**
  * logged: something is there; missing: nothing, and the day is one that should have it (over, in use);
  * skipped: the user answered "Skip" on the fill-in page; none: nothing to say (before first use, today
- * not over yet, journal days without an entry).
+ * not over yet, journal days without an entry, a weekday the user said not to ask about).
  */
 export type Mark = 'logged' | 'missing' | 'skipped' | 'none';
 
@@ -42,6 +42,8 @@ export interface LayersInput {
   skipped: Readonly<Record<string, readonly CatchUpKind[]>>;
   /** The habits and what they need, when habits are on. */
   habits?: { list: readonly Habit[]; data: HabitData };
+  /** The weekdays to ask about each kind on (Settings → Reminders); a day not asked about is never missing. */
+  askDays?: AskDays;
 }
 
 function firstDay(rs: readonly { day: string }[]): string | undefined {
@@ -66,14 +68,14 @@ export function dayLayers(input: LayersInput): Map<string, DayLayers> {
       if (has[layer]) return 'logged';
       if (skipped.has(layer)) return 'skipped';
       const from = since[layer];
-      return over && from !== undefined && day >= from ? 'missing' : 'none';
+      return over && from !== undefined && day >= from && asksOn(input.askDays, layer, day) ? 'missing' : 'none';
     };
     const st = input.dayStatus[day];
-    const meals: Mark = st === undefined || st === 'pending' ? 'none' : st === 'unknown' ? (skipped.has('food') ? 'skipped' : 'missing') : 'logged';
+    const meals: Mark = st === undefined || st === 'pending' ? 'none' : st === 'unknown' ? (skipped.has('food') ? 'skipped' : asksOn(input.askDays, 'food', day) ? 'missing' : 'none') : 'logged';
     const journal = input.journal.filter((r) => r.day === day).length;
     const habits = input.habits ? habitsDaySummary(input.habits.list, day, input.habits.data) : { kept: 0, missed: 0, open: 0 };
     // A day with any habit answered counts as logged; one with only open daily habits is missing them, once over.
-    const habitMark: Mark = habits.kept + habits.missed > 0 ? 'logged' : skipped.has('habits') ? 'skipped' : over && habits.open > 0 ? 'missing' : 'none';
+    const habitMark: Mark = habits.kept + habits.missed > 0 ? 'logged' : skipped.has('habits') ? 'skipped' : over && habits.open > 0 && asksOn(input.askDays, 'habits', day) ? 'missing' : 'none';
     out.set(day, {
       marks: { meals, sleep: tracker('sleep'), activity: tracker('activity'), water: tracker('water'), journal: journal ? 'logged' : 'none', habits: habitMark },
       sleepMinutes,

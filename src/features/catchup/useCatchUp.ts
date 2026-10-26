@@ -46,6 +46,7 @@ export function useCatchUp(day: string): CatchUpKind[] | undefined {
     water,
     skipped,
     habitsOpen: isOn(f, 'habits') && openHabitsOn(habits.active, day, habits.data).length > 0,
+    askDays: d.settings.askDays,
   });
 }
 

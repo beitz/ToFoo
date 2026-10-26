@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ActivityRecord, SleepRecord, WaterRecord } from '../storage/types';
-import { atDayMinute, frequentActivities, missingOn, usualNight, usualWater, type CatchUpInput } from './catchUp';
+import { asksOn, atDayMinute, frequentActivities, missingOn, usualNight, usualWater, type CatchUpInput } from './catchUp';
 
 const at = (day: number, h: number, m = 0) => new Date(2026, 9, day, h, m).getTime();
 const key = (day: number) => `2026-10-${String(day).padStart(2, '0')}`;
@@ -40,6 +40,17 @@ describe('catch up', () => {
     // First used only after the day: not asked about.
     expect(missingOn({ ...base, water: [{ day: key(23) }] })).toEqual(['sleep', 'activity']);
     expect(missingOn({ ...base, skipped: new Set(['sleep', 'water'] as const) })).toEqual(['activity']);
+  });
+
+  it('asks about each thing only on the weekdays set for it', () => {
+    // 2026-10-22 is a Thursday (4).
+    expect(asksOn(undefined, 'activity', key(22))).toBe(true);
+    expect(asksOn({ activity: [1, 3, 5] }, 'activity', key(22))).toBe(false);
+    expect(asksOn({ activity: [4] }, 'activity', key(22))).toBe(true);
+    expect(asksOn({ activity: [] }, 'activity', key(22))).toBe(false);
+    expect(asksOn({ activity: [] }, 'sleep', key(22))).toBe(true);
+    expect(missingOn({ ...base, foodUnknown: true, askDays: { activity: [1, 3, 5], water: [], sleep: [1, 2, 3, 4, 5, 6, 7] } })).toEqual(['food', 'sleep']);
+    expect(missingOn({ ...base, askDays: { activity: [4] } })).toEqual(['sleep', 'activity', 'water']);
   });
 
   it('does not ask about food before the model starts, and a sleep still going does not count', () => {

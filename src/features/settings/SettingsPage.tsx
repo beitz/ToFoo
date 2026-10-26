@@ -8,6 +8,7 @@ import { FEATURE_GROUPS, FEATURES, isOn } from '../../settings/features';
 import { repo } from '../../storage/repo';
 import { Field, NumberInput, Segmented, Toggle } from '../../ui/controls';
 import { AccentPicker } from './AccentPicker';
+import { AskDays } from './AskDays';
 import { viewsOf } from '../../settings/views';
 import { Icon } from '../../ui/Icon';
 
@@ -151,6 +152,7 @@ export function SettingsPage() {
                 label={f.comingIn ? `${f.label} (${t('settings.comingIn', { v: f.comingIn })})` : f.label}
                 description={f.description}
               />
+              {f.key === 'yesterdayNudge' && <AskDays />}
             </div>
           ))}
         </Fold>

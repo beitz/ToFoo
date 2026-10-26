@@ -36,6 +36,14 @@ describe('calendar layers', () => {
     expect(base.days.map((d) => l.get(d)!.marks.water)).toEqual(['none', 'none', 'none', 'none', 'none']);
   });
 
+  it('never marks missing on a weekday the user said not to ask about', () => {
+    // 2026-10-19 is a Monday, 2026-10-20 a Tuesday, 2026-10-21 a Wednesday.
+    const l = dayLayers({ ...base, askDays: { food: [2, 3, 4, 5, 6, 7], sleep: [1], activity: [] } });
+    expect(base.days.map((d) => l.get(d)!.marks.meals)).toEqual(['logged', 'none', 'logged', 'skipped', 'none']);
+    expect(base.days.map((d) => l.get(d)!.marks.sleep)).toEqual(['none', 'logged', 'none', 'logged', 'none']);
+    expect(base.days.map((d) => l.get(d)!.marks.activity)).toEqual(['none', 'none', 'logged', 'none', 'none']);
+  });
+
   it('adds up sleep, activity and journal per day; a sleep still going does not count', () => {
     const l = dayLayers(base);
     expect(l.get(key(21))!.sleepMinutes).toBe(6 * 60);

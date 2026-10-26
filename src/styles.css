@@ -8415,3 +8415,18 @@ button.link-row {
 .habit-answer-head .icon-btn {
   margin-left: auto;
 }
+
+/* Settings → Reminders: which days to ask about each thing. */
+.ask-days {
+  padding: 4px 0 8px 14px;
+  box-shadow: inset 2px 0 0 var(--border);
+}
+.ask-days-row {
+  margin-top: 12px;
+}
+.ask-days-head {
+  margin: 0 0 6px;
+}
+.ask-days .chips {
+  margin-top: 8px;
+}
