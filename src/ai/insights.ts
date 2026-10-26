@@ -15,6 +15,7 @@ import {
   journalEntries,
   MEASURE_BY_ID,
   OPS,
+  periodDays,
   type CompareResult,
   type Condition,
   type CountResult,
@@ -30,6 +31,8 @@ export const INSIGHT_TOOL_NAMES: ReadonlySet<string> = new Set(INSIGHT_TOOLS.map
 
 const MAX_MEASURES = 8;
 const MAX_DETAIL_DAYS = 31;
+/** Values per daily table: three months of 50 measures, about 15k tokens; more would crowd out the rest of the chat. */
+const MAX_TABLE_CELLS = 5000;
 /** Journal entries per read: a few months of daily notes; more would crowd out the comparisons. */
 const MAX_JOURNAL_ENTRIES = 400;
 
@@ -57,6 +60,7 @@ const journalInput = z.object({ ...period, words: z.array(z.string()).default([]
 const countInput = z.object({ ...period, group: z.array(conditionInput), outcome: z.array(conditionInput).min(1) });
 const compareInput = z.object({ ...period, group: z.array(conditionInput).default([]), measures: z.array(z.string()).min(1) });
 const detailsInput = z.object({ days: z.array(dayKey).min(1) });
+const tableInput = z.object({ ...period, measures: z.array(z.string()).min(1) });
 
 function toCondition(c: z.infer<typeof conditionInput>): Condition {
   const common = { offset: c.offset, span: c.span, negate: c.negate };
@@ -139,6 +143,19 @@ export function runInsightTool(name: string, input: unknown, data: InsightData):
     if (p.data.days.length > MAX_DETAIL_DAYS) return { ok: false, text: `At most ${MAX_DETAIL_DAYS} days per call.` };
     return { ok: true, text: p.data.days.map((d) => dayText(d, data)).join('\n\n') };
   }
+  if (name === 'daily_table') {
+    const p = tableInput.safeParse(input);
+    if (!p.success) return { ok: false, text: zodError(p.error) };
+    const bad = periodProblem(p.data.from, p.data.to);
+    if (bad) return { ok: false, text: bad };
+    const measures = [...new Set(p.data.measures)];
+    const unknown = measures.filter((m) => !MEASURE_BY_ID.has(m));
+    if (unknown.length) return { ok: false, text: `Unknown measures: ${unknown.join(', ')}.` };
+    const days = periodDays(data, p.data.from, p.data.to);
+    if (days.length * measures.length > MAX_TABLE_CELLS)
+      return { ok: false, text: `${days.length} days × ${measures.length} measures is more than ${MAX_TABLE_CELLS} values: choose fewer measures or a shorter period.` };
+    return { ok: true, text: tableText(data, days, measures) };
+  }
   return { ok: false, text: `Unknown tool ${name}.` };
 }
 
@@ -161,6 +178,35 @@ export function fmtMeasure(id: string, v: number): string {
   const m = MEASURE_BY_ID.get(id);
   const decimals = id === 'sleep_hours' ? 1 : Math.max(m?.decimals ?? 0, Math.abs(v) < 10 && v !== 0 ? 1 : 0);
   return `${fmtNumber(v, decimals)}${m?.unit ? ` ${m.unit}` : ''}`;
+}
+
+/** A value for the daily table: no units or thousands separators, clock measures as HH:MM. */
+function cell(id: string, v: number): string {
+  if (CLOCK_MEASURES.has(id)) return fmtMeasure(id, v);
+  const decimals = id === 'sleep_hours' ? 1 : (MEASURE_BY_ID.get(id)?.decimals ?? 0);
+  return String(Math.round(v * 10 ** decimals) / 10 ** decimals);
+}
+
+/** One row per day, units once in the header, nothing repeated: day-by-day values at the fewest tokens. */
+function tableText(data: InsightData, days: readonly string[], measures: readonly string[]): string {
+  if (!days.length) return 'No shared days in this period.';
+  const head = measures.map((id) => {
+    const unit = CLOCK_MEASURES.has(id) ? 'HH:MM' : MEASURE_BY_ID.get(id)?.unit;
+    return unit ? `${id} (${unit})` : id;
+  });
+  const rows = days.map((day) => {
+    const f = data.days.get(day)!;
+    const cells = measures.map((id) => {
+      const v = f.values[id];
+      return v === null || v === undefined ? '' : `${cell(id, v)}${f.missing.has(id) ? '*' : ''}`;
+    });
+    return [`${day} ${weekday(day)}`, ...cells].join(',');
+  });
+  return [
+    `${days.length} days, ${days[0]} to ${days[days.length - 1]}. Empty: unknown that day (not logged, not tracked yet or not shared). *: at least this much (some items had no data for it).`,
+    ['day', ...head].join(','),
+    ...rows,
+  ].join('\n');
 }
 
 /** A chance (0–1) as a percentage that does not pretend to more precision than it has. */
@@ -227,8 +273,12 @@ function dayText(day: string, data: InsightData): string {
   const lines = [`${day} ${weekday(day)} · food log: ${STATUS_TEXT[f.status] ?? f.status}`];
   if (f.entries.length) lines.push(`food: ${f.entries.map((e) => `${clock(e.time)} ${e.label}${e.grams !== undefined ? ` ${fmtNumber(e.grams)} g` : ''}${e.supplement ? ' (supplement or drink mark)' : ''}`).join('; ')}`);
   if (f.foodComplete) lines.push(`totals: ${['ENERCC', 'PROT625', 'FAT', 'CHO', 'SUGAR', 'FIBT', 'alcohol'].map((id) => `${MEASURE_BY_ID.get(id)?.name.toLowerCase()} ${fmtMeasure(id, v[id] ?? 0)}${f.missing.has(id) ? ' (at least)' : ''}`).join(', ')}`);
-  if (f.night) lines.push(`sleep: ${clock(f.night.start)}–${clock(f.night.end)} (${fmtMeasure('sleep_hours', v.sleep_hours ?? 0)})${v.nap_minutes ? `; naps ${fmtMeasure('nap_minutes', v.nap_minutes)}` : ''}`);
-  else if (v.nap_minutes !== null) lines.push(`sleep: no night logged${v.nap_minutes ? `; naps ${fmtMeasure('nap_minutes', v.nap_minutes)}` : ''}`);
+  const span = (p: { start: number; end: number }) => `${clock(p.start)}–${clock(p.end)}`;
+  const naps = f.naps.length ? `; naps ${f.naps.map(span).join(', ')} (${fmtMeasure('nap_minutes', v.nap_minutes ?? 0)})` : '';
+  if (f.night) {
+    const woke = v.wake_ups ? `; woken ${v.wake_ups} ${v.wake_ups === 1 ? 'time' : 'times'}, awake ${fmtMeasure('awake_minutes', v.awake_minutes ?? 0)}` : '';
+    lines.push(`sleep: ${f.night.parts.map(span).join(', ')} (${fmtMeasure('sleep_hours', v.sleep_hours ?? 0)} asleep${woke})${naps}`);
+  } else if (v.nap_minutes !== null) lines.push(`sleep: no night logged${naps}`);
   if (f.activities.length) lines.push(`activity: ${f.activities.map((a) => `${clock(a.time)} ${a.name || a.kind} ${a.minutes} min${a.intensity ? `, ${a.intensity}` : ''}${a.outside ? ', outside' : ''}`).join('; ')}`);
   if (v.plain_water) lines.push(`plain water: ${fmtMeasure('plain_water', v.plain_water)}${v.total_water !== null ? `; with water in food ${fmtMeasure('total_water', v.total_water ?? 0)}` : ''}`);
   const habits = Object.entries(f.habits);

@@ -3,10 +3,10 @@
  * usual times with their spread, and weekly averages. Pure, tested in nights.test.ts. Unlogged
  * nights are unknown, never zero: they stay out of every sum and average.
  */
-import { addDays, dayKey } from '../lib/dates';
+import { addDays } from '../lib/dates';
 import { weekStart } from '../lib/periods';
 import type { SleepRecord } from '../storage/types';
-import { isNight, sleepBlocks, type SleepBlock } from './sleep';
+import { sleepByDay, type DaySleep, type SleepBlock } from './sleep';
 
 const MIN = 60_000;
 const DAY_MIN = 24 * 60;
@@ -22,26 +22,6 @@ export interface Night {
   asleep?: number;
   /** Minutes over (+) or under (−) the need. */
   diff?: number;
-}
-
-type DaySleep = { night?: SleepBlock; naps: SleepBlock[] };
-
-/**
- * Every sleep by the day it ended, as in the diary and the calendar (owner's report 2026-10-24: a
- * midday nap showed in the diary but not here): night blocks ending the same day count as one night,
- * and naps count to their day too. Only a night makes a day logged, so a day with just a nap stays unknown.
- */
-function sleepByDay(records: readonly SleepRecord[]): Map<string, DaySleep> {
-  const out = new Map<string, DaySleep>();
-  for (const b of sleepBlocks(records)) {
-    const day = dayKey(new Date(b.end));
-    const had = out.get(day) ?? { naps: [] };
-    if (!isNight(b)) had.naps.push(b);
-    else if (!had.night) had.night = b;
-    else had.night = { start: Math.min(had.night.start, b.start), end: Math.max(had.night.end, b.end), asleep: had.night.asleep + b.asleep, parts: [...had.night.parts, ...b.parts] };
-    out.set(day, had);
-  }
-  return out;
 }
 
 /** Milliseconds asleep on a day: the night and its naps; undefined without a night. */

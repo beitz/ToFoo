@@ -2687,7 +2687,7 @@ export const en = {
   'sent.chatNot': 'Your profile (age, weight, height), your past diary (beyond the list of foods eaten most, with recipe ideas on), journal, sleep, activity, water and your habit answers unless you include them (next card), backups, other chats and your other API keys.',
   'sent.patternsTitle': 'Your data in the assistant: Claude by Anthropic',
   'sent.patternsWhen': 'Only once you tick data under "Include my data" in the assistant (it opens ticked when you come from Look for patterns), with each message you then send in that chat.',
-  'sent.patternsWhat': 'Only from the period and the kinds of data you ticked, and only what the assistant looks up: journal entries (private ones only if you tick them for that chat), the foods and grams of a day, sleep times, activities, water, the names of your habits and which days they were kept, and the counts and averages the app works out.',
+  'sent.patternsWhat': 'Only from the period and the kinds of data you ticked, and only what the assistant looks up: journal entries (private ones only if you tick them for that chat), the foods and grams of a day, sleep times, activities, water, the names of your habits and which days they were kept, and the counts and averages the app works out, and day-by-day values when you ask for a deep look.',
   'sent.patternsNot': 'Days outside the period, the kinds you left unticked, private journal entries unless you tick them, your profile.',
   'sent.anthropicTerms': 'Anthropic\'s commercial terms say it may not train its models on what you send through the API.',
   'sent.voiceTitle': 'Voice input: OpenAI',

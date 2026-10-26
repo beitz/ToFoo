@@ -90,8 +90,30 @@ describe('insight tools', () => {
     const d = runInsightTool('day_details', { days: [key(2)] }, data).text;
     expect(d).toContain('2026-10-02 Fri · food log: logged');
     expect(d).toContain('food: 08:00 Coffee 200 g');
-    expect(d).toContain('sleep: 01:00–07:00 (6 h)');
+    expect(d).toContain('sleep: 01:00–07:00 (6 h asleep)');
     expect(d).toContain('journal: 15:30 Headache since lunch');
+  });
+
+  it('shows each sleep of a night with its wake-ups, and naps with their times', () => {
+    const split = buildInsightData({
+      ...input,
+      sleep: [
+        { id: 'a', schemaVersion: 1, day: key(2), start: at(1, 23), end: at(2, 1, 30) },
+        { id: 'b', schemaVersion: 1, day: key(2), start: at(2, 2, 55), end: at(2, 7) },
+        { id: 'n', schemaVersion: 1, day: key(2), start: at(2, 13), end: at(2, 13, 40) },
+      ],
+    });
+    expect(runInsightTool('day_details', { days: [key(2)] }, split).text).toContain('sleep: 23:00–01:30, 02:55–07:00 (6.6 h asleep; woken 1 time, awake 85 min); naps 13:00–13:40 (40 min)');
+  });
+
+  it('gives a compact daily table, and clear errors', () => {
+    const r = runInsightTool('daily_table', { from: key(1), to: key(3), measures: ['sleep_hours', 'wake_time', 'ENERCC'] }, data);
+    expect(r.ok).toBe(true);
+    const lines = r.text.split('\n');
+    expect(lines[1]).toBe('day,sleep_hours (h),wake_time (HH:MM),ENERCC (kcal)');
+    expect(lines[3]).toBe('2026-10-02 Fri,6,07:00,2000');
+    expect(lines).toHaveLength(5);
+    expect(runInsightTool('daily_table', { from: key(1), to: key(3), measures: ['mood'] }, data)).toEqual({ ok: false, text: 'Unknown measures: mood.' });
   });
 
   it('sends back clear errors for input it cannot use', () => {
