@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import type { Product } from '../storage/types';
 import type { BlsFile } from './blsTypes';
 import { buildFoodDb, groupSearchBoost } from './foodDb';
-import { autoMatches, bestMatch, initialChoice, macroSimilarity, withChoice, wantsAutoMatch } from './productMatch';
+import { autoMatches, bestMatch, bestPairing, ingredientMix, initialChoice, macroSimilarity, mixDetail, withChoice, wantsAutoMatch } from './productMatch';
 import { buildIndex } from './search';
 
 const product = (name: string, brand: string, categories: string[], extra: Partial<Product> = {}): Product => ({
@@ -52,6 +52,66 @@ describe.runIf(existsSync(file))('pairing products with a similar BLS food', () 
     expect(meal('Erbsensuppe', ['Meals', 'Soups'], { FAT: 1.6, PROT625: 2.5, CHO: 7.4 })).toMatch(/^Pea soup/);
     // Plain foods keep their match when the label fits.
     expect(meal('Thunfisch im eigenen Saft', ['Seafood', 'Fishes', 'Canned fishes', 'Tunas', 'Canned tunas'], { FAT: 0.9, PROT625: 27.8, CHO: 0 })).toBe('Tuna canned, drained');
+  });
+
+  // YOUCOOK Indian Style Butter Chicken (4260334165158), as Open Food Facts read its list on 2026-10-26.
+  const butterChicken = product('Indian Style Butter Chicken mit Huhn', 'YOUCOOK', ['Meals', 'Meats and their products', 'Meals with meat', 'poultry-meals', 'Meals with chicken', 'Butter chicken'], {
+    per100: { ENERCC: 144, FAT: 7.1, FASAT: 3.9, PROT625: 5.3, CHO: 14.1, SUGAR: 1.7, FIBT: 1.2, NA: 216 },
+    ingredients: [
+      ['en:rice', 'gegarter Reis', 42],
+      ['en:chicken-breast-fillet', 'Hähnchenbrustfilet mariniert', 14.5],
+      ['de:gegart', 'gegart', 9.5],
+      ['en:tomato', 'Tomaten', 9.5],
+      ['en:tomato-puree', 'Tomatenmark', 3.35],
+      ['en:paprika-or-bell-pepper', 'Paprika', 2.44],
+      ['en:onion', 'Zwiebeln', 1.87],
+      ['en:cream', 'Sahne', 1.48],
+      ['en:coconut-milk', 'Kokosnussmilchpulver', 1.1],
+      ['en:butter', 'Butter', 1],
+      ['en:creme-fraiche', 'Crème Fraîche', 0.84],
+      ['de:Geflügelbrühe', 'Geflügelbrühe', 0.63],
+      ['en:chicken-fat', 'Hühnerfett', 0.62],
+      ['en:spice', 'Gewürze', 0.54],
+      ['en:sugar', 'Zucker', 0.48],
+      ['en:starch', 'Stärke', 0.42],
+      ['en:salt', 'Salz', 0.37],
+    ].map(([id, text, percent]) => ({ id: id as string, text: text as string, percent: percent as number })),
+  });
+
+  it('builds a ready meal from its ingredient list, with cooked rice because the label says 144 kcal', () => {
+    const parts = ingredientMix(butterChicken, db)!;
+    expect(parts.reduce((a, p) => a + p.share, 0)).toBeCloseTo(100, 0);
+    const name = (code: string) => db.byCode.get(code)!.nameEn;
+    expect(name(parts[0]!.code)).toBe('White rice boiled');
+    expect(parts[0]!.share).toBeGreaterThan(45);
+    expect(parts.map((p) => name(p.code))).toContain('Chicken breast fillet, raw');
+    const detail = mixDetail(butterChicken, parts);
+    expect(detail.rows[0]!.texts).toEqual(['gegarter Reis']);
+    expect(detail.leftOut.texts).toEqual(['gegart', 'Geflügelbrühe', 'Gewürze']);
+    // A dish with an ingredient list gets the mix rather than one similar food.
+    expect(bestPairing(butterChicken, index, db, boost)).toEqual({ code: parts[0]!.code, parts });
+    // Too little known, or no list: no mix.
+    expect(ingredientMix({ ...butterChicken, ingredients: butterChicken.ingredients!.filter((i) => i.id !== 'en:rice') }, db)).toBeUndefined();
+    expect(ingredientMix({ ...butterChicken, ingredients: undefined }, db)).toBeUndefined();
+    // A mix whose make-up does not fit the label (all rice, labelled as pure fat) is no mix.
+    expect(ingredientMix({ per100: { FAT: 100, PROT625: 0, CHO: 0 }, ingredients: [{ id: 'en:rice', text: 'Reis', percent: 100 }] }, db)).toBeUndefined();
+  });
+
+  it('keeps a single food for plain products whose one food fits better, and saves a mix as the choice', () => {
+    const tuna = product('Thunfisch im eigenen Saft', '', ['Seafood', 'Fishes', 'Canned fishes', 'Tunas', 'Canned tunas'], {
+      per100: { ENERCC: 119, FAT: 0.9, PROT625: 27.8, CHO: 0 },
+      ingredients: [{ id: 'en:tuna', text: 'Thunfisch', percent: 77, declared: true }, { id: 'en:water', text: 'Wasser', percent: 0.6 }, { id: 'en:salt', text: 'Speisesalz', percent: 0.6 }],
+    });
+    expect(bestPairing(tuna, index, db, boost)?.parts).toBeUndefined();
+    const choice = initialChoice(butterChicken, db, index, boost);
+    expect(choice.parts).toBeDefined();
+    const saved = withChoice(butterChicken, choice, '4.0');
+    expect(saved.match).toMatchObject({ code: choice.food!.code, parts: choice.parts, auto: true });
+    expect(initialChoice(saved, db, index, boost)).toEqual(choice);
+    // An earlier single pick of the app's is replaced by the mix; the same mix again changes nothing.
+    const old = { ...butterChicken, match: { version: '4.0', code: 'Q830000', auto: true as const } };
+    expect(autoMatches([old], index, db, boost)[0]!.match.parts).toEqual(choice.parts);
+    expect(autoMatches([saved], index, db, boost)).toEqual([]);
   });
 
   it('compares fat, protein and carbohydrate', () => {

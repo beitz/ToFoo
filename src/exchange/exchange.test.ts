@@ -68,7 +68,7 @@ const snapshot: Snapshot = {
       brand: 'Ferrero',
       per100: { ENERCC: 632, FAT: 48, NA: 124 },
       categories: ['Snacks', 'Chocolate candies'],
-      match: { version: '4.0', code: 'S610000', auto: true },
+      match: { version: '4.0', code: 'S610000', auto: true, parts: [{ code: 'S610000', share: 80 }, { code: 'H130100', share: 20 }] },
       fetchedAt: 1,
     },
     {
@@ -78,6 +78,10 @@ const snapshot: Snapshot = {
       code: '4001686301265',
       name: 'Goldbären',
       per100: { ENERCC: 343, SUGAR: 46 },
+      ingredients: [
+        { id: 'en:glucose-syrup', text: 'Glukosesirup', percent: 52.2 },
+        { id: 'en:sugar', text: 'Zucker', percent: 16.1, declared: true },
+      ],
       categories: ['Gummi candies'],
       labelOnly: true,
       fetchedAt: 3,

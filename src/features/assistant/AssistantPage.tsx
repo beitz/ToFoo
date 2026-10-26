@@ -81,6 +81,7 @@ import type { AppData } from '../../app/data';
 import { takeAsk } from '../../app/ask';
 import { openCardIds, reopenChat, type Reopened } from './reopen';
 import { ChangeButton, DoneRow } from './CardFrame';
+import { pairingName } from '../food/pairingName';
 
 export type { RecipeChat } from './cards';
 
@@ -1518,7 +1519,7 @@ function ProposalCard({ card, day, toast, onLogged, register }: CardProps<Extrac
                 <SourceTag source={it.product?.source ?? 'BLS'} product={it.product} /> {it.note || it.food.nameDe}
               </span>
               {it.product?.match && (
-                <span className="muted small block">{t('ai.microsFrom', { name: d.foods.byCode.get(it.product.match.code)?.nameEn ?? it.product.match.code })}</span>
+                <span className="muted small block">{t('ai.microsFrom', { name: pairingName(it.product.match, d.foods) })}</span>
               )}
               {it.pieces && <span className="muted small block">{pieceLine(it.pieces, it.grams, it.product?.perMl ? 'ml' : 'g')}</span>}
             </div>
@@ -1640,7 +1641,7 @@ function IngredientsCard({ card, toast, onLogged, register, recipe }: CardProps<
                 {it.preparation !== 'asListed' && ` · ${t(`prep.${it.preparation}` as MessageKey)}`}
               </span>
               {it.product?.match && (
-                <span className="muted small block">{t('recipes.microsFromLine', { name: d.foods.byCode.get(it.product.match.code)?.nameEn ?? it.product.match.code })}</span>
+                <span className="muted small block">{t('recipes.microsFromLine', { name: pairingName(it.product.match, d.foods) })}</span>
               )}
             </button>
             <NumberInput value={it.grams} onChange={(g) => setItems((all) => all.map((x, j) => (j === i ? { ...x, grams: g } : x)))} suffix="g" min={0} />

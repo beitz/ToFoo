@@ -8,6 +8,7 @@ import { refKey } from '../../lib/refs';
 import { repo } from '../../storage/repo';
 import type { Product } from '../../storage/types';
 import { SubPage } from './ProfilePage';
+import { pairingName } from '../food/pairingName';
 
 /**
  * Saved products and where their vitamins and minerals come from. The app's own picks and products
@@ -25,12 +26,11 @@ export function ProductsPage() {
     if (!p.match) return;
     const { auto: _a, ...match } = p.match;
     await repo.setProductMatch(p.id, { match });
-    toast(t('match.saved', { name: productLabel(p), food: d.foods.byCode.get(p.match.code)?.nameEn ?? p.match.code }), () => repo.setProductMatch(p.id, { match: p.match }));
+    toast(t('match.saved', { name: productLabel(p), food: pairingName(p.match, d.foods) }), () => repo.setProductMatch(p.id, { match: p.match }));
   }
 
   function status(p: Product): string {
-    const food = p.match ? d.foods.byCode.get(p.match.code) : undefined;
-    if (food) return p.match?.auto ? `${food.nameEn} · ${t('match.autoShort')}` : food.nameEn;
+    if (p.match && d.foods.byCode.has(p.match.code)) return p.match.auto ? `${pairingName(p.match, d.foods)} · ${t('match.autoShort')}` : pairingName(p.match, d.foods);
     if (p.labelOnly) return t('match.labelOnly');
     return t(hasOwnMicros(p) ? 'usda.matchNone' : 'match.noneFound');
   }

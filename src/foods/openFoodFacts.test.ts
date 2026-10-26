@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { lookupBarcode, normalizeBarcode, parseNutriments, parseProduct, validGtin } from './openFoodFacts';
+import { lookupBarcode, normalizeBarcode, parseIngredients, parseNutriments, parseProduct, validGtin } from './openFoodFacts';
 
 // Trimmed from the real v3 response for Giotto Haselnuss (fetched 2026-10-16).
 const giotto = {
@@ -71,6 +71,22 @@ describe('parsing Open Food Facts products', () => {
     // YOUCOOK Butter Chicken (4260334165158, fetched 2026-10-26): ten minerals and vitamins at 0.
     const n = parseNutriments({ fat_100g: 7.1, sugars_100g: 0, salt_100g: 0, sodium_100g: 0, fiber_100g: 0, iron_100g: 0, zinc_100g: 0, 'vitamin-c_100g': 0, calcium_100g: 0.02 });
     expect(n).toEqual({ FAT: 7.1, SUGAR: 0, NA: 0, FIBT: 0, CA: 20 });
+  });
+
+  it('keeps the top level of the ingredient list with declared or estimated shares', () => {
+    // Trimmed from YOUCOOK Butter Chicken (4260334165158, fetched 2026-10-26).
+    const list = parseIngredients([
+      { id: 'en:rice', text: 'gegarter Reis', percent: 42, percent_estimate: 41.99, ingredients: [{ id: 'en:water', text: 'Wasser' }] },
+      { id: 'en:butter', text: '_Butter_', percent_estimate: 1 },
+      { id: 'en:e160c', text: 'Paprikaextrakt' },
+      { text: 'no id', percent_estimate: 1 },
+    ]);
+    expect(list).toEqual([
+      { id: 'en:rice', text: 'gegarter Reis', percent: 42, declared: true },
+      { id: 'en:butter', text: 'Butter', percent: 1 },
+    ]);
+    expect(parseIngredients(undefined)).toEqual([]);
+    expect(parseProduct({ code: '1', product_name: 'Wasser' })!.ingredients).toEqual([]);
   });
 
   it('uses kJ when kcal is missing', () => {

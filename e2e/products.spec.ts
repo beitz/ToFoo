@@ -58,3 +58,156 @@ test('a packaged product is found by name and logged after its barcode lookup', 
   await expect.poll(() => todayKcal(page)).toBe(510);
   expect(errors).toEqual([]);
 });
+
+// YOUCOOK Butter Chicken (trimmed from a real response, 2026-10-26): a ready meal the app once paired with "Chicken fat".
+const BUTTER_CHICKEN = { code: '4260334165158', status: 'success', product: {
+    "code": "4260334165158",
+    "product_name": "Indian Style Butter Chicken mit Huhn",
+    "brands": "YOUCOOK",
+    "quantity": "420 g",
+    "categories_tags_en": [
+      "Meals",
+      "Meats and their products",
+      "Meals with meat",
+      "poultry-meals",
+      "Meals with chicken",
+      "Butter chicken"
+    ],
+    "nutriments": {
+      "carbohydrates_100g": 14.1,
+      "energy-kcal_100g": 144.05,
+      "fat_100g": 7.1,
+      "fiber_100g": 1.2,
+      "iron_100g": 0,
+      "proteins_100g": 5.3,
+      "salt_100g": 0.55,
+      "saturated-fat_100g": 3.9,
+      "sugars_100g": 1.7,
+      "zinc_100g": 0
+    },
+    "ingredients": [
+      {
+        "id": "en:rice",
+        "text": "Reis",
+        "percent": 42,
+        "percent_estimate": 41.99
+      },
+      {
+        "id": "en:chicken-breast-fillet",
+        "text": "Hähnchenbrustfilet",
+        "percent": 14,
+        "percent_estimate": 14.5
+      },
+      {
+        "id": "de:gegart",
+        "text": "gegart",
+        "percent_estimate": 9.5
+      },
+      {
+        "id": "en:tomato",
+        "text": "Tomaten",
+        "percent": 10,
+        "percent_estimate": 9.5
+      },
+      {
+        "id": "en:tomato-puree",
+        "text": "Tomatenmark",
+        "percent_estimate": 3.35
+      },
+      {
+        "id": "en:paprika-or-bell-pepper",
+        "text": "Paprika",
+        "percent_estimate": 2.44
+      },
+      {
+        "id": "en:onion",
+        "text": "Zwiebeln",
+        "percent_estimate": 1.87
+      },
+      {
+        "id": "en:cream",
+        "text": "Sahne",
+        "percent_estimate": 1.48
+      },
+      {
+        "id": "en:coconut-milk",
+        "text": "Kokosnussmilch",
+        "percent_estimate": 1.1
+      },
+      {
+        "id": "en:butter",
+        "text": "Butter",
+        "percent_estimate": 1
+      },
+      {
+        "id": "en:creme-fraiche",
+        "text": "Crème Fraîche",
+        "percent_estimate": 0.84
+      },
+      {
+        "id": "de:Geflügelbrühe",
+        "text": "Geflügelbrühe",
+        "percent_estimate": 0.63
+      },
+      {
+        "id": "en:chicken-fat",
+        "text": "Hühnerfett",
+        "percent_estimate": 0.62
+      },
+      {
+        "id": "en:spice",
+        "text": "Gewürze",
+        "percent_estimate": 0.54
+      },
+      {
+        "id": "en:sugar",
+        "text": "Zucker",
+        "percent_estimate": 0.48
+      },
+      {
+        "id": "en:starch",
+        "text": "Stärke",
+        "percent_estimate": 0.42
+      },
+      {
+        "id": "en:salt",
+        "text": "Salz",
+        "percent_estimate": 0.37
+      },
+      {
+        "id": "en:herb",
+        "text": "Kräuter",
+        "percent_estimate": 0.34
+      }
+    ]
+  } };
+
+test('a ready meal is built from its ingredient list, shown on its page', async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.route('https://world.openfoodfacts.org/api/v3/product/**', (route) => route.fulfill({ json: BUTTER_CHICKEN }));
+  await firstLaunch(page);
+  await page.goto('./#/settings');
+  await page.getByText('Food sources').click();
+  const toggle = page.getByRole('switch', { name: /^Open Food Facts lookup/ });
+  await toggle.click();
+  await expect(toggle).toBeChecked();
+
+  await page.goto('./#/log');
+  await page.getByPlaceholder('Search foods').pressSequentially('youcook butter chicken', { delay: 30 });
+  await page.locator('.off-results').getByRole('button').first().click();
+  // The sheet starts with the mix, picked by the app: rice cooked (the label says 144 kcal), chicken, tomatoes…
+  await expect(page.getByText('its ingredients', { exact: false }).first()).toBeVisible();
+  await expect(page.locator('.mix-list')).toContainText('White rice boiled');
+  await page.getByRole('button', { name: /^All \d+/ }).click();
+  await expect(page.locator('.mix-list')).toContainText('Left out');
+  await page.getByRole('button', { name: '200 g' }).click();
+  await page.getByRole('button', { name: 'Add', exact: true }).click();
+  await expect.poll(() => todayKcal(page)).toBe(288);
+
+  // Its page shows the same, and "Looks right" keeps it.
+  await page.goto('./#/food/OFF:4260334165158');
+  await expect(page.locator('.mix-list')).toContainText('Chicken breast fillet, raw');
+  await page.getByRole('button', { name: 'Looks right' }).click();
+  await expect(page.getByText('Picked by the app')).toHaveCount(0);
+  expect(errors).toEqual([]);
+});

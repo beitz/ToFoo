@@ -556,13 +556,15 @@ export function describeProduct(p: Product, db: Pick<FoodDb, 'byCode'>): string 
     ...(p.source === 'USDA' ? [own ? `USDA ${p.usdaType}, generic food with full nutrient data` : 'USDA branded product (US label)'] : []),
     sizes || 'size unknown',
     label.length ? `${own ? '' : 'label '}${per}: ${label.join(', ')}` : 'no nutrition values on the label data',
-    match
-      ? `${own ? 'gaps filled' : 'micronutrients'} from ${match.code} ${match.nameEn} (${p.match?.auto ? 'picked by the app, not checked: give micros_from if a closer food fits' : 'chosen by the user'})`
-      : p.labelOnly
-        ? 'label values only (the user chose no similar food)'
-        : own
-          ? 'no similar BLS food chosen (optional)'
-          : 'no similar BLS food chosen yet',
+    p.match?.parts
+      ? `micronutrients from its ingredient list as BLS foods (${p.match.parts.map((x) => `${fmtNumber(x.share, 0)}% ${db.byCode.get(x.code)?.nameEn ?? x.code}`).join(', ')}; ${p.match.auto ? 'built by the app' : 'chosen by the user'}): leave micros_from empty`
+      : match
+        ? `${own ? 'gaps filled' : 'micronutrients'} from ${match.code} ${match.nameEn} (${p.match?.auto ? 'picked by the app, not checked: give micros_from if a closer food fits' : 'chosen by the user'})`
+        : p.labelOnly
+          ? 'label values only (the user chose no similar food)'
+          : own
+            ? 'no similar BLS food chosen (optional)'
+            : 'no similar BLS food chosen yet',
   ].join(' | ');
 }
 
@@ -958,8 +960,8 @@ function validateItems(
       const microsFrom = it.micros_from?.trim() ?? '';
       const match = microsFrom ? db.byCode.get(microsFrom) : undefined;
       if (!found) problems.push(`Unknown product ${code}: use only codes returned by lookup_barcode, search_usda or search_foods.`);
-      // The user's own choice (a food, or "label values only") always wins.
-      else if ((found.match && !found.match.auto) || found.labelOnly) product = found;
+      // The user's own choice (a food, or "label values only") always wins, and so does a ready meal built from its ingredients.
+      else if ((found.match && (!found.match.auto || found.match.parts)) || found.labelOnly) product = found;
       // The assistant's food replaces the app's own pick.
       else if (match) product = { ...found, match: { version: db.version ?? '4.0', code: match.code } };
       else if (microsFrom) problems.push(`${code}: micros_from must be the BLS code (from search_foods) of the most similar generic food; ${microsFrom} is not one.`);
