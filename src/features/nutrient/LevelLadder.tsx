@@ -89,7 +89,7 @@ export function LevelLadder({ id, r }: { id: string; r: NutrientResult }) {
             <RungRow key={rung.kind} id={id} rung={rung} r={r} req={req} store={store} you={you?.kind === rung.kind ? you : undefined} />
           ))}
         </ol>
-        {you && <p className="muted ladder-note">{t('ladder.whyTag', { basis: basisText(r) })}</p>}
+        <p className="muted ladder-note">{you ? t('ladder.whyTag', { basis: basisText(r) }) : t('ladder.noTag')}</p>
       </div>
     </details>
   );
@@ -100,12 +100,12 @@ function RungRow({ id, rung, r, req, store, you }: { id: string; rung: Rung; r: 
   const own = (part: string) => text(`ladder.${key}.${rung.kind === 'plenty' ? 'over' : rung.kind}${part}`);
   const step = rung.step;
   const line = rungLine(key, rung, store, !!req?.limitOnly);
-  const how = step ? own('.how') : rung.kind === 'bitLow' ? t('ladder.generic.bitLowHow', { margin: `${Math.round(referenceMargin.value.low * 100)}–${fmtPercent(referenceMargin.value.high)}` }) : undefined;
+  const how = step ? own('.how') : rung.kind === 'bitLow' && !text(`ladder.${key}.bitLow`) ? t('ladder.generic.bitLowHow', { margin: `${Math.round(referenceMargin.value.low * 100)}–${fmtPercent(referenceMargin.value.high)}` }) : undefined;
   const signTexts = step?.signs?.length ? (own('.signs') ?? '').split(' · ') : [];
   const who = step ? own('.who') : undefined;
   const sources = rungSources(id, rung, req);
   const amount = amountLabel(id, rung, r, req, store);
-  const name = t(`ladder.step.${stepName(rung.kind, req)}` as MessageKey);
+  const name = text(`ladder.${key}.name.${rung.kind}`) ?? t(`ladder.step.${stepName(rung.kind, req)}` as MessageKey);
   const more = !!(how || signTexts.length || who || step?.goesAway || step?.onset || sources.length);
   const head = (
     <>
@@ -245,9 +245,9 @@ export function rungLine(key: string, rung: Rung, store: boolean, limitOnly: boo
       // With a "far too much" step below it, the general text would say the same again.
       return (rung.step && text(`ladder.${key}.over`)) ?? (ladder[key]?.farOver ? undefined : text(`info.${key}.high`)) ?? t('ladder.generic.plenty');
     case 'enough':
-      return t(limitOnly ? 'ladder.generic.enoughLimit' : store ? 'ladder.generic.enoughStore' : 'ladder.generic.enough');
+      return text(`ladder.${key}.enough`) ?? t(limitOnly ? 'ladder.generic.enoughLimit' : store ? 'ladder.generic.enoughStore' : 'ladder.generic.enough');
     case 'bitLow':
-      return t('ladder.generic.bitLow');
+      return text(`ladder.${key}.bitLow`) ?? t('ladder.generic.bitLow');
     case 'low':
       return (rung.step && text(`ladder.${key}.low`)) ?? t(store ? 'ladder.generic.storeLow' : 'ladder.generic.low');
     case 'none':
@@ -272,12 +272,15 @@ function amountLabel(id: string, rung: Rung, r: NutrientResult, req: Requirement
     }
     case 'over': {
       const v = req?.upperLimit?.value ?? r.limit;
-      return v !== undefined ? t('ladder.amount.over', { amount: fmtAmount(id, v) }) : undefined;
+      if (v !== undefined) return t('ladder.amount.over', { amount: fmtAmount(id, v) });
+      // Energy: more than its need (Home's "too high" for energy).
+      return id === 'ENERCC' ? t('ladder.amount.pctOver', { pct: pct(1) }) : undefined;
     }
     case 'plenty':
       return t('ladder.amount.noLimit');
     case 'enough':
       if (req?.limitOnly) return r.limit !== undefined ? t('ladder.amount.under', { amount: fmtAmount(id, r.limit) }) : undefined;
+      if (id === 'ENERCC') return t('ladder.amount.pctRange', { from: String(Math.round(th.gettingLow * 100)), to: pct(1) });
       return store ? t('ladder.amount.storeOver', { pct: pct(th.gettingLow) }) : t('ladder.amount.pctOrMore', { pct: pct(th.gettingLow) });
     case 'bitLow':
       return t(store ? 'ladder.amount.storeRange' : 'ladder.amount.pctRange', { from: String(Math.round(th.low * 100)), to: pct(th.gettingLow) });

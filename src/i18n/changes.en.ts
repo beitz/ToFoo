@@ -8,6 +8,7 @@
  * scenes and small fixes. A pull request that changes what users see adds its line here in the same PR.
  */
 export const changesEn = {
+  'change.147': '"What it does" on nutrient pages shows its roles as tiles, where it is found and quick facts (does the body make it, how much is taken up, how much survives boiling). Energy now shows where you are on its steps too.',
   'change.145': 'Every nutrient page has "From too little to too much": each step from almost none to far too much, what it does, how serious and how fast, where it shows, with sources, and where you are.',
   'change.145.major': 'From too little to too much, on every nutrient page',
   'change.144': 'Kitchen finds spices the food database lacks (bay leaves, cinnamon, nutmeg…) as packaged products, and a name typed without a match is kept and filed with the spices.',

@@ -35,7 +35,9 @@ export function ladderRungs(key: string, shape: LadderShape): Rung[] {
   const rungs: Rung[] = [];
   const add = (kind: RungKind, status: GaugeStatus, step?: LadderStep) => rungs.push({ kind, status, ...(step ? { step } : {}) });
   if (steps.farOver) add('farOver', 'tooHigh', steps.farOver);
-  add(shape.hasUpper || shape.limitOnly ? 'over' : 'plenty', shape.hasUpper || shape.limitOnly ? 'tooHigh' : 'fine', steps.over);
+  // Energy has no upper limit, but more than you use is "too much" on Home too (the today ring).
+  const over = shape.hasUpper || shape.limitOnly || key === 'ENERCC';
+  add(over ? 'over' : 'plenty', over ? 'tooHigh' : 'fine', steps.over);
   add('enough', 'fine');
   if (shape.limitOnly) return rungs;
   add('bitLow', 'gettingLow');
@@ -71,9 +73,8 @@ export function youAt(key: string, r: NutrientResult, req: Requirement | undefin
       break;
     }
     case 'fine':
-      // Energy has no sourced line for "too much": over the need, the ladder can't say which step.
-      if (key === 'ENERCC' && r.value.central > 1) return undefined;
-      kind = 'enough';
+      // Energy over its need is "too much", as Home's today ring shows it.
+      kind = key === 'ENERCC' && r.value.central > 1 ? 'over' : 'enough';
       break;
     case 'gettingLow':
       kind = 'bitLow';
