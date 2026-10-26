@@ -1,11 +1,8 @@
 import { useMemo, useState } from 'react';
-import { useData } from '../../app/data';
 import { href } from '../../app/router';
 import { t } from '../../i18n';
 import { newId } from '../../lib/id';
-import { fmtLeftGrams, onShoppingList, planReports, type Report } from '../../logic/pantry';
-import { planAdd } from '../../logic/shopping';
-import { isOn } from '../../settings/features';
+import { fmtLeftGrams, planReports, type Report } from '../../logic/pantry';
 import { repo } from '../../storage/repo';
 import { CURRENT_SCHEMA_VERSION } from '../../storage/types';
 import { Icon } from '../../ui/Icon';
@@ -15,14 +12,12 @@ import { ChangeButton, DoneRow } from './CardFrame';
 
 /**
  * Things for At home the assistant proposes (H1, …): what was bought (put away, adding to what is
- * there), and what runs low or is used up (marked so, and put on the shopping list), each tickable.
+ * there), and what runs low or is used up (marked so; the shopping list is left to the user), each tickable.
  */
 export function HomeCard({ card, toast, onLogged, register }: CardProps<Extract<Card, { kind: 'home' }>>) {
   const { home } = card;
-  const d = useData();
   const left = usePantryLeft();
-  const { placeOf, asShopping } = usePantryFoods();
-  const shoppingOn = isOn(d.settings.features, 'shoppingList');
+  const { placeOf } = usePantryFoods();
   const reports = useMemo(
     (): Report[] =>
       home.items.map(({ product: _p, place, ...it }) => ({ ...it, place: place ?? placeOf(it.name, it.ref) })),
@@ -41,13 +36,7 @@ export function HomeCard({ card, toast, onLogged, register }: CardProps<Extract<
       const now = Date.now();
       // Products looked up in the chat are kept, so the things can be logged later.
       for (const [i, it] of home.items.entries()) if (it.product && !off.has(i)) await repo.saveProduct(it.product);
-      const undo = await repo.changeHome((pantry, shopping) => {
-        const listed = shoppingOn ? chosen.filter((r) => (r.status === 'low' || r.status === 'out') && !onShoppingList(r, shopping)) : [];
-        return {
-          pantry: planReports(pantry, chosen, now, newId, CURRENT_SCHEMA_VERSION, left),
-          ...(listed.length ? { shopping: planAdd(shopping, listed.map((r) => asShopping(r, shopping)), now, newId, CURRENT_SCHEMA_VERSION) } : {}),
-        };
-      });
+      const undo = await repo.changeHome((pantry) => ({ pantry: planReports(pantry, chosen, now, newId, CURRENT_SCHEMA_VERSION, left) }));
       onLogged(true, { saved: chosen.map((r) => `${r.name} (${r.status})`) });
       return async () => {
         await repo.undoHome(undo);

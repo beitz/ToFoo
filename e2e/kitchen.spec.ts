@@ -118,3 +118,30 @@ test('a spice missing from the food database is found as a product, or kept by i
   await expect(main.locator('.home-row', { hasText: 'Lorbeerblätter' })).toContainText('5 g');
   expect(errors).toEqual([]);
 });
+
+test('marking something used up leaves the shopping list to the user', async ({ page }) => {
+  const errors = watchErrors(page);
+  await firstLaunch(page);
+
+  await page.goto('./#/kitchen');
+  await page.getByPlaceholder('Add what you bought').fill('Wacholderbeeren');
+  await page.getByRole('button', { name: 'Add', exact: true }).click();
+  const main = page.locator('main');
+  await main.locator('.home-row', { hasText: 'Wacholderbeeren' }).click();
+  await page.getByRole('radio', { name: 'Used up' }).click();
+  await page.getByRole('button', { name: 'Save' }).click();
+
+  // Used up shows in the kitchen, and nothing went on the list by itself (owner, 2026-10-26).
+  await expect(main.getByRole('heading', { name: 'Used up (1)' })).toBeVisible();
+  await page.goto('./#/shopping');
+  await expect(page.locator('main').getByText('Wacholderbeeren')).toHaveCount(0);
+
+  // One tap in its sheet puts it on the list.
+  await page.goto('./#/kitchen');
+  await main.locator('.home-row', { hasText: 'Wacholderbeeren' }).click();
+  await page.getByRole('button', { name: 'Add to shopping list' }).click();
+  await expect(page.getByText('On the shopping list', { exact: true })).toBeVisible();
+  await page.goto('./#/shopping');
+  await expect(page.locator('main').getByText('Wacholderbeeren')).toBeVisible();
+  expect(errors).toEqual([]);
+});

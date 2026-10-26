@@ -323,9 +323,6 @@ export function planReports(
   return { put: [...changed.values()], remove: [] };
 }
 
-/** What needs buying: running low or used up. */
-export const needsBuying = (left: Left) => left.low || left.out;
-
 /** On the shopping list already (to buy or in the basket). */
 export function onShoppingList(item: Pick<PantryItem, 'name' | 'ref'>, shopping: readonly ShoppingItem[]): boolean {
   return shopping.some((s) => s.clearedAt === undefined && sameThing(s, item));

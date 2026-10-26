@@ -2,11 +2,10 @@ import { useMemo, useState } from 'react';
 import { useData } from '../../app/data';
 import { useToast } from '../../app/toast';
 import { t } from '../../i18n';
-import { newId } from '../../lib/id';
 import { errorText } from '../../lib/shareFile';
-import { amountText, bySection, isOpen, onList, planAdd, planClear, shareText } from '../../logic/shopping';
+import { amountText, bySection, isOpen, onList, planClear, shareText } from '../../logic/shopping';
 import { repo } from '../../storage/repo';
-import { CURRENT_SCHEMA_VERSION, type ShoppingItem } from '../../storage/types';
+import { type ShoppingItem } from '../../storage/types';
 import { Icon } from '../../ui/Icon';
 import { ItemSheet, sectionName } from './ItemSheet';
 import { RecipeToListSheet } from './RecipeToListSheet';
@@ -14,9 +13,8 @@ import { useShopping } from './useShopping';
 import { ShoppingAdd } from './ShoppingAdd';
 import { useWakeLock } from './useWakeLock';
 import { isOn } from '../../settings/features';
-import { needsBuying, onShoppingList } from '../../logic/pantry';
 import { PutAwaySheet } from '../pantry/PutAwaySheet';
-import { placeName, usePantry, usePantryFoods, usePantryLeft } from '../pantry/usePantry';
+import { placeName, usePantryFoods } from '../pantry/usePantry';
 import { useGaps } from '../recipes/useGaps';
 import { portionGrams } from '../../model/ranking';
 import { NUTRIENT_BY_ID } from '../../model/nutrients';
@@ -35,29 +33,11 @@ export function ShoppingPage() {
   const [editing, setEditing] = useState<ShoppingItem | null>(null);
   const [puttingAway, setPuttingAway] = useState(false);
   const atHome = isOn(d.settings.features, 'atHome');
-  const pantry = usePantry();
-  const left = usePantryLeft();
-  const { asShopping, placeOf } = usePantryFoods();
-  // Running low or used up at home and not on the list yet (marking it puts it on; eating it up does not).
-  const needed = atHome ? (pantry ?? []).filter((p) => needsBuying(left(p)) && !onShoppingList(p, all ?? [])).sort((a, b) => a.name.localeCompare(b.name)) : [];
+  const { placeOf } = usePantryFoods();
   const items = useMemo(() => (all ?? []).filter(onList), [all]);
   const toBuy = items.filter(isOpen);
   const basket = items.filter((i) => i.checkedAt !== undefined).sort((a, b) => b.checkedAt! - a.checkedAt!);
   useWakeLock(items.length > 0);
-
-  async function addNeeded(names: readonly string[]) {
-    const things = needed.filter((p) => names.includes(p.id));
-    const undo = await repo.changeShopping((current) =>
-      planAdd(
-        current,
-        things.map((p) => asShopping(p, current)),
-        Date.now(),
-        newId,
-        CURRENT_SCHEMA_VERSION,
-      ),
-    );
-    toast(t('shopping.added', { n: things.length }), () => repo.undoShopping(undo));
-  }
 
   async function toggle(item: ShoppingItem) {
     const next = { ...item };
@@ -108,36 +88,6 @@ export function ShoppingPage() {
           </span>
         )}
       </div>
-
-      {needed.length > 0 && (
-        <div className="card shop-needed">
-          <div className="row-between">
-            <h2 className="shop-needed-title">
-              <Icon name="pantry" size={18} /> {t('pantry.needed')}
-            </h2>
-            {needed.length > 1 && (
-              <button className="btn btn-small btn-ghost" onClick={() => void addNeeded(needed.map((p) => p.id))}>
-                {t('pantry.addAllToList')}
-              </button>
-            )}
-          </div>
-          <ul className="plain-list">
-            {needed.map((p) => (
-              <li key={p.id}>
-                <button className="shop-row" onClick={() => void addNeeded([p.id])} aria-label={t('pantry.addToList', { name: p.name })}>
-                  <span className="shop-check" aria-hidden>
-                    <Icon name="plus" size={16} />
-                  </span>
-                  <span className="shop-text">
-                    <span className="shop-name">{p.name}</span>
-                  </span>
-                  <span className="muted small shop-amount">{left(p).out ? t('pantry.out') : t('pantry.low')}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
 
       {all && items.length === 0 && <p className="muted empty">{t('shopping.empty')}</p>}
       {/* Ticked things stay in their section (design 2026-10-22), after what is still to get. */}

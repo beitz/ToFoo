@@ -3,20 +3,24 @@ import { useData } from '../../app/data';
 import { useToast } from '../../app/toast';
 import { t } from '../../i18n';
 import { productLabel, productRef } from '../../foods/products';
-import { amountField, fmtLeftGrams, leftOf, piecesAsGrams, stockAmount, withAmount } from '../../logic/pantry';
+import { amountField, fmtLeftGrams, leftOf, onShoppingList, piecesAsGrams, stockAmount, withAmount } from '../../logic/pantry';
+import { isOn } from '../../settings/features';
 import { repo } from '../../storage/repo';
 import { HOME_PLACES, type FoodRef, type HomePlace, type PantryItem } from '../../storage/types';
 import { Field, Segmented, Sheet } from '../../ui/controls';
+import { Icon } from '../../ui/Icon';
 import { refHref } from '../food/links';
 import { BarcodeSheet } from '../log/BarcodeSheet';
 import { FoodPicker, type PickedFood } from '../log/FoodPicker';
-import { placeName, useMarkPantry, usePantryFoods, usePantryLeft } from './usePantry';
+import { useShopping } from '../shopping/useShopping';
+import { placeName, useListPantry, useMarkPantry, usePantryFoods, usePantryLeft } from './usePantry';
 
 type Status = 'have' | 'low' | 'out';
 
 /**
  * Change something at home: its name, the food it is, how much is left (counted again from now),
- * where it is kept, and whether it is running low or used up (which puts it on the shopping list).
+ * where it is kept, and whether it is running low or used up. Putting it on the shopping list is a
+ * separate tap: marking it does not do that by itself.
  */
 export function PantryItemSheet({ item, onClose }: { item: PantryItem; onClose: () => void }) {
   const d = useData();
@@ -24,6 +28,9 @@ export function PantryItemSheet({ item, onClose }: { item: PantryItem; onClose: 
   const left = usePantryLeft()(item);
   const { nameOfRef, packGramsOf } = usePantryFoods();
   const mark = useMarkPantry();
+  const list = useListPantry();
+  const shopping = useShopping();
+  const shoppingOn = isOn(d.settings.features, 'shoppingList');
   const startAmount = amountField(item, left);
   const startStatus: Status = left.out ? 'out' : left.low ? 'low' : 'have';
   const [name, setName] = useState(item.name);
@@ -58,9 +65,8 @@ export function PantryItemSheet({ item, onClose }: { item: PantryItem; onClose: 
       toast(t('pantry.saved', { name: next.name }), () => repo.undoHome(undo));
     } else {
       const newStatus = status === 'have' ? undefined : status;
-      const { undo, listed } = await mark(next, newStatus, amountChanged ? leftOf(next, new Map()) : left);
-      const said = t(newStatus === 'low' ? 'pantry.markedLow' : newStatus === 'out' ? 'pantry.markedOut' : 'pantry.saved', { name: next.name });
-      toast(listed ? `${said} ${t('pantry.listed', { name: next.name })}` : said, () => repo.undoHome(undo));
+      const undo = await mark(next, newStatus, amountChanged ? leftOf(next, new Map()) : left);
+      toast(t(newStatus === 'low' ? 'pantry.markedLow' : newStatus === 'out' ? 'pantry.markedOut' : 'pantry.saved', { name: next.name }), () => repo.undoHome(undo));
     }
     onClose();
   }
@@ -70,6 +76,12 @@ export function PantryItemSheet({ item, onClose }: { item: PantryItem; onClose: 
     setAmount(text);
     const a = stockAmount(text);
     if (status === 'out' && ((a.pieces ?? 0) > 0 || (a.grams ?? 0) > 0)) setStatus('have');
+  }
+
+  async function addToList() {
+    const thing = { name: name.trim() || item.name, ...(ref ? { ref } : {}) };
+    const undo = await list(thing);
+    if (undo) toast(t('pantry.listed', { name: thing.name }), () => repo.undoHome(undo));
   }
 
   async function remove() {
@@ -95,6 +107,19 @@ export function PantryItemSheet({ item, onClose }: { item: PantryItem; onClose: 
             <span className="field-label">{t('pantry.status')}</span>
             <Segmented label={t('pantry.status')} value={status} onChange={setStatus} options={[{ value: 'have', label: t('pantry.have') }, { value: 'low', label: t('pantry.low') }, { value: 'out', label: t('pantry.out') }]} />
           </div>
+          {shoppingOn && shopping && (
+            <div className="pantry-to-list">
+              {onShoppingList({ name: name.trim() || item.name, ...(ref ? { ref } : {}) }, shopping) ? (
+                <span className="small muted">
+                  <Icon name="check" size={14} /> {t('pantry.onListNow')}
+                </span>
+              ) : (
+                <button className="btn btn-small btn-ghost" onClick={() => void addToList()}>
+                  <Icon name="cart" size={16} /> {t('pantry.addToShopping')}
+                </button>
+              )}
+            </div>
+          )}
           <Field label={t('pantry.amount')} hint={t('pantry.amountHint')}>
             {(id) => <input id={id} value={amount} placeholder={t('pantry.amountPlaceholder')} onChange={(e) => changeAmount(e.target.value)}/>}
           </Field>

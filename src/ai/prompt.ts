@@ -703,7 +703,7 @@ function proposeShopping(recipes: boolean): BetaTool {
 function proposeHome(codeHelp: string): BetaTool {
   return {
     name: 'propose_home',
-    description: 'Show the user things bought, counted, running low or used up for their At home list, as a card for the user to check and confirm; nothing is saved until they do. The app adds amounts bought to what is at home, sets counted amounts as what is left now, and puts things running low on the shopping list. After a correction, call it again with the complete list and replaces set to the card id.',
+    description: 'Show the user things bought, counted, running low or used up for their At home list, as a card for the user to check and confirm; nothing is saved until they do. The app adds amounts bought to what is at home, sets counted amounts as what is left now, and marks things running low or used up; it does not put them on the shopping list. After a correction, call it again with the complete list and replaces set to the card id.',
     // Not strict: see STRICT_NESTED. The app validates the input itself and sends errors back.
     input_schema: {
       type: 'object',
