@@ -3,7 +3,12 @@ import { href } from '../../app/router';
 import { t } from '../../i18n';
 import { addDays, parseDay } from '../../lib/dates';
 import { addMonths, formatMonth, monthGrid, weekStart } from '../../lib/periods';
-import { habitDay, habitRun, habitStart, habitTally, habitWeek, TALLY_WEEKS } from '../../logic/habits';
+import { activityCounts, habitDay, habitRun, habitStart, habitTally, habitWeek, TALLY_WEEKS } from '../../logic/habits';
+import type { ActivityRecord, Habit } from '../../storage/types';
+import { useData } from '../../app/data';
+import { formatTime } from '../../lib/dates';
+import { activityName } from '../activity/ActivityForm';
+import { ActivitySheet } from '../activity/ActivitySheet';
 import { BackButton } from '../../ui/BackButton';
 import { Icon } from '../../ui/Icon';
 import { activitiesText, DaySheet, goalText, HabitActivitySheet, habitStyle, markText, MarkGlyph, quickText, shownMark, useQuickLog, weekdayName } from './HabitParts';
@@ -61,7 +66,7 @@ export function HabitPage({ id }: { id: string }) {
         )}
         <p className="muted small">
           {goalText(h)}
-          {h.kind === 'minutes' && ` · ${activitiesText(h.activities)}`}
+          {h.kind === 'minutes' && ` · ${t('habits.fromActivities', { what: activitiesText(h.activities) })}`}
           {h.archived && ` · ${t('habits.isArchived')}`}
         </p>
         {h.goal.type !== 'none' && (
@@ -80,6 +85,8 @@ export function HabitPage({ id }: { id: string }) {
           </div>
         )}
       </div>
+
+      {h.kind === 'minutes' && <CountedToday habit={h} />}
 
       <div className="card">
         <div className="row-between">
@@ -157,5 +164,44 @@ export function HabitPage({ id }: { id: string }) {
       {day && <DaySheet habit={h} day={day} onClose={() => setDay(undefined)} />}
       {changing && <HabitActivitySheet habit={h} day={data.today} onClose={() => setChanging(false)} />}
     </section>
+  );
+}
+
+/**
+ * An activity habit's today: the activities that counted, each opening to edit, and the ones that
+ * didn't, so it is plain the habit is read from the activity log, not kept by itself.
+ */
+function CountedToday({ habit: h }: { habit: Habit }) {
+  const d = useData();
+  const [editing, setEditing] = useState<ActivityRecord>();
+  const today = d.activities.filter((a) => a.day === d.today).sort((a, b) => a.time - b.time);
+  const counted = today.filter((a) => activityCounts(h, a));
+  const others = today.filter((a) => !activityCounts(h, a));
+  const m = counted.reduce((n, a) => n + a.minutes, 0);
+  return (
+    <div className="card">
+      <h2>{h.minutes ? t('habits.todayCountedOf', { m, of: h.minutes }) : t('habits.todayCounted', { m })}</h2>
+      {counted.length ? (
+        <ul className="plain-list">
+          {counted.map((a) => (
+            <li key={a.id}>
+              <button className="entry-row" onClick={() => setEditing(a)}>
+                <span className="entry-label journal-label">
+                  <Icon name="activity" size={16} /> {activityName(a)} · {t('tracker.minutes', { m: a.minutes })}
+                </span>
+                <span className="muted small">{formatTime(a.time)}</span>
+                <span className="entry-edit">
+                  <Icon name="edit" size={16} />
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="muted small">{t('habits.todayNothing')}</p>
+      )}
+      {others.length > 0 && <p className="muted small">{t('habits.notCounted', { list: others.map((a) => `${activityName(a)} ${t('tracker.minutes', { m: a.minutes })}`).join(', ') })}</p>}
+      {editing && <ActivitySheet activity={editing} defaultTime={editing.time} onClose={() => setEditing(undefined)} />}
+    </div>
   );
 }

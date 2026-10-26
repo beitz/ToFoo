@@ -102,7 +102,7 @@ export function useQuickLog() {
     const rec = quickActivity(h.quick, Date.now(), DEFAULT_ACTIVITY_SKIN);
     const added = await repo.addActivity(rec);
     const m = habitMinutes(h, d.activities, rec.day) + rec.minutes;
-    const text = h.minutes ? t('habits.quickLogged', { what: quickText(h.quick), m, of: h.minutes }) : t('habits.quickLoggedTotal', { what: quickText(h.quick), m });
+    const text = h.minutes ? t('habits.quickLogged', { what: quickText(h.quick), name: h.name, m, of: h.minutes }) : t('habits.quickLoggedTotal', { what: quickText(h.quick), name: h.name, m });
     toast(text, () => void repo.deleteActivity(added.id));
   };
 }

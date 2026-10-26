@@ -69,6 +69,8 @@ export function HabitsRow() {
                 {h.name}
               </span>
               <span className="habit-card-value" aria-hidden>
+                {/* Marks a card that reads the activity log rather than being ticked. */}
+                {h.kind === 'minutes' && <Icon name="activity" size={12} />}
                 {v.text}
               </span>
             </button>
