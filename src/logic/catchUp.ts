@@ -1,5 +1,6 @@
 import { parseDay } from '../lib/dates';
-import type { ActivityRecord, Intensity, SleepRecord, WaterRecord } from '../storage/types';
+import type { ActivityRecord, AskDays, Intensity, SleepRecord, WaterRecord } from '../storage/types';
+import { isoWeekday } from './habits';
 import { minuteOfDay } from './nights';
 import { usualTimes } from './sleep';
 
@@ -11,6 +12,15 @@ import { usualTimes } from './sleep';
 
 export const CATCH_UP_KINDS = ['food', 'sleep', 'activity', 'water', 'habits'] as const;
 export type CatchUpKind = (typeof CATCH_UP_KINDS)[number];
+
+/**
+ * Whether `day` is one to ask about `kind` on (owner's ask, 2026-10-26: he sleeps every night but
+ * doesn't do something every day). Unset = every day, an empty list = never.
+ */
+export function asksOn(askDays: AskDays | undefined, kind: CatchUpKind, day: string): boolean {
+  const days = askDays?.[kind];
+  return !days || days.includes(isoWeekday(day));
+}
 
 export interface CatchUpInput {
   day: string;
@@ -27,13 +37,15 @@ export interface CatchUpInput {
   skipped: ReadonlySet<CatchUpKind>;
   /** Habits are on and some due that day are still open (see openHabitsOn in ./habits). */
   habitsOpen?: boolean;
+  /** The weekdays to ask about each kind on (Settings → Reminders); unset = every day. */
+  askDays?: AskDays;
 }
 
 /**
  * What `day` is missing, in a fixed order: every tracker that is on, even one never used yet (the
  * owner switched Activity on and expected the question). Days before a tracker's first entry are not
  * asked about, so an older day in the diary doesn't ask for what wasn't tracked then. A sleep counts
- * for the day it ended on.
+ * for the day it ended on. A day the user said not to ask about (`askDays`) lacks nothing of that kind.
  */
 export function missingOn(input: CatchUpInput): CatchUpKind[] {
   const { day } = input;
@@ -44,7 +56,7 @@ export function missingOn(input: CatchUpInput): CatchUpKind[] {
   if (input.on.activity && lacks(input.activities)) out.push('activity');
   if (input.on.water && lacks(input.water)) out.push('water');
   if (input.habitsOpen) out.push('habits');
-  return out.filter((k) => !input.skipped.has(k));
+  return out.filter((k) => !input.skipped.has(k) && asksOn(input.askDays, k, day));
 }
 
 /** Epoch ms at `minutes` after midnight (local) on `day`. */

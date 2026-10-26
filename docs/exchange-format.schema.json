@@ -369,6 +369,28 @@
                       "exclusiveMinimum": 0,
                       "maximum": 9007199254740991
                     },
+                    "askDays": {
+                      "description": "Weekdays (1 = Monday … 7 = Sunday) to ask about each thing on when a day lacks it; unset = every day, [] = never",
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string",
+                        "enum": [
+                          "food",
+                          "sleep",
+                          "activity",
+                          "water",
+                          "habits"
+                        ]
+                      },
+                      "additionalProperties": {
+                        "type": "array",
+                        "items": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 7
+                        }
+                      }
+                    },
                     "autoBackupKeep": {
                       "type": "integer",
                       "exclusiveMinimum": 0,

@@ -29,9 +29,9 @@ export function useMissingDays(layer: Layer, days: readonly string[]): string[] 
   const habits = useHabitLayers();
   return useMemo(() => {
     if (!sleep || !water || !journal || !skipped || habits === undefined) return undefined;
-    const layers = dayLayers({ days, today: d.today, dayStatus: d.model.dayStatus, sleep, activities: d.activities, water, journal, skipped, habits: habits ?? undefined });
+    const layers = dayLayers({ days, today: d.today, dayStatus: d.model.dayStatus, sleep, activities: d.activities, water, journal, skipped, habits: habits ?? undefined, askDays: d.settings.askDays });
     return days.filter((day) => layers.get(day)?.marks[layer] === 'missing').reverse();
-  }, [layer, days, d.today, d.model.dayStatus, sleep, d.activities, water, journal, skipped, habits]);
+  }, [layer, days, d.today, d.model.dayStatus, sleep, d.activities, water, journal, skipped, habits, d.settings.askDays]);
 }
 
 /** Days with nothing logged, as chips to the fill-in page; the most recent few, then a count. */

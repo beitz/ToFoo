@@ -123,6 +123,8 @@ export interface Settings extends Versioned {
   /** Guided tours already shown (or skipped), by tour id; unset = an install from before the tours, which counts as all seen. */
   toursSeen?: string[];
   backupReminderDays: number;
+  /** Weekdays (1 = Monday … 7 = Sunday) to ask about each thing on when a day lacks it; unset kind = every day, [] = never. */
+  askDays?: AskDays;
   /** How many automatic backups to keep on the phone; unset = DEFAULT_AUTO_BACKUP_KEEP. */
   autoBackupKeep?: number;
   /** Default storage plan for new recipes. */
@@ -152,6 +154,9 @@ export interface Settings extends Versioned {
   /** Empty pots remembered by name ("Big red pot"), so weighing a batch is one number. */
   pots?: Pot[];
 }
+
+/** Per thing the fill-in page asks about: the weekdays to ask on (Settings → Reminders). */
+export type AskDays = Partial<Record<'food' | 'sleep' | 'activity' | 'water' | 'habits', number[]>>;
 
 /** An empty pot, weighed once and remembered by name. */
 export interface Pot {

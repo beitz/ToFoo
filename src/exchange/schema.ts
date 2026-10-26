@@ -106,6 +106,10 @@ export const settingsSchema = z.object({
   accent: z.enum(['green', 'teal', 'blue', 'rose', 'ink']).optional(),
   toursSeen: z.array(z.string()).optional(),
   backupReminderDays: z.number().int().positive(),
+  askDays: z
+    .partialRecord(z.enum(['food', 'sleep', 'activity', 'water', 'habits']), z.array(z.number().int().min(1).max(7)))
+    .optional()
+    .describe('Weekdays (1 = Monday … 7 = Sunday) to ask about each thing on when a day lacks it; unset = every day, [] = never'),
   autoBackupKeep: z.number().int().positive().optional(),
   defaultPlan: plan,
   homeView: z.enum(['compact', 'detailed']).optional(),
