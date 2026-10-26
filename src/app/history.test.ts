@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { renderHook } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { useBackCloses } from './history';
+import { onLayerEntry, useBackCloses } from './history';
 
 const tick = () => new Promise((r) => setTimeout(r, 0));
 
@@ -33,6 +33,28 @@ describe('useBackCloses', () => {
     rerender({ open: false });
     await tick();
     expect(go).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  it('takes the leftover layer mark off the page entry, so one back press closes the next sheet', async () => {
+    // The app was reloaded while a sheet was open (Android, an app in the background): the entry
+    // still says "layer 1", but nothing is open (owner's report 2026-10-26, Kitchen).
+    window.history.replaceState({ tofooLayer: 1, tofooPage: 2 }, '', '#/kitchen');
+    expect(onLayerEntry()).toBe(false);
+    const onClose = vi.fn();
+    const { unmount } = renderHook(() => useBackCloses(true, onClose));
+    await tick();
+    expect(window.history.state).toEqual({ tofooLayer: 1, tofooPage: 2 });
+    expect(onLayerEntry()).toBe(true);
+
+    const landed: unknown[] = [];
+    const onPop = () => landed.push(window.history.state);
+    window.addEventListener('popstate', onPop);
+    window.history.back();
+    await new Promise((r) => setTimeout(r, 50));
+    window.removeEventListener('popstate', onPop);
+    expect(landed).toEqual([{ tofooPage: 2 }]);
+    expect(onClose).toHaveBeenCalledTimes(1);
     unmount();
   });
 });
