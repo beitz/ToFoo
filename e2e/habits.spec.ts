@@ -11,7 +11,7 @@ async function turnOnHabits(page: Page): Promise<void> {
   }
 }
 
-async function addHabit(page: Page, name: string, kind?: 'Avoid' | 'Minutes'): Promise<void> {
+async function addHabit(page: Page, name: string, kind?: 'Avoid' | 'Activity'): Promise<void> {
   await page.goto('./#/habits/new');
   await page.getByLabel('Name').fill(name);
   if (kind) await page.getByRole('radio', { name: kind }).click();
@@ -29,7 +29,7 @@ test('habits: add them, tick today on Home, answer a day on the habit page', asy
   await expect(page).toHaveURL(/#\/habits\/new$/);
   await addHabit(page, 'Floss');
   await addHabit(page, 'Alcohol', 'Avoid');
-  await addHabit(page, 'Exercise', 'Minutes');
+  await addHabit(page, 'Exercise', 'Activity');
 
   // Home: one card per habit; a tap answers today, a second tap clears it.
   await page.goto('./#/');
@@ -64,10 +64,12 @@ test('habits: one tap logs the preset activity, again and again, and long press 
   await turnOnHabits(page);
   await page.goto('./#/habits/new');
   await page.getByLabel('Name').fill('Commute');
-  await page.getByRole('radio', { name: 'Minutes' }).click();
+  await page.getByRole('radio', { name: 'Activity' }).click();
   await page.getByLabel('Minutes a day').fill('60');
-  await page.getByRole('switch', { name: /^One tap logs it/ }).click();
+  await page.getByRole('switch', { name: /^One tap on Home logs it/ }).click();
   await page.getByLabel('Minutes per tap').fill('30');
+  // The form's picture of the Home card says what a tap will do.
+  await expect(page.getByText('Tap: + Walk 30 min')).toBeVisible();
   await page.getByRole('button', { name: 'Save' }).click();
   await expect(page.getByRole('button', { name: 'Log Walk 30 min' })).toBeVisible();
 

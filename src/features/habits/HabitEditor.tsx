@@ -10,8 +10,10 @@ import { BackButton } from '../../ui/BackButton';
 import { Field, NumberInput, Segmented, Toggle } from '../../ui/controls';
 import { activityCounts } from '../../logic/habits';
 import { MAX_ACTIVITY_MINUTES } from '../../logic/activity';
+import { Icon } from '../../ui/Icon';
+import { InfoButton } from '../../ui/InfoButton';
 import { activityName } from '../activity/ActivityForm';
-import { habitStyle, weekdayName } from './HabitParts';
+import { habitStyle, MarkGlyph, quickText, weekdayName } from './HabitParts';
 import { useHabits } from './useHabits';
 
 /** Names longer than this are cut on the Home card; the field says so, it doesn't stop the user. */
@@ -36,13 +38,30 @@ interface Draft {
 
 const OUTSIDE_KINDS = new Set(['walk', 'run', 'cycling']);
 
+/** What a tap logs for this activity before the user changes it: a walk is easy, walking, running and cycling are outside. */
+const presetOf = (a: HabitActivity): Pick<HabitQuickLog, 'kind' | 'name' | 'intensity' | 'outside'> => ({
+  kind: a.kind,
+  name: a.name,
+  intensity: a.kind === 'walk' ? 'easy' : 'moderate',
+  outside: OUTSIDE_KINDS.has(a.kind),
+});
+
 /** A first preset: the habit's first activity (else a walk) for its minutes. */
 function quickFor(activities: HabitActivity[], minutes: number | undefined): Draft['quick'] {
-  const a = activities[0] ?? { kind: 'walk' as const };
-  return { kind: a.kind, ...(a.name ? { name: a.name } : {}), minutes, intensity: a.kind === 'walk' ? 'easy' : 'moderate', outside: OUTSIDE_KINDS.has(a.kind), sun: true };
+  return { ...presetOf(activities[0] ?? { kind: 'walk' }), minutes, sun: true };
 }
 
 const sameActivity = (a: HabitActivity, b: HabitActivity) => a.kind === b.kind && (a.name ?? '').toLowerCase() === (b.name ?? '').toLowerCase();
+
+/**
+ * The picks under "What counts", with the one-tap activity kept among them: a habit that counts one
+ * activity logs that one (no second choice to make), and one dropped from the picks is replaced.
+ */
+function withActivities(d: Draft, activities: HabitActivity[]): Partial<Draft> {
+  const first = activities[0];
+  if (!first || activities.some((a) => sameActivity(a, d.quick))) return { activities };
+  return { activities, quick: { ...d.quick, ...presetOf(first) } };
+}
 
 function draftOf(h: Habit | undefined, used: number): Draft {
   if (!h) return { name: '', colour: HABIT_COLOURS[used % HABIT_COLOURS.length]!, kind: 'do', goalType: 'daily', days: [1, 3, 5], times: 2, minutes: 30, activities: [], quickOn: false, quick: quickFor([], 30) };
@@ -173,6 +192,7 @@ function EditorForm({ habit, all, activityOn }: { habit: Habit | undefined; all:
         <h1 className="grow">{t(habit ? 'habits.editTitle' : 'habits.newTitle')}</h1>
       </header>
       <div className="card habit-editor" style={habitStyle(draft)}>
+        <Preview draft={draft} />
         <Field label={t('habits.editor.name')} hint={draft.name.trim().length > CARD_NAME ? t('habits.editor.nameLong') : t('habits.editor.nameHint')}>
           {(id) => <input id={id} type="text" value={draft.name} maxLength={MAX_NAME} placeholder={t('habits.editor.namePlaceholder')} onChange={(e) => set({ name: e.target.value })} />}
         </Field>
@@ -195,13 +215,16 @@ function EditorForm({ habit, all, activityOn }: { habit: Habit | undefined; all:
             ))}
           </div>
         </div>
-        <Segmented<HabitKind>
-          label={t('habits.editor.kind')}
-          value={draft.kind}
-          onChange={(kind) => set({ kind, times: kind === 'avoid' && (draft.times ?? 0) > 6 ? 6 : draft.times })}
-          options={HABIT_KINDS.filter((k) => k !== 'minutes' || activityOn || draft.kind === 'minutes').map((k) => ({ value: k, label: t(`habits.kind.${k}` as MessageKey) }))}
-        />
-        <p className="muted small">{t(`habits.kindHint.${draft.kind}` as MessageKey)}</p>
+        <div className="field">
+          <span className="field-label">{t('habits.editor.kind')}</span>
+          <Segmented<HabitKind>
+            label={t('habits.editor.kind')}
+            value={draft.kind}
+            onChange={(kind) => set({ kind, times: kind === 'avoid' && (draft.times ?? 0) > 6 ? 6 : draft.times })}
+            options={HABIT_KINDS.filter((k) => k !== 'minutes' || activityOn || draft.kind === 'minutes').map((k) => ({ value: k, label: t(`habits.kind.${k}` as MessageKey) }))}
+          />
+          <div className="field-hint">{t(`habits.kindHint.${draft.kind}` as MessageKey)}</div>
+        </div>
         {!activityOn && draft.kind !== 'minutes' && <p className="muted small">{t('habits.editor.minutesNeedActivity')}</p>}
 
         {draft.kind === 'minutes' && (
@@ -210,7 +233,7 @@ function EditorForm({ habit, all, activityOn }: { habit: Habit | undefined; all:
             <div className="field">
               <span className="field-label">{t('habits.editor.activities')}</span>
               <div className="chips">
-                <button type="button" className={draft.activities.length ? 'chip' : 'chip on'} aria-pressed={!draft.activities.length} onClick={() => set({ activities: [] })}>
+                <button type="button" className={draft.activities.length ? 'chip' : 'chip on'} aria-pressed={!draft.activities.length} onClick={() => set(withActivities(draft, []))}>
                   {t('habits.anyActivity')}
                 </button>
                 {choices.map((c) => {
@@ -221,7 +244,7 @@ function EditorForm({ habit, all, activityOn }: { habit: Habit | undefined; all:
                       type="button"
                       className={on ? 'chip on' : 'chip'}
                       aria-pressed={on}
-                      onClick={() => set({ activities: on ? draft.activities.filter((p) => !sameActivity(p, c)) : [...draft.activities, c] })}
+                      onClick={() => set(withActivities(draft, on ? draft.activities.filter((p) => !sameActivity(p, c)) : [...draft.activities, c]))}
                     >
                       {activityName(c)}
                     </button>
@@ -232,49 +255,71 @@ function EditorForm({ habit, all, activityOn }: { habit: Habit | undefined; all:
             </div>
             <Toggle
               checked={draft.quickOn}
-              onChange={(quickOn) => set({ quickOn, ...(quickOn && !quickChoices.some(sameAsQuick) ? { quick: { ...quickFor(quickChoices, draft.quick.minutes ?? draft.minutes), sun: draft.quick.sun } } : {}) })}
+              onChange={(quickOn) => set({ quickOn, ...(quickOn && !quickChoices.some(sameAsQuick) ? { quick: { ...draft.quick, ...presetOf(quickChoices[0] ?? { kind: 'walk' }) } } : {}) })}
               label={t('habits.editor.quick')}
               description={t('habits.editor.quickHint')}
             />
             {draft.quickOn && (
               <div className="habit-quick">
-                <div className="chips" role="radiogroup" aria-label={t('habits.editor.quickWhat')}>
-                  {quickChoices.map((c) => {
-                    const on = sameAsQuick(c);
-                    return (
-                      <button
-                        key={`${c.kind}|${c.name ?? ''}`}
-                        type="button"
-                        role="radio"
-                        aria-checked={on}
-                        className={on ? 'chip on' : 'chip'}
-                        onClick={() => setQuick({ kind: c.kind, name: c.name, ...(OUTSIDE_KINDS.has(c.kind) ? { outside: true } : {}) })}
-                      >
-                        {activityName(c)}
-                      </button>
-                    );
-                  })}
-                </div>
                 <Field label={t('habits.editor.quickMinutes')}>{(id) => <NumberInput id={id} value={draft.quick.minutes} onChange={(minutes) => setQuick({ minutes })} suffix="min" min={0} />}</Field>
-                <Segmented<Intensity>
-                  label={t('activity.howHard')}
-                  value={draft.quick.intensity}
-                  onChange={(intensity) => setQuick({ intensity })}
-                  options={INTENSITIES.map((i) => ({ value: i, label: t(`activity.intensity.${i}` as MessageKey) }))}
-                />
-                <Toggle checked={draft.quick.outside} onChange={(outside) => setQuick({ outside })} label={t('activity.outside')} />
-                {draft.quick.outside && sunOn && <Toggle checked={draft.quick.sun} onChange={(sun) => setQuick({ sun })} label={t('activity.sun')} description={t('activity.sunHint')} />}
+                {/* Only when the habit counts more than one activity is there a choice to make. */}
+                {draft.activities.length !== 1 && (
+                  <div className="field">
+                    <span className="field-label">{t('habits.editor.quickWhat')}</span>
+                    <div className="chips" role="radiogroup" aria-label={t('habits.editor.quickWhat')}>
+                      {quickChoices.map((c) => {
+                        const on = sameAsQuick(c);
+                        return (
+                          <button key={`${c.kind}|${c.name ?? ''}`} type="button" role="radio" aria-checked={on} className={on ? 'chip on' : 'chip'} onClick={() => setQuick(presetOf(c))}>
+                            {activityName(c)}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+                <details className="fold habit-quick-more">
+                  <summary>
+                    <span className="grow">{detailsText(draft.quick, sunOn)}</span>
+                    <Icon name="down" size={18} />
+                  </summary>
+                  <div className="fold-body habit-quick-body">
+                    <div className="field">
+                      <span className="field-label">{t('activity.howHard')}</span>
+                      <Segmented<Intensity>
+                        label={t('activity.howHard')}
+                        value={draft.quick.intensity}
+                        onChange={(intensity) => setQuick({ intensity })}
+                        options={INTENSITIES.map((i) => ({ value: i, label: t(`activity.intensity.${i}` as MessageKey) }))}
+                      />
+                    </div>
+                    <Toggle checked={draft.quick.outside} onChange={(outside) => setQuick({ outside })} label={t('activity.outside')} />
+                    {draft.quick.outside && sunOn && (
+                      <div className="row habit-sun">
+                        <div className="grow">
+                          <Toggle checked={draft.quick.sun} onChange={(sun) => setQuick({ sun })} label={t('activity.sun')} />
+                        </div>
+                        <InfoButton title={t('activity.sun')}>
+                          <p>{t('activity.sunHint')}</p>
+                        </InfoButton>
+                      </div>
+                    )}
+                  </div>
+                </details>
               </div>
             )}
           </>
         )}
 
-        <Segmented<GoalType>
-          label={t('habits.editor.goal')}
-          value={draft.goalType}
-          onChange={(goalType) => set({ goalType })}
-          options={(['daily', 'weekdays', 'perWeek'] as const).map((g) => ({ value: g, label: t(goalLabels[g]) }))}
-        />
+        <div className="field">
+          <span className="field-label">{t('habits.editor.goal')}</span>
+          <Segmented<GoalType>
+            label={t('habits.editor.goal')}
+            value={draft.goalType}
+            onChange={(goalType) => set({ goalType })}
+            options={(['daily', 'weekdays', 'perWeek'] as const).map((g) => ({ value: g, label: t(goalLabels[g]) }))}
+          />
+        </div>
         {draft.goalType === 'weekdays' && (
           <div className="chips habit-weekdays" role="group" aria-label={t('habits.editor.onDays')}>
             {[1, 2, 3, 4, 5, 6, 7].map((n) => {
@@ -331,5 +376,39 @@ function EditorForm({ habit, all, activityOn }: { habit: Habit | undefined; all:
         </div>
       )}
     </section>
+  );
+}
+
+/** The folded line under the one-tap minutes: "Easy · outside · vitamin D". */
+function detailsText(q: Draft['quick'], sunOn: boolean): string {
+  const parts = [t(`activity.intensity.${q.intensity}` as MessageKey), t(q.outside ? 'habits.editor.outside' : 'habits.editor.inside')];
+  if (q.outside && sunOn && q.sun) parts.push(t('habits.editor.sunCounts'));
+  return parts.join(' · ');
+}
+
+/** The habit's Home card as it will look today, and what a tap on it does, so the form shows rather than explains. */
+function Preview({ draft }: { draft: Draft }) {
+  const weekly = draft.goalType === 'perWeek';
+  const value =
+    weekly && draft.kind === 'avoid' ? t('habits.card.max', { n: 0, max: draft.times ?? 0 }) : weekly ? `0/${draft.times ?? 0}` : draft.kind === 'minutes' ? `0/${draft.minutes ?? 0}′` : <MarkGlyph mark="open" />;
+  const q = draft.quick;
+  const tap =
+    draft.kind !== 'minutes'
+      ? t(draft.kind === 'avoid' ? 'habits.editor.tapAvoid' : 'habits.editor.tapDo')
+      : draft.quickOn && q.minutes
+        ? t('habits.editor.tapQuick', { what: quickText({ ...q, minutes: q.minutes }) })
+        : t('habits.editor.tapSheet');
+  return (
+    <div className="habit-preview">
+      <span className="habit-card" style={habitStyle(draft)} aria-hidden>
+        <span className="habit-card-name">{draft.name.trim() || '…'}</span>
+        <span className="habit-card-value">{value}</span>
+      </span>
+      <span className="muted small">
+        {t('habits.editor.onHome')}
+        <br />
+        {tap}
+      </span>
+    </div>
   );
 }
