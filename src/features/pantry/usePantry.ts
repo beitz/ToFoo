@@ -8,7 +8,6 @@ import { newId } from '../../lib/id';
 import { refKey } from '../../lib/refs';
 import { guessPlace, leftOf, packGrams, leftText, onShoppingList, usageOf, withStatus, type Left } from '../../logic/pantry';
 import { planAdd, sectionOfRef, type NewShoppingItem } from '../../logic/shopping';
-import { isOn } from '../../settings/features';
 import { repo, type HomeUndo } from '../../storage/repo';
 import { CURRENT_SCHEMA_VERSION, type FoodRef, type HomePlace, type PantryItem, type ShoppingItem } from '../../storage/types';
 import { useShopFoods } from '../shopping/useShopping';
@@ -61,21 +60,27 @@ export function usePantryFoods() {
 }
 
 /**
- * Mark something as running low, used up, or had again. Running low and used up put it on the
- * shopping list too (when the list is on and it is not on it yet), in one undoable change.
+ * Mark something as running low, used up, or had again. Only the mark: putting it on the shopping
+ * list is the user's call (owner, 2026-10-26: "it's his responsibility to add it"), one tap away
+ * in the same sheet (useListPantry).
  */
 export function useMarkPantry() {
-  const d = useData();
+  return async (next: PantryItem, status: PantryItem['status'], left: Left): Promise<HomeUndo> => {
+    const marked = withStatus(next, status, left, Date.now());
+    return repo.changeHome(() => ({ pantry: { put: [marked], remove: [] } }));
+  };
+}
+
+/** Put something at home on the shopping list, by hand, unless it is on it already; undefined then. */
+export function useListPantry() {
   const { asShopping } = usePantryFoods();
-  const shoppingOn = isOn(d.settings.features, 'shoppingList');
-  return async (next: PantryItem, status: PantryItem['status'], left: Left): Promise<{ undo: HomeUndo; listed: boolean }> => {
-    const now = Date.now();
-    const marked = withStatus(next, status, left, now);
-    let listed = false;
+  return async (item: Pick<PantryItem, 'name' | 'ref'>): Promise<HomeUndo | undefined> => {
+    let added = false;
     const undo = await repo.changeHome((_, shopping) => {
-      listed = !!status && shoppingOn && !onShoppingList(next, shopping);
-      return { pantry: { put: [marked], remove: [] }, ...(listed ? { shopping: planAdd(shopping, [asShopping(next, shopping)], now, newId, CURRENT_SCHEMA_VERSION) } : {}) };
+      if (onShoppingList(item, shopping)) return {};
+      added = true;
+      return { shopping: planAdd(shopping, [asShopping(item, shopping)], Date.now(), newId, CURRENT_SCHEMA_VERSION) };
     });
-    return { undo, listed };
+    return added ? undo : undefined;
   };
 }

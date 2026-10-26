@@ -3863,6 +3863,23 @@ button.week-row:focus-visible {
   gap: 8px;
   min-height: 44px;
 }
+.pantry-to-list {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  margin: -4px 0 8px;
+}
+.pantry-to-list .small {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.pantry-to-list .btn {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
 .put-away-row {
   border-bottom: 1px solid var(--border);
 }
@@ -3870,26 +3887,6 @@ button.week-row:focus-visible {
   margin: 0 0 8px 38px;
   width: auto;
   min-height: 40px;
-}
-.shop-needed {
-  margin: 12px 0 4px;
-}
-.shop-needed-title {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.95rem;
-  margin: 0;
-}
-.shop-needed .shop-row {
-  width: 100%;
-}
-.shop-needed .btn {
-  white-space: nowrap;
-}
-.shop-needed .shop-check {
-  border-style: dashed;
-  color: var(--text-muted);
 }
 .log-home-link {
   display: inline-flex;
