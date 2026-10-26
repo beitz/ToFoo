@@ -8,6 +8,7 @@
  * scenes and small fixes. A pull request that changes what users see adds its line here in the same PR.
  */
 export const changesEn = {
+  'change.163': 'Nutrient pages have a How often chip with the food guideline where there is one (fatty fish once or twice a week for omega-3, with what 100 g of herring, salmon or mackerel covers). Omega-3, the other essential fats and vitamin E now average over 8 weeks, since the body evens them out slowly; vitamin K over 7 days.',
   'change.162': 'Look for patterns now takes an open look at your data and tells you what stands out most: trends, standout days, changes in routine or connections.',
   'change.161': 'Look for patterns now sees when you wake up in the night (how often, how long awake), keeps both halves of a night with a long wake-up, and can go through your data day by day when you ask for a deep look.',
   'change.160': 'Kitchen: a bin on the Used up card clears everything used up in one tap, with undo.',
