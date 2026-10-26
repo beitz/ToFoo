@@ -1523,7 +1523,7 @@ export const en = {
   'insights.kind.activity': 'activity',
   'insights.kind.water': 'water',
   'insights.kind.habits': 'habits',
-  'insights.lookPrompt': 'Look for patterns in my data.',
+  'insights.lookPrompt': 'Look through my data and tell me what stands out.',
   'insights.thinking': 'Comparing… this can take a minute.',
   'insights.checks': 'Numbers from the app ({n})',
   'insights.allDays': 'All days',
