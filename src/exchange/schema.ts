@@ -98,6 +98,17 @@ export const profileSchema = z.object({
   onboarded: z.boolean(),
 });
 
+const favouriteActivity = z.object({
+  id: z.string(),
+  kind: z.enum(['walk', 'run', 'cycling', 'strength', 'other']),
+  name: z.string().optional(),
+  minutes: z.number().positive(),
+  intensity: z.enum(['easy', 'moderate', 'hard']).optional(),
+  compendium: z.string().regex(/^\d{5}$/).optional(),
+  outside: z.boolean(),
+  sunSkin: skin.optional(),
+});
+
 export const settingsSchema = z.object({
   id: z.literal('settings'),
   ...versioned,
@@ -124,6 +135,7 @@ export const settingsSchema = z.object({
   homeCollapsed: z.record(z.string(), z.boolean()).optional(),
   favourites: z.array(foodRef).optional(),
   favouriteMeals: z.array(favouriteMeal).optional(),
+  favouriteActivities: z.array(favouriteActivity).optional().describe('Activities pinned in the activity sheet: what, usual minutes and effort, Compendium row, outside, sun skin; no time'),
   logCollapsed: z.record(z.string(), z.boolean()).optional(),
   cookingPreferences: z.string().optional(),
   potGrams: z.number().positive().optional(),

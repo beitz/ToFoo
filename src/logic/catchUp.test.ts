@@ -77,6 +77,22 @@ describe('catch up', () => {
     expect(frequentActivities(records, key(18))).toEqual([]);
   });
 
+  it('counts the day itself and a shorter window when asked, and keeps Compendium rows apart', () => {
+    const records = [
+      activity(1, 8, 30),
+      activity(20, 8, 30),
+      activity(22, 8, 30),
+      activity(21, 18, 60, { kind: 'other', name: undefined, compendium: '15610', outside: false }),
+      activity(22, 18, 45, { kind: 'other', name: undefined, compendium: '02105', outside: false }),
+    ];
+    const picks = frequentActivities(records, key(22), 10, { days: 7, withDay: true });
+    expect(picks.map((p) => [p.kind, p.compendium, p.count])).toEqual([
+      ['cycling', undefined, 2],
+      ['other', '02105', 1],
+      ['other', '15610', 1],
+    ]);
+  });
+
   it('takes usual water as the median day of recent plain water', () => {
     const w = (day: number, ml: number): WaterRecord => ({ id: `w${day}${ml}`, schemaVersion: 1, time: at(day, 12), day: key(day), ml });
     expect(usualWater([w(19, 500), w(19, 500), w(20, 1500), w(21, 750), w(22, 3000)], key(22))).toBe(1000);

@@ -5,11 +5,13 @@ import { dayKey } from '../../lib/dates';
 import { repo } from '../../storage/repo';
 import type { ActivityRecord } from '../../storage/types';
 import { Sheet } from '../../ui/controls';
+import { ActivityPicks } from './ActivityPicks';
 import { ActivityForm, DEFAULT_ACTIVITY_SKIN, draftOf, recordOf, type ActivityDraft } from './ActivityForm';
 
 /**
  * Add an activity (starting at `defaultTime`), or edit or delete one, with undo. `initial` fills in a
  * new one (a habit's activity and minutes), and `presets` offers other activities as one-tap chips.
+ * A plain new one starts with Favourites and Recent (ActivityPicks).
  */
 export function ActivitySheet({
   activity,
@@ -66,6 +68,7 @@ export function ActivitySheet({
           })}
         </div>
       )}
+      {!activity && !initial && <ActivityPicks draft={draft} onPick={(patch) => setDraft({ ...draft, ...patch })} />}
       <ActivityForm draft={draft} onChange={setDraft} />
       {!r.ok && (
         <p className="notice small" role="alert">

@@ -1017,6 +1017,66 @@
                         ]
                       }
                     },
+                    "favouriteActivities": {
+                      "description": "Activities pinned in the activity sheet: what, usual minutes and effort, Compendium row, outside, sun skin; no time",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "walk",
+                              "run",
+                              "cycling",
+                              "strength",
+                              "other"
+                            ]
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "minutes": {
+                            "type": "number",
+                            "exclusiveMinimum": 0
+                          },
+                          "intensity": {
+                            "type": "string",
+                            "enum": [
+                              "easy",
+                              "moderate",
+                              "hard"
+                            ]
+                          },
+                          "compendium": {
+                            "type": "string",
+                            "pattern": "^\\d{5}$"
+                          },
+                          "outside": {
+                            "type": "boolean"
+                          },
+                          "sunSkin": {
+                            "type": "string",
+                            "enum": [
+                              "faceHands",
+                              "faceHandsForearms",
+                              "faceHandsArms",
+                              "armsLegs",
+                              "mostOfBody"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "kind",
+                          "minutes",
+                          "outside"
+                        ]
+                      }
+                    },
                     "logCollapsed": {
                       "type": "object",
                       "propertyNames": {

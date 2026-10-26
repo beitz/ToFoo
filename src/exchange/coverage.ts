@@ -4,7 +4,7 @@
  * silently lost on backup and restore. `npm run typecheck` fails here instead. Types only.
  */
 import type { z } from 'zod';
-import type { ActivityRecord, Batch, CustomFood, DayStatusRecord, Fast, FavouriteMealItem, FoodPortionSizes, Habit, HabitDay, Ingredient, JournalEntry, KetoneReading, LabResult, LogEntry, OutdoorSession, PantryItem, PortionSize, Product, Profile, Recipe, Settings, ShoppingItem, SleepRecord, SunEntry, WaterRecord } from '../storage/types';
+import type { ActivityRecord, Batch, CustomFood, DayStatusRecord, Fast, FavouriteActivity, FavouriteMealItem, FoodPortionSizes, Habit, HabitDay, Ingredient, JournalEntry, KetoneReading, LabResult, LogEntry, OutdoorSession, PantryItem, PortionSize, Product, Profile, Recipe, Settings, ShoppingItem, SleepRecord, SunEntry, WaterRecord } from '../storage/types';
 import type { Snapshot } from '../storage/repo';
 import type * as S from './schema';
 
@@ -21,6 +21,7 @@ export type BackupCoversStoredFields = [
   Covered<Missing<OutdoorSession, Item<NonNullable<Data['profile']>['outdoorRoutine']>>>,
   Covered<Missing<LabResult, Item<NonNullable<Data['profile']>['labResults']>>>,
   Covered<Missing<Settings, z.infer<typeof S.settingsSchema>>>,
+  Covered<Missing<FavouriteActivity, Item<NonNullable<Data['settings']>['favouriteActivities']>>>,
   Covered<Missing<FavouriteMealItem, Item<Item<NonNullable<Data['settings']>['favouriteMeals']>['items']>>>,
   Covered<Missing<Recipe, z.infer<typeof S.recipeRecordSchema>>>,
   Covered<Missing<Ingredient, Item<Data['recipes'][number]['ingredients']>>>,

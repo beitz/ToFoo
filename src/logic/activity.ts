@@ -17,3 +17,11 @@ export function activitySun(activities: readonly ActivityRecord[]): ExtraSun[] {
 
 /** Longest plausible single activity (a long hike); more is a typo. */
 export const MAX_ACTIVITY_MINUTES = 16 * 60;
+
+/**
+ * What makes two activities the same one for Recent and Favourites: kind, own name (any case),
+ * Compendium row and inside or outside. Length, effort and time can differ.
+ */
+export function activityKey(a: Pick<ActivityRecord, 'kind' | 'name' | 'compendium' | 'outside'>): string {
+  return `${a.kind}|${(a.name ?? '').trim().toLowerCase()}|${a.compendium ?? ''}|${a.outside}`;
+}

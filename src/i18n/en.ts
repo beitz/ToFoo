@@ -1470,6 +1470,8 @@ export const en = {
   'activity.pickNone': 'No activity found. Try another word, in English.',
   'activity.pickSource': 'From the 2024 Adult Compendium of Physical Activities (Herrmann et al.), 1,111 activities with their measured energy cost.',
   'activity.addsShort': '+{kcal} kcal',
+  'activity.picks': 'Favourites and recent',
+  'activity.picksRecent': '{detail} · {n}× in {weeks} weeks',
   'journal.placeholder': 'Write anything: how you feel, how you slept, what happened…',
   'journal.speak': 'Speak',
   'journal.saved': 'Saved to your journal.',
