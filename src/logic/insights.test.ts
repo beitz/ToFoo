@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { dayRange } from '../lib/dates';
 import type { DailyTotals } from '../model/simulate';
 import type { DayStatus, FoodPart, ModelEntry } from '../model/types';
-import type { JournalEntry, SleepRecord } from '../storage/types';
-import { buildInsightData, compareMeasures, conditionProblem, countDays, fisherExact, holds, journalEntries, overview, permutationChance, shareInsightData, type InsightInput } from './insights';
+import type { ActivityRecord, Habit, JournalEntry, SleepRecord } from '../storage/types';
+import { buildInsightData, compareMeasures, conditionProblem, countDays, fisherExact, habitName, holds, journalEntries, overview, permutationChance, shareInsightData, type InsightInput } from './insights';
 
 const at = (day: number, h: number, m = 0) => new Date(2026, 9, day, h, m).getTime();
 const key = (day: number) => `2026-10-${String(day).padStart(2, '0')}`;
@@ -162,6 +162,58 @@ describe('insight day facts', () => {
     expect(conditionProblem({ kind: 'journal', words: [' '] })).toMatch(/word/);
     expect(conditionProblem({ ...headache, offset: -40 })).toMatch(/offset/);
     expect(conditionProblem(headache)).toBeUndefined();
+  });
+});
+
+describe('habits in patterns', () => {
+  const habit = (o: Partial<Habit> & Pick<Habit, 'id' | 'name' | 'kind'>): Habit => ({ schemaVersion: 1, colour: 'teal', goal: { type: 'daily' }, order: 0, createdAt: at(1, 8), ...o });
+  const list = [
+    habit({ id: 'f', name: 'Floss', kind: 'do', goal: { type: 'weekdays', days: [1, 3, 5] } }),
+    habit({ id: 'a', name: 'Alcohol', kind: 'avoid' }),
+    habit({ id: 'x', name: 'Exercise', kind: 'minutes', minutes: 30, activities: [{ kind: 'run' }] }),
+  ];
+  const act = (day: number, minutes: number, kind: ActivityRecord['kind'] = 'run'): ActivityRecord => ({ id: `a${day}${kind}`, schemaVersion: 1, day: key(day), time: at(day, 18), kind, minutes, intensity: 'moderate', outside: true });
+  const activities = [act(2, 40), act(3, 10, 'walk'), act(10, 10)];
+  const answers = new Map([
+    ['f', new Map([[key(1), true], [key(2), false], [key(4), true]])],
+    ['a', new Map([[key(7), true], [key(8), false]])],
+  ]);
+  const withHabits = buildInsightData({ ...input, activities, habits: { list, data: { today: key(10), answers, activities, noActivity: new Set([key(5)]) } } });
+
+  it('marks each habit kept or not on days it was answered, due or not, and leaves the rest unknown', () => {
+    // 2026-10-04 is a Sunday: Floss is not due, but the answer still counts for patterns.
+    expect(withHabits.days.get(key(4))!.habits).toEqual({ Floss: true });
+    expect(withHabits.days.get(key(2))!.habits).toEqual({ Floss: false, Exercise: true });
+    expect(withHabits.days.get(key(7))!.habits).toEqual({ Alcohol: false });
+    expect(withHabits.days.get(key(8))!.habits).toEqual({ Alcohol: true });
+    // A walk doesn't count for Exercise, but it answers the day; "No activity" too.
+    expect(withHabits.days.get(key(3))!.habits).toEqual({ Exercise: false });
+    expect(withHabits.days.get(key(5))!.habits).toEqual({ Exercise: false });
+    // Today, 10 of 30 minutes may still become 30.
+    expect(withHabits.days.get(key(10))!.habits).toEqual({});
+    expect(withHabits.habits).toEqual([
+      { name: 'Floss', kind: 'do' },
+      { name: 'Alcohol', kind: 'avoid' },
+      { name: 'Exercise', kind: 'minutes' },
+    ]);
+  });
+
+  it('checks habit conditions by name, and counts days with answers', () => {
+    expect(habitName('floss', withHabits)).toBe('Floss');
+    expect(holds({ kind: 'habit', habit: 'floss' }, key(1), withHabits)).toBe(true);
+    expect(holds({ kind: 'habit', habit: 'Floss' }, key(3), withHabits)).toBeNull();
+    expect(holds({ kind: 'habit', habit: 'Alcohol', offset: -1 }, key(8), withHabits)).toBe(false);
+    expect(holds({ kind: 'habit', habit: 'Floss', negate: true }, key(2), withHabits)).toBe(true);
+    expect(overview(withHabits, key(1), key(10)).habitDays).toBe(7);
+    expect(conditionProblem({ kind: 'habit', habit: ' ' })).toMatch(/name/);
+  });
+
+  it('shares habits only when ticked', () => {
+    const without = shareInsightData(withHabits, key(1), new Set(['food', 'activity']));
+    expect(without.habits).toEqual([]);
+    expect(without.days.get(key(1))!.habits).toEqual({});
+    expect(holds({ kind: 'habit', habit: 'Floss' }, key(1), without)).toBeNull();
+    expect(shareInsightData(withHabits, key(1), new Set(['habits'])).days.get(key(1))!.habits).toEqual({ Floss: true });
   });
 });
 

@@ -39,7 +39,7 @@ import { SentNote } from './SentNote';
 import { clipTime, VoiceClip } from './VoiceClip';
 import { UsageLine } from './UsageLine';
 import { VoiceFailed } from './VoiceFailed';
-import type { ProposedItem, ProductTools, RecipeTools } from '../../ai/tools';
+import type { HabitInfo, ProposedItem, ProductTools, RecipeTools } from '../../ai/tools';
 import { piecesToGrams } from '../../foods/pieces';
 import { findProduct, findUsda } from '../../foods/findProduct';
 import { loadOffIndex, searchOffIndex } from '../../foods/offIndex';
@@ -71,6 +71,7 @@ import { ProposalGroup, cardAnchor } from './ProposalGroup';
 import { CardFrame, useCardIntake } from './CardFrame';
 import { ForgottenAsk } from './ForgottenAsk';
 import { WeightProposalCard } from './WeightCard';
+import { HabitsProposalCard } from './HabitsCard';
 import { addAnswer } from '../../ai/segments';
 import { refKey } from '../../lib/refs';
 import { itemIngredient } from '../../logic/ingredients';
@@ -249,6 +250,10 @@ function Chat({
     else savers.current.delete(id);
   }, []);
   const [savingAll, setSavingAll] = useState(false);
+  // The user's habits go in the note of the first message and again when they change (they are short, but every note stays in the chat).
+  const habitRows = useLiveQuery(() => repo.db.habits.orderBy('order').toArray(), []);
+  const habits: HabitInfo[] | undefined = !recipe && isOn(d.settings.features, 'habits') ? habitRows?.filter((h) => !h.archived).map(({ id, name, kind }) => ({ id, name, kind })) : undefined;
+  const habitsSent = useRef<string | undefined>(undefined);
   /** The undo of each card saved in this visit, for its folded row. */
   const [undos, setUndos] = useState<ReadonlyMap<string, Undo>>(new Map());
   const keepUndo = useCallback((id: string, undo: Undo | undefined) => setUndos((all) => {
@@ -399,7 +404,7 @@ function Chat({
     if (insights && sharing && !shared) {
       const whole = overview(insightData!, sharing.from, d.today);
       const privateLeftOut = sharing.kinds.includes('journal') && !sharing.privateJournal && whole.privateJournalEntries > 0;
-      share = shareNote(overview(insights, sharing.from, d.today), kinds.filter((k) => !sharing.kinds.includes(k)), privateLeftOut);
+      share = shareNote(overview(insights, sharing.from, d.today), kinds.filter((k) => !sharing.kinds.includes(k)), privateLeftOut, insights.habits);
     }
     const all = [...cards.values()];
     const note = appNote({
@@ -411,6 +416,7 @@ function Chat({
       barcodes: [...new Set(images_.flatMap((i) => i.barcodes))],
       dictated: dictated_ && !!text_.trim(),
       ...(recipe ? { recipe: recipe.soFar() } : {}),
+      ...(habits?.length && JSON.stringify(habits) !== habitsSent.current ? { habits } : {}),
       ...(share ? { share } : {}),
     });
     const labelled = images_.map((img, i) => ({ ...img, label: photoLabel(photoCount + i + 1, img.time) }));
@@ -467,6 +473,7 @@ function Chat({
               water: isOn(d.settings.features, 'water'),
               ketones: isOn(d.settings.features, 'ketosis') && isOn(d.settings.features, 'ketoneReadings'),
               weight: isOn(d.settings.features, 'weight'),
+              ...(habits?.length ? { habits } : {}),
               shopping: isOn(d.settings.features, 'shoppingList'),
               forgotten: isOn(d.settings.features, 'forgottenCheck'),
               ...(atHome ? { pantry: atHome } : {}),
@@ -477,6 +484,7 @@ function Chat({
       // Photos whose cards are all saved leave the chat, so this and later requests don't pay for them again.
       const lighter = retirePhotos(sharing ? { ...conversation, shared: sharing } : conversation, (id) => !cardsRef.current.get(id) || !!cardsRef.current.get(id)?.logged);
       const r = await sendMessage(create, model, lighter, msg, ctx, onUsage);
+      if (habits?.length) habitsSent.current = JSON.stringify(habits);
       setConversation(r.conversation);
       const { messages, ...state } = r.conversation;
       // Meal chats keep what reopening them needs (the recipe editor's chat belongs to its recipe).
@@ -527,6 +535,7 @@ function Chat({
         ...outcome.waters.map((w): Card => ({ kind: 'water', water: w, logged: false })),
         ...outcome.ketones.map((k): Card => ({ kind: 'ketone', ketone: k, logged: false })),
         ...outcome.weights.map((w): Card => ({ kind: 'weight', weight: w, logged: false })),
+        ...outcome.habits.map((h): Card => ({ kind: 'habits', habits: h, logged: false })),
         ...outcome.shopping.map((l): Card => ({ kind: 'shopping', shopping: l, logged: false })),
         ...outcome.homes.map((h): Card => ({ kind: 'home', home: h, logged: false })),
         ...outcome.ingredients.map((r): Card => ({ kind: 'ingredients', ingredients: r, logged: false })),
@@ -736,6 +745,7 @@ function Chat({
                     isOn(d.settings.features, 'water') && t('ai.introWater'),
                     isOn(d.settings.features, 'ketosis') && isOn(d.settings.features, 'ketoneReadings') && t('ai.introKetones'),
                     isOn(d.settings.features, 'weight') && t('ai.introWeight'),
+                    isOn(d.settings.features, 'habits') && !!habits?.length && t('ai.introHabits'),
                     isOn(d.settings.features, 'shoppingList') && t('ai.introShopping'),
                     isOn(d.settings.features, 'atHome') && t('ai.introPantry'),
                     t('ai.introRecipes'),
@@ -1026,6 +1036,7 @@ function CardView({ card, ...rest }: CardProps<Card>) {
   if (card.kind === 'water') return <WaterProposalCard card={card} {...rest} />;
   if (card.kind === 'ketone') return <KetoneProposalCard card={card} {...rest} />;
   if (card.kind === 'weight') return <WeightProposalCard card={card} {...rest} />;
+  if (card.kind === 'habits') return <HabitsProposalCard card={card} {...rest} />;
   if (card.kind === 'shopping') return <ShoppingCard card={card} {...rest} />;
   if (card.kind === 'home') return <HomeCard card={card} {...rest} />;
   if (card.kind === 'ingredients') return <IngredientsCard card={card} {...rest} />;

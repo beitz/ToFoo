@@ -28,6 +28,8 @@ import {
   type ShoppingItem,
   type PantryItem,
   type KetoneReading,
+  type Habit,
+  type HabitDay,
   type LogEntry,
   type NewLogEntry as NewLog,
   type Product,
@@ -59,6 +61,8 @@ export interface Snapshot {
   shopping: ShoppingItem[];
   pantry: PantryItem[];
   ketones: KetoneReading[];
+  habits: Habit[];
+  habitDays: HabitDay[];
   /** Missing in backups from before portion sizes were included; restoring one keeps the sizes on the phone. */
   portionSizes?: FoodPortionSizes[];
 }
@@ -472,6 +476,61 @@ export function createRepo(db: ToFooDB) {
       await db.ketones.put(k);
     },
 
+    // ── Habits ──
+    /** Add a habit at the end of the list. */
+    async addHabit(h: Omit<Habit, 'id' | 'schemaVersion' | 'order' | 'createdAt'>, now = Date.now()): Promise<Habit> {
+      return db.transaction('rw', db.habits, async () => {
+        const last = await db.habits.orderBy('order').last();
+        const rec: Habit = { ...h, id: newId(), schemaVersion: v, order: (last?.order ?? -1) + 1, createdAt: now };
+        await db.habits.put(rec);
+        return rec;
+      });
+    },
+    async updateHabit(h: Habit): Promise<void> {
+      await db.habits.put({ ...h, schemaVersion: v });
+    },
+    /** Put the habits in this order (ids not listed keep theirs, after these). */
+    async setHabitOrder(ids: readonly string[]): Promise<void> {
+      await db.transaction('rw', db.habits, async () => {
+        for (const [i, id] of ids.entries()) await db.habits.update(id, { order: i });
+      });
+    },
+    /** Delete a habit with all its answers; returns both so the UI can offer undo via restoreHabit. */
+    async deleteHabit(id: string): Promise<{ habit: Habit; days: HabitDay[] } | undefined> {
+      return db.transaction('rw', db.habits, db.habitDays, async () => {
+        const habit = await db.habits.get(id);
+        if (!habit) return undefined;
+        const days = await db.habitDays.where('habitId').equals(id).toArray();
+        await db.habitDays.bulkDelete(days.map((d) => d.id));
+        await db.habits.delete(id);
+        return { habit, days };
+      });
+    },
+    async restoreHabit(habit: Habit, days: HabitDay[]): Promise<void> {
+      await db.transaction('rw', db.habits, db.habitDays, async () => {
+        await db.habits.put(habit);
+        await db.habitDays.bulkPut(days);
+      });
+    },
+    /**
+     * Answer a do or avoid habit for a day (`did`: it happened), or clear the answer with null. Returns
+     * the answer it replaced, for undo via restoreHabitDay.
+     */
+    async setHabitDay(habitId: string, day: string, did: boolean | null): Promise<HabitDay | undefined> {
+      const id = `${habitId}|${day}`;
+      return db.transaction('rw', db.habitDays, async () => {
+        const old = await db.habitDays.get(id);
+        if (did === null) await db.habitDays.delete(id);
+        else await db.habitDays.put({ id, habitId, day, did, schemaVersion: v });
+        return old;
+      });
+    },
+    /** Put back what setHabitDay replaced (nothing: the day is open again). */
+    async restoreHabitDay(habitId: string, day: string, old: HabitDay | undefined): Promise<void> {
+      if (old) await db.habitDays.put(old);
+      else await db.habitDays.delete(`${habitId}|${day}`);
+    },
+
     // ── Shopping list ──
     /**
      * Change the shopping list: `plan` gets every line (cleared ones too) inside the transaction and
@@ -584,7 +643,7 @@ export function createRepo(db: ToFooDB) {
      * `backupFirst`, an automatic backup of the data it replaces is saved in the same transaction.
      */
     async restore(s: Snapshot, { backupFirst = false } = {}): Promise<void> {
-      const tables = [db.profile, db.settings, db.recipes, db.batches, db.log, db.customFoods, db.dayStatus, db.fasts, db.sunEntries, db.products, db.journal, db.sleep, db.activities, db.water, db.shopping, db.pantry, db.ketones];
+      const tables = [db.profile, db.settings, db.recipes, db.batches, db.log, db.customFoods, db.dayStatus, db.fasts, db.sunEntries, db.products, db.journal, db.sleep, db.activities, db.water, db.shopping, db.pantry, db.ketones, db.habits, db.habitDays];
       await db.transaction('rw', [...SNAPSHOT_TABLES, 'autoBackups'], async () => {
         if (backupFirst) await writeAutoBackup((name) => db.table(name), 'restore', new Date());
         await Promise.all(tables.map((t) => t.clear()));
@@ -605,6 +664,8 @@ export function createRepo(db: ToFooDB) {
         await db.shopping.bulkPut(s.shopping);
         await db.pantry.bulkPut(s.pantry);
         await db.ketones.bulkPut(s.ketones);
+        await db.habits.bulkPut(s.habits);
+        await db.habitDays.bulkPut(s.habitDays);
         if (s.portionSizes) {
           await db.meta.where('key').startsWith(PORTIONS_PREFIX).delete();
           await db.meta.bulkPut(s.portionSizes.map((p) => ({ key: PORTIONS_PREFIX + p.food, value: p.sizes })));

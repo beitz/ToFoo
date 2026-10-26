@@ -181,6 +181,35 @@ describe('repository', () => {
     expect(await b.db.activities.where('day').equals('2026-10-15').toArray()).toEqual([removed]);
   });
 
+  it('keeps habits in order, answers a day with undo, deletes a habit with its answers and backs them up', async () => {
+    const repo = await fresh();
+    const floss = await repo.addHabit({ name: 'Floss', colour: 'teal', kind: 'do', goal: { type: 'daily' } }, 10);
+    const run = await repo.addHabit({ name: 'Run', colour: 'green', kind: 'minutes', goal: { type: 'perWeek', times: 2 }, minutes: 30, activities: [{ kind: 'run' }] }, 11);
+    expect([floss.order, run.order]).toEqual([0, 1]);
+    await repo.setHabitOrder([run.id, floss.id]);
+    expect((await repo.db.habits.orderBy('order').toArray()).map((h) => h.name)).toEqual(['Run', 'Floss']);
+
+    const before = await repo.setHabitDay(floss.id, '2026-10-25', true);
+    expect(before).toBeUndefined();
+    const replaced = await repo.setHabitDay(floss.id, '2026-10-25', false);
+    expect(replaced?.did).toBe(true);
+    await repo.restoreHabitDay(floss.id, '2026-10-25', replaced);
+    expect((await repo.db.habitDays.get(`${floss.id}|2026-10-25`))?.did).toBe(true);
+    await repo.setHabitDay(floss.id, '2026-10-25', null);
+    expect(await repo.db.habitDays.count()).toBe(0);
+    await repo.setHabitDay(floss.id, '2026-10-24', true);
+
+    const b = await fresh();
+    await b.restore(await repo.snapshot());
+    expect(await b.db.habits.count()).toBe(2);
+    expect(await b.db.habitDays.toArray()).toEqual([{ id: `${floss.id}|2026-10-24`, schemaVersion: 1, habitId: floss.id, day: '2026-10-24', did: true }]);
+
+    const gone = await repo.deleteHabit(floss.id);
+    expect(await repo.db.habitDays.count()).toBe(0);
+    await repo.restoreHabit(gone!.habit, gone!.days);
+    expect(await repo.db.habitDays.count()).toBe(1);
+  });
+
   it('adds, edits, deletes and restores water, and backs it up', async () => {
     const repo = await fresh();
     const w = await repo.addWater({ time: 10, day: '2026-10-15', ml: 250 });

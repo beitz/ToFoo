@@ -6,7 +6,7 @@ import Dexie, { type Table, type Transaction } from 'dexie';
 import { SNAPSHOT_TABLES, writeAutoBackup } from './autoBackup';
 import { migrateRecord, needsMigration, TABLES, type TableName } from './migrations';
 import type { ChatAudio, ChatPhoto, ChatRecord } from '../ai/chatRecord';
-import type { ActivityRecord, AutoBackup, Batch, CustomFood, DayStatusRecord, Fast, JournalEntry, KetoneReading, LogEntry, MetaRecord, Product, Profile, Recipe, Settings, PantryItem, ShoppingItem, SleepRecord, SunEntry, WaterRecord } from './types';
+import type { ActivityRecord, AutoBackup, Batch, CustomFood, DayStatusRecord, Fast, Habit, HabitDay, JournalEntry, KetoneReading, LogEntry, MetaRecord, Product, Profile, Recipe, Settings, PantryItem, ShoppingItem, SleepRecord, SunEntry, WaterRecord } from './types';
 
 export class ToFooDB extends Dexie {
   profile!: Table<Profile, string>;
@@ -26,6 +26,8 @@ export class ToFooDB extends Dexie {
   shopping!: Table<ShoppingItem, string>;
   pantry!: Table<PantryItem, string>;
   ketones!: Table<KetoneReading, string>;
+  habits!: Table<Habit, string>;
+  habitDays!: Table<HabitDay, string>;
   meta!: Table<MetaRecord, string>;
   /** Saved assistant chats (not in backups: they are logs for debugging, see src/ai/chatRecord.ts). */
   chats!: Table<ChatRecord, string>;
@@ -84,6 +86,10 @@ export class ToFooDB extends Dexie {
     // v12: voice recordings kept with saved chats (like chats, not in backups).
     this.version(12)
       .stores({ chatAudio: 'id, chatId' })
+      .upgrade((tx) => this.backupBeforeUpgrade(tx));
+    // v13: habits and their answers per day.
+    this.version(13)
+      .stores({ habits: 'id, order', habitDays: 'id, habitId, day' })
       .upgrade((tx) => this.backupBeforeUpgrade(tx));
   }
 

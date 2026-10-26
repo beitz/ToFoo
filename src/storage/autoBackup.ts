@@ -27,7 +27,7 @@ export const SNAPSHOT_TABLES: string[] = [...TABLES, 'meta'];
  * runs the older versions' upgrade steps first, and the backup taken in the first of those steps
  * cannot see a table that does not exist yet; it is empty then anyway.
  */
-const LATER_TABLES = new Set(['shopping', 'pantry', 'ketones']);
+const LATER_TABLES = new Set(['shopping', 'pantry', 'ketones', 'habits', 'habitDays']);
 
 /** All personal data, as stored. The one reader behind "Export everything" and automatic backups. */
 export async function readSnapshot(table: GetTable): Promise<Snapshot> {
@@ -58,6 +58,8 @@ export async function readSnapshot(table: GetTable): Promise<Snapshot> {
     shopping: await all('shopping'),
     pantry: await all('pantry'),
     ketones: await all('ketones'),
+    habits: await all('habits'),
+    habitDays: await all('habitDays'),
     portionSizes: portions.filter((r) => Array.isArray(r.value) && r.value.length).map((r) => ({ food: r.key.slice(PORTIONS_PREFIX.length), sizes: r.value as PortionSize[] })),
   };
 }

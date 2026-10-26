@@ -21,6 +21,8 @@ const ROUTES = [
   'food/C133000',
   'fasting',
   'weight',
+  'habits',
+  'habits/new',
   'settings',
   'settings/profile',
   'settings/backup',

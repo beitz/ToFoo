@@ -36,6 +36,9 @@ export function describeCondition(c: Condition): string {
     case 'weekday':
       s = c.weekdays.map(weekdayName).join(t('insights.or'));
       break;
+    case 'habit':
+      s = t('insights.c.habit', { name: c.habit });
+      break;
     case 'status':
       s = t('insights.c.status', { statuses: c.statuses.map((x) => t(`day.${x}` as MessageKey).toLowerCase()).join(t('insights.or')) });
       break;

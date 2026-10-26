@@ -51,6 +51,9 @@ import { CatchUpPage } from '../features/catchup/CatchUpPage';
 import { ActivityPage } from '../features/trackers/ActivityPage';
 import { WaterPage } from '../features/trackers/WaterPage';
 import { WeightPage } from '../features/weight/WeightPage';
+import { HabitsPage } from '../features/habits/HabitsPage';
+import { HabitPage } from '../features/habits/HabitPage';
+import { HabitEditor } from '../features/habits/HabitEditor';
 
 function Page({ route }: { route: string[] }) {
   const d = useData();
@@ -148,6 +151,11 @@ function Page({ route }: { route: string[] }) {
       return <WeightPage />;
     case 'catchup':
       return <CatchUpPage key={b} day={b ?? d.today} />;
+    case 'habits':
+      if (b === 'new') return <HabitEditor key="new" />;
+      if (b && c === 'edit') return <HabitEditor key={`${b}/edit`} id={b} />;
+      if (b) return <HabitPage key={b} id={b} />;
+      return <HabitsPage />;
     default:
       return <HomePage />;
   }

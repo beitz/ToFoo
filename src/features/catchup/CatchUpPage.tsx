@@ -17,8 +17,11 @@ import { useSleep } from '../sleep/useSleep';
 import { addWaterWithUndo, WaterSheet } from '../water/WaterSheet';
 import { waterText } from '../water/format';
 import { skip, useCatchUp } from './useCatchUp';
+import { openHabitsOn } from '../../logic/habits';
+import { useHabits } from '../habits/useHabits';
+import { answerLabels, habitStyle, useAnswer } from '../habits/HabitParts';
 
-const ICON: Record<CatchUpKind, string> = { food: 'diary', sleep: 'bed', activity: 'activity', water: 'drop' };
+const ICON: Record<CatchUpKind, string> = { food: 'diary', sleep: 'bed', activity: 'activity', water: 'drop', habits: 'repeat' };
 const NOON = 12 * 60;
 
 /**
@@ -45,12 +48,13 @@ export function CatchUpPage({ day }: { day: string }) {
       {shown.length > 0 && <p className="muted">{t('catchUp.lead')}</p>}
       {shown.length === 0 && <p className="muted">{t('catchUp.nothing')}</p>}
       {shown.map((k) => (
-        // Activity stays open once logged: the way home is a second commute.
-        <CatchUpCard key={k} kind={k} open={missing.includes(k)} keepOpen={k === 'activity'}>
+        // Activity stays open once logged: the way home is a second commute. Habits stay open to change an answer.
+        <CatchUpCard key={k} kind={k} open={missing.includes(k)} keepOpen={k === 'activity' || k === 'habits'}>
           {k === 'food' && <FoodChoices day={day} />}
           {k === 'sleep' && <SleepChoices day={day} />}
           {k === 'activity' && <ActivityChoices day={day} />}
           {k === 'water' && <WaterChoices day={day} />}
+          {k === 'habits' && <HabitChoices day={day} />}
         </CatchUpCard>
       ))}
       {shown.length > 0 && done && (
@@ -205,6 +209,44 @@ function WaterChoices({ day }: { day: string }) {
         <SkipButton day={day} kind="water" />
       </div>
       {sheet && <WaterSheet defaultTime={atDayMinute(day, NOON)} onClose={() => setSheet(false)} />}
+    </>
+  );
+}
+
+/** The habits that were open when the page opened, each with its two answers; they stay to change an answer. */
+function HabitChoices({ day }: { day: string }) {
+  const habits = useHabits();
+  const answer = useAnswer();
+  const [ids, setIds] = useState<string[]>();
+  useEffect(() => {
+    if (habits && !ids) setIds(openHabitsOn(habits.active, day, habits.data).map((h) => h.id));
+  }, [habits, ids, day]);
+  if (!habits || !ids) return null;
+  const shown = ids.map((id) => habits.all.find((h) => h.id === id)).filter((h) => !!h);
+  return (
+    <>
+      <p className="muted small">{t('catchUp.habits')}</p>
+      <ul className="plain-list catchup-habits">
+        {shown.map((h) => {
+          const did = habits.data.answers.get(h.id)?.get(day);
+          const labels = answerLabels(h);
+          return (
+            <li key={h.id} className="catchup-habit" style={habitStyle(h)}>
+              <span className="habit-name">{h.name}</span>
+              <span className="prompt-actions">
+                {([true, false] as const).map((v) => (
+                  <button key={String(v)} className={did === v ? 'btn btn-small btn-primary' : 'btn btn-small'} aria-pressed={did === v} onClick={() => void answer(h, day, did === v ? null : v)}>
+                    {v ? labels.yes : labels.no}
+                  </button>
+                ))}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+      <div className="prompt-actions">
+        <SkipButton day={day} kind="habits" />
+      </div>
     </>
   );
 }

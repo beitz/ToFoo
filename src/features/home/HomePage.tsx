@@ -13,6 +13,7 @@ import { SettingsButton } from '../../ui/SettingsButton';
 import { AskChips } from '../../ui/AskChips';
 import { SleepQuestion } from '../sleep/SleepQuestion';
 import { WaterCard } from '../water/WaterCard';
+import { HabitsRow } from '../habits/HabitsRow';
 import { withStores } from '../../logic/stores';
 import { DayStrip } from './DayStrip';
 import { CatchUpLine } from '../catchup/CatchUpLine';
@@ -76,6 +77,7 @@ export function HomePage() {
       <DayStrip days={windowDays} />
       <CatchUpLine />
       <FastCard />
+      {isOn(d.settings.features, 'habits') && <HabitsRow />}
 
       {isOn(d.settings.features, 'sleep') && <SleepQuestion />}
       <Prompts />

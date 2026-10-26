@@ -8,7 +8,7 @@ import type { FeatureKey, Settings } from '../../storage/types';
  * marker isn't on screen (feature off, card hidden) is skipped. Lines say what a part is, never how
  * it looks (owner's ask), so a restyle doesn't make them wrong.
  */
-export type TourId = 'home' | 'insights' | 'kitchen' | 'fan' | 'settings' | 'assistant' | 'nutrient' | 'weight';
+export type TourId = 'home' | 'insights' | 'kitchen' | 'fan' | 'settings' | 'assistant' | 'nutrient' | 'weight' | 'habits';
 
 export interface TourStep {
   /** The `data-tour` marker to outline; none = a bubble in the middle of the screen. */
@@ -34,6 +34,7 @@ export const TOURS: Record<TourId, Tour> = {
       { target: 'tabs', text: 'tour.home.tabs' },
       { target: 'home.days', text: 'tour.home.days' },
       { target: 'home.today', text: 'tour.home.today' },
+      { target: 'home.habits', text: 'tour.home.habits' },
       { target: 'home.week', text: 'tour.home.week' },
       { target: 'home.stores', text: 'tour.home.stores' },
       { target: 'home.info', text: 'tour.home.info' },
@@ -105,6 +106,13 @@ export const TOURS: Record<TourId, Tour> = {
       { target: 'weight.check', text: 'tour.weight.check' },
     ],
   },
+  habits: {
+    requires: 'habits',
+    steps: [
+      { target: 'habits.list', text: 'tour.habits.list' },
+      { target: 'habits.key', text: 'tour.habits.key' },
+    ],
+  },
 };
 
 export const TOUR_IDS = Object.keys(TOURS) as TourId[];
@@ -123,6 +131,7 @@ export function tourForRoute(route: readonly string[]): TourId | undefined {
   // The nutrient page itself, not its food list, Why page or a split over a recipe or meal.
   if (a === 'nutrient' && b && !c) return 'nutrient';
   if (a === 'weight') return 'weight';
+  if (a === 'habits' && !b) return 'habits';
   return undefined;
 }
 

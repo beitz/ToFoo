@@ -5,6 +5,7 @@ import { buildInsightData, SHARE_KINDS, type InsightData, type ShareKind } from 
 import { isOn } from '../../settings/features';
 import { repo } from '../../storage/repo';
 import { useJournal } from '../journal/useJournal';
+import { useHabits } from '../habits/useHabits';
 
 /**
  * Everything the pattern tools could read, built on the phone. Only built while `enabled` (the
@@ -17,8 +18,9 @@ export function useInsightData(enabled: boolean): InsightData | undefined {
   const sleep = useLiveQuery(() => repo.db.sleep.toArray(), []);
   const activities = useLiveQuery(() => repo.db.activities.toArray(), []);
   const water = useLiveQuery(() => repo.db.water.toArray(), []);
+  const habits = useHabits();
   return useMemo(() => {
-    if (!enabled || !journal || !sleep || !activities || !water) return undefined;
+    if (!enabled || !journal || !sleep || !activities || !water || !habits) return undefined;
     // Trackers the user turned off stay out of the analysis.
     return buildInsightData({
       days: d.modelDays,
@@ -31,8 +33,9 @@ export function useInsightData(enabled: boolean): InsightData | undefined {
       water: isOn(f, 'water') ? water : [],
       mealWindowMinutes: d.settings.mealWindowMinutes,
       today: d.today,
+      ...(isOn(f, 'habits') ? { habits: { list: habits.all, data: habits.data } } : {}),
     });
-  }, [enabled, d.modelDays, d.model, d.modelEntries, d.settings.mealWindowMinutes, d.today, f, journal, sleep, activities, water]);
+  }, [enabled, d.modelDays, d.model, d.modelEntries, d.settings.mealWindowMinutes, d.today, f, journal, sleep, activities, water, habits]);
 }
 
 /** The kinds of data there are to send: the food log, and each tracker that is on. */

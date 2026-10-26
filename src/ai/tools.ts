@@ -29,7 +29,7 @@ import type { SkinExposure } from '../model/sun';
 import { excludedFoods, type RecipeInfo } from '../logic/recipeIdeas';
 import type { InsightData } from '../logic/insights';
 import { stockAmount } from '../logic/pantry';
-import { ACTIVITY_KINDS, HOME_PLACES, INTENSITIES, type ActivityKind, type FoodRef, type HomePlace, type Ingredient, type Intensity, type KetoneType, type Product, type Profile } from '../storage/types';
+import { ACTIVITY_KINDS, HOME_PLACES, INTENSITIES, type ActivityKind, type FoodRef, type HabitKind, type HomePlace, type Ingredient, type Intensity, type KetoneType, type Product, type Profile } from '../storage/types';
 
 export const PREPARATIONS = ['asListed', 'raw', 'boiled', 'steamed', 'baked', 'fried'] as const satisfies readonly Preparation[];
 const SKIN_EXPOSURES = ['faceHands', 'faceHandsForearms', 'faceHandsArms', 'armsLegs', 'mostOfBody'] as const satisfies readonly SkinExposure[];
@@ -235,6 +235,26 @@ export const weightProposalInput = z.object({
   replaces: z.string().optional(),
 });
 
+export const habitsProposalInput = z.object({
+  /** One answer per habit and day. */
+  answers: z.array(z.object({ habit: z.string(), day: z.string().optional(), did: z.boolean() })),
+  /** Id of the open habit card this replaces (e.g. "T1"); empty for a new one. */
+  replaces: z.string().optional(),
+});
+
+/** A habit as the assistant knows it: the user's do and avoid habits (minutes habits come from activities). */
+export interface HabitInfo {
+  id: string;
+  name: string;
+  kind: HabitKind;
+}
+
+/** Answers to the user's habits the assistant proposes (docs/SPEC.md, "Habits"), for the user to check. */
+export interface HabitsProposal {
+  answers: Array<{ habitId: string; name: string; day: string; did: boolean }>;
+  replaces?: string;
+}
+
 /** A weigh-in the assistant proposes, for the user to check. */
 export interface WeightProposal {
   kg: number;
@@ -427,6 +447,8 @@ export interface ToolContext {
   ketones?: boolean;
   /** Weight is on: the assistant may propose weigh-ins. */
   weight?: boolean;
+  /** Habits are on: the user's habits, which the assistant may answer per day (absent when there are none). */
+  habits?: readonly HabitInfo[];
   /** The shopping list is on: the assistant may propose things to put on it. */
   shopping?: boolean;
   /** At home is on: the assistant may propose things bought or running low, and search_foods marks what is at home (by refKey). */
@@ -467,7 +489,7 @@ export interface IdeaTools {
 }
 
 /** Which online sources the assistant is offered (decides the prompt and tool variant). */
-export function sourcesOf(ctx: Pick<ToolContext, 'products' | 'journal' | 'sleep' | 'activity' | 'water' | 'ketones' | 'weight' | 'shopping' | 'pantry' | 'recipe' | 'recipes' | 'forgotten' | 'insights'>): {
+export function sourcesOf(ctx: Pick<ToolContext, 'products' | 'journal' | 'sleep' | 'activity' | 'water' | 'ketones' | 'weight' | 'habits' | 'shopping' | 'pantry' | 'recipe' | 'recipes' | 'forgotten' | 'insights'>): {
   off: boolean;
   usda: boolean;
   webSearch: boolean;
@@ -477,6 +499,7 @@ export function sourcesOf(ctx: Pick<ToolContext, 'products' | 'journal' | 'sleep
   water: boolean;
   ketones: boolean;
   weight: boolean;
+  habits: boolean;
   shopping: boolean;
   pantry: boolean;
   recipe: boolean;
@@ -487,7 +510,7 @@ export function sourcesOf(ctx: Pick<ToolContext, 'products' | 'journal' | 'sleep
 } {
   const { products } = ctx;
   const online = { off: !!products?.find, usda: !!products?.searchUsda, webSearch: !!products?.find && !!products.webSearch };
-  if (ctx.recipe) return { ...online, journal: false, sleep: false, activity: false, water: false, ketones: false, weight: false, shopping: false, pantry: false, recipe: true, recipes: false, ideas: false, forgotten: false, insights: false };
+  if (ctx.recipe) return { ...online, journal: false, sleep: false, activity: false, water: false, ketones: false, weight: false, habits: false, shopping: false, pantry: false, recipe: true, recipes: false, ideas: false, forgotten: false, insights: false };
   return {
     ...online,
     journal: !!ctx.journal,
@@ -496,6 +519,7 @@ export function sourcesOf(ctx: Pick<ToolContext, 'products' | 'journal' | 'sleep
     water: !!ctx.water,
     ketones: !!ctx.ketones,
     weight: !!ctx.weight,
+    habits: !!ctx.habits?.length,
     shopping: !!ctx.shopping,
     pantry: !!ctx.pantry,
     recipe: false,
@@ -779,6 +803,42 @@ export function validateWeightProposal(input: unknown, now?: number): { ok: true
   if (problems.length) return { ok: false, error: `${problems.join('\n')}\nFix these and call propose_weight again.` };
   const replaces = parsed.data.replaces?.trim();
   return { ok: true, proposal: { kg: Math.round(kg * 10) / 10, ...(day ? { day } : {}), ...(replaces ? { replaces } : {}) } };
+}
+
+/** Check a `propose_habits` call: habits the user has (do or avoid, by name), days not in the future, each habit and day once. */
+export function validateHabitsProposal(input: unknown, habits: readonly HabitInfo[], now?: number): { ok: true; proposal: HabitsProposal } | { ok: false; error: string } {
+  const parsed = habitsProposalInput.safeParse(input);
+  if (!parsed.success) return { ok: false, error: `Invalid input: ${parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}` };
+  const problems: string[] = [];
+  const names = habits.filter((h) => h.kind !== 'minutes').map((h) => `"${h.name}"`).join(', ');
+  const today = now !== undefined ? dayKey(new Date(now)) : undefined;
+  const answers: HabitsProposal['answers'] = [];
+  const seen = new Set<string>();
+  if (!parsed.data.answers.length) problems.push('answers is empty: give at least one habit and day.');
+  for (const a of parsed.data.answers) {
+    const wanted = normalize(a.habit);
+    const h = habits.find((x) => normalize(x.name) === wanted);
+    const day = a.day?.trim() || today || '';
+    if (!h) {
+      problems.push(`"${a.habit}" is not one of the user's habits (${names || 'none'}); use the name exactly as listed. Habits are created in the app, not here.`);
+      continue;
+    }
+    if (h.kind === 'minutes') {
+      problems.push(`"${h.name}" counts minutes of activity and is read from the activity log: propose the activity with propose_activity instead.`);
+      continue;
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) problems.push(`day "${a.day}" for "${h.name}" must be local "YYYY-MM-DD", or empty for today.`);
+    else if (today && day > today) problems.push(`day ${day} for "${h.name}" is in the future (today is ${today}).`);
+    else if (now !== undefined && now - new Date(`${day}T12:00`).getTime() > MAX_PAST_MS) problems.push(`day ${day} for "${h.name}" is more than a year ago.`);
+    else if (seen.has(`${h.id}|${day}`)) problems.push(`"${h.name}" on ${day} is given twice; give each habit and day once.`);
+    else {
+      seen.add(`${h.id}|${day}`);
+      answers.push({ habitId: h.id, name: h.name, day, did: a.did });
+    }
+  }
+  if (problems.length) return { ok: false, error: `${problems.join('\n')}\nFix these and call propose_habits again.` };
+  const replaces = parsed.data.replaces?.trim();
+  return { ok: true, proposal: { answers, ...(replaces ? { replaces } : {}) } };
 }
 
 /** Check a `propose_shopping` call: something to buy, and recipes that are in the book. */

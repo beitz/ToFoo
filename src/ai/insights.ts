@@ -11,6 +11,7 @@ import {
   conditionProblem,
   countDays,
   DAY_STATUSES,
+  habitName,
   journalEntries,
   MEASURE_BY_ID,
   OPS,
@@ -39,7 +40,8 @@ export type Check =
 
 const dayKey = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Days are "YYYY-MM-DD".');
 const conditionInput = z.object({
-  kind: z.enum(['journal', 'food', 'measure', 'weekday', 'status']),
+  kind: z.enum(['journal', 'food', 'measure', 'weekday', 'status', 'habit']),
+  habit: z.string().default(''),
   words: z.array(z.string()).default([]),
   measure: z.string().default(''),
   op: z.enum(OPS).default('<'),
@@ -68,6 +70,8 @@ function toCondition(c: z.infer<typeof conditionInput>): Condition {
       return { kind: 'weekday', weekdays: c.weekdays.map((w) => WEEKDAYS.indexOf(w)), ...common };
     case 'status':
       return { kind: 'status', statuses: c.statuses, ...common };
+    case 'habit':
+      return { kind: 'habit', habit: c.habit, ...common };
   }
 }
 
@@ -75,11 +79,13 @@ type ToolResult = { ok: true; text: string; check?: Check } | { ok: false; text:
 
 const zodError = (e: z.ZodError) => `Invalid input: ${e.issues.map((i) => `${i.path.join('.') || 'input'}: ${i.message}`).join('; ')}`;
 
-function conditions(cs: z.infer<typeof conditionInput>[]): Condition[] | string {
+function conditions(cs: z.infer<typeof conditionInput>[], data: InsightData): Condition[] | string {
   const out = cs.map(toCondition);
   for (const c of out) {
     const p = conditionProblem(c);
     if (p) return p;
+    if (c.kind === 'habit' && !habitName(c.habit, data))
+      return data.habits.length ? `"${c.habit}" is not one of the shared habits (${data.habits.map((h) => `"${h.name}"`).join(', ')}).` : 'The user shared no habits.';
   }
   return out;
 }
@@ -107,8 +113,8 @@ export function runInsightTool(name: string, input: unknown, data: InsightData):
     if (!p.success) return { ok: false, text: zodError(p.error) };
     const bad = periodProblem(p.data.from, p.data.to);
     if (bad) return { ok: false, text: bad };
-    const group = conditions(p.data.group);
-    const outcome = conditions(p.data.outcome);
+    const group = conditions(p.data.group, data);
+    const outcome = conditions(p.data.outcome, data);
     if (typeof group === 'string') return { ok: false, text: group };
     if (typeof outcome === 'string') return { ok: false, text: outcome };
     const result = countDays(data, p.data.from, p.data.to, group, outcome);
@@ -122,7 +128,7 @@ export function runInsightTool(name: string, input: unknown, data: InsightData):
     const unknown = p.data.measures.filter((m) => !MEASURE_BY_ID.has(m));
     if (unknown.length) return { ok: false, text: `Unknown measures: ${unknown.join(', ')}.` };
     if (p.data.measures.length > MAX_MEASURES) return { ok: false, text: `At most ${MAX_MEASURES} measures per call.` };
-    const group = conditions(p.data.group);
+    const group = conditions(p.data.group, data);
     if (typeof group === 'string') return { ok: false, text: group };
     const result = compareMeasures(data, p.data.from, p.data.to, group, p.data.measures);
     return { ok: true, text: compareText(result, group.length > 0), check: { kind: 'compare', from: p.data.from, to: p.data.to, group, measures: p.data.measures, result } };
@@ -225,18 +231,22 @@ function dayText(day: string, data: InsightData): string {
   else if (v.nap_minutes !== null) lines.push(`sleep: no night logged${v.nap_minutes ? `; naps ${fmtMeasure('nap_minutes', v.nap_minutes)}` : ''}`);
   if (f.activities.length) lines.push(`activity: ${f.activities.map((a) => `${clock(a.time)} ${a.name || a.kind} ${a.minutes} min${a.intensity ? `, ${a.intensity}` : ''}${a.outside ? ', outside' : ''}`).join('; ')}`);
   if (v.plain_water) lines.push(`plain water: ${fmtMeasure('plain_water', v.plain_water)}${v.total_water !== null ? `; with water in food ${fmtMeasure('total_water', v.total_water ?? 0)}` : ''}`);
+  const habits = Object.entries(f.habits);
+  if (habits.length) lines.push(`habits: ${habits.map(([name, kept]) => `${name} ${kept ? 'kept' : 'not kept'}`).join(', ')}`);
   if (f.journal.length) lines.push(`journal: ${f.journal.map((j) => `${clock(j.time)} ${j.text.replace(/\s+/g, ' ').trim()}`).join(' / ')}`);
   return lines.join('\n');
 }
 
-const KIND_NAME: Record<ShareKind, string> = { food: 'food log', journal: 'journal', sleep: 'sleep', activity: 'activity', water: 'water' };
+const KIND_NAME: Record<ShareKind, string> = { food: 'food log', journal: 'journal', sleep: 'sleep', activity: 'activity', water: 'water', habits: 'habits' };
+
+const HABIT_KIND_TEXT: Record<InsightData['habits'][number]['kind'], string> = { do: 'to do', avoid: 'to avoid', minutes: 'minutes of activity, from the activity log' };
 
 /**
  * The app's note on the message the user first shares their data with: the period, what its data
  * consists of, and what the user chose not to share. `privateLeftOut`: the period has private
  * journal entries the user kept back.
  */
-export function shareNote(o: Overview, notShared: readonly ShareKind[] = [], privateLeftOut = false): string {
+export function shareNote(o: Overview, notShared: readonly ShareKind[] = [], privateLeftOut = false, habits: InsightData['habits'] = []): string {
   const s = o.status;
   return [
     `The user included their data from now on. Period chosen by the user: ${o.from} to ${o.to} (${o.days} days); the app shares no days outside it, so if the user asks about other days, say they can choose a longer period in a new chat.`,
@@ -246,7 +256,12 @@ export function shareNote(o: Overview, notShared: readonly ShareKind[] = [], pri
     ...(privateLeftOut
       ? ['The user keeps some journal entries private and did not share them: a day with only private entries reads as not mentioned, so say "not in the shared entries" rather than "never mentioned" where it matters.']
       : []),
-    `In this period: food log complete on ${o.foodComplete} days (logged ${s.logged}, fasted ${s.fasted}), partly logged ${s.partial}, not logged ${s.unknown + s.filled}, left out by the user ${s.excluded}; ${o.journalEntries} journal entries on ${o.journalDays} days; sleep logged for ${o.nights} nights; activities on ${o.activityDays} days; plain water on ${o.waterDays} days.`,
+    `In this period: food log complete on ${o.foodComplete} days (logged ${s.logged}, fasted ${s.fasted}), partly logged ${s.partial}, not logged ${s.unknown + s.filled}, left out by the user ${s.excluded}; ${o.journalEntries} journal entries on ${o.journalDays} days; sleep logged for ${o.nights} nights; activities on ${o.activityDays} days; plain water on ${o.waterDays} days${habits.length ? `; habits answered on ${o.habitDays} days` : ''}.`,
+    ...(habits.length
+      ? [
+          `The user's habits (habit conditions use these names): ${habits.map((h) => `"${h.name}" (${HABIT_KIND_TEXT[h.kind]})`).join(', ')}. A habit condition holds on days it was kept (a habit to do done, a habit to avoid avoided, the minutes reached) and fails on days it was not; days not answered cannot be told.`,
+        ]
+      : []),
     "Today's food log counts as incomplete until the day is over.",
   ].join(' ');
 }

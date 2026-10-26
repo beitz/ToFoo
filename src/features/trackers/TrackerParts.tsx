@@ -8,6 +8,7 @@ import { dayLayers, type Layer } from '../../logic/calendarLayers';
 import { repo } from '../../storage/repo';
 import { Segmented } from '../../ui/controls';
 import { useSkipped } from '../catchup/useCatchUp';
+import { useHabitLayers } from '../habits/useHabits';
 import { useJournal } from '../journal/useJournal';
 import { useSleep } from '../sleep/useSleep';
 
@@ -25,11 +26,12 @@ export function useMissingDays(layer: Layer, days: readonly string[]): string[] 
   const water = useLiveQuery(() => repo.db.water.toArray(), []);
   const journal = useJournal();
   const skipped = useSkipped();
+  const habits = useHabitLayers();
   return useMemo(() => {
-    if (!sleep || !water || !journal || !skipped) return undefined;
-    const layers = dayLayers({ days, today: d.today, dayStatus: d.model.dayStatus, sleep, activities: d.activities, water, journal, skipped });
+    if (!sleep || !water || !journal || !skipped || habits === undefined) return undefined;
+    const layers = dayLayers({ days, today: d.today, dayStatus: d.model.dayStatus, sleep, activities: d.activities, water, journal, skipped, habits: habits ?? undefined });
     return days.filter((day) => layers.get(day)?.marks[layer] === 'missing').reverse();
-  }, [layer, days, d.today, d.model.dayStatus, sleep, d.activities, water, journal, skipped]);
+  }, [layer, days, d.today, d.model.dayStatus, sleep, d.activities, water, journal, skipped, habits]);
 }
 
 /** Days with nothing logged, as chips to the fill-in page; the most recent few, then a count. */

@@ -20,6 +20,7 @@ import { Icon } from '../../ui/Icon';
 import { STATUS_ICON, statusLabel } from '../../ui/status';
 import { activityName } from '../activity/ActivityForm';
 import { useSkipped } from '../catchup/useCatchUp';
+import { useHabitLayers } from '../habits/useHabits';
 import { fmtFastDuration } from '../fast/useFast';
 import { useJournal } from '../journal/useJournal';
 import { useSleepNeed } from '../settings/SleepNeed';
@@ -47,6 +48,7 @@ export function OverviewPage() {
   const water = useLiveQuery(() => repo.db.water.toArray(), []);
   const journal = useJournal();
   const skipped = useSkipped();
+  const habits = useHabitLayers();
   const need = useSleepNeed();
   const hidden = useMemo(() => new Set(d.settings.hiddenNutrients), [d.settings.hiddenNutrients]);
   const impute = isOn(f, 'fillUnloggedDays');
@@ -67,8 +69,11 @@ export function OverviewPage() {
   }, [d.modelDays, d.model, d.requirements, impute, finished, hidden]);
 
   const layers = useMemo(
-    () => (sleep && water && journal && skipped ? dayLayers({ days, today: d.today, dayStatus: d.model.dayStatus, sleep, activities: d.activities, water, journal, skipped }) : undefined),
-    [days, d.today, d.model.dayStatus, sleep, d.activities, water, journal, skipped],
+    () =>
+      sleep && water && journal && skipped && habits !== undefined
+        ? dayLayers({ days, today: d.today, dayStatus: d.model.dayStatus, sleep, activities: d.activities, water, journal, skipped, habits: habits ?? undefined })
+        : undefined,
+    [days, d.today, d.model.dayStatus, sleep, d.activities, water, journal, skipped, habits],
   );
 
   const fast = useMemo(() => {
@@ -92,7 +97,7 @@ export function OverviewPage() {
   const notes = journal.filter((j) => j.day >= days[0]!);
   // A private entry's words stay off the overview; it still counts.
   const latest = notes.filter((n) => !n.private).pop();
-  const off = (['sleep', 'activity', 'water', 'weight', 'journal'] as const).filter((k) => !isOn(f, k));
+  const off = (['sleep', 'activity', 'water', 'weight', 'journal', 'habits'] as const).filter((k) => !isOn(f, k));
   const offNames = [...(isOn(f, 'fasting') ? [] : [t('overview.fasting')]), ...off.map((k) => t(OFF_NAME[k]))];
 
   return (
@@ -128,7 +133,7 @@ export function OverviewPage() {
         )}
       </div>
 
-      {off.length < 5 && (
+      {off.length < 6 && (
         <div className="card ov-card" data-tour="insights.trackers">
           {isOn(f, 'sleep') && (
             <Row to={href('nights')} icon="bed" title={t('nights.title')} strip={strip('sleep')}>
@@ -149,6 +154,13 @@ export function OverviewPage() {
           {isOn(f, 'water') && (
             <Row to={href('water')} icon="drop" title={t('water.title')} strip={strip('water')}>
               {wat.averageMl === undefined ? t('overview.nothingDays') : t('overview.water', { avg: waterText(wat.averageMl), n: wat.daysAtTarget, target: waterText(target) })}
+            </Row>
+          )}
+          {isOn(f, 'habits') && habits && (
+            <Row to={href('habits')} icon="repeat" title={t('habits.title')} strip={strip('habits')}>
+              {!habits.list.length
+                ? t('overview.noHabits')
+                : t('overview.habits', { kept: days.reduce((n, day) => n + (layers.get(day)?.habits.kept ?? 0), 0), n: habits.list.length })}
             </Row>
           )}
           {isOn(f, 'weight') && <WeightRow />}
@@ -180,12 +192,13 @@ export function OverviewPage() {
   );
 }
 
-const OFF_NAME: Record<'sleep' | 'activity' | 'water' | 'weight' | 'journal', MessageKey> = {
+const OFF_NAME: Record<'sleep' | 'activity' | 'water' | 'weight' | 'journal' | 'habits', MessageKey> = {
   sleep: 'nights.title',
   activity: 'activity.short',
   water: 'water.title',
   weight: 'weight.title',
   journal: 'journal.title',
+  habits: 'habits.title',
 };
 
 /** Weight: the trend now, and what the log check says once it can say something. */

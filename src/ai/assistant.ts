@@ -23,6 +23,7 @@ import {
   validateWaterProposal,
   validateKetoneProposal,
   validateWeightProposal,
+  validateHabitsProposal,
   validateShoppingProposal,
   validateHomeProposal,
   validateIngredientsProposal,
@@ -43,6 +44,8 @@ import {
   type WaterProposal,
   type KetoneProposal,
   type WeightProposal,
+  type HabitsProposal,
+  type HabitInfo,
   type ShoppingProposal,
   type HomeProposal,
   type ToolContext,
@@ -82,6 +85,8 @@ export interface Conversation {
   ketones?: number;
   /** Weight cards shown so far; the next one gets id G(weights + 1). */
   weights?: number;
+  /** Habit cards shown so far; the next one gets id T(habits + 1). */
+  habits?: number;
   /** Shopping list cards shown so far; the next one gets id L(lists + 1). */
   lists?: number;
   /** At home cards shown so far; the next one gets id H(homes + 1). */
@@ -111,7 +116,7 @@ export interface PhotoTurn {
   cards: string[];
 }
 
-export const emptyConversation = (): Conversation => ({ messages: [], pendingResults: [], cards: 0, notes: 0, sleeps: 0, activities: 0, waters: 0, ketones: 0, weights: 0, lists: 0, homes: 0, recipes: 0, portions: 0, batches: 0, photoTurns: [] });
+export const emptyConversation = (): Conversation => ({ messages: [], pendingResults: [], cards: 0, notes: 0, sleeps: 0, activities: 0, waters: 0, ketones: 0, weights: 0, habits: 0, lists: 0, homes: 0, recipes: 0, portions: 0, batches: 0, photoTurns: [] });
 
 const RETIRED_PHOTO = '[photo removed]';
 const RETIRED_NOTE =
@@ -158,6 +163,8 @@ export type ShownWater = WaterProposal & { id: string };
 export type ShownKetone = KetoneProposal & { id: string };
 /** A weigh-in as shown: with its card id (G1, G2, …). */
 export type ShownWeight = WeightProposal & { id: string };
+/** Habit answers as shown: with their card id (T1, T2, …). */
+export type ShownHabits = HabitsProposal & { id: string };
 /** Things for the shopping list as shown: with their card id (L1, L2, …). */
 export type ShownShopping = ShoppingProposal & { id: string };
 /** Things for At home as shown: with their card id (H1, H2, …). */
@@ -185,6 +192,7 @@ export type TurnOutcome =
       waters: ShownWater[];
       ketones: ShownKetone[];
       weights: ShownWeight[];
+      habits: ShownHabits[];
       shopping: ShownShopping[];
       homes: ShownHome[];
       ingredients: ShownIngredients[];
@@ -276,6 +284,7 @@ export async function sendMessage(
   let waters = conversation.waters ?? 0;
   let ketones = conversation.ketones ?? 0;
   let weights = conversation.weights ?? 0;
+  let habits = conversation.habits ?? 0;
   let lists = conversation.lists ?? 0;
   let homes = conversation.homes ?? 0;
   let recipes = conversation.recipes ?? 0;
@@ -283,7 +292,7 @@ export async function sendMessage(
   let batches = conversation.batches ?? 0;
   const checks: Check[] = [];
   const shared = conversation.shared ? { shared: conversation.shared } : {};
-  const done = (outcome: TurnOutcome, pendingResults: Beta.BetaToolResultBlockParam[] = []) => ({ conversation: { messages, pendingResults, cards, notes, sleeps, activities, waters, ketones, weights, lists, homes, recipes, portions, batches, photoTurns, ...shared }, outcome });
+  const done = (outcome: TurnOutcome, pendingResults: Beta.BetaToolResultBlockParam[] = []) => ({ conversation: { messages, pendingResults, cards, notes, sleeps, activities, waters, ketones, weights, habits, lists, homes, recipes, portions, batches, photoTurns, ...shared }, outcome });
 
   for (let step = 0; step < MAX_STEPS; step++) {
     const res = await create(requestParams(model, messages, sources));
@@ -306,6 +315,7 @@ export async function sendMessage(
     const watersProposed: Array<{ id: string; proposal: WaterProposal }> = [];
     const ketonesProposed: Array<{ id: string; proposal: KetoneProposal }> = [];
     const weightsProposed: Array<{ id: string; proposal: WeightProposal }> = [];
+    const habitsProposed: Array<{ id: string; proposal: HabitsProposal }> = [];
     const listsProposed: Array<{ id: string; proposal: ShoppingProposal }> = [];
     const homesProposed: Array<{ id: string; proposal: HomeProposal }> = [];
     const ingredientsProposed: Array<{ id: string; proposal: IngredientsProposal }> = [];
@@ -412,6 +422,13 @@ export async function sendMessage(
           rejected = true;
           results.push({ type: 'tool_result', tool_use_id: use.id, content: r.error, is_error: true });
         }
+      } else if (use.name === 'propose_habits' && sources.habits) {
+        const r = validateHabitsProposal(use.input, ctx.habits ?? [], ctx.now);
+        if (r.ok) habitsProposed.push({ id: use.id, proposal: r.proposal });
+        else {
+          rejected = true;
+          results.push({ type: 'tool_result', tool_use_id: use.id, content: r.error, is_error: true });
+        }
       } else if (use.name === 'propose_home' && sources.pantry) {
         const r = validateHomeProposal(use.input, ctx.db, ctx.products);
         if (r.ok) homesProposed.push({ id: use.id, proposal: r.proposal });
@@ -437,7 +454,7 @@ export async function sendMessage(
     }
 
     // Cards are shown all together or not at all, so the user never sees half a batch.
-    const anyProposed = proposals.length + notesProposed.length + sleepsProposed.length + activitiesProposed.length + watersProposed.length + ketonesProposed.length + weightsProposed.length + listsProposed.length + homesProposed.length + ingredientsProposed.length + recipesProposed.length + portionsProposed.length + batchesProposed.length > 0;
+    const anyProposed = proposals.length + notesProposed.length + sleepsProposed.length + activitiesProposed.length + watersProposed.length + ketonesProposed.length + weightsProposed.length + habitsProposed.length + listsProposed.length + homesProposed.length + ingredientsProposed.length + recipesProposed.length + portionsProposed.length + batchesProposed.length > 0;
     if (anyProposed && !rejected) {
       const shown = proposals.map(({ proposal }): ShownProposal => ({ ...proposal, id: `M${++cards}` }));
       const shownNotes = notesProposed.map(({ proposal }): ShownNote => ({ ...proposal, id: `J${++notes}` }));
@@ -446,6 +463,7 @@ export async function sendMessage(
       const shownWaters = watersProposed.map(({ proposal }): ShownWater => ({ ...proposal, id: `W${++waters}` }));
       const shownKetones = ketonesProposed.map(({ proposal }): ShownKetone => ({ ...proposal, id: `K${++ketones}` }));
       const shownWeights = weightsProposed.map(({ proposal }): ShownWeight => ({ ...proposal, id: `G${++weights}` }));
+      const shownHabits = habitsProposed.map(({ proposal }): ShownHabits => ({ ...proposal, id: `T${++habits}` }));
       const shownLists = listsProposed.map(({ proposal }): ShownShopping => ({ ...proposal, id: `L${++lists}` }));
       const shownHomes = homesProposed.map(({ proposal }): ShownHome => ({ ...proposal, id: `H${++homes}` }));
       const shownIngredients = ingredientsProposed.map(({ proposal }): ShownIngredients => ({ ...proposal, id: `R${++recipes}` }));
@@ -460,6 +478,7 @@ export async function sendMessage(
         ...watersProposed.map(({ id }, i) => [id, shownWaters[i]!.id] as const),
         ...ketonesProposed.map(({ id }, i) => [id, shownKetones[i]!.id] as const),
         ...weightsProposed.map(({ id }, i) => [id, shownWeights[i]!.id] as const),
+        ...habitsProposed.map(({ id }, i) => [id, shownHabits[i]!.id] as const),
         ...listsProposed.map(({ id }, i) => [id, shownLists[i]!.id] as const),
         ...homesProposed.map(({ id }, i) => [id, shownHomes[i]!.id] as const),
         ...ingredientsProposed.map(({ id }, i) => [id, shownIngredients[i]!.id] as const),
@@ -480,6 +499,7 @@ export async function sendMessage(
         ...watersProposed.map(({ id }, i) => shownResult(id, shownWaters[i]!.id, 'saved')),
         ...ketonesProposed.map(({ id }, i) => shownResult(id, shownKetones[i]!.id, 'saved')),
         ...weightsProposed.map(({ id }, i) => shownResult(id, shownWeights[i]!.id, 'saved')),
+        ...habitsProposed.map(({ id }, i) => shownResult(id, shownHabits[i]!.id, 'saved')),
         ...listsProposed.map(({ id }, i) => shownResult(id, shownLists[i]!.id, 'added to the list')),
         ...homesProposed.map(({ id }, i) => shownResult(id, shownHomes[i]!.id, 'saved')),
         ...ingredientsProposed.map(({ id }, i) => shownResult(id, shownIngredients[i]!.id, 'added to the recipe')),
@@ -499,6 +519,7 @@ export async function sendMessage(
           waters: shownWaters,
           ketones: shownKetones,
           weights: shownWeights,
+          habits: shownHabits,
           shopping: shownLists,
           homes: shownHomes,
           ingredients: shownIngredients,
@@ -524,6 +545,9 @@ export async function sendMessage(
     }
     for (const { id } of weightsProposed) {
       results.push({ type: 'tool_result', tool_use_id: id, content: 'Not shown: another proposal in this response had errors. Call propose_weight again for this weigh-in too.', is_error: true });
+    }
+    for (const { id } of habitsProposed) {
+      results.push({ type: 'tool_result', tool_use_id: id, content: 'Not shown: another proposal in this response had errors. Call propose_habits again for these answers too.', is_error: true });
     }
     for (const { id } of ketonesProposed) {
       results.push({ type: 'tool_result', tool_use_id: id, content: 'Not shown: another proposal in this response had errors. Call propose_ketone again for this measurement too.', is_error: true });
@@ -588,13 +612,15 @@ export interface RecipeSoFar {
   instructions?: string;
 }
 
+const HABIT_KIND_NOTE: Record<HabitInfo['kind'], string> = { do: 'do', avoid: 'avoid', minutes: 'minutes of activity, from the activity log' };
+
 /**
  * The app's note on each user message: the current time and the chat's day (so "yesterday" and
  * photo times can be placed), cards already logged or still open, barcodes read from photos, and
  * whether the text was dictated. In the recipe editor: what the recipe already has instead of the day.
  * `share`: on the message the user first includes their data with, what it holds (shareNote).
  */
-export function appNote(o: { now: number; day: string; today: string; logged: string[]; open: string[]; barcodes: string[]; dictated?: boolean; recipe?: RecipeSoFar; share?: string }): string {
+export function appNote(o: { now: number; day: string; today: string; logged: string[]; open: string[]; barcodes: string[]; dictated?: boolean; recipe?: RecipeSoFar; habits?: readonly HabitInfo[]; share?: string }): string {
   const parts = [`Now: ${fmtLocalDateTime(o.now)}.`];
   if (o.dictated) parts.push('The text was spoken and turned into text by a speech model: expect misheard words, especially food and brand names, and corrections the user made while talking.');
   if (o.recipe) {
@@ -605,6 +631,7 @@ export function appNote(o: { now: number; day: string; today: string; logged: st
   if (o.logged.length) parts.push(`Cards already ${o.recipe ? 'added to the recipe' : 'logged'}: ${o.logged.join(', ')}.`);
   if (o.open.length) parts.push(`Cards still open: ${o.open.join(', ')}.`);
   if (o.barcodes.length) parts.push(`Barcodes the app read from the photos: ${o.barcodes.join(', ')}.`);
+  if (o.habits?.length) parts.push(`The user's habits: ${o.habits.map((h) => `"${h.name}" (${HABIT_KIND_NOTE[h.kind]})`).join(', ')}.`);
   if (o.share) parts.push(o.share);
   return `(${parts.join(' ')})`;
 }

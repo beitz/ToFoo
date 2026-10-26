@@ -7,11 +7,26 @@ import type { ActivityRecord } from '../../storage/types';
 import { Sheet } from '../../ui/controls';
 import { ActivityForm, DEFAULT_ACTIVITY_SKIN, draftOf, recordOf, type ActivityDraft } from './ActivityForm';
 
-/** Add an activity (starting at `defaultTime`), or edit or delete one, with undo. */
-export function ActivitySheet({ activity, defaultTime, onClose }: { activity?: ActivityRecord; defaultTime: number; onClose: () => void }) {
+/**
+ * Add an activity (starting at `defaultTime`), or edit or delete one, with undo. `initial` fills in a
+ * new one (a habit's activity and minutes), and `presets` offers other activities as one-tap chips.
+ */
+export function ActivitySheet({
+  activity,
+  defaultTime,
+  onClose,
+  initial,
+  presets,
+}: {
+  activity?: ActivityRecord;
+  defaultTime: number;
+  onClose: () => void;
+  initial?: Partial<ActivityDraft>;
+  presets?: Array<{ label: string; patch: Partial<ActivityDraft> }>;
+}) {
   const toast = useToast();
   const [draft, setDraft] = useState<ActivityDraft>(() =>
-    activity ? draftOf(activity) : { kind: 'walk', name: '', time: defaultTime, minutes: 30, intensity: 'moderate', outside: true, sun: true, skin: DEFAULT_ACTIVITY_SKIN },
+    activity ? draftOf(activity) : { kind: 'walk', name: '', time: defaultTime, minutes: 30, intensity: 'moderate', outside: true, sun: true, skin: DEFAULT_ACTIVITY_SKIN, ...initial },
   );
   const r = recordOf(draft);
 
@@ -39,6 +54,18 @@ export function ActivitySheet({ activity, defaultTime, onClose }: { activity?: A
 
   return (
     <Sheet title={t(activity ? 'activity.editTitle' : 'activity.addTitle')} onClose={onClose}>
+      {presets && presets.length > 1 && (
+        <div className="chips">
+          {presets.map((p) => {
+            const on = p.patch.kind === draft.kind && (p.patch.name ?? '') === draft.name;
+            return (
+              <button key={p.label} type="button" className={on ? 'chip on' : 'chip'} aria-pressed={on} onClick={() => setDraft({ ...draft, ...p.patch })}>
+                {p.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
       <ActivityForm draft={draft} onChange={setDraft} />
       {!r.ok && (
         <p className="notice small" role="alert">

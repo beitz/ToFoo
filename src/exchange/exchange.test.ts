@@ -115,6 +115,12 @@ const snapshot: Snapshot = {
     { id: 'k1', schemaVersion: 1, time: 17, day: '2026-10-21', type: 'blood', value: 1.4 },
     { id: 'k2', schemaVersion: 1, time: 18, day: '2026-10-21', type: 'breath', value: 12 },
   ],
+  habits: [
+    { id: 'hb1', schemaVersion: 1, name: 'Floss', colour: 'teal', kind: 'do', goal: { type: 'daily' }, order: 0, createdAt: 19 },
+    { id: 'hb2', schemaVersion: 1, name: 'Alcohol', colour: 'orange', kind: 'avoid', goal: { type: 'perWeek', times: 2 }, order: 1, createdAt: 19, archived: true },
+    { id: 'hb3', schemaVersion: 1, name: 'Exercise', colour: 'green', kind: 'minutes', goal: { type: 'weekdays', days: [1, 3, 5] }, minutes: 30, activities: [{ kind: 'run' }, { kind: 'other', name: 'Yoga' }], order: 2, createdAt: 19 },
+  ],
+  habitDays: [{ id: 'hb1|2026-10-21', schemaVersion: 1, habitId: 'hb1', day: '2026-10-21', did: true }],
   portionSizes: [
     { food: 'C133000', sizes: [{ label: 'My bowl', grams: 60 }] },
     { food: 'OFF:8000500319475', sizes: [{ label: 'piece', grams: 4.3, piece: true }] },
@@ -132,8 +138,8 @@ describe('exchange format', () => {
     }
   });
 
-  it('reads backups made before products, the journal, sleep, activities, water, the shopping list, the At home list and ketone measurements existed', () => {
-    const { products: _products, journal: _journal, sleep: _sleep, activities: _activities, water: _water, shopping: _shopping, pantry: _pantry, ketones: _ketones, portionSizes: _sizes, ...older } = snapshot;
+  it('reads backups made before products, the journal, sleep, activities, water, the shopping list, the At home list, ketone measurements and habits existed', () => {
+    const { products: _products, journal: _journal, sleep: _sleep, activities: _activities, water: _water, shopping: _shopping, pantry: _pantry, ketones: _ketones, habits: _habits, habitDays: _habitDays, portionSizes: _sizes, ...older } = snapshot;
     const parsed = parseExchange(JSON.stringify(buildBackup({ ...older, log: snapshot.log.slice(0, 2) } as Snapshot, '0.1.0', new Date())));
     expect(parsed.ok && parsed.value.type === 'backup' && parsed.value.data.products).toEqual([]);
     expect(parsed.ok && parsed.value.type === 'backup' && parsed.value.data.journal).toEqual([]);
@@ -143,6 +149,8 @@ describe('exchange format', () => {
     expect(parsed.ok && parsed.value.type === 'backup' && parsed.value.data.shopping).toEqual([]);
     expect(parsed.ok && parsed.value.type === 'backup' && parsed.value.data.pantry).toEqual([]);
     expect(parsed.ok && parsed.value.type === 'backup' && parsed.value.data.ketones).toEqual([]);
+    expect(parsed.ok && parsed.value.type === 'backup' && parsed.value.data.habits).toEqual([]);
+    expect(parsed.ok && parsed.value.type === 'backup' && parsed.value.data.habitDays).toEqual([]);
     // Left missing, so restoring an older backup keeps the portion sizes on the phone.
     expect(parsed.ok && parsed.value.type === 'backup' && parsed.value.data.portionSizes).toBeUndefined();
   });
