@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { useData } from '../../app/data';
+import { useToast } from '../../app/toast';
 import { href } from '../../app/router';
 import { t, type MessageKey } from '../../i18n';
 import { onShoppingList, type Left } from '../../logic/pantry';
 import { amountText, isOpen, onList } from '../../logic/shopping';
 import { kitchenPlaces, placeCount, sectionInView } from '../../logic/kitchen';
 import { isOn } from '../../settings/features';
+import { repo } from '../../storage/repo';
 import type { Batch, HomePlace, PantryItem } from '../../storage/types';
 import { Icon } from '../../ui/Icon';
 import { AskChips } from '../../ui/AskChips';
@@ -39,6 +41,7 @@ type Adding = HomePlace | 'shopping';
  */
 export function KitchenPage() {
   const d = useData();
+  const toast = useToast();
   const all = usePantry();
   const shopping = useShopping();
   const left = usePantryLeft();
@@ -81,6 +84,13 @@ export function KitchenPage() {
     if (el) refs.current.set(key, el);
     else refs.current.delete(key);
   };
+  // The bin on the Used up card (owner's ask 2026-10-26): clears them all in one go, with undo.
+  async function clearUsedUp() {
+    const ids = usedUp.map((i) => i.id);
+    const undo = await repo.changeHome(() => ({ pantry: { put: [], remove: ids } }));
+    toast(t('pantry.clearedUsedUp', { n: ids.length }), () => repo.undoHome(undo));
+  }
+
   /** The "+" in a card's heading: opens that card's add box (one at a time), or closes it again. */
   const addButton = (key: Adding, label: string) => {
     const open = adding === key;
@@ -159,7 +169,12 @@ export function KitchenPage() {
 
       {homeOn && usedUp.length > 0 && (
         <div className="card">
-          <h2>{t('pantry.usedUpN', { n: usedUp.length })}</h2>
+          <div className="card-head">
+            <h2>{t('pantry.usedUpN', { n: usedUp.length })}</h2>
+            <button type="button" className="icon-btn card-add" onClick={() => void clearUsedUp()} aria-label={t('pantry.clearUsedUp')} title={t('pantry.clearUsedUp')}>
+              <Icon name="trash" size={20} />
+            </button>
+          </div>
           <ul className="plain-list shop-list">
             {usedUp.map((i) => (
               <li key={i.id}>

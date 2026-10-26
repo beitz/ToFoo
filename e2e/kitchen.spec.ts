@@ -143,5 +143,12 @@ test('marking something used up leaves the shopping list to the user', async ({ 
   await expect(page.getByText('On the shopping list', { exact: true })).toBeVisible();
   await page.goto('./#/shopping');
   await expect(page.locator('main').getByText('Wacholderbeeren')).toBeVisible();
+
+  // The bin on the Used up card clears it, with undo.
+  await page.goto('./#/kitchen');
+  await page.getByRole('button', { name: 'Remove everything used up' }).click();
+  await expect(main.getByRole('heading', { name: /^Used up/ })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(main.getByRole('heading', { name: 'Used up (1)' })).toBeVisible();
   expect(errors).toEqual([]);
 });

@@ -1187,6 +1187,8 @@ export const en = {
   'pantry.place.spices': 'Spices and herbs',
   'pantry.cooked': 'Cooked',
   'pantry.usedUpN': 'Used up ({n})',
+  'pantry.clearUsedUp': 'Remove everything used up',
+  'pantry.clearedUsedUp': 'Used up cleared ({n}).',
   'pantry.low': 'Running low',
   'pantry.out': 'Used up',
   'pantry.onList': 'on the shopping list',

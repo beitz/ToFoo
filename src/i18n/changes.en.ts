@@ -8,6 +8,7 @@
  * scenes and small fixes. A pull request that changes what users see adds its line here in the same PR.
  */
 export const changesEn = {
+  'change.160': 'Kitchen: a bin on the Used up card clears everything used up in one tap, with undo.',
   'change.159': 'Kitchen: marking something running low or used up no longer puts it on the shopping list by itself, and the list no longer offers things eaten up. Its sheet has Add to shopping list for when you want it there.',
   'change.157': 'The activity sheet starts with your favourite and most frequent activities of the last four weeks: one tap fills in the activity, minutes, effort and outside. Tap the star to keep one as a favourite.',
   'change.158': 'Habits and activities are told apart: a new habit asks who answers it (you, or your activities), activity habits show the activity mark on Home, each activity says which habits it counts for, and an activity habit page lists the activities that counted today.',
