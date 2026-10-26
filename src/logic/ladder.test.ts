@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Requirement } from '../model/requirements';
 import type { NutrientResult, StoreResult } from '../model/simulate';
+import { ladder } from '../../model/ladder';
 import { ladderRungs, youAt } from './ladder';
 
 const range = (v: number) => ({ low: v, central: v, high: v });
@@ -80,8 +81,26 @@ describe('where you are on the ladder', () => {
     expect(youAt('FE', result('FE', { store, averageIntake: 0 }), req('FE'), rungs('FE'))).toEqual({ kind: 'low', unsure: true });
   });
 
-  it('says nothing without data, or for energy over the need', () => {
+  it('says nothing without data', () => {
     expect(youAt('ZN', result('ZN', { knownDays: 0 }), req('ZN'), rungs('ZN'))).toBeUndefined();
-    expect(youAt('ENERCC', result('ENERCC', { value: range(1.3) }), req('ENERCC'), rungs('ENERCC'))).toBeUndefined();
+    expect(youAt('ZN', result('ZN', { status: 'unknown' }), req('ZN'), rungs('ZN'))).toBeUndefined();
+  });
+
+  it('tags energy at every level, over the need as too much like Home', () => {
+    expect(kinds('ENERCC')).toEqual(['over', 'enough', 'bitLow', 'low']);
+    expect(youAt('ENERCC', result('ENERCC', { value: range(1.3) }), req('ENERCC'), rungs('ENERCC'))?.kind).toBe('over');
+    expect(youAt('ENERCC', result('ENERCC', { value: range(0.95) }), req('ENERCC'), rungs('ENERCC'))?.kind).toBe('enough');
+    expect(youAt('ENERCC', result('ENERCC', { status: 'low', value: range(0.5) }), req('ENERCC'), rungs('ENERCC'))?.kind).toBe('low');
+  });
+
+  it('tags every nutrient with a ladder when there is data', () => {
+    for (const key of Object.keys(ladder)) {
+      const rs = ladderRungs(key, { info: false, limitOnly: key === 'FASAT', hasUpper: true });
+      for (const status of ['fine', 'gettingLow', 'low', 'tooHigh'] as const) {
+        const r = result(key, { status, kind: key === 'FASAT' ? 'limit' : 'rolling', ulRatio: status === 'tooHigh' ? 1.5 : undefined });
+        if (key === 'FASAT' && (status === 'gettingLow' || status === 'low')) continue; // a limit has no low
+        expect(youAt(key, r, req(key, { upperLimit: { value: 100, basis: key, scope: 'all' } }), rs), `${key} ${status}`).toBeDefined();
+      }
+    }
   });
 });

@@ -29,6 +29,7 @@ export const ladderEn = {
   'ladder.amount.noLimit': 'no limit set',
   'ladder.amount.pctOrMore': '{pct}+ of your need',
   'ladder.amount.pctRange': '{from}–{to} of need',
+  'ladder.amount.pctOver': 'over {pct} of need',
   'ladder.amount.pctUnder': 'under {pct} of need',
   'ladder.amount.storeOver': 'store {pct}+ full',
   'ladder.amount.storeRange': 'store {from}–{to} full',
@@ -55,6 +56,11 @@ export const ladderEn = {
   'ladder.basis.rolling': 'your {days}-day average as a share of your daily need',
   'ladder.basis.store': 'how full your body store is',
   'ladder.basis.limit': 'your {days}-day average as a share of the limit',
+  'ladder.noTag': 'No “you” tag yet: there are no logged days in the window to read your level from.',
+  // Info-only nutrients have no steps, so no "you" tag: why.
+  'ladder.noLadder.FAT': 'No steps or “you” tag for fat: DGE gives a guide share of energy, not a need, so the app shows the amount only.',
+  'ladder.noLadder.CHO': 'No steps or “you” tag for carbohydrates: DGE gives a guide share of energy, not a need, so the app shows the amount only. A carb maximum in your profile adds them.',
+  'ladder.noLadder.SUGAR': 'No steps or “you” tag for sugars: the limits are for free sugars, which the food table does not separate from natural ones, so the app shows the amount only.',
   'ladder.seeAll': 'All steps, from too little to too much',
 
   // Steps every nutrient shares: the app's own status lines.
@@ -67,6 +73,14 @@ export const ladderEn = {
   'ladder.generic.storeLow': 'The body store is running low. While it lasts, nothing shows.',
   'ladder.generic.plenty': 'No harm known from food.',
 
+  // Energy's need is your energy target (an estimate of what you use, or your own number), so its steps
+  // speak of the target rather than of "nearly everyone".
+  'ladder.ENERCC.name.over': 'Over your target',
+  'ladder.ENERCC.name.enough': 'On target',
+  'ladder.ENERCC.name.bitLow': 'A bit under',
+  'ladder.ENERCC.name.low': 'Well under',
+  'ladder.ENERCC.enough': 'Around your energy target. Your weight over weeks is the best check.',
+  'ladder.ENERCC.bitLow': 'A little under your target. If the target is what you use, weight slowly drops.',
   'ladder.ENERCC.low': 'Weight loss, tiredness and loss of muscle, over weeks.',
   'ladder.ENERCC.low.how': 'When food brings less energy than you use, the body burns its fat and also breaks down muscle protein.',
   'ladder.ENERCC.low.signs': 'Weight loss · Tiredness · Less muscle',

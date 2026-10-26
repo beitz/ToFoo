@@ -4,12 +4,14 @@ import { homeInfoEn } from './homeInfo.en';
 import { nutrientInfoEn } from './nutrientInfo.en';
 import { effectsEn } from './effects.en';
 import { ladderEn } from './ladder.en';
+import { doesEn } from './does.en';
 import { changesEn } from './changes.en';
 
 export const en = {
   ...nutrientInfoEn,
   ...effectsEn,
   ...ladderEn,
+  ...doesEn,
   ...groupInfoEn,
   ...homeInfoEn,
   ...changesEn,

@@ -37,6 +37,7 @@ import { FillsBest } from './FillsBest';
 import { UptakeCard, uptakeVaries } from './UptakeCard';
 import { EffectCard } from './EffectCard';
 import { hasLadder, LevelLadder } from './LevelLadder';
+import { WhatItDoes } from './WhatItDoes';
 
 export function NutrientPage({ id, context }: { id: string; context?: SplitContext }) {
   const d = useData();
@@ -531,7 +532,9 @@ function NutrientInfo({ id, r }: { id: string; r: NutrientResult }) {
   const source = NUTRIENT_INFO_SOURCES[key];
   const text = (part: 'role' | 'low' | 'high') => t(`info.${key}.${part}` as MessageKey);
   if (text('role').startsWith('info.')) return null; // no text for this nutrient
-  const name = NUTRIENT_BY_ID.get(id)?.name.toLowerCase() ?? id;
+  // "Vitamin C" → "vitamin C", not "vitamin c".
+  const full = NUTRIENT_BY_ID.get(id)?.name ?? id;
+  const name = full.charAt(0).toLowerCase() + full.slice(1);
   const cite = source && (
     <p className="muted small">
       {t('nutrient.infoSource')}:{' '}
@@ -550,8 +553,7 @@ function NutrientInfo({ id, r }: { id: string; r: NutrientResult }) {
       title: t('nutrient.whatItDoesName', { name }),
       body: (
         <>
-          {<p>{text('role')}</p>}
-          {key === 'EAA' && <p>{t(`aaRole.${id}` as MessageKey)}</p>}
+          <WhatItDoes id={id} skipUrl={source?.url} extra={key === 'EAA' ? t(`aaRole.${id}` as MessageKey) : undefined} />
         </>
       ),
     },
@@ -586,7 +588,7 @@ function NutrientInfo({ id, r }: { id: string; r: NutrientResult }) {
           </div>
         </details>
       ))}
-      {ladder && <LevelLadder id={id} r={r} />}
+      {ladder ? <LevelLadder id={id} r={r} /> : <p className="muted small ladder-note">{t(`ladder.noLadder.${key}` as MessageKey)}</p>}
     </>
   );
 }
