@@ -2,6 +2,8 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { useData } from '../../app/data';
 import { isOn } from '../../settings/features';
 import { missingOn, type CatchUpKind } from '../../logic/catchUp';
+import { openHabitsOn } from '../../logic/habits';
+import { useHabits } from '../habits/useHabits';
 import { repo } from '../../storage/repo';
 import { useSleep } from '../sleep/useSleep';
 
@@ -31,7 +33,8 @@ export function useCatchUp(day: string): CatchUpKind[] | undefined {
     if (await repo.getMeta<boolean>(foodSkipKey(day))) kinds.add('food');
     return kinds;
   }, [day]);
-  if (!sleep || !water || !skipped) return undefined;
+  const habits = useHabits();
+  if (!sleep || !water || !skipped || !habits) return undefined;
   const f = d.settings.features;
   return missingOn({
     day,
@@ -42,6 +45,7 @@ export function useCatchUp(day: string): CatchUpKind[] | undefined {
     activities: d.activities,
     water,
     skipped,
+    habitsOpen: isOn(f, 'habits') && openHabitsOn(habits.active, day, habits.data).length > 0,
   });
 }
 

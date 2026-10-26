@@ -9,7 +9,7 @@ import { usualTimes } from './sleep';
  * passes the records and which trackers are on.
  */
 
-export const CATCH_UP_KINDS = ['food', 'sleep', 'activity', 'water'] as const;
+export const CATCH_UP_KINDS = ['food', 'sleep', 'activity', 'water', 'habits'] as const;
 export type CatchUpKind = (typeof CATCH_UP_KINDS)[number];
 
 export interface CatchUpInput {
@@ -25,6 +25,8 @@ export interface CatchUpInput {
   water: readonly Pick<WaterRecord, 'day'>[];
   /** What the user already answered with "Skip" for this day. */
   skipped: ReadonlySet<CatchUpKind>;
+  /** Habits are on and some due that day are still open (see openHabitsOn in ./habits). */
+  habitsOpen?: boolean;
 }
 
 /**
@@ -41,6 +43,7 @@ export function missingOn(input: CatchUpInput): CatchUpKind[] {
   if (input.on.sleep && lacks(input.sleep.filter((r) => r.end !== undefined))) out.push('sleep');
   if (input.on.activity && lacks(input.activities)) out.push('activity');
   if (input.on.water && lacks(input.water)) out.push('water');
+  if (input.habitsOpen) out.push('habits');
   return out.filter((k) => !input.skipped.has(k));
 }
 

@@ -112,7 +112,7 @@ export const settingsSchema = z.object({
   macroView: z.enum(['rings', 'bars']).optional(),
   nutrientView: z.enum(['comets', 'bars']).optional(),
   homeGrouping: z.enum(['status', 'type', 'none']).optional(),
-  calendarLayer: z.enum(['all', 'meals', 'sleep', 'activity', 'water', 'journal']).optional(),
+  calendarLayer: z.enum(['all', 'meals', 'sleep', 'activity', 'water', 'journal', 'habits']).optional(),
   homeCollapsed: z.record(z.string(), z.boolean()).optional(),
   favourites: z.array(foodRef).optional(),
   favouriteMeals: z.array(favouriteMeal).optional(),
@@ -263,6 +263,33 @@ export const ketoneSchema = z
   .object({ id: z.string(), ...versioned, time: z.number(), day, type: z.enum(['blood', 'breath', 'urine']), value: z.number().nonnegative() })
   .describe('A ketone measurement: when (epoch ms), how (blood: β-hydroxybutyrate in mmol/L from a finger-prick meter; breath: acetone in ppm, device-specific; urine: acetoacetate in mmol/L as the strip reads) and the value in that unit');
 
+const activityKind = z.enum(['walk', 'run', 'cycling', 'strength', 'other']);
+export const habitSchema = z
+  .object({
+    id: z.string(),
+    ...versioned,
+    name: z.string().min(1),
+    colour: z.enum(['teal', 'violet', 'orange', 'pink', 'green', 'blue']),
+    kind: z.enum(['do', 'avoid', 'minutes']).describe('do: done or not; avoid: had some or none; minutes: minutes of activity a day, read from the activity log'),
+    goal: z
+      .discriminatedUnion('type', [
+        z.object({ type: z.literal('daily') }),
+        z.object({ type: z.literal('weekdays'), days: z.array(z.number().int().min(1).max(7)).min(1).describe('1 = Monday … 7 = Sunday') }),
+        z.object({ type: z.literal('perWeek'), times: z.number().int().min(1).max(7) }),
+      ])
+      .describe('When it is due; for an avoid habit a maximum (never, never on these days, at most n days a week)'),
+    minutes: z.number().positive().optional(),
+    activities: z.array(z.object({ kind: activityKind, name: z.string().optional() })).optional().describe('Activities that count toward a minutes habit; empty or missing = any'),
+    order: z.number(),
+    archived: z.boolean().optional(),
+    createdAt: z.number(),
+  })
+  .describe('A habit to do or avoid, or minutes of activity, with its goal');
+
+export const habitDaySchema = z
+  .object({ id: z.string(), ...versioned, habitId: z.string(), day, did: z.boolean().describe('It happened: done (do habit) or had some (avoid habit)') })
+  .describe('One answer for a habit on one day; a day without one is open, not "no"');
+
 export const portionSizesSchema = z
   .object({
     food: z.string().min(1),
@@ -304,6 +331,8 @@ export const backupSchema = z.object({
     shopping: z.array(shoppingItemSchema).default([]),
     pantry: z.array(pantryItemSchema).default([]),
     ketones: z.array(ketoneSchema).default([]),
+    habits: z.array(habitSchema).default([]),
+    habitDays: z.array(habitDaySchema).default([]),
     // Optional, not defaulted: restoring a backup from before portion sizes were in backups keeps the
     // sizes on the phone instead of clearing them.
     portionSizes: z.array(portionSizesSchema).optional(),

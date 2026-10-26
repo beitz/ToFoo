@@ -106,7 +106,8 @@ export type FeatureKey =
   | 'ketoneReadings'
   | 'fasting'
   | 'forgottenCheck'
-  | 'weight';
+  | 'weight'
+  | 'habits';
 
 export interface Settings extends Versioned {
   id: 'settings';
@@ -135,7 +136,7 @@ export interface Settings extends Versioned {
   /** Home nutrient list grouping; unset = by status. */
   homeGrouping?: 'status' | 'type' | 'none';
   /** What the calendar shows: every tracker as dots, or one of them; unset = all. */
-  calendarLayer?: 'all' | 'meals' | 'sleep' | 'activity' | 'water' | 'journal';
+  calendarLayer?: 'all' | 'meals' | 'sleep' | 'activity' | 'water' | 'journal' | 'habits';
   /** Home groups the user opened (false) or closed (true), by group key; unset keys use the default. */
   homeCollapsed?: Record<string, boolean>;
   /** Foods pinned to the top of the log screen, in the order they were added. */
@@ -366,6 +367,60 @@ export interface WaterRecord extends Versioned {
   /** Local calendar day of `time` (YYYY-MM-DD). */
   day: string;
   ml: number;
+}
+
+export const HABIT_KINDS = ['do', 'avoid', 'minutes'] as const;
+export type HabitKind = (typeof HABIT_KINDS)[number];
+/** Colours that tell habits apart (never status); the CSS tokens are --habit-<colour>. */
+export const HABIT_COLOURS = ['teal', 'violet', 'orange', 'pink', 'green', 'blue'] as const;
+export type HabitColour = (typeof HABIT_COLOURS)[number];
+
+/**
+ * When a habit is due: every day, on set weekdays (1 = Monday … 7 = Sunday), or n days a week on any
+ * days (weeks Monday to Sunday). For an avoid habit the same goals read as a maximum: never, never on
+ * these days, at most n days a week.
+ */
+export type HabitGoal = { type: 'daily' } | { type: 'weekdays'; days: number[] } | { type: 'perWeek'; times: number };
+
+/** An activity that counts toward a minutes habit: a kind, and the user's own name when it must match too. */
+export interface HabitActivity {
+  kind: ActivityKind;
+  name?: string;
+}
+
+/**
+ * A habit (docs/SPEC.md, "Habits"): something to do or avoid, answered per day in `habitDays`, or
+ * minutes of activity read from the activity log (nothing stored per day then).
+ */
+export interface Habit extends Versioned {
+  id: string;
+  /** Kept short by the user so it fits a Home card. */
+  name: string;
+  colour: HabitColour;
+  kind: HabitKind;
+  goal: HabitGoal;
+  /** Minutes habits: the day's total that counts as kept. */
+  minutes?: number;
+  /** Minutes habits: which activities count; empty = any activity. */
+  activities?: HabitActivity[];
+  /** Position on Home and the habits page. */
+  order: number;
+  /** Off Home and out of the questions, history kept. */
+  archived?: boolean;
+  /** Epoch ms; the habit is counted from this day on (and from any earlier day answered). */
+  createdAt: number;
+}
+
+/**
+ * One answer for a do or avoid habit on one day: `did` says it happened (done, or had some). A day with
+ * no record is open, never "no" (missing is not zero). Id is `<habitId>|<day>`, one per habit and day.
+ */
+export interface HabitDay extends Versioned {
+  id: string;
+  habitId: string;
+  /** Local calendar day (YYYY-MM-DD). */
+  day: string;
+  did: boolean;
 }
 
 export const KETONE_TYPES = ['blood', 'breath', 'urine'] as const;

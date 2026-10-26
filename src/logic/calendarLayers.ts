@@ -1,13 +1,14 @@
 import type { DayStatus } from '../model/types';
-import type { ActivityRecord, JournalEntry, SleepRecord, WaterRecord } from '../storage/types';
+import type { ActivityRecord, Habit, JournalEntry, SleepRecord, WaterRecord } from '../storage/types';
 import type { CatchUpKind } from './catchUp';
+import { habitsDaySummary, type HabitData, type HabitsDaySummary } from './habits';
 
 /**
  * What the calendar shows per day for each thing the user tracks (owner's ask, 2026-10-23: meals were
  * logged but activities forgotten, and the calendar could not show which days). Pure.
  */
 
-export const LAYERS = ['meals', 'sleep', 'activity', 'water', 'journal'] as const;
+export const LAYERS = ['meals', 'sleep', 'activity', 'water', 'journal', 'habits'] as const;
 export type Layer = (typeof LAYERS)[number];
 
 /**
@@ -24,6 +25,8 @@ export interface DayLayers {
   activityMinutes: number;
   waterMl: number;
   journal: number;
+  /** Habits kept, missed and (daily ones) still open that day. */
+  habits: HabitsDaySummary;
 }
 
 export interface LayersInput {
@@ -37,6 +40,8 @@ export interface LayersInput {
   journal: readonly Pick<JournalEntry, 'day'>[];
   /** Kinds skipped on the fill-in page, by day. */
   skipped: Readonly<Record<string, readonly CatchUpKind[]>>;
+  /** The habits and what they need, when habits are on. */
+  habits?: { list: readonly Habit[]; data: HabitData };
 }
 
 function firstDay(rs: readonly { day: string }[]): string | undefined {
@@ -66,12 +71,16 @@ export function dayLayers(input: LayersInput): Map<string, DayLayers> {
     const st = input.dayStatus[day];
     const meals: Mark = st === undefined || st === 'pending' ? 'none' : st === 'unknown' ? (skipped.has('food') ? 'skipped' : 'missing') : 'logged';
     const journal = input.journal.filter((r) => r.day === day).length;
+    const habits = input.habits ? habitsDaySummary(input.habits.list, day, input.habits.data) : { kept: 0, missed: 0, open: 0 };
+    // A day with any habit answered counts as logged; one with only open daily habits is missing them, once over.
+    const habitMark: Mark = habits.kept + habits.missed > 0 ? 'logged' : skipped.has('habits') ? 'skipped' : over && habits.open > 0 ? 'missing' : 'none';
     out.set(day, {
-      marks: { meals, sleep: tracker('sleep'), activity: tracker('activity'), water: tracker('water'), journal: journal ? 'logged' : 'none' },
+      marks: { meals, sleep: tracker('sleep'), activity: tracker('activity'), water: tracker('water'), journal: journal ? 'logged' : 'none', habits: habitMark },
       sleepMinutes,
       activityMinutes: sum(input.activities, day, (r) => r.minutes),
       waterMl: sum(input.water, day, (r) => r.ml),
       journal,
+      habits,
     });
   }
   return out;

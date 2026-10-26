@@ -30,6 +30,14 @@
   --t-activity: #be185d;
   --t-water: #1d6fd6;
   --t-journal: #8a6d1a;
+  --t-habits: #0f766e;
+  /* Habit colours tell habits apart, never status. */
+  --habit-teal: #0f766e;
+  --habit-violet: #7c3aed;
+  --habit-orange: #c2410c;
+  --habit-pink: #be185d;
+  --habit-green: #15803d;
+  --habit-blue: #1d4ed8;
   --tank: #1a66ae;
   --tank-soft: color-mix(in srgb, var(--tank) 26%, transparent);
   /* The shopping list: what is still to get, set apart from what is at home (Kitchen tab). */
@@ -76,11 +84,25 @@
   --t-activity: #f472b6;
   --t-water: #60a5fa;
   --t-journal: #d6b45a;
+  --t-habits: #2dd4bf;
+  --habit-teal: #2dd4bf;
+  --habit-violet: #a78bfa;
+  --habit-orange: #fb923c;
+  --habit-pink: #f472b6;
+  --habit-green: #4ade80;
+  --habit-blue: #60a5fa;
     --t-meals: #fb923c;
     --t-sleep: #a78bfa;
     --t-activity: #f472b6;
     --t-water: #60a5fa;
     --t-journal: #d6b45a;
+    --t-habits: #2dd4bf;
+    --habit-teal: #2dd4bf;
+    --habit-violet: #a78bfa;
+    --habit-orange: #fb923c;
+    --habit-pink: #f472b6;
+    --habit-green: #4ade80;
+    --habit-blue: #60a5fa;
     --tank: #5baef2;
     --tank-soft: color-mix(in srgb, var(--tank) 26%, transparent);
     --shop: #8fb4f7;
@@ -7005,6 +7027,7 @@ a.contributor-link > span:first-child {
 .cal-activity { --c: var(--t-activity); }
 .cal-water { --c: var(--t-water); }
 .cal-journal { --c: var(--t-journal); }
+.cal-habits { --c: var(--t-habits); }
 .cal-dots {
   display: flex;
   gap: 1.5px;
@@ -8097,4 +8120,201 @@ button.link-row {
 }
 .fold + .ladder-note {
   margin: 8px 0;
+}
+
+/* ── Habits (docs/SPEC.md "Habits") ───────────────────────────── */
+/* --hc is the habit's own colour: it tells habits apart and never carries status (marks are shapes). */
+.habits-row {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  margin: 12px 0;
+}
+.habits-scroll {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+}
+.habits-scroll::-webkit-scrollbar {
+  display: none;
+}
+.habit-card {
+  flex: none;
+  width: 68px;
+  min-height: 56px;
+  scroll-snap-align: start;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 6px 4px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--hc);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+.habit-card.dim {
+  opacity: 0.6;
+}
+.habit-card-name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--hc);
+}
+.habit-card-value {
+  font-size: 0.95rem;
+  font-weight: 700;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.habit-card-value .habit-mark {
+  font-size: 1.1rem;
+}
+.habits-all {
+  flex: none;
+  width: 52px;
+  min-height: 56px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border-radius: var(--radius-sm);
+  border: 1px dashed var(--border);
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+.habit-mark {
+  display: inline-block;
+  min-width: 1em;
+  text-align: center;
+  font-weight: 700;
+  line-height: 1;
+}
+.habit-mark.mark-kept {
+  color: var(--ok);
+}
+.habit-mark.mark-missed {
+  color: var(--low);
+}
+.habit-mark.mark-open,
+.habit-mark.mark-off {
+  color: var(--text-muted);
+}
+.habit-name {
+  color: var(--hc, var(--text));
+}
+.habits-list {
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+.habit-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 0;
+  color: var(--text);
+  text-decoration: none;
+  border-left: 3px solid var(--hc);
+  padding-left: 10px;
+  margin: 6px 0;
+}
+.habit-row + .habit-row {
+  margin-top: 10px;
+}
+.habit-row-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+.habit-week {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+.habit-week-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 0;
+  border-radius: 8px;
+}
+.habit-week-day.today {
+  outline: 2px solid var(--accent);
+}
+.habit-week-letter {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+.habits-archived summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+.habit-day {
+  font: inherit;
+  cursor: pointer;
+}
+.habit-day-minutes {
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+.habit-answers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.habit-answers .btn {
+  flex: 1 1 30%;
+}
+.habit-colours {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.habit-colour {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  background: var(--hc);
+  color: var(--surface);
+  font-weight: 700;
+  cursor: pointer;
+}
+.habit-colour.on {
+  border-color: var(--text);
+}
+.habit-weekdays .chip {
+  padding: 0 10px;
+  min-width: 44px;
+  justify-content: center;
+}
+.catchup-habit {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 6px 0;
+}
+.catchup-habit .habit-name {
+  font-weight: 700;
 }

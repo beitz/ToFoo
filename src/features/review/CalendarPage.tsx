@@ -15,6 +15,7 @@ import { InsightsTabs } from './InsightsTabs';
 import { DAY_ICON } from './dayStatus';
 import { useSleep } from '../sleep/useSleep';
 import { useSkipped } from '../catchup/useCatchUp';
+import { useHabitLayers } from '../habits/useHabits';
 import { useJournal } from '../journal/useJournal';
 import { hmShort } from '../sleep/format';
 import { fmtNumber } from '../../lib/format';
@@ -22,7 +23,7 @@ import { fmtNumber } from '../../lib/format';
 type View = NonNullable<Settings['calendarLayer']>;
 
 /** Each tracker's own page, linked under the month when that tracker is shown. */
-const PAGE: Partial<Record<View, string>> = { sleep: 'nights', activity: 'activity', water: 'water', journal: 'journal' };
+const PAGE: Partial<Record<View, string>> = { sleep: 'nights', activity: 'activity', water: 'water', journal: 'journal', habits: 'habits' };
 
 /** The trackers switched on, in the calendar's fixed order (meals always). */
 function layersOn(features: Settings['features']): Layer[] {
@@ -48,10 +49,14 @@ export function CalendarPage({ month: monthParam }: { month?: string }) {
   const water = useLiveQuery(() => repo.db.water.toArray(), []);
   const journal = useJournal();
   const skipped = useSkipped();
+  const habits = useHabitLayers();
   const days = useMemo(() => weeks.flat().filter((x): x is string => !!x && x <= d.today), [weeks, d.today]);
   const layers = useMemo(
-    () => (sleep && water && journal && skipped ? dayLayers({ days, today: d.today, dayStatus: d.model.dayStatus, sleep, activities: d.activities, water, journal, skipped }) : undefined),
-    [days, d.today, d.model.dayStatus, sleep, d.activities, water, journal, skipped],
+    () =>
+      sleep && water && journal && skipped && habits !== undefined
+        ? dayLayers({ days, today: d.today, dayStatus: d.model.dayStatus, sleep, activities: d.activities, water, journal, skipped, habits: habits ?? undefined })
+        : undefined,
+    [days, d.today, d.model.dayStatus, sleep, d.activities, water, journal, skipped, habits],
   );
   const counts: Record<string, number> = {};
   for (const day of weeks.flat()) {
@@ -204,7 +209,17 @@ function spokenMark(layer: Layer, l: DayLayers): string {
 function LayerValue({ layer, l }: { layer: Exclude<Layer, 'meals'>; l: DayLayers }) {
   const mark = l.marks[layer];
   if (mark !== 'logged') return <span className={`cal-dot cal-${layer} mark-${mark}`} aria-hidden />;
-  const text = layer === 'sleep' ? hmShort(l.sleepMinutes) : layer === 'activity' ? `${l.activityMinutes}′` : layer === 'water' ? `${fmtNumber(l.waterMl / 1000, 1)} l` : String(l.journal);
+  const h = l.habits;
+  const text =
+    layer === 'sleep'
+      ? hmShort(l.sleepMinutes)
+      : layer === 'activity'
+        ? `${l.activityMinutes}′`
+        : layer === 'water'
+          ? `${fmtNumber(l.waterMl / 1000, 1)} l`
+          : layer === 'habits'
+            ? `${h.kept}/${h.kept + h.missed + h.open}`
+            : String(l.journal);
   return (
     <span className={`cal-value cal-${layer}`} aria-hidden>
       {text}
