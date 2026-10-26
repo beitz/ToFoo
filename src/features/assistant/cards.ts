@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import type { useToast } from '../../app/toast';
-import type { RecipeSoFar, ShownActivity, ShownBatch, ShownIngredients, ShownNote, ShownPortion, ShownProposal, ShownHome, ShownRecipe, ShownShopping, ShownSleep, ShownWater, ShownKetone, ShownWeight } from '../../ai/assistant';
+import type { RecipeSoFar, ShownActivity, ShownBatch, ShownIngredients, ShownNote, ShownPortion, ShownProposal, ShownHome, ShownRecipe, ShownShopping, ShownSleep, ShownWater, ShownKetone, ShownWeight, ShownHabits } from '../../ai/assistant';
 import type { ProposedItem } from '../../ai/tools';
 import type { AudioClip } from '../../ai/chatRecord';
 import { t } from '../../i18n';
@@ -12,7 +12,7 @@ import { waterText } from '../water/format';
 import { KETONE_TYPE_KEY, ketoneValueText } from '../fast/ketoneFormat';
 
 /**
- * A proposed meal (M1, …), journal entry (J1, …), sleep (S1, …), activity (A1, …), water (W1, …), ketone measurement (K1, …), weigh-in (G1, …),
+ * A proposed meal (M1, …), journal entry (J1, …), sleep (S1, …), activity (A1, …), water (W1, …), ketone measurement (K1, …), weigh-in (G1, …), habit answers (T1, …),
  * things for the shopping list (L1, …), things bought or running low at home (H1, …),
  * recipe ingredients (R1, …, recipe editor), recipe for the book (R1, …, main chat), serving from
  * stock (P1, …) or cooked batch (B1, …), and whether the user logged, saved or added it.
@@ -25,6 +25,7 @@ export type Card =
   | { kind: 'water'; water: ShownWater; logged: boolean }
   | { kind: 'ketone'; ketone: ShownKetone; logged: boolean }
   | { kind: 'weight'; weight: ShownWeight; logged: boolean }
+  | { kind: 'habits'; habits: ShownHabits; logged: boolean }
   | { kind: 'shopping'; shopping: ShownShopping; logged: boolean }
   | { kind: 'home'; home: ShownHome; logged: boolean }
   | { kind: 'ingredients'; ingredients: ShownIngredients; logged: boolean }
@@ -48,6 +49,8 @@ export function cardOf(c: Card) {
       return c.ketone;
     case 'weight':
       return c.weight;
+    case 'habits':
+      return c.habits;
     case 'shopping':
       return c.shopping;
     case 'home':
@@ -83,6 +86,8 @@ export function cardTitle(c: Card): string {
       return `${t('ketone.cardTitle')} · ${ketoneValueText(c.ketone)} (${t(KETONE_TYPE_KEY[c.ketone.type])})`;
     case 'weight':
       return `${t('weight.title')} · ${t('weight.kg', { kg: fmtKg(c.weight.kg) })}`;
+    case 'habits':
+      return `${t('habits.title')} · ${[...new Set(c.habits.answers.map((a) => a.name))].join(', ')}`;
     case 'shopping':
       return `${t('shopping.title')} · ${[...c.shopping.recipes.map((r) => r.name), ...c.shopping.items.map((i) => i.name)].join(', ')}`;
     case 'home':

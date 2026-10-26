@@ -24,6 +24,7 @@ import { UsageLine } from '../assistant/UsageLine';
 import { ChatExport } from '../assistant/ChatExport';
 import { VoiceFailed } from '../assistant/VoiceFailed';
 import { useJournal } from '../journal/useJournal';
+import { useHabits } from '../habits/useHabits';
 import { describeConditions, verdict } from './describe';
 import { BackButton } from '../../ui/BackButton';
 import { SentNote } from '../assistant/SentNote';
@@ -115,8 +116,9 @@ function useInsightData(): InsightData | undefined {
   const sleep = useLiveQuery(() => repo.db.sleep.toArray(), []);
   const activities = useLiveQuery(() => repo.db.activities.toArray(), []);
   const water = useLiveQuery(() => repo.db.water.toArray(), []);
+  const habits = useHabits();
   return useMemo(() => {
-    if (!journal || !sleep || !activities || !water) return undefined;
+    if (!journal || !sleep || !activities || !water || !habits) return undefined;
     // Trackers the user turned off stay out of the analysis.
     return buildInsightData({
       days: d.modelDays,
@@ -129,8 +131,9 @@ function useInsightData(): InsightData | undefined {
       water: isOn(f, 'water') ? water : [],
       mealWindowMinutes: d.settings.mealWindowMinutes,
       today: d.today,
+      ...(isOn(f, 'habits') ? { habits: { list: habits.all, data: habits.data } } : {}),
     });
-  }, [d.modelDays, d.model, d.modelEntries, d.settings.mealWindowMinutes, d.today, f, journal, sleep, activities, water]);
+  }, [d.modelDays, d.model, d.modelEntries, d.settings.mealWindowMinutes, d.today, f, journal, sleep, activities, water, habits]);
 }
 
 /** The kinds of data there are to send: the food log, and each tracker that is on. */
@@ -199,7 +202,7 @@ function Chat({ apiKey, model }: { apiKey: string; model: AiModel }) {
     try {
       const notShared = kinds.filter((k) => !before.share.includes(k));
       const privateLeftOut = before.share.includes('journal') && !before.privateJournal && !!ov?.privateJournalEntries;
-      const note = insightNote(Date.now(), sharedOv, before.conversation.messages.length === 0, notShared, privateLeftOut);
+      const note = insightNote(Date.now(), sharedOv, before.conversation.messages.length === 0, notShared, privateLeftOut, shared.habits);
       const r = await askInsights(create, model, before.conversation, { text: question, appNote: note }, shared, onUsage);
       recorder.conversation(r.conversation.messages, { system: INSIGHT_SYSTEM, tools: INSIGHT_TOOLS });
       if (r.outcome.kind === 'error') {
@@ -236,8 +239,9 @@ function Chat({ apiKey, model }: { apiKey: string; model: AiModel }) {
         sleep: t('insights.ovNights', { n: ov.nights }),
         activity: t('insights.ovActivity', { n: ov.activityDays }),
         water: t('insights.ovWater', { n: ov.waterDays }),
+        habits: t('insights.ovHabits', { n: ov.habitDays }),
       }
-    : { food: '', journal: '', sleep: '', activity: '', water: '' };
+    : { food: '', journal: '', sleep: '', activity: '', water: '', habits: '' };
   const { recording, transcribing } = dictation;
 
   return (

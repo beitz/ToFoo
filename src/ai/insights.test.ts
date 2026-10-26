@@ -19,7 +19,7 @@ const coffee = (day: number): ModelEntry => ({
   isSupplement: false,
   parts: [{ label: 'Coffee (beverage)', nameEn: 'Coffee (beverage)', nameDe: 'Kaffee', grams: 200, per100: { ALC: 0, WATER: 99 }, preparation: 'asListed', storage: 'fresh' }],
 });
-const data = buildInsightData({
+const input = {
   days,
   daily: days.map(() => ({ absorbed: { low: {}, central: {}, high: {} }, intake: { ENERCC: 2000 }, supplementIntake: {}, missing: new Set<string>() })),
   dayStatus: Object.fromEntries(days.map((d) => [d, 'logged' as DayStatus])),
@@ -30,9 +30,10 @@ const data = buildInsightData({
   water: [],
   mealWindowMinutes: 60,
   today: key(8),
-});
+};
+const data = buildInsightData(input);
 
-const cond = (o: Record<string, unknown>) => ({ kind: 'journal', words: [], measure: '', op: '<', value: 0, weekdays: [], statuses: [], offset: 0, span: 1, negate: false, ...o });
+const cond = (o: Record<string, unknown>) => ({ kind: 'journal', words: [], measure: '', op: '<', value: 0, weekdays: [], statuses: [], habit: '', offset: 0, span: 1, negate: false, ...o });
 const headache = cond({ words: ['headache'] });
 const shortNight = cond({ kind: 'measure', measure: 'sleep_hours', op: '<', value: 7 });
 
@@ -95,6 +96,28 @@ describe('insight tools', () => {
     expect(runInsightTool('count_days', { from: key(7), to: key(1), group: [], outcome: [headache] }, data).text).toMatch(/is after/);
     expect(runInsightTool('count_days', { from: key(1), to: key(7), group: [cond({ words: [] })], outcome: [headache] }, data).text).toMatch(/needs at least one word/);
     expect(runInsightTool('read_journal', { from: 'yesterday', to: key(7), words: [] }, data).text).toMatch(/YYYY-MM-DD/);
+  });
+
+  it('compares by habit, shows habits in a day, and names the habits there are', () => {
+    const habits = buildInsightData({
+      ...input,
+      habits: {
+        list: [{ id: 'f', schemaVersion: 1, name: 'Floss', colour: 'teal', kind: 'do', goal: { type: 'daily' }, order: 0, createdAt: at(1, 8) }],
+        data: { today: key(8), answers: new Map([['f', new Map([[key(2), true], [key(3), false], [key(5), true]])]]), activities: [], noActivity: new Set() },
+      },
+    });
+    const r = runInsightTool('count_days', { from: key(1), to: key(7), group: [cond({ kind: 'habit', habit: 'floss' })], outcome: [headache] }, habits);
+    expect(r.ok && r.check?.kind === 'count' && r.check.result.groupDays).toEqual([
+      { day: key(2), outcome: true },
+      { day: key(5), outcome: true },
+    ]);
+    expect(runInsightTool('day_details', { days: [key(3)] }, habits).text).toContain('habits: Floss not kept');
+    expect(runInsightTool('count_days', { from: key(1), to: key(7), group: [cond({ kind: 'habit', habit: 'Stretch' })], outcome: [headache] }, habits).text).toBe('"Stretch" is not one of the shared habits ("Floss").');
+    expect(runInsightTool('count_days', { from: key(1), to: key(7), group: [cond({ kind: 'habit', habit: 'Floss' })], outcome: [headache] }, data).text).toBe('The user shared no habits.');
+    const note = insightNote(at(8, 9), overview(habits, key(1), key(7)), true, [], false, habits.habits);
+    expect(note).toContain('habits answered on 3 days');
+    expect(note).toContain('"Floss" (to do)');
+    expect(insightNote(at(8, 9), overview(data, key(1), key(7)), true)).not.toContain('habit');
   });
 
   it('formats measures and chances', () => {

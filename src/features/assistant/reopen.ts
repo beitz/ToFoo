@@ -141,6 +141,8 @@ export function restoreCard(summary: Summary, logged: boolean, ctx: RestoreConte
       return { kind: 'ketone', ketone: c, logged };
     case 'G':
       return { kind: 'weight', weight: c, logged };
+    case 'T':
+      return { kind: 'habits', habits: c, logged };
     case 'L':
       return { kind: 'shopping', shopping: c, logged };
     case 'H':
@@ -185,6 +187,7 @@ export function rebuildConversation(messages: Beta.BetaMessageParam[], events: r
     waters: highest('W'),
     ketones: highest('K'),
     weights: highest('G'),
+    habits: highest('T'),
     lists: highest('L'),
     homes: highest('H'),
     recipes: highest('R'),

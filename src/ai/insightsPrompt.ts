@@ -12,18 +12,19 @@ const DAY = { type: 'string', description: 'Local day "YYYY-MM-DD".' };
 const CONDITION = {
   type: 'object',
   properties: {
-    kind: { type: 'string', enum: ['journal', 'food', 'measure', 'weekday', 'status'] },
+    kind: { type: 'string', enum: ['journal', 'food', 'measure', 'weekday', 'status', 'habit'] },
     words: { type: 'array', items: { type: 'string' }, description: 'journal and food: words or word stems, any of them; empty otherwise.' },
     measure: { type: 'string', description: 'measure: a measure id from the list; empty otherwise.' },
     op: { type: 'string', enum: [...OPS], description: 'measure: how to compare; any value otherwise.' },
     value: { type: 'number', description: 'measure: the number to compare with, in the measure\'s unit; 0 otherwise.' },
     weekdays: { type: 'array', items: { type: 'string', enum: [...WEEKDAYS] }, description: 'weekday: any of these; empty otherwise.' },
     statuses: { type: 'array', items: { type: 'string', enum: [...DAY_STATUSES] }, description: 'status: any of these food-log statuses; empty otherwise.' },
+    habit: { type: 'string', description: "habit: the habit's name as in the app's note; empty otherwise." },
     offset: { type: 'integer', description: 'Which day to check, relative to the day being counted: 0 the same day, -1 the day before, 1 the day after.' },
     span: { type: 'integer', description: '1: only that day. 3: that day and the 2 before it (holds if it holds on any of them; a measure: its average over them).' },
     negate: { type: 'boolean', description: 'true: the condition must not hold.' },
   },
-  required: ['kind', 'words', 'measure', 'op', 'value', 'weekdays', 'statuses', 'offset', 'span', 'negate'],
+  required: ['kind', 'words', 'measure', 'op', 'value', 'weekdays', 'statuses', 'habit', 'offset', 'span', 'negate'],
   additionalProperties: false,
 };
 
@@ -77,7 +78,7 @@ export const INSIGHT_TOOLS: BetaTool[] = [
   },
   {
     name: 'day_details',
-    description: 'Everything logged on some days: food log status, meals with foods and grams, energy, protein, alcohol, sleep, activities, water and journal entries.',
+    description: 'Everything logged on some days: food log status, meals with foods and grams, energy, protein, alcohol, sleep, activities, water, habits and journal entries.',
     strict: true,
     input_schema: {
       type: 'object',
@@ -105,7 +106,7 @@ function measureList(): string {
     .join('\n');
 }
 
-export const INSIGHT_SYSTEM = `You help the user look for patterns in their own data in ToFoo, a personal nutrition diary with a free-text journal, sleep, activity and water. The user lives in Germany; the journal is in their own words, in German or English.
+export const INSIGHT_SYSTEM = `You help the user look for patterns in their own data in ToFoo, a personal nutrition diary with a free-text journal, sleep, activity, water and habits. The user lives in Germany; the journal is in their own words, in German or English.
 
 The core rule: you choose what to compare, the app computes every number. Every count, average, percentage and date in your answer comes from a tool result in this chat. Do not work out new numbers yourself (no sums, differences or percentages the tools did not give) and never estimate values.
 
@@ -115,12 +116,12 @@ Tools:
 - compare_measures: a measure (sleep, energy, a nutrient, …) on the group days against the other days, or over all days of a period.
 - day_details: everything logged on given days, to look at them closely or show them to the user.
 
-Conditions: journal (words in that day's journal entries), food (words in the names of the foods and dishes logged that day, English or German), measure (a measure compared with a number), weekday, or status (the food log status of the day). offset moves a condition in time: -1 checks the day before the day being counted, 1 the day after. span widens it to several days ending at the offset day: it holds if it holds on any of them (a measure: its average over them). negate reverses it. All conditions in a list must hold. Words match parts of words, ignoring case and accents, so use stems and both languages: ["kopfschm", "kopfweh", "headache", "migr"]. Read the journal first to see which words the user actually uses.
+Conditions: journal (words in that day's journal entries), food (words in the names of the foods and dishes logged that day, English or German), measure (a measure compared with a number), weekday, status (the food log status of the day), or habit (one of the user's habits was kept that day; the habits are listed in the app's note when the user shares them). offset moves a condition in time: -1 checks the day before the day being counted, 1 the day after. span widens it to several days ending at the offset day: it holds if it holds on any of them (a measure: its average over them). negate reverses it. All conditions in a list must hold. Words match parts of words, ignoring case and accents, so use stems and both languages: ["kopfschm", "kopfweh", "headache", "migr"]. Read the journal first to see which words the user actually uses.
 
 Measures (id, name, unit):
 ${measureList()}
 
-Only what the user chose to share is there: the period and the kinds of data (food log, journal, sleep, activity, water) in the app's note with the first question. Days outside the period and kinds left out have no data, so the tools treat them as unknown.
+Only what the user chose to share is there: the period and the kinds of data (food log, journal, sleep, activity, water, habits) in the app's note with the first question. Days outside the period and kinds left out have no data, so the tools treat them as unknown.
 
 Unknown stays unknown: a day whose food log is not complete, or a tracker before its first record, cannot be told and is left out of a comparison, never counted as zero or "no". Days without a journal entry count as "not mentioned" once the user has started the journal. The tool results say how many days were left out; mention it when it is many.
 

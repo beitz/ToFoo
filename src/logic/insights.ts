@@ -8,7 +8,8 @@ import { addDays, dayKey, dayRange, parseDay } from '../lib/dates';
 import { NUTRIENTS } from '../model/nutrients';
 import { groupMeals, type DailyTotals } from '../model/simulate';
 import type { DayStatus, ModelEntry } from '../model/types';
-import type { ActivityRecord, JournalEntry, SleepRecord, WaterRecord } from '../storage/types';
+import type { ActivityRecord, Habit, HabitKind, JournalEntry, SleepRecord, WaterRecord } from '../storage/types';
+import { habitDay, habitStart, type HabitData } from './habits';
 import { isNight, sleepBlocks } from './sleep';
 
 export interface InsightInput {
@@ -23,6 +24,8 @@ export interface InsightInput {
   water: readonly WaterRecord[];
   mealWindowMinutes: number;
   today: string;
+  /** Habits with their answers (docs/SPEC.md, "Habits"); absent while Habits is off. */
+  habits?: { list: readonly Habit[]; data: HabitData };
 }
 
 export type MeasureGroup = 'food' | 'sleep' | 'activity' | 'water' | 'journal';
@@ -91,10 +94,19 @@ export interface DayFacts {
   /** Normalised food names of the day (entry labels and each food in English and German), for matching. */
   foodText: string;
   journalText: string;
+  /** Kept or not per habit name, only for habits answered that day (a day not answered can't be told). */
+  habits: Record<string, boolean>;
+}
+
+export interface InsightHabit {
+  name: string;
+  kind: HabitKind;
 }
 
 export interface InsightData {
   days: ReadonlyMap<string, DayFacts>;
+  /** The user's habits, archived ones too (their answers are history). */
+  habits: readonly InsightHabit[];
   /** First day with any data. */
   first: string;
   today: string;
@@ -137,7 +149,9 @@ export function buildInsightData(input: InsightInput): InsightData {
     water: earliest(input.water.map((x) => x.day)),
   };
   const tracked = (k: keyof typeof since, day: string) => since[k] !== undefined && day >= since[k];
-  const first = earliest([input.days[0] ?? input.today, ...Object.values(since).filter((x): x is string => !!x)]) ?? input.today;
+  const habitList = input.habits?.list ?? [];
+  const habitStarts = new Map(habitList.map((h) => [h.id, habitStart(h, input.habits!.data)]));
+  const first = earliest([input.days[0] ?? input.today, ...Object.values(since).filter((x): x is string => !!x), ...habitStarts.values()]) ?? input.today;
 
   const days = new Map<string, DayFacts>();
   for (const day of dayRange(first <= input.today ? first : input.today, input.today)) {
@@ -189,6 +203,14 @@ export function buildInsightData(input: InsightInput): InsightData {
     const notes = [...(journal.get(day) ?? [])].sort((a, b) => a.time - b.time);
     values.journal_entries = tracked('journal', day) ? notes.length : null;
 
+    // Whether each habit was kept, on any day (not only the days it is due): for patterns, an answer is an answer.
+    const habits: Record<string, boolean> = {};
+    for (const h of habitList) {
+      const s = habitDay({ ...h, goal: { type: 'daily' } }, day, input.habits!.data, habitStarts.get(h.id));
+      // A minutes habit short of its minutes today may still be reached.
+      if (s.mark === 'kept' || (s.mark === 'missed' && !(h.kind === 'minutes' && day === input.today))) habits[h.name] = s.mark === 'kept';
+    }
+
     const names = dayEntries.flatMap((e) => [e.label, ...e.parts.flatMap((p) => [p.label, p.nameEn ?? '', p.nameDe ?? ''])]);
     days.set(day, {
       day,
@@ -208,9 +230,10 @@ export function buildInsightData(input: InsightInput): InsightData {
       missing,
       foodText: ` ${names.map(normalize).join(' | ')} `,
       journalText: ` ${notes.map((n) => normalize(n.text)).join(' | ')} `,
+      habits,
     });
   }
-  return { days, first, today: input.today };
+  return { days, habits: habitList.map((h) => ({ name: h.name, kind: h.kind })), first, today: input.today };
 }
 
 /**
@@ -239,6 +262,7 @@ export type Condition = (
   | { kind: 'measure'; measure: string; op: Op; value: number }
   | { kind: 'weekday'; weekdays: number[] }
   | { kind: 'status'; statuses: Array<(typeof DAY_STATUSES)[number]> }
+  | { kind: 'habit'; habit: string }
 ) & { offset?: number; span?: number; negate?: boolean };
 
 /** Why a condition cannot be checked, or undefined if it is fine. */
@@ -248,6 +272,7 @@ export function conditionProblem(c: Condition): string | undefined {
   if (c.kind === 'measure' && !Number.isFinite(c.value)) return 'A measure condition needs a number to compare with.';
   if (c.kind === 'weekday' && !c.weekdays.length) return 'A weekday condition needs at least one weekday.';
   if (c.kind === 'status' && !c.statuses.length) return 'A status condition needs at least one status.';
+  if (c.kind === 'habit' && !c.habit.trim()) return "A habit condition needs the habit's name.";
   if (Math.abs(c.offset ?? 0) > MAX_OFFSET_DAYS) return `offset must be between -${MAX_OFFSET_DAYS} and ${MAX_OFFSET_DAYS}.`;
   if ((c.span ?? 1) < 1 || (c.span ?? 1) > MAX_SPAN_DAYS) return `span must be between 1 and ${MAX_SPAN_DAYS}.`;
   return undefined;
@@ -271,11 +296,22 @@ function holdsOn(c: Condition, day: string, data: InsightData): Tri {
     case 'food':
       if (hasWord(f.foodText, c.words)) return true;
       return f.foodComplete ? false : null;
+    case 'habit': {
+      const name = habitName(c.habit, data);
+      const kept = name === undefined ? undefined : f.habits[name];
+      return kept === undefined ? null : kept;
+    }
     case 'measure': {
       const v = f.values[c.measure];
       return v === null || v === undefined ? null : compare(v, c.op, c.value);
     }
   }
+}
+
+/** A habit's name as stored, matched ignoring case and accents. */
+export function habitName(name: string, data: Pick<InsightData, 'habits'>): string | undefined {
+  const wanted = normalize(name);
+  return data.habits.find((h) => normalize(h.name) === wanted)?.name;
 }
 
 function compare(v: number, op: Op, x: number): boolean {
@@ -443,10 +479,12 @@ export interface Overview {
   nights: number;
   activityDays: number;
   waterDays: number;
+  /** Days with at least one habit answered (or a minutes habit settled). */
+  habitDays: number;
 }
 
 /** What the user can choose to share in Insights, each a whole tracker (docs/SPEC.md, "Insights"). */
-export const SHARE_KINDS = ['food', 'journal', 'sleep', 'activity', 'water'] as const satisfies readonly MeasureGroup[];
+export const SHARE_KINDS = ['food', 'journal', 'sleep', 'activity', 'water', 'habits'] as const satisfies readonly (MeasureGroup | 'habits')[];
 export type ShareKind = (typeof SHARE_KINDS)[number];
 
 /**
@@ -478,11 +516,12 @@ export function shareInsightData(data: InsightData, from: string, kinds: Readonl
       journal: notes,
       journalText: notes.length === f.journal.length ? f.journalText : ` ${notes.map((n) => normalize(n.text)).join(' | ')} `,
       activities: kinds.has('activity') ? f.activities : [],
+      habits: kinds.has('habits') ? f.habits : {},
       values,
       missing: new Set([...f.missing].filter((id) => !hidden.has(id))),
     });
   }
-  return { days, first, today: data.today };
+  return { days, habits: kinds.has('habits') ? data.habits : [], first, today: data.today };
 }
 
 /** What a period's data consists of: the user sees it before asking, the assistant gets it with the question. */
@@ -502,6 +541,7 @@ export function overview(data: InsightData, from: string, to: string): Overview 
     nights: days.filter((f) => f.night).length,
     activityDays: days.filter((f) => f.activities.length > 0).length,
     waterDays: days.filter((f) => (f.values.plain_water ?? 0) > 0).length,
+    habitDays: days.filter((f) => Object.keys(f.habits).length > 0).length,
   };
 }
 
