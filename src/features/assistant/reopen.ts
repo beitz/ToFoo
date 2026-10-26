@@ -11,6 +11,7 @@ import type * as Beta from '@anthropic-ai/sdk/resources/beta/messages/messages';
 import { cardVerb, emptyConversation, shownText, type Conversation } from '../../ai/assistant';
 import { joinPhotos, photoNumber, type ChatAudio, type ChatEvent, type ChatPhoto, type ChatRecord } from '../../ai/chatRecord';
 import { parseLocalDateTime } from '../../ai/photoTime';
+import type { Check } from '../../ai/insights';
 import type { ProposedItem } from '../../ai/tools';
 import type { FoodDb } from '../../foods/foodDb';
 import { productFood } from '../../foods/products';
@@ -46,6 +47,7 @@ export function replayEvents(events: readonly ChatEvent[], recipe = false): Repl
       bubbles.push({ role: 'user', text: e.text, photos: e.photos.map(photoNumber).filter((n): n is number => n !== undefined), audio: e.audio ?? [] });
     } else if (e.type === 'assistant') {
       if (e.text) bubbles.push({ role: 'assistant', text: e.text });
+      if (e.checks?.length) bubbles.push({ role: 'checks', checks: e.checks as Check[] });
     } else if (e.type === 'error') {
       if (prev?.type === 'user' && !ANSWER_ERRORS.has(e.reason)) bubbles.pop();
     } else if (e.type === 'cards') {
@@ -58,6 +60,7 @@ export function replayEvents(events: readonly ChatEvent[], recipe = false): Repl
       bubbles = bubbles.filter((b) => !(b.role === 'card' && replaced.has(b.id)));
       if (ids.length >= 2 && !recipe) bubbles.push({ role: 'pages', key: ++pages, text: e.text, ids });
       else bubbles.push(...(e.text ? [{ role: 'assistant' as const, text: e.text }] : []), ...ids.map((id) => ({ role: 'card' as const, id })));
+      if (e.checks?.length) bubbles.push({ role: 'checks', checks: e.checks as Check[] });
     } else {
       const card = cards.get(e.card);
       if (card) card.logged = e.type === 'saved';

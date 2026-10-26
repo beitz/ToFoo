@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useData } from '../../app/data';
 import { useToast } from '../../app/toast';
-import { href, navigate } from '../../app/router';
+import { href, navigate, replaceRoute } from '../../app/router';
 import { useBackCloses } from '../../app/history';
 import { SourceTag } from '../recipes/SourceTag';
 import { t, type MessageKey } from '../../i18n';
@@ -16,8 +16,15 @@ import {
   sendMessage,
   type AiModel,
   type Conversation,
+  type SharedData,
   type TurnOutcome,
 } from '../../ai/assistant';
+import { shareNote } from '../../ai/insights';
+import { overview, shareInsightData } from '../../logic/insights';
+import { Checks } from '../insights/Checks';
+import { availableKinds, useInsightData } from '../insights/useInsightData';
+import { BackButton } from '../../ui/BackButton';
+import { DataPanel, periodStart, type DataChoice } from './DataPanel';
 import { describeAiError, getAiSettings, logAiError, makeCreate, saveUsage } from '../../ai/client';
 import { errorText } from '../../lib/shareFile';
 import { cardSummary, itemSummary, localTimes, type AudioClip, type ChatRecord } from '../../ai/chatRecord';
@@ -127,21 +134,38 @@ export function RecipeAssistant({ recipe, onClose }: { recipe: RecipeChat; onClo
 
 /**
  * The assistant: meals, journal, sleep, activity, water and recipes in one chat, photos, text and
- * voice in, cards to check out. Route: #/assistant (from Home), #/assistant/day (from the log
- * screen of that day) or #/assistant/chat/id (a saved chat, reopened).
+ * voice in, cards to check out, and with "Include my data" patterns in the user's days. Route:
+ * #/assistant (from Home), #/assistant/day (from the log screen of that day), #/assistant/chat/id
+ * (a saved chat, reopened) or #/insights (Look for patterns: the data panel open and ticked).
  */
-export function AssistantPage({ day: dayParam, chatId }: { day?: string; chatId?: string }) {
+export function AssistantPage({ day: dayParam, chatId, patterns = false }: { day?: string; chatId?: string; patterns?: boolean }) {
   const d = useData();
   const day = dayParam && /^\d{4}-\d{2}-\d{2}$/.test(dayParam) ? dayParam : d.today;
-  const back = dayParam ? href('log', day) : href();
-  const body = <ChatOrNotice chat={(ai) => (chatId ? <ReopenedChat id={chatId} ai={ai} /> : <Chat apiKey={ai.apiKey} model={ai.model} day={day} />)} />;
+  const back = dayParam ? ['log', day] : patterns ? ['overview'] : [];
+  // A new chat starts here again; after a chat with data, with the data panel open and ticked again.
+  const [fresh, setFresh] = useState({ key: 0, patterns });
+  const onNew = (withData: boolean) => {
+    if (chatId) return replaceRoute(withData ? 'insights' : 'assistant');
+    setFresh((f) => ({ key: f.key + 1, patterns: withData }));
+  };
+  const patternsOff = patterns && !isOn(d.settings.features, 'insights');
+  const body = patternsOff ? (
+    <div className="card">
+      <p>{t('insights.off')}</p>
+      <a className="btn btn-primary" href={href('settings', 'assistant')}>
+        {t('ai.openSettings')}
+      </a>
+    </div>
+  ) : (
+    <ChatOrNotice
+      chat={(ai) => (chatId ? <ReopenedChat id={chatId} ai={ai} onNew={onNew} /> : <Chat key={fresh.key} apiKey={ai.apiKey} model={ai.model} day={day} patterns={fresh.patterns} onNew={onNew} />)}
+    />
+  );
 
   return (
     <section className="assistant-page">
       <header className="page-head row">
-        <a className="icon-btn" href={back} aria-label={t('common.back')}>
-          <Icon name="back" />
-        </a>
+        <BackButton to={back} />
         <h1>{t('ai.pageTitle')}</h1>
       </header>
       {body}
@@ -153,7 +177,7 @@ export function AssistantPage({ day: dayParam, chatId }: { day?: string; chatId?
 type ReopenedState = { record: ChatRecord; state: Reopened };
 
 /** A saved meal chat, loaded and rebuilt, then the chat as it was left. */
-function ReopenedChat({ id, ai }: { id: string; ai: { apiKey: string; model: AiModel } }) {
+function ReopenedChat({ id, ai, onNew }: { id: string; ai: { apiKey: string; model: AiModel }; onNew: (withData: boolean) => void }) {
   const d = useData();
   const [loaded, setLoaded] = useState<ReopenedState | null>();
   useEffect(() => {
@@ -174,7 +198,7 @@ function ReopenedChat({ id, ai }: { id: string; ai: { apiKey: string; model: AiM
   }, [id]);
   if (loaded === undefined) return <p className="muted">{t('common.loading')}</p>;
   if (loaded === null) return <p className="muted">{t('chats.missing')}</p>;
-  return <Chat apiKey={ai.apiKey} model={ai.model} day={loaded.record.day ?? d.today} reopened={loaded} />;
+  return <Chat apiKey={ai.apiKey} model={ai.model} day={loaded.record.day ?? d.today} reopened={loaded} onNew={onNew} />;
 }
 
 const ERROR_TEXT: Record<string, MessageKey> = {
@@ -191,7 +215,24 @@ const ERROR_TEXT: Record<string, MessageKey> = {
   tooManySteps: 'ai.error.tooManySteps',
 };
 
-function Chat({ apiKey, model, day, recipe, reopened }: { apiKey: string; model: AiModel; day: string; recipe?: RecipeChat; reopened?: ReopenedState }) {
+function Chat({
+  apiKey,
+  model,
+  day,
+  recipe,
+  reopened,
+  patterns = false,
+  onNew,
+}: {
+  apiKey: string;
+  model: AiModel;
+  day: string;
+  recipe?: RecipeChat;
+  reopened?: ReopenedState;
+  /** Opened from Look for patterns: "Include my data" starts open, with everything tracked ticked. */
+  patterns?: boolean;
+  onNew?: (withData: boolean) => void;
+}) {
   const d = useData();
   const toast = useToast();
   const was = reopened?.state;
@@ -277,6 +318,14 @@ function Chat({ apiKey, model, day, recipe, reopened }: { apiKey: string; model:
   const { recording, transcribing } = dictation;
   /** Index of the photo shown large, for looking at photos while talking about them. */
   const [viewing, setViewing] = useState<number>();
+  // Include my data (Patterns on): what the user ticks, and once sent, what the chat holds (fixed).
+  const dataOn = !recipe && isOn(d.settings.features, 'insights');
+  const kinds = availableKinds(d.settings.features);
+  const [choice, setChoice] = useState<DataChoice>(() => ({ open: patterns, period: '3m', kinds: patterns ? kinds : [], privateJournal: false }));
+  const shared = dataOn ? conversation.shared : undefined;
+  const insightData = useInsightData(dataOn && (choice.open || choice.kinds.length > 0 || !!shared));
+  /** The next message goes with data (ticked, or the chat already has it). */
+  const withData = dataOn && (!!shared || choice.kinds.length > 0);
 
   useEffect(() => {
     endRef.current?.scrollIntoView?.({ block: 'end', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
@@ -339,6 +388,19 @@ function Chat({ apiKey, model, day, recipe, reopened }: { apiKey: string; model:
     const voice_ = reply ? [] : voice;
     const dictated_ = reply ? reply.dictated : dictated;
     if (busy || (!text_.trim() && images_.length === 0)) return;
+    // Include my data: whatever is ticked goes with this message, then the choice is fixed for the chat.
+    const sharing: SharedData | undefined = !dataOn
+      ? undefined
+      : (shared ?? (choice.kinds.length ? { from: periodStart(insightData, choice.period, d.today), kinds: choice.kinds, privateJournal: choice.privateJournal } : undefined));
+    if (sharing && !insightData) return;
+    // What the pattern tools can read: only the period and the kinds ticked, enforced here rather than asked of the model.
+    const insights = sharing && insightData ? shareInsightData(insightData, sharing.from, new Set(sharing.kinds), { privateJournal: sharing.privateJournal }) : undefined;
+    let share: string | undefined;
+    if (insights && sharing && !shared) {
+      const whole = overview(insightData!, sharing.from, d.today);
+      const privateLeftOut = sharing.kinds.includes('journal') && !sharing.privateJournal && whole.privateJournalEntries > 0;
+      share = shareNote(overview(insights, sharing.from, d.today), kinds.filter((k) => !sharing.kinds.includes(k)), privateLeftOut);
+    }
     const all = [...cards.values()];
     const note = appNote({
       now: Date.now(),
@@ -349,6 +411,7 @@ function Chat({ apiKey, model, day, recipe, reopened }: { apiKey: string; model:
       barcodes: [...new Set(images_.flatMap((i) => i.barcodes))],
       dictated: dictated_ && !!text_.trim(),
       ...(recipe ? { recipe: recipe.soFar() } : {}),
+      ...(share ? { share } : {}),
     });
     const labelled = images_.map((img, i) => ({ ...img, label: photoLabel(photoCount + i + 1, img.time) }));
     const msg = { text: text_, images: labelled, appNote: note };
@@ -408,10 +471,11 @@ function Chat({ apiKey, model, day, recipe, reopened }: { apiKey: string; model:
               forgotten: isOn(d.settings.features, 'forgottenCheck'),
               ...(atHome ? { pantry: atHome } : {}),
               recipes: recipeTools(),
+              ...(insights ? { insights } : {}),
             }),
       };
       // Photos whose cards are all saved leave the chat, so this and later requests don't pay for them again.
-      const lighter = retirePhotos(conversation, (id) => !cardsRef.current.get(id) || !!cardsRef.current.get(id)?.logged);
+      const lighter = retirePhotos(sharing ? { ...conversation, shared: sharing } : conversation, (id) => !cardsRef.current.get(id) || !!cardsRef.current.get(id)?.logged);
       const r = await sendMessage(create, model, lighter, msg, ctx, onUsage);
       setConversation(r.conversation);
       const { messages, ...state } = r.conversation;
@@ -450,6 +514,9 @@ function Chat({ apiKey, model, day, recipe, reopened }: { apiKey: string; model:
       return;
     }
     const added: Bubble[] = outcome.text ? [{ role: 'assistant', text: outcome.text }] : [];
+    // The app's own numbers behind a pattern answer, right under it.
+    const checked: Bubble[] = outcome.checks.length ? [{ role: 'checks', checks: outcome.checks }] : [];
+    const checks = outcome.checks.length ? { checks: outcome.checks } : {};
     if (outcome.kind === 'proposal') {
       // A correction replaces its open card: the old one goes, the new one appears at the end.
       const shown: Card[] = [
@@ -470,7 +537,7 @@ function Chat({ apiKey, model, day, recipe, reopened }: { apiKey: string; model:
       // In the order the assistant proposed them, so a day reads in order and related cards sit together.
       const rank = (c: Card) => outcome.order.indexOf(cardId(c));
       shown.sort((a, b) => rank(a) - rank(b));
-      recorder.event({ type: 'cards', text: outcome.text, cards: shown.map((c) => cardSummary(cardOf(c))) });
+      recorder.event({ type: 'cards', text: outcome.text, cards: shown.map((c) => cardSummary(cardOf(c))), ...checks });
       const replaced = new Set(shown.map((c) => cardOf(c).replaces).filter((id): id is string => !!id && cardsRef.current.get(id)?.logged === false));
       setCards((all) => {
         const next = new Map([...all].filter(([id]) => !replaced.has(id)));
@@ -481,10 +548,10 @@ function Chat({ apiKey, model, day, recipe, reopened }: { apiKey: string; model:
       const paged = shown.length >= 2 && !recipe;
       const key = ++pagesKey.current;
       const next: Bubble[] = paged ? [{ role: 'pages', key, text: outcome.text, ids: shown.map(cardId) }] : [...added, ...shown.map((c): Bubble => ({ role: 'card', id: cardId(c) }))];
-      setBubbles((b) => [...b.filter((x) => !(x.role === 'card' && replaced.has(x.id))), ...next]);
+      setBubbles((b) => [...b.filter((x) => !(x.role === 'card' && replaced.has(x.id))), ...next, ...checked]);
     } else {
-      recorder.event({ type: 'assistant', text: outcome.text });
-      setBubbles((b) => [...b, ...added]);
+      recorder.event({ type: 'assistant', text: outcome.text, ...checks });
+      setBubbles((b) => [...b, ...added, ...checked]);
     }
   }
 
@@ -600,6 +667,23 @@ function Chat({ apiKey, model, day, recipe, reopened }: { apiKey: string; model:
     textRef.current?.focus();
   }
 
+  /** Before a day chip opens the diary: back from there reopens this chat as saved, not a fresh one. */
+  const comeBack = () => {
+    const id = recorder.id;
+    if (recorder.enabled && id) window.history.replaceState(window.history.state, '', href('assistant', 'chat', id));
+  };
+
+  // The composer grows with the data panel open: keep the end of the chat above it.
+  const composerRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = composerRef.current;
+    const page = el?.closest<HTMLElement>('.assistant-page');
+    if (!el || !page || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => page.style.setProperty('--composer-h', `${el.offsetHeight}px`));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   const renderCard = (id: string) => (
     <CardFrame.Provider
       key={id}
@@ -637,8 +721,8 @@ function Chat({ apiKey, model, day, recipe, reopened }: { apiKey: string; model:
           bubbles.length === 0 &&
           !reopened && (
             <div className="chat-start">
-              <h2>{t('ai.startTitle')}</h2>
-              <p className="muted">{t('ai.startLine')}</p>
+              <h2>{t(patterns ? 'data.startTitle' : 'ai.startTitle')}</h2>
+              <p className="muted">{t(patterns ? 'data.startLine' : 'ai.startLine')}</p>
               <details className="chat-start-info">
                 <summary>
                   <Icon name="info" size={16} /> {t('ai.startInfo')}
@@ -670,10 +754,12 @@ function Chat({ apiKey, model, day, recipe, reopened }: { apiKey: string; model:
             {reopened.state.lost.length > 0 && ` ${t('ai.reopenedLost', { ids: reopened.state.lost.join(', ') })}`}
           </p>
         ) : (
-          !recipe && recorder.enabled && bubbles.length === 0 && !busy && <LastChat today={d.today} />
+          !recipe && !patterns && recorder.enabled && bubbles.length === 0 && !busy && <LastChat today={d.today} />
         )}
         {bubbles.map((b, i) =>
-          b.role === 'card' ? (
+          b.role === 'checks' ? (
+            <Checks key={i} checks={b.checks} onLeave={comeBack} />
+          ) : b.role === 'card' ? (
             cards.has(b.id) && renderCard(b.id)
           ) : b.role === 'pages' ? (
             <ProposalGroup
@@ -713,7 +799,7 @@ function Chat({ apiKey, model, day, recipe, reopened }: { apiKey: string; model:
             </button>
           </div>
         )}
-        {busy && <div className="bubble bubble-assistant muted">{t('ai.thinking')}</div>}
+        {busy && <div className="bubble bubble-assistant muted">{t(withData ? 'insights.thinking' : 'ai.thinking')}</div>}
         {error && (
           <div className="card notice-card" role="alert">
             <Icon name="alert" size={18} />
@@ -724,12 +810,13 @@ function Chat({ apiKey, model, day, recipe, reopened }: { apiKey: string; model:
           </div>
         )}
         <UsageLine chat={chatTokens} turn={turnTokens} model={model} />
+        {shared && bubbles.length > 0 && <p className="muted small disclaimer">{t('insights.disclaimer')}</p>}
         {/* Also after a first message that failed: the saved chat holds the error to share. */}
         {recorder.enabled && (bubbles.length > 0 || !!error) && !busy && <ChatExport recorder={recorder} />}
         <div ref={endRef} />
       </div>
 
-      <div className="composer" data-tour="assistant.input" inert={viewing !== undefined}>
+      <div ref={composerRef} className="composer" data-tour="assistant.input" inert={viewing !== undefined}>
         {images.length > 0 && (
           <div className="composer-photos">
             {images.map((img, i) => (
@@ -749,7 +836,8 @@ function Chat({ apiKey, model, day, recipe, reopened }: { apiKey: string; model:
         {micButton && images.length > 0 && !voiceStatus && <p className="composer-note muted small">{t('viewer.hint')}</p>}
         {voiceStatus}
         {/* Before the first message: what goes where, in one line (owner's ask, 2026-10-23). */}
-        {!voiceStatus && bubbles.length === 0 && images.length === 0 && <SentNote text={t(micButton ? 'sent.chatVoiceNote' : 'sent.chatNote')} />}
+        {/* The open data panel says itself what can go, so the screen keeps room for the chat. */}
+        {!voiceStatus && bubbles.length === 0 && images.length === 0 && !(dataOn && choice.open) && <SentNote text={t(micButton ? 'sent.chatVoiceNote' : 'sent.chatNote')} />}
         {voice.length > 0 && (
           <div className="composer-note voice-pending small">
             <Icon name="mic" size={16} />
@@ -763,6 +851,18 @@ function Chat({ apiKey, model, day, recipe, reopened }: { apiKey: string; model:
             </button>
           </div>
         )}
+        {dataOn && (
+          <DataPanel
+            choice={choice}
+            onChoice={setChoice}
+            data={insightData}
+            kinds={kinds}
+            {...(shared ? { shared } : {})}
+            onLook={() => void send({ text: t('insights.lookPrompt'), dictated: false })}
+            canLook={!busy && !dictation.busy && !!insightData}
+            onNew={() => onNew?.(true)}
+          />
+        )}
         <div className="composer-row">
           <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={(e) => void addPhotos(e.target.files).then(() => (e.target.value = ''))} />
           <button className="icon-btn composer-btn" aria-label={t('ai.addPhoto')} onClick={() => fileRef.current?.click()} disabled={busy}>
@@ -773,8 +873,8 @@ function Chat({ apiKey, model, day, recipe, reopened }: { apiKey: string; model:
             ref={textRef}
             rows={1}
             value={text}
-            placeholder={t(recipe ? 'ai.recipePlaceholder' : 'ai.placeholderAll')}
-            aria-label={t(recipe ? 'ai.recipePlaceholder' : 'ai.placeholderAll')}
+            placeholder={t(recipe ? 'ai.recipePlaceholder' : withData ? 'data.placeholder' : 'ai.placeholderAll')}
+            aria-label={t(recipe ? 'ai.recipePlaceholder' : withData ? 'data.placeholder' : 'ai.placeholderAll')}
             onChange={(e) => setText(e.target.value)}
             enterKeyHint="enter"
             onKeyDown={(e) => {

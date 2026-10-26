@@ -19,14 +19,14 @@ export const CHAT_SCHEMA_VERSION = 2;
 export const CHAT_EXPORT_FORMAT = 'tofoo-chat';
 export const CHAT_EXPORT_VERSION = 1;
 
-/** Meal logging (#/assistant), the recipe editor's assistant, or Insights. */
+/** The assistant (#/assistant, also Look for patterns since 2026-10-26), the recipe editor's assistant, or Insights' own chat as it was before. */
 export type ChatKind = 'log' | 'recipe' | 'insights';
 
 /** Something the user saw or did in the chat, in order, alongside the API messages. */
 export type ChatEvent =
   | { at: number; type: 'user'; text: string; photos: string[]; dictated?: boolean; audio?: number[] }
   | { at: number; type: 'assistant'; text: string; checks?: unknown[] }
-  | { at: number; type: 'cards'; text: string; cards: unknown[] }
+  | { at: number; type: 'cards'; text: string; cards: unknown[]; checks?: unknown[] }
   | { at: number; type: 'saved'; card: string; saved: unknown }
   | { at: number; type: 'undone'; card: string }
   | { at: number; type: 'error'; reason: string; detail?: string };

@@ -128,6 +128,25 @@ describe('reopening a saved chat', () => {
     expect(openCardIds(events)).toEqual(['M3']);
   });
 
+  it('puts the app\'s numbers back under a pattern answer', () => {
+    const check = { kind: 'compare', from: '2026-10-01', to: '2026-10-07', group: [], measures: ['alcohol'], result: { days: 7, groupDays: [], unknownGroup: 0, measures: [] } };
+    const events: ChatEvent[] = [
+      at({ type: 'user', text: 'Look for patterns in my data.', photos: [] }, 0),
+      at({ type: 'assistant', text: 'Little alcohol.', checks: [check] }, 1),
+      at({ type: 'user', text: 'Log it', photos: [] }, 2),
+      at({ type: 'cards', text: 'Here.', cards: [{ id: 'J1', text: 'x' }], checks: [check] }, 3),
+    ];
+    expect(replayEvents(events).bubbles).toEqual([
+      { role: 'user', text: 'Look for patterns in my data.', photos: [], audio: [] },
+      { role: 'assistant', text: 'Little alcohol.' },
+      { role: 'checks', checks: [check] },
+      { role: 'user', text: 'Log it', photos: [], audio: [] },
+      { role: 'assistant', text: 'Here.' },
+      { role: 'card', id: 'J1' },
+      { role: 'checks', checks: [check] },
+    ]);
+  });
+
   it('rebuilds cards of every kind with their times, and leaves out a product no longer on the phone', () => {
     const product = { id: 'OFF:400', name: 'Oat drink', source: 'OFF', per100: {} } as unknown as Product;
     const products = new Map([[product.id, product]]);
