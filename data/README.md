@@ -161,3 +161,12 @@ It writes the dated file (removing the old one) and `src/foods/offIndexInfo.ts` 
 - **Order:** most-scanned first (`unique_scans_n`), then most complete. Search shows the first matches, so popular products lead.
 - **Format:** gzip, UTF-8, one header line starting with `#`, then one product per line, tab-separated: barcode, name (German, else the product's main language, else English), brands (comma-separated, duplicates removed), quantity as printed.
 - **No label values:** they are fetched by barcode when a product is picked, so they are always current and the file stays small.
+
+## `raw/2024_Adult_Compendium.pdf`
+
+The 2024 Adult Compendium of Physical Activities (adults 19–59), as downloaded from [pacompendium.com](https://pacompendium.com/adult-compendium) on 2026-10-26. Terms (from the site): free to use, also commercially; cite the Compendium; do not change MET values or combine activities with different MET values.
+
+> Herrmann SD, Willis EA, Ainsworth BE et al. (2024): 2024 Adult Compendium of Physical Activities: A third update of the energy costs of human activities. J Sport Health Sci 13(1):6–12. DOI: [10.1016/j.jshs.2023.10.010](https://doi.org/10.1016/j.jshs.2023.10.010)
+
+One table: major heading, five-digit activity code (the first two digits are the heading), MET value, description. The PDF lists 1,111 activities (the paper counts 1,114). `npm run compendium` (needs `pdftotext` from poppler-utils, so it is not part of `npm run data`) extracts it into `src/activities/compendium-2024.json`, which is committed: `{ source, url, rows: [[code, MET, description], …] }`, values and descriptions exactly as printed. Long descriptions wrap around their row in the PDF (start above, rest below the code); the script joins them. A test checks the row count, unique codes and a few known rows.
+

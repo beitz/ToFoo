@@ -96,6 +96,24 @@
                       "type": "number",
                       "exclusiveMinimum": 0
                     },
+                    "energyCorrection": {
+                      "description": "Correction of the energy estimate accepted from the weight trend: estimate × factor, accepted on day",
+                      "type": "object",
+                      "properties": {
+                        "factor": {
+                          "type": "number",
+                          "exclusiveMinimum": 0
+                        },
+                        "day": {
+                          "type": "string",
+                          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                        }
+                      },
+                      "required": [
+                        "factor",
+                        "day"
+                      ]
+                    },
                     "nutrientTargets": {
                       "type": "object",
                       "propertyNames": {
@@ -2570,6 +2588,11 @@
                       "moderate",
                       "hard"
                     ]
+                  },
+                  "compendium": {
+                    "description": "Code of the 2024 Adult Compendium of Physical Activities row it counts as; missing: the row for its kind and intensity",
+                    "type": "string",
+                    "pattern": "^\\d{5}$"
                   },
                   "outside": {
                     "type": "boolean"

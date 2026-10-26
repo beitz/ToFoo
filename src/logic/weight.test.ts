@@ -3,6 +3,7 @@ import { weightCheck } from '../../model/parameters';
 import { addDays, dayRange } from '../lib/dates';
 import { estimateEnergyNeed } from '../model/requirements';
 import type { DailyTotals } from '../model/simulate';
+import type { ActivityRecord } from '../storage/types';
 import { logCheck, sortedWeighIns, weightSlope, weightTrend, type LogCheckInput } from './weight';
 
 const today = '2026-10-29';
@@ -111,5 +112,45 @@ describe('logCheck', () => {
     const c = logCheck(i);
     expect(c.loggedDays).toBe(26);
     if (c.state === 'fits' || c.state === 'low') expect(c.loggedKcal).toBeCloseTo((burn() * 25) / 26);
+  });
+
+  it('adds logged activities to the burn when they count', () => {
+    // A hard hour of running every day of the window.
+    const runs: ActivityRecord[] = dayRange(day(28), day(1)).map((d, i) => ({ id: `r${i}`, schemaVersion: 1, kind: 'run', time: 0, day: d, minutes: 60, intensity: 'hard', outside: true }));
+    const without = logCheck(input(burn() + 700));
+    expect(without.state).toBe('high');
+    const c = logCheck(input(burn() + 700, 80, 0, { activities: runs }));
+    expect(c.state).toBe('fits');
+    if (c.state !== 'fits') return;
+    expect(c.activityKcal).toBeGreaterThan(600);
+    expect(c.burnKcal).toBeCloseTo(c.baseKcal + c.activityKcal);
+  });
+
+  it('reads a log outside the range the other way: what was burned if it is complete, and the correction for it', () => {
+    const c = logCheck(input(burn() * 1.25));
+    expect(c.state).toBe('high');
+    if (c.state !== 'high') return;
+    expect(c.measured?.kcal.central).toBeCloseTo(burn() * 1.25);
+    expect(c.measured?.factor).toBeCloseTo(1.25);
+    // Never narrower than the method's error for one person.
+    expect(c.measured!.kcal.high - c.measured!.kcal.low).toBeGreaterThanOrEqual(2 * weightCheck.methodErrorKcal.value);
+    // A fitting log offers nothing to correct.
+    const fits = logCheck(input(burn()));
+    expect(fits.state === 'fits' && fits.measured).toBeFalsy();
+  });
+
+  it('finds the correction that gives the measured burn with activities on top', () => {
+    const walks: ActivityRecord[] = dayRange(day(28), day(1)).map((d, i) => ({ id: `w${i}`, schemaVersion: 1, kind: 'walk', time: 0, day: d, minutes: 60, intensity: 'hard', outside: true }));
+    const c = logCheck(input(burn() * 1.3, 80, 0, { activities: walks }));
+    if (c.state === 'fits' || !('measured' in c) || !c.measured) throw new Error(`expected a measured burn, got ${c.state}`);
+    const after = logCheck(input(burn() * 1.3, 80, 0, { activities: walks, energyFactor: c.measured.factor }));
+    if (!('burnKcal' in after)) throw new Error(after.state);
+    expect(after.burnKcal).toBeCloseTo(c.measured.kcal.central, 0);
+  });
+
+  it('uses the accepted correction, after which the same log fits', () => {
+    const c = logCheck(input(burn() * 1.25, 80, 0, { energyFactor: 1.25 }));
+    expect(c.state).toBe('fits');
+    if (c.state === 'fits') expect(c.baseKcal).toBeCloseTo(burn() * 1.25);
   });
 });

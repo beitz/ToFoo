@@ -26,6 +26,7 @@ import { defaultTimeFor } from '../log/time';
 import { useSleep } from '../sleep/useSleep';
 import { SleepSheet } from '../sleep/SleepSheet';
 import { spanText } from '../sleep/format';
+import { useAddsText } from '../activity/useBurn';
 import { ActivitySheet } from '../activity/ActivitySheet';
 import { activityName } from '../activity/ActivityForm';
 import { useActivities } from '../activity/useActivities';
@@ -64,6 +65,7 @@ export function DiaryPage({ day: dayParam }: { day?: string }) {
   const activities = useActivities(day) ?? [];
   // An activity being edited, or 'new' for one being added.
   const [activitySheet, setActivitySheet] = useState<ActivityRecord | 'new' | null>(null);
+  const adds = useAddsText();
   const waterOn = isOn(d.settings.features, 'water');
   const water = useWater(day) ?? [];
   const [waterSheet, setWaterSheet] = useState<WaterRecord | null>(null);
@@ -205,7 +207,7 @@ export function DiaryPage({ day: dayParam }: { day?: string }) {
               <span className="entry-label journal-label">
                 <Icon name="activity" size={16} /> {activityName(item.activity)}
               </span>
-              <span className="muted small">{activitySummary(item.activity)}</span>
+              <span className="muted small">{activitySummary(item.activity, adds(item.activity))}</span>
               <span className="entry-edit">
                 <Icon name="edit" size={16} />
               </span>
@@ -393,12 +395,13 @@ function MealCard({ meal, day, onEdit }: { meal: LogEntry[]; day: string; onEdit
 }
 
 /** "14:30 · 45 min · Moderate · outside" */
-function activitySummary(a: ActivityRecord): string {
+function activitySummary(a: ActivityRecord, adds: string | undefined): string {
   return [
     formatTime(a.time),
     t('activity.summary', { min: a.minutes }),
     ...(a.intensity ? [t(`activity.intensity.${a.intensity}` as MessageKey)] : []),
     ...(a.outside ? [t('activity.outsideMark')] : []),
+    ...(adds ? [adds] : []),
   ].join(' · ');
 }
 

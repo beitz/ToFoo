@@ -7,6 +7,7 @@
  * Everything here is pure except the injected lookups.
  */
 import { z } from 'zod';
+import { compendiumActivity, searchCompendium } from '../activities/compendium';
 import type { Food, FoodDb } from '../foods/foodDb';
 import type { FindResult, UsdaFindResult } from '../foods/findProduct';
 import type { OffListing } from '../foods/offIndex';
@@ -187,6 +188,8 @@ export const activityProposalInput = z.object({
   outside: z.boolean(),
   /** Skin uncovered outside, when the user said ("in shorts and T-shirt"); empty for the default. */
   skin: z.union([z.literal(''), z.enum(SKIN_EXPOSURES)]).optional(),
+  /** Code of the 2024 Compendium row it is (from search_activities); empty for the usual row of its kind and effort. */
+  activity_code: z.string().optional(),
   /** Id of the open activity card this replaces (e.g. "A1"); empty for a new one. */
   replaces: z.string().optional(),
 });
@@ -198,6 +201,8 @@ export interface ActivityProposal {
   start: number;
   minutes: number;
   intensity?: Intensity;
+  /** 2024 Compendium row code. */
+  compendium?: string;
   outside: boolean;
   skin?: SkinExposure;
   replaces?: string;
@@ -649,6 +654,20 @@ export async function runSearchProducts(input: unknown, ctx: ToolContext): Promi
   return { ok: true, text: blocks.join('\n\n') };
 }
 
+/** Activities listed per query: the general row and its variants by pace or effort. */
+const MAX_ACTIVITY_HITS = 8;
+
+/** Run `search_activities`: rows of the bundled 2024 Adult Compendium, for propose_activity's activity_code. */
+export function runSearchActivities(input: unknown): { ok: boolean; text: string } {
+  const parsed = productsInput.safeParse(input);
+  if (!parsed.success) return { ok: false, text: 'Invalid input: expected {"queries": ["…"]}.' };
+  const blocks = parsed.data.queries.slice(0, MAX_QUERIES).map((q) => {
+    const lines = searchCompendium(q, MAX_ACTIVITY_HITS).map((a) => `${a.code} | ${fmtNumber(a.met, 1)} MET | ${a.heading}: ${a.description}`);
+    return `Activities for "${q}" (code | MET | heading: description):\n${lines.length ? lines.join('\n') : 'No matches. Try one English word, e.g. "soccer", "swimming".'}`;
+  });
+  return { ok: true, text: blocks.join('\n\n') };
+}
+
 const USDA_ERRORS: Record<Extract<UsdaFindResult, { kind: 'error' }>['reason'], string> = {
   offline: 'no connection',
   busy: 'USDA is busy',
@@ -735,6 +754,8 @@ export function validateActivityProposal(input: unknown, now?: number): { ok: tr
   else if (start.time === undefined) problems.push('start is empty; give the time it started (estimate from what the user said).');
   if (!(minutes > 0)) problems.push('minutes must be more than 0.');
   else if (minutes > MAX_ACTIVITY_MINUTES) problems.push(`minutes is ${minutes}, more than ${MAX_ACTIVITY_MINUTES / 60} hours; check the number.`);
+  const code = parsed.data.activity_code?.trim();
+  if (code && !compendiumActivity(code)) problems.push(`activity_code "${code}" is not a Compendium activity; take a code from search_activities, or leave it empty.`);
   if (problems.length || start.time === undefined) return { ok: false, error: `${problems.join('\n')}\nFix these and call propose_activity again.` };
   const name = parsed.data.name?.trim();
   const replaces = parsed.data.replaces?.trim();
@@ -746,6 +767,7 @@ export function validateActivityProposal(input: unknown, now?: number): { ok: tr
       start: start.time,
       minutes: Math.round(minutes),
       ...(intensity ? { intensity } : {}),
+      ...(code ? { compendium: code } : {}),
       outside,
       ...(outside && skin ? { skin } : {}),
       ...(replaces ? { replaces } : {}),

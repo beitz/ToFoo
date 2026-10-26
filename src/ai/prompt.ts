@@ -29,7 +29,7 @@ const JOURNAL = (activity: boolean) => `- Journal: the user keeps a free-text jo
 const SLEEP = (journal: boolean) => `- Sleep: when the user says when they slept ("slept from 1 to 8", "in bed at 23:30, up at 7", "napped an hour after lunch"), propose it with propose_sleep: start is when they fell asleep, end when they woke up, both local "YYYY-MM-DD HH:MM"; a night usually starts the evening before the morning it ends. One call per sleep, naps included; a night with waking up in between ("slept 23 to 2, awake a while, then until 7") is one call per part, each with its own times. If only one end is known ("woke up at 6"), use their usual pattern from the conversation or ask in your numbered questions. The app records no sleep quality${journal ? ': how they slept (badly, woke up often, tired) goes in a journal entry, in their words, not in the sleep card' : ''}. Saving a sleep replaces any sleep the app already has at that time (other sleeps that night stay), so propose a night even if the user may have pressed the sleep buttons. To change an open sleep card, call propose_sleep again with replaces set to its id (S1, S2, …).`;
 
 // Activity (docs/SPEC.md, "Activity"): what, when, how long, roughly how hard; no calories.
-const ACTIVITY = `- Activity: when the user says they moved (a walk, a run, cycling to work, the gym, football, gardening), propose it with propose_activity: kind (walk, run, cycling, strength, or other with their word as name), start as local "YYYY-MM-DD HH:MM", minutes, intensity only if they said or it is obvious (easy, moderate, hard), and whether it was outside. One call per activity. Estimate a missing start or length from what they said ("walked to work" fits their usual commute time) and say so in your text; ask in your numbered questions only when it matters. Outside time counts toward the vitamin D sun estimate; set skin only when they said what they wore ("in shorts and T-shirt": armsLegs). The app computes no calories. To change an open activity card, call propose_activity again with replaces set to its id (A1, A2, …).`;
+const ACTIVITY = `- Activity: when the user says they moved (a walk, a run, cycling to work, the gym, football, gardening), propose it with propose_activity: kind (walk, run, cycling, strength, or other with their word as name), start as local "YYYY-MM-DD HH:MM", minutes, intensity only if they said or it is obvious (easy, moderate, hard), and whether it was outside. One call per activity. Estimate a missing start or length from what they said ("walked to work" fits their usual commute time) and say so in your text; ask in your numbered questions only when it matters. Outside time counts toward the vitamin D sun estimate; set skin only when they said what they wore ("in shorts and T-shirt": armsLegs). The app works out the energy from the activity. When the user said what exactly they did beyond the kind and effort (football, yoga, gardening, swimming, Nordic walking, cycling to work, the stairs), find it with search_activities in English words ("soccer", "yoga") and set activity_code to the matching row; leave it empty for a plain walk, run, ride or workout, and never guess a code. Don't state calories. To change an open activity card, call propose_activity again with replaces set to its id (A1, A2, …).`;
 
 // Water (docs/SPEC.md, "Water"): only plain water; every other drink is a food with its own water.
 // Ketones (docs/SPEC.md, "Ketosis estimate during fasts"): only what the user measured.
@@ -375,7 +375,7 @@ function tools({ off = false, usda = false, webSearch = false, journal = false, 
     },
     ...(journal ? [PROPOSE_JOURNAL_ENTRY] : []),
     ...(sleep ? [PROPOSE_SLEEP] : []),
-    ...(activity ? [PROPOSE_ACTIVITY] : []),
+    ...(activity ? [SEARCH_ACTIVITIES, PROPOSE_ACTIVITY] : []),
     ...(water ? [PROPOSE_WATER] : []),
     ...(ketones ? [PROPOSE_KETONE] : []),
     ...(weight ? [PROPOSE_WEIGHT] : []),
@@ -541,6 +541,20 @@ const PROPOSE_SLEEP: BetaTool = {
   },
 };
 
+const SEARCH_ACTIVITIES: BetaTool = {
+  name: 'search_activities',
+  description:
+    'Find activities in the 2024 Adult Compendium of Physical Activities on the phone, by English words. Returns per query up to 8 rows: "code | MET | heading: description", the closest first. Then give the matching code as activity_code in propose_activity.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      queries: { type: 'array', items: { type: 'string' }, description: 'Up to 6 searches in English, e.g. ["soccer", "yoga"].' },
+    },
+    required: ['queries'],
+    additionalProperties: false,
+  },
+};
+
 const PROPOSE_ACTIVITY: BetaTool = {
   name: 'propose_activity',
   description:
@@ -554,11 +568,12 @@ const PROPOSE_ACTIVITY: BetaTool = {
       start: { type: 'string', description: 'When it started, local "YYYY-MM-DD HH:MM", e.g. "2026-10-16 17:30".' },
       minutes: { type: 'number', description: 'How long, in minutes.' },
       intensity: { type: 'string', enum: ['', ...INTENSITIES], description: 'How hard, if said or obvious; empty otherwise.' },
+      activity_code: { type: 'string', description: 'Code of the matching activity from search_activities (e.g. "15610"); empty for a plain walk, run, ride or workout.' },
       outside: { type: 'boolean' },
       skin: { type: 'string', enum: ['', 'faceHands', 'faceHandsForearms', 'faceHandsArms', 'armsLegs', 'mostOfBody'], description: 'Uncovered skin outside, only if the user said what they wore; empty otherwise.' },
       replaces: { type: 'string', description: 'Id of the open activity card this corrects (e.g. "A1"); empty for a new activity.' },
     },
-    required: ['kind', 'name', 'start', 'minutes', 'intensity', 'outside', 'skin', 'replaces'],
+    required: ['kind', 'name', 'start', 'minutes', 'intensity', 'activity_code', 'outside', 'skin', 'replaces'],
     additionalProperties: false,
   },
 };

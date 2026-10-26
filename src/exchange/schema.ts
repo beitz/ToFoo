@@ -77,6 +77,10 @@ export const profileSchema = z.object({
   heightCm: z.number().positive().optional(),
   activity: z.enum(['low', 'medium', 'high']).optional(),
   energyTargetKcal: z.number().positive().optional(),
+  energyCorrection: z
+    .object({ factor: z.number().positive(), day })
+    .optional()
+    .describe('Correction of the energy estimate accepted from the weight trend: estimate × factor, accepted on day'),
   nutrientTargets: z.record(z.string(), z.object({ amount: z.number().positive(), per: z.enum(['kg', 'day']) })).optional(),
   sleepNeedMinutes: z.number().positive().max(1440).optional(),
   phytate: z.enum(['low', 'medium', 'high']).optional(),
@@ -221,6 +225,7 @@ export const activitySchema = z
     day,
     minutes: z.number().nonnegative(),
     intensity: z.enum(['easy', 'moderate', 'hard']).optional(),
+    compendium: z.string().regex(/^\d{5}$/).optional().describe('Code of the 2024 Adult Compendium of Physical Activities row it counts as; missing: the row for its kind and intensity'),
     outside: z.boolean(),
     sunSkin: skin.optional(),
   })

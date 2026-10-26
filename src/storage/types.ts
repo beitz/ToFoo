@@ -53,6 +53,11 @@ export interface Profile extends Versioned {
   activity?: ActivityLevel;
   /** Own energy target in kcal/day; not set: estimated from age, sex, weight and activity. */
   energyTargetKcal?: number;
+  /**
+   * Correction of the energy estimate the user accepted on the Weight page (what their weight says
+   * they burn): the estimate is multiplied by `factor`. Accepted on `day`.
+   */
+  energyCorrection?: { factor: number; day: string };
   /** Own daily targets by nutrient id (only OWN_TARGETS: a protein need, a carbohydrate maximum); not set: the DGE value, or no limit. */
   nutrientTargets?: Record<string, OwnTarget>;
   /** Own sleep need in minutes a night; not set: the recommendation (model/parameters.ts `sleepNeed`). */
@@ -95,6 +100,7 @@ export type FeatureKey =
   | 'journal'
   | 'sleep'
   | 'activity'
+  | 'activityEnergy'
   | 'water'
   | 'insights'
   | 'recipeIdeas'
@@ -358,7 +364,7 @@ export type Intensity = (typeof INTENSITIES)[number];
 
 /**
  * One activity (docs/SPEC.md, "Activity"): what, when, how long, roughly how hard, and whether it
- * was outside. No energy burned (that needs a sourced table of activity energy costs).
+ * was outside. Its energy is worked out from a 2024 Adult Compendium row (docs/SPEC.md, "Energy burned").
  */
 /**
  * Plain water drunk (docs/SPEC.md, "Water"): tap, mineral or sparkling water without anything in it.
@@ -458,6 +464,8 @@ export interface ActivityRecord extends Versioned {
   day: string;
   minutes: number;
   intensity?: Intensity;
+  /** Code of the 2024 Adult Compendium row picked for it ("15610", soccer); missing: the row for its kind and effort. */
+  compendium?: string;
   outside: boolean;
   /**
    * When outside: counts toward the vitamin D sun estimate, with this much skin showing. Missing when

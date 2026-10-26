@@ -104,7 +104,7 @@ describe('energy target', () => {
   it('estimates the need from age, sex, weight and activity (Müller 2004 × PAL)', () => {
     // (0.047 × 80 + 1.009 − 0.01452 × 30 + 3.21) MJ = 7.543 MJ = 1,803 kcal; × 1.6 = 2,885 kcal.
     expect(male30.energy.basis).toBe('estimate');
-    expect(male30.energy.estimate).toEqual({ kcal: 2880, reeKcal: 1800, pal: 1.6 });
+    expect(male30.energy.estimate).toEqual({ kcal: 2880, reeKcal: 1800, pal: 1.6, factor: 1 });
     expect(male30.byNutrient.get('ENERCC')!.recommended).toBe(2880);
     expect(male30.byNutrient.get('ENERCC')!.source).toContain('Müller');
     expect(male30.energy.guideKcal).toBe(2700);
@@ -121,6 +121,14 @@ describe('energy target', () => {
           const est = estimateEnergyNeed(sex, age, refWeight[sex][i]!, activity).kcal;
           expect(Math.abs(est - spec[sex][activity][i]!)).toBeLessThanOrEqual(50);
         });
+  });
+
+  it('multiplies the estimate by the correction taken from the weight, also as the target', () => {
+    const r = resolveRequirements({ sex: 'male', birthYear: 1996, weightKg: 80, energyFactor: 1.1 }, 2026);
+    expect(r.energy.estimate).toMatchObject({ kcal: 3170, reeKcal: 1800, factor: 1.1 });
+    expect(r.energy.kcal).toBe(3170);
+    // An own target stays as it is.
+    expect(resolveRequirements({ sex: 'male', birthYear: 1996, weightKg: 80, energyFactor: 1.1, energyTargetKcal: 2000 }, 2026).energy.kcal).toBe(2000);
   });
 
   it('takes the lower estimate when sex is not set', () => {

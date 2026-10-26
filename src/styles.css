@@ -8440,3 +8440,57 @@ button.link-row {
 .ask-days .chips {
   margin-top: 8px;
 }
+
+/* Energy page: what yesterday and today burned next to what was eaten (EnergyBurnCard). */
+.burn-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+  margin: 0 0 8px;
+}
+.burn-table th,
+.burn-table td {
+  padding: 6px 0 6px 8px;
+  text-align: right;
+  font-weight: normal;
+}
+.burn-table th[scope='row'] {
+  text-align: left;
+  padding-left: 0;
+  color: var(--text-muted);
+}
+.burn-table thead th {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+.burn-table tbody tr + tr {
+  border-top: 1px solid var(--border);
+}
+.burn-table .burn-total th,
+.burn-table .burn-total td {
+  font-weight: 600;
+  color: var(--text);
+}
+.burn-table td .block {
+  display: block;
+}
+
+/* Activity sheet: which Compendium activity it counts as (CountsAs). */
+.counts-as-row {
+  margin: 2px 0;
+}
+.counts-as-actions {
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+/* Weight page: the other reading of the log check, with a tap to accept it (MeasuredBurn). */
+.measured-burn {
+  border-top: 1px solid var(--border);
+  margin-top: 10px;
+  padding-top: 10px;
+}
+.measured-burn > p:first-child {
+  margin-top: 0;
+}

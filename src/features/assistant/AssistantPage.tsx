@@ -60,6 +60,7 @@ import { waterText } from '../water/format';
 import { waterProblem } from '../water/WaterSheet';
 import { KETONE_TYPE_KEY, KETONE_UNIT, ketoneProblem, ketoneValueText } from '../fast/ketoneFormat';
 import { IngredientSheet } from '../recipes/IngredientSheet';
+import { useAddsText } from '../activity/useBurn';
 import { ActivityForm, activityName, DEFAULT_ACTIVITY_SKIN, recordOf, type ActivityDraft } from '../activity/ActivityForm';
 import { cardId, cardOf, cardTitle, useRegister, type Bubble, type Card, type CardProps, type RecipeChat, type Saver, type Undo } from './cards';
 import { RecipeCard } from './RecipeCard';
@@ -1257,12 +1258,14 @@ function KetoneProposalCard({ card, day, toast, onLogged, register }: CardProps<
 function ActivityCard({ card, toast, onLogged, register }: CardProps<Extract<Card, { kind: 'activity' }>>) {
   const { activity } = card;
   const d = useData();
+  const adds = useAddsText();
   const [draft, setDraft] = useState<ActivityDraft>(() => ({
     kind: activity.kind,
     name: activity.name ?? '',
     time: activity.start,
     minutes: activity.minutes,
     intensity: activity.intensity ?? 'moderate',
+    ...(activity.compendium ? { compendium: activity.compendium } : {}),
     outside: activity.outside,
     sun: true,
     skin: activity.skin ?? DEFAULT_ACTIVITY_SKIN,
@@ -1297,6 +1300,7 @@ function ActivityCard({ card, toast, onLogged, register }: CardProps<Extract<Car
     t('activity.summary', { min: draft.minutes ?? '–' }),
     t(`activity.intensity.${draft.intensity}` as MessageKey),
     ...(draft.outside ? [t('activity.outsideMark')] : []),
+    ...(draft.minutes && adds({ ...draft, minutes: draft.minutes }) ? [adds({ ...draft, minutes: draft.minutes })!] : []),
   ].join(' · ');
 
   if (card.logged) {

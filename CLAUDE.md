@@ -13,6 +13,7 @@ npm run e2e         # Playwright end-to-end tests of the main flows (e2e/), agai
 npm run typecheck   # tsc, strict
 npm run build       # data + typecheck + vite build (dist/)
 npm run schema      # regenerate docs/exchange-format.schema.json after changing src/exchange/schema.ts
+npm run compendium  # data/raw Compendium PDF → src/activities/compendium-2024.json (needs pdftotext; only when the PDF changes)
 ```
 
 CI (`.github/workflows/deploy.yml`) runs data → typecheck → test → build → e2e on every push (any branch); pushes to `main` also deploy to Pages.
@@ -21,11 +22,12 @@ CI (`.github/workflows/deploy.yml`) runs data → typecheck → test → build �
 
 | Path | What |
 | --- | --- |
-| `data/raw/` | BLS 4.0 zip and the UK table CoFID 2021 (selenium only), never edited. Formats documented in `data/README.md`. |
+| `data/raw/` | BLS 4.0 zip, the UK table CoFID 2021 (selenium only) and the 2024 Adult Compendium PDF, never edited. Formats documented in `data/README.md`. |
 | `scripts/` | Build-time scripts (BLS conversion, selenium from CoFID). |
 | `model/` | **Data files with sources**: `reference-values.ts` (DGE/EFSA), `parameters.ts` (absorption, capacity, retention, sun). Every number has a citation, a low/central/high range and a confidence note. |
 | `src/model/` | The nutrient model: **pure functions only** (no React, no IndexedDB, no `Date.now()`), fully unit-tested. |
 | `src/foods/` | Loading the BLS JSON, food lookup, search. |
+| `src/activities/` | The 2024 Adult Compendium of Physical Activities (bundled JSON from `data/raw/`): lookup and search. |
 | `src/ai/` | AI assistant logging: tools (BLS search, meal proposal check), prompt, conversation loop (pure, tested), API client and photo scaling. |
 | `src/logic/` | Pure glue from stored data to model inputs (log → model entries, fasting days, sun per day). |
 | `src/app/` | App shell: router, data context (`useData`: live queries + model), toasts with undo. |

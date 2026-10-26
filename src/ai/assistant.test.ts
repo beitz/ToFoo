@@ -3,7 +3,7 @@ import type * as Beta from '@anthropic-ai/sdk/resources/beta/messages/messages';
 import type { Food } from '../foods/foodDb';
 import { buildIndex } from '../foods/search';
 import { appNote, emptyConversation, requestParams, retirePhotos, sendMessage, textOf, type CreateMessage } from './assistant';
-import { describeFood, validateBatchProposal, validatePortionProposal, MAX_INGREDIENT_GRAMS, MAX_ITEM_GRAMS, runCheckRecipe, runListRecipes, validateRecipeProposal, validateIngredientsProposal, runLookupBarcode, runSearchFoods, runSearchProducts, runSearchUsda, validateJournalProposal, validateProposal, validateSleepProposal, validateActivityProposal, validateWaterProposal, validateKetoneProposal, validateWeightProposal, validateHabitsProposal, validateShoppingProposal, validateHomeProposal, type ProductTools, type ToolContext } from './tools';
+import { describeFood, validateBatchProposal, validatePortionProposal, MAX_INGREDIENT_GRAMS, MAX_ITEM_GRAMS, runCheckRecipe, runListRecipes, validateRecipeProposal, validateIngredientsProposal, runLookupBarcode, runSearchFoods, runSearchProducts, runSearchActivities, runSearchUsda, validateJournalProposal, validateProposal, validateSleepProposal, validateActivityProposal, validateWaterProposal, validateKetoneProposal, validateWeightProposal, validateHabitsProposal, validateShoppingProposal, validateHomeProposal, type ProductTools, type ToolContext } from './tools';
 import type { Product } from '../storage/types';
 import type { FindResult } from '../foods/findProduct';
 
@@ -578,12 +578,13 @@ describe('sleep', () => {
 
 describe('activity', () => {
   const now = new Date(2026, 9, 17, 20, 0).getTime();
-  const activity = (o: Partial<{ kind: string; name: string; start: string; minutes: number; intensity: string; outside: boolean; skin: string; replaces: string }> = {}) => ({
+  const activity = (o: Partial<{ kind: string; name: string; start: string; minutes: number; intensity: string; activity_code: string; outside: boolean; skin: string; replaces: string }> = {}) => ({
     kind: 'walk',
     name: '',
     start: '2026-10-17 12:30',
     minutes: 40,
     intensity: '',
+    activity_code: '',
     outside: true,
     skin: '',
     replaces: '',
@@ -594,6 +595,7 @@ describe('activity', () => {
     const names = (on: boolean) => (requestParams('claude-opus-5-5', [], { activity: on }).tools ?? []).map((t) => ('name' in t ? t.name : ''));
     expect(names(false)).not.toContain('propose_activity');
     expect(names(true)).toContain('propose_activity');
+    expect(names(true)).toContain('search_activities');
     expect(String(requestParams('claude-opus-5-5', [], { journal: true }).system)).toContain('exercise,');
     expect(String(requestParams('claude-opus-5-5', [], { journal: true, activity: true }).system)).not.toContain('exercise,');
   });
@@ -624,6 +626,18 @@ describe('activity', () => {
       proposal: { kind: 'walk', start: new Date(2026, 9, 17, 12, 30).getTime(), minutes: 45, outside: false, replaces: 'A1' },
     });
     expect(validateActivityProposal(activity({ skin: 'armsLegs' }), now)).toMatchObject({ ok: true, proposal: { skin: 'armsLegs' } });
+  });
+
+  it('keeps a Compendium activity found with search_activities, and refuses a made-up code', () => {
+    expect(validateActivityProposal(activity({ kind: 'other', name: 'Yoga', activity_code: '02175' }), now)).toMatchObject({ ok: true, proposal: { compendium: '02175' } });
+    expect(validateActivityProposal(activity({ activity_code: '' }), now)).toMatchObject({ ok: true, proposal: { kind: 'walk' } });
+    expect(validateActivityProposal(activity({ activity_code: '' }), now)).not.toMatchObject({ proposal: { compendium: expect.anything() } });
+    const bad = validateActivityProposal(activity({ activity_code: '99999' }), now);
+    expect(bad.ok === false && bad.error).toContain('search_activities');
+    const r = runSearchActivities({ queries: ['yoga', 'zzzz'] });
+    expect(r.ok).toBe(true);
+    expect(r.text).toContain('02175 | 2.3 MET | Conditioning exercise: Yoga, General');
+    expect(r.text).toContain('No matches');
   });
 });
 

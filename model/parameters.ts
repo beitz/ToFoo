@@ -375,6 +375,52 @@ export const energyNeed: {
   roundToKcal: 10,
 };
 
+// ── Energy burned by activities (docs/SPEC.md, "Energy burned") ──────────────────
+
+/**
+ * Energy of a logged activity, from the MET value of its 2024 Adult Compendium row
+ * (src/activities/compendium-2024.json). Only what it costs above the base day (resting energy ×
+ * PAL) for those minutes is added, so the minutes are not counted twice.
+ */
+export const activityEnergy = {
+  /** kcal per minute = MET × kg × this. */
+  kcalPerMetKgMinute: {
+    value: 3.5 / 200,
+    source: 'Compendium of Physical Activities, Unit conversions: "METS to Kcal/min = multiply METS x 3.5 x body weight in kg then divide by 200" (1 MET = 3.5 ml O₂/kg/min, about 5 kcal per litre of O₂)',
+    url: 'https://pacompendium.com/unite-conversions/',
+    confidence: 'high',
+    note: 'A unit conversion. The Compendium MET values are measured oxygen uptake ÷ 3.5 ml/kg/min, so the energy of an activity is the same for anyone of a weight; "corrected METs" with one\'s own resting rate change how hard an activity counts, not its energy. Values are averages over the people measured; one person\'s cost can differ.',
+  } satisfies Valued<number>,
+  /** The Compendium row for each kind and effort, used when no other row was picked. */
+  defaultRows: {
+    value: {
+      walk: { easy: '17152', moderate: '17190', hard: '17200' },
+      run: { easy: '12020', moderate: '12050', hard: '12070' },
+      cycling: { easy: '01015', moderate: '01016', hard: '01017' },
+      strength: { easy: '02054', moderate: '02052', hard: '02050' },
+    },
+    source: 'Modelling choice: one 2024 Adult Compendium row per kind and effort (walking 2.0–2.4 / 2.8–3.4 / 3.5–3.9 mph; jogging self-selected / running 6 / 7 mph; bicycling self-selected easy / moderate / vigorous; resistance training 8–15 reps / squats and deadlift / vigorous)',
+    url: 'https://pacompendium.com/adult-compendium',
+    confidence: 'assumption',
+    note: 'Easy, moderate and hard are the user\'s rough word for the pace, so the row is a guess at it; an activity without an effort counts as moderate. "Other" has no row of its own: its energy stays unknown until a Compendium activity is picked. See docs/OPEN_QUESTIONS.md.',
+  } satisfies Valued<Record<'walk' | 'run' | 'cycling' | 'strength', Record<'easy' | 'moderate' | 'hard', string>>>,
+  /** Picking a Compendium row sets the effort from its MET value: below `moderate` easy, from `hard` hard. */
+  effortFromMet: {
+    value: { moderate: 3, hard: 6 },
+    source: 'Herrmann SD et al. (2024): 2024 Adult Compendium of Physical Activities. J Sport Health Sci 13(1):6–12, section 2.5: "light-intensity PAs as 1.6–2.9 METs", "moderate-intensity PAs as 3.0–5.9 METs, and vigorous-intensity PAs as ≥6.0 METs"',
+    url: 'https://doi.org/10.1016/j.jshs.2023.10.010',
+    confidence: 'high',
+    note: 'Sedentary (1.0–1.5) and light both count as easy here. Absolute intensity: what is moderate for one person can be hard for another, so the effort stays editable. Checked against the full text (PMC10818145) on 2026-10-26.',
+  } satisfies Valued<{ moderate: number; hard: number }>,
+  /** What the base day already pays for an activity's minutes. */
+  baseSubtracted: {
+    value: 'restingTimesPal',
+    source: 'Modelling choice',
+    confidence: 'assumption',
+    note: 'The base day (resting energy × PAL) already counts every minute of the day at its average rate, so an activity adds its energy minus that rate for its minutes, and never less than zero. Subtracting only rest (1 MET, the "net" cost) would count the ordinary movement of those minutes twice. The PAL itself should describe a day without the logged activities. See docs/OPEN_QUESTIONS.md.',
+  } satisfies Valued<'restingTimesPal'>,
+};
+
 // ── Own protein target (docs/SPEC.md, "Own nutrient targets") ─────────────────────
 
 /**
@@ -1091,6 +1137,15 @@ export const weightCheck = {
     confidence: 'medium',
     note: 'Low and high are ± 1 SD. Validated over 6-month periods against doubly labelled water: group bias under 40 kcal/day, but about 215 kcal/day (root mean square) for one person, so only a large gap says something.',
   } satisfies Valued<{ low: number; central: number; high: number }>,
+  /** How far the burn read from intake and weight change can be off for one person (kcal/day, either way). */
+  methodErrorKcal: {
+    value: 215,
+    source:
+      'Sanghvi A, Redman LM, Martin CK, Ravussin E, Hall KD (2015) Am J Clin Nutr 102(2):353–358: intake from weight change was off by about 215 kcal/day (root mean square) for one person over 6-month periods, against doubly labelled water',
+    url: 'https://doi.org/10.3945/ajcn.115.111070',
+    confidence: 'medium',
+    note: 'Widens the "your weight says you burn" range on top of the slope and ρ, so a burn read from a few tidy weigh-ins never looks more exact than the method is. Over 4 weeks the error is likely larger; this is the least it can be.',
+  } satisfies Valued<number>,
   /** How far one person’s resting energy can be from the Müller equation (kcal/day, either way). */
   reeSpreadKcal: {
     value: 200,

@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { useData } from '../../app/data';
+import { useToast } from '../../app/toast';
+import { formatDay } from '../../lib/dates';
 import { t } from '../../i18n';
 import { fmtNumber } from '../../lib/format';
 import type { EnergyTarget } from '../../model/requirements';
@@ -51,13 +53,44 @@ export function EnergyTargetCard() {
       )}
       <p className="small muted">
         {e.estimate
-          ? t('energy.howEstimate', { ree: kcal(e.estimate.reeKcal), pal: fmtNumber(e.estimate.pal, 1), kcal: kcal(e.estimate.kcal), guide: kcal(e.guideKcal) })
+          ? e.estimate.factor !== 1
+            ? t('energy.howEstimateCorrected', {
+                ree: kcal(e.estimate.reeKcal),
+                pal: fmtNumber(e.estimate.pal, 1),
+                factor: fmtNumber(e.estimate.factor, 2),
+                kcal: kcal(e.estimate.kcal),
+                guide: kcal(e.guideKcal),
+                plain: kcal(Math.round((e.estimate.reeKcal * e.estimate.pal) / 10) * 10),
+              })
+            : t('energy.howEstimate', { ree: kcal(e.estimate.reeKcal), pal: fmtNumber(e.estimate.pal, 1), kcal: kcal(e.estimate.kcal), guide: kcal(e.guideKcal) })
           : t('energy.howGuide')}{' '}
         <a href={energyNeed.ree.url} target="_blank" rel="noreferrer">
           {t('energy.sourceLink')}
         </a>
       </p>
+      {d.profile.energyCorrection && <CorrectionLine />}
       <p className="small muted">{t('energy.alsoUsed')}</p>
+    </div>
+  );
+}
+
+/** The correction accepted on the Weight page, with a way back. */
+function CorrectionLine() {
+  const d = useData();
+  const toast = useToast();
+  const c = d.profile.energyCorrection!;
+  return (
+    <div className="energy-correction">
+      <p className="small">{t('energy.corrected', { day: formatDay(c.day, d.today), factor: fmtNumber(c.factor, 2) })}</p>
+      <button
+        className="btn btn-small btn-ghost"
+        onClick={async () => {
+          await repo.updateProfile({ energyCorrection: undefined });
+          toast(t('energy.correctionRemoved'), () => repo.updateProfile({ energyCorrection: c }));
+        }}
+      >
+        {t('energy.correctionRemove')}
+      </button>
     </div>
   );
 }
