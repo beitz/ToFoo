@@ -2,7 +2,7 @@ import { useMemo, type ReactNode } from 'react';
 import { useData } from '../../app/data';
 import { href } from '../../app/router';
 import { t, type MessageKey } from '../../i18n';
-import { fmtAmount, fmtFill, fmtNumber, fmtPercent } from '../../lib/format';
+import { fmtAmount, fmtFill, fmtNumber, fmtPercent, nameInSentence } from '../../lib/format';
 import { NUTRIENT_BY_ID } from '../../model/nutrients';
 import { earlyReading, isUnsure, tankTrend, type GaugeStatus, type HistoryPoint, type NutrientResult, type StoreResult } from '../../model/simulate';
 import type { Range } from '../../model/paramTypes';
@@ -39,6 +39,7 @@ import { EffectCard } from './EffectCard';
 import { EnergyBurnCard } from './EnergyBurnCard';
 import { hasLadder, LevelLadder } from './LevelLadder';
 import { WhatItDoes } from './WhatItDoes';
+import { FillingUp } from './FillingUp';
 import { HowOftenChip, WindowWhy } from './HowOften';
 import { MissingChip } from './MissingChip';
 
@@ -84,7 +85,8 @@ export function NutrientPage({ id, context }: { id: string; context?: SplitConte
       )}
       <EffectCard r={r} />
       <Hero r={r} noData={noData} showRange={showRange} whyLabel={t('nutrient.whyLink', { value: shown })} />
-      <AskChips questions={gap ? [t('nutrient.askMore', { name: def.name.toLowerCase() })] : []} />
+      <AskChips questions={gap ? [t('nutrient.askMore', { name: nameInSentence(def.name) })] : []} />
+      <FillingUp r={r} noData={noData} />
       {id === 'ENERCC' && <EnergyBurnCard />}
 
       {history.length > 1 && (
@@ -545,8 +547,7 @@ function NutrientInfo({ id, r }: { id: string; r: NutrientResult }) {
   const text = (part: 'role' | 'low' | 'high') => t(`info.${key}.${part}` as MessageKey);
   if (text('role').startsWith('info.')) return null; // no text for this nutrient
   // "Vitamin C" → "vitamin C", not "vitamin c".
-  const full = NUTRIENT_BY_ID.get(id)?.name ?? id;
-  const name = full.charAt(0).toLowerCase() + full.slice(1);
+  const name = nameInSentence(NUTRIENT_BY_ID.get(id)?.name ?? id);
   const cite = source && (
     <p className="muted small">
       {t('nutrient.infoSource')}:{' '}

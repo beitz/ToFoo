@@ -47,4 +47,19 @@ describe('what it does: tiles and quick facts', () => {
     expect(quickFacts('VITC').find((f) => f.label === 'Kept when boiled')?.value).toBe('65–85%');
     expect(quickFacts('ID').find((f) => f.label === 'Taken up')?.value).toBe('nearly all');
   });
+
+  it('adds what one meal gives, the store size and how fast it refills, where model/ has a source', () => {
+    const ctx = { weightKg: 70, sex: 'male' as const, physiological: 2 };
+    const b12 = quickFacts('VITB12', ctx);
+    expect(b12.find((f) => f.label === 'From one meal')?.value).toBe('about 1.5 µg');
+    expect(b12.find((f) => f.label === 'Body store')?.value).toBe('2–3 mg');
+    // Without the user's weight there is no store size.
+    expect(quickFacts('VITB12').find((f) => f.label === 'Body store')).toBeUndefined();
+    expect(quickFacts('VITC').find((f) => f.label === 'From one meal')?.value).toBe('all of up to 200 mg');
+    expect(quickFacts('FE', { ...ctx, physiological: 1 }).find((f) => f.label === 'Body store')?.value).toBe('0.5–1.5 g');
+    const o3 = quickFacts('EPADHA', ctx);
+    expect(o3.find((f) => f.label === 'Taken up')?.value).toBe('55–90%');
+    expect(o3.find((f) => f.label === 'Refills')?.value).toBe('half in 4 weeks, all in 6 months');
+    for (const f of [...b12, ...o3]) if (f.label !== 'Body makes it' && f.label !== 'Kept when boiled') expect(f.detail, f.label).toBeTruthy();
+  });
 });

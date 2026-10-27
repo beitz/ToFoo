@@ -1,12 +1,21 @@
+import { useState } from "react";
+import { createPortal } from "react-dom";
+import { useData } from "../../app/data";
 import { t, type MessageKey } from "../../i18n";
 import { infoId } from "../../i18n/nutrientInfo.en";
-import { fmtPercent } from "../../lib/format";
+import { fmtAmount, fmtNumber, fmtPercent } from "../../lib/format";
+import { NUTRIENT_BY_ID } from "../../model/nutrients";
+import type { Range, Sex } from "../../model/paramTypes";
+import { tankCapacityRange } from "../../model/simulate";
+import { Sheet } from "../../ui/controls";
+import { fmtDuration } from "../../ui/duration";
 import { Icon } from "../../ui/Icon";
-import { bodyMakes } from "../../../model/nutrientFacts";
+import { bodyMakes, turnover } from "../../../model/nutrientFacts";
 import {
   nutrientParams,
   preparationRetention,
   retentionClassOf,
+  storage,
 } from "../../../model/parameters";
 
 /**
@@ -68,6 +77,34 @@ export interface QuickFact {
   /** Short name of the source, for the sources line. */
   source: string;
   url?: string;
+  /** One sentence on what the fact means, shown when it is tapped. */
+  detail?: string;
+}
+
+/** Who the store sizes are for: they scale with body weight and, for iron, differ by sex. */
+export interface FactContext {
+  weightKg: number;
+  sex?: Sex;
+  /** The absorbed daily need. */
+  physiological: number;
+}
+
+/** A store size range in the largest unit that keeps it readable ("2–3 mg", "0.5–1.5 g"). */
+export function fmtStoreRange(id: string, r: Pick<Range, "low" | "high">): string {
+  let { low, high } = r;
+  let unit = NUTRIENT_BY_ID.get(id)?.unit ?? "";
+  if (unit === "µg" && high >= 1000) {
+    low /= 1000;
+    high /= 1000;
+    unit = "mg";
+  }
+  if (unit === "mg" && high >= 1000) {
+    low /= 1000;
+    high /= 1000;
+    unit = "g";
+  }
+  const decimals = high < 10 ? 1 : 0;
+  return `${fmtNumber(low, decimals)}–${fmtNumber(high, decimals)} ${unit}`;
 }
 
 /** Short form of a long model citation ("EFSA NDA Panel (2015): DRVs for calcium — …" → "EFSA NDA Panel (2015)"). */
@@ -80,7 +117,7 @@ function shortSource(s: string): string {
  * sourced share), how much survives boiling (where USDA has a factor). Facts the model has no source
  * for are left out, not shown as zero or full.
  */
-export function quickFacts(id: string): QuickFact[] {
+export function quickFacts(id: string, ctx?: FactContext): QuickFact[] {
   const key = infoId(id);
   const facts: QuickFact[] = [];
   const made = bodyMakes[key];
@@ -110,8 +147,13 @@ export function quickFacts(id: string): QuickFact[] {
       value,
       source: shortSource(up.source),
       url: up.url,
+      detail: t("does.uptake.detail", { value }),
     });
   }
+  const perMeal = perMealFact(id);
+  if (perMeal) facts.push(perMeal);
+  const store = storeFacts(id, ctx);
+  facts.push(...store);
   const cls = retentionClassOf[id];
   const boiled = cls ? preparationRetention.value.boiled[cls] : undefined;
   if (boiled) {
@@ -128,6 +170,87 @@ export function quickFacts(id: string): QuickFact[] {
     });
   }
   return facts;
+}
+
+/** How much one meal can give, where the model has a sourced limit per meal. */
+function perMealFact(id: string): QuickFact | undefined {
+  const rule = nutrientParams[id]?.rule;
+  if (!rule) return undefined;
+  const base = { icon: "gauge", label: t("does.perMeal") };
+  if (rule.type === "saturable") {
+    const amount = fmtAmount(id, rule.activeCapPerMeal.value.central);
+    return {
+      ...base,
+      value: t("does.perMeal.cap", { amount }),
+      source: shortSource(rule.activeCapPerMeal.source),
+      url: rule.activeCapPerMeal.url,
+      detail: t("does.perMeal.capDetail", { amount, pct: fmtPercent(rule.passiveFraction.value.central) }),
+    };
+  }
+  if (rule.type === "doseTable") {
+    // The largest single dose still taken up in full.
+    const full = rule.points.value.filter(([, f]) => f >= 1).at(-1)?.[0];
+    if (!full) return undefined;
+    const amount = fmtAmount(id, full);
+    return {
+      ...base,
+      value: t("does.perMeal.full", { amount }),
+      source: shortSource(rule.points.source),
+      url: rule.points.url,
+      detail: t("does.perMeal.fullDetail", { amount }),
+    };
+  }
+  if (rule.type === "doseLog")
+    return {
+      ...base,
+      value: t("does.perMeal.less"),
+      source: shortSource(rule.source),
+      url: rule.url,
+      detail: t("does.perMeal.lessDetail"),
+    };
+  return undefined;
+}
+
+/** Where the body keeps it and how big the store is, and how fast its level follows a change. */
+function storeFacts(id: string, ctx?: FactContext): QuickFact[] {
+  const out: QuickFact[] = [];
+  const model = storage[id];
+  if (model?.kind === "tank" && ctx) {
+    const range = tankCapacityRange(id, ctx.weightKg, ctx.sex, ctx.physiological);
+    if (range) {
+      const size = fmtStoreRange(id, range);
+      out.push({
+        icon: "tank",
+        label: t("does.store"),
+        value: size,
+        source: shortSource(model.capacity.source),
+        url: model.capacity.url,
+        detail: t("does.store.detail", { size, kg: fmtNumber(ctx.weightKg) }),
+      });
+    }
+  }
+  const turn = turnover[id];
+  if (turn) {
+    const half = fmtDuration(turn.value.halfLifeDays);
+    const steady = fmtDuration(turn.value.steadyDays);
+    out.push({
+      icon: "tank",
+      label: t("does.store"),
+      value: t(`does.store.${turn.value.where}`),
+      source: shortSource(turn.source),
+      url: turn.url,
+      detail: t(`does.store.${turn.value.where}Detail`),
+    });
+    out.push({
+      icon: "hourglass",
+      label: t("does.turnover"),
+      value: t("does.turnover.value", { half, steady }),
+      source: shortSource(turn.source),
+      url: turn.url,
+      detail: t("does.turnover.detail", { half, steady }),
+    });
+  }
+  return out;
 }
 
 /**
@@ -147,7 +270,13 @@ export function WhatItDoes({
   const icons = ROLE_ICONS[key] ?? [];
   const foods = text(`does.${key}.foods`);
   const note = text(`does.${key}.note`);
-  const facts = quickFacts(id);
+  const d = useData();
+  const physiological = d.requirements.byNutrient.get(id)?.physiological;
+  const facts = quickFacts(
+    id,
+    physiological !== undefined ? { weightKg: d.weightKg, sex: d.profile.sex, physiological } : undefined,
+  );
+  const [open, setOpen] = useState<QuickFact | null>(null);
   // The page's own source line follows; don't name it twice.
   const sources = facts.filter(
     (f, i) =>
@@ -178,13 +307,27 @@ export function WhatItDoes({
         <>
           <h4 className="rung-label">{t("does.facts")}</h4>
           <ul className="quick-facts">
-            {facts.map((f) => (
-              <li key={f.label} className="quick-fact">
-                <Icon name={f.icon} size={16} />
-                <span className="quick-fact-label">{f.label}</span>
-                <strong className="quick-fact-value">{f.value}</strong>
-              </li>
-            ))}
+            {facts.map((f) => {
+              const body = (
+                <>
+                  <Icon name={f.icon} size={16} />
+                  <span className="quick-fact-label">{f.label}</span>
+                  <strong className="quick-fact-value">{f.value}</strong>
+                </>
+              );
+              return (
+                <li key={`${f.label}·${f.value}`} className="quick-fact">
+                  {f.detail ? (
+                    <button type="button" className="quick-fact-btn" onClick={() => setOpen(f)}>
+                      {body}
+                      <Icon name="chevron" size={12} />
+                    </button>
+                  ) : (
+                    body
+                  )}
+                </li>
+              );
+            })}
           </ul>
           {sources.length > 0 && (
             <p className="muted rung-sources">
@@ -205,6 +348,27 @@ export function WhatItDoes({
           )}
         </>
       )}
+      {open &&
+        createPortal(
+          <Sheet title={open.label} onClose={() => setOpen(null)}>
+            <div className="info-sheet">
+              <p>
+                <strong>{open.value}</strong>
+              </p>
+              <p>{open.detail}</p>
+              <p className="muted small">
+                {open.url ? (
+                  <a href={open.url} target="_blank" rel="noreferrer">
+                    {open.source}
+                  </a>
+                ) : (
+                  open.source
+                )}
+              </p>
+            </div>
+          </Sheet>,
+          document.body,
+        )}
     </div>
   );
 }
