@@ -1262,6 +1262,20 @@ textarea:focus-visible,
   flex: none;
   margin-left: 8px;
 }
+/* Check logged foods: what may be wrong, said in words with a warning sign, not by colour alone. */
+.check-flag {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  color: var(--warn);
+}
+.check-flag svg {
+  flex: none;
+  margin-top: 2px;
+}
+.check-compare {
+  font-variant-numeric: tabular-nums;
+}
 .match-auto {
   gap: 8px;
   margin-top: 4px;

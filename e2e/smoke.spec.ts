@@ -26,6 +26,7 @@ const ROUTES = [
   'settings',
   'settings/profile',
   'settings/backup',
+  'settings/check',
   'settings/nutrients',
   'settings/assistant',
   'settings/diagnostics',
