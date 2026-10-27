@@ -886,6 +886,8 @@ export const en = {
   'ai.error.other': 'The answer from the AI service broke off. Tap Send to try again; the details below say what happened.',
   'ai.error.rejected': 'The AI service turned this message down. The details below give its reason; tap Send to try again, and if it fails the same way, share the details.',
   'ai.error.app': 'The app ran into an error of its own while working on this message (a bug, not your input). Tap Send to try again, and please share the details below.',
+  'ai.error.update': 'A new version of the app was installed while it was open, and this part has to load from it first. Nothing was sent. Reload, and your message stays in the box.',
+  'ai.error.reload': 'Reload',
   'ai.error.detail': 'Details: {detail}',
   'ai.error.refusal': 'The assistant could not help with this message. Try describing the meal differently.',
   'ai.error.tooLong': 'The answer got too long. Try a shorter message, or start over.',
