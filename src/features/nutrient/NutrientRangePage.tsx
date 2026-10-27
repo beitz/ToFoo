@@ -16,6 +16,7 @@ import { BackButton } from '../../ui/BackButton';
 import { statusLabel } from '../../ui/status';
 import { StatusMark, symbolOf } from '../../ui/Tile';
 import { CameFromCard } from './CameFromCard';
+import { MissingChip } from './MissingChip';
 import { AmountBar, BigTile } from './NutrientPage';
 
 const DAY_KEY = /^\d{4}-\d{2}-\d{2}$/;
@@ -140,11 +141,7 @@ export function NutrientRangePage({ id, from: fromParam, to: toParam }: { id: st
                 <Icon name="warning" size={14} /> {t('nutrient.chipUpperLimit', { pct: fmtPercent(r.ulRatio!) })}
               </span>
             )}
-            {r.missingDataDays > 0 && (
-              <span className="chip chip-warn">
-                <Icon name="question" size={14} /> {t('nutrient.chipMissing', { n: r.missingDataDays })}
-              </span>
-            )}
+            {r.missingDataDays > 0 && <MissingChip id={id} days={period.counted} />}
           </div>
         )}
       </div>

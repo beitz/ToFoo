@@ -28,10 +28,7 @@ export function CameFromCard({ r, days }: { r: NutrientResult; days?: readonly s
       <div className="card-head">
         <h2>{t('came.title')}</h2>
         <span className="card-note">
-          {t('came.note', {
-            days: n,
-            amount: fmtAmount(r.id, total),
-          })}
+          {n === 1 ? t('came.noteOne', { amount: fmtAmount(r.id, total) }) : t('came.note', { days: n, amount: fmtAmount(r.id, total) })}
         </span>
       </div>
       <div className="segmented" role="group" aria-label={t('came.viewLabel')}>

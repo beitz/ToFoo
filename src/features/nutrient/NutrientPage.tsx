@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import { useData } from '../../app/data';
 import { href } from '../../app/router';
 import { t, type MessageKey } from '../../i18n';
@@ -40,6 +40,7 @@ import { EnergyBurnCard } from './EnergyBurnCard';
 import { hasLadder, LevelLadder } from './LevelLadder';
 import { WhatItDoes } from './WhatItDoes';
 import { HowOftenChip, WindowWhy } from './HowOften';
+import { MissingChip } from './MissingChip';
 
 export function NutrientPage({ id, context }: { id: string; context?: SplitContext }) {
   const d = useData();
@@ -201,6 +202,8 @@ function Hero({ r, noData, showRange, whyLabel }: { r: NutrientResult; noData: b
   const span = noData ? undefined : (store?.statusSpan ?? r.statusSpan);
   const trend = noData ? null : store ? storeTrendOf(store) : r.status === 'unknown' ? null : trendOf(r);
   const early = noData ? null : earlyReading(r);
+  // The model's window ends yesterday: today joins once it is over.
+  const windowDayKeys = useMemo(() => d.modelDays.slice(Math.max(0, d.modelDays.length - 1 - r.windowDays), -1), [d.modelDays, r.windowDays]);
   const trust = logTrust[id];
   const value = noData
     ? '–'
@@ -304,11 +307,7 @@ function Hero({ r, noData, showRange, whyLabel }: { r: NutrientResult; noData: b
             <Icon name="warning" size={14} /> {t('nutrient.chipUpperLimit', { pct: fmtPercent(r.ulRatio!) })}
           </span>
         )}
-        {r.missingDataDays > 0 && (
-          <span className="chip chip-warn">
-            <Icon name="question" size={14} /> {t('nutrient.chipMissing', { n: r.missingDataDays })}
-          </span>
-        )}
+        {r.missingDataDays > 0 && <MissingChip id={id} days={windowDayKeys} />}
         {trust && (
           <span className={trust.trust === 'blind' ? 'chip chip-warn' : 'chip'} data-tour="nutrient.trust">
             <Icon name="eye" size={14} /> {t(`trust.chip.${trust.trust}`)}
