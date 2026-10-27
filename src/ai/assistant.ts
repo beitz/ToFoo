@@ -10,7 +10,8 @@ import { usageOf, type ModelTokens } from './pricing';
 import { fmtLocalDateTime } from './photoTime';
 import { INSIGHT_TOOL_NAMES, runInsightTool, type Check } from './insights';
 import type { ShareKind } from '../logic/insights';
-import { runCheckLoggedFoods, validateFoodFix, type FoodFixProposal } from './foodCheck';
+import type { HomePlace } from '../storage/types';
+import { runCheckLoggedFoods, validateFoodFix, validateMarkChecked, type FoodFixProposal, type MarkCheckedProposal } from './foodCheck';
 import {
   runLookupBarcode,
   runSearchFoods,
@@ -107,11 +108,16 @@ export interface Conversation {
   shared?: SharedData;
 }
 
-/** What the user chose to share for a chat: from this day to today, these kinds, private journal entries or not. */
+/**
+ * What the user chose to share for a chat: from this day to today, these kinds, private journal
+ * entries or not, and what is at home in these places (missing in chats from before the kitchen
+ * could be included).
+ */
 export interface SharedData {
   from: string;
   kinds: ShareKind[];
   privateJournal: boolean;
+  kitchen?: HomePlace[];
 }
 
 /** A user message with photos (its index in messages) and the cards proposed after it, until the next one. */
@@ -183,6 +189,8 @@ export type ShownPortion = PortionProposal & { id: string };
 export type ShownBatch = BatchProposal & { id: string };
 /** A fix from a check of the logged foods as shown: with its card id (F1, F2, …). */
 export type ShownFoodFix = FoodFixProposal & { id: string };
+/** Foods the check found right, to mark as checked: an F card too (F1, F2, …). */
+export type ShownMarkChecked = MarkCheckedProposal & { id: string };
 
 /** `checks`: the comparisons the app computed for the answer (pattern tools), shown under it. */
 export type TurnOutcome =
@@ -205,7 +213,7 @@ export type TurnOutcome =
       recipes: ShownRecipe[];
       portions: ShownPortion[];
       batches: ShownBatch[];
-      fixes: ShownFoodFix[];
+      fixes: Array<ShownFoodFix | ShownMarkChecked>;
       /** Every card id, in the order the assistant proposed them (meals, recipes and trackers mixed). */
       order: string[];
     }
@@ -330,7 +338,7 @@ export async function sendMessage(
     const recipesProposed: Array<{ id: string; proposal: RecipeProposal }> = [];
     const portionsProposed: Array<{ id: string; proposal: PortionProposal }> = [];
     const batchesProposed: Array<{ id: string; proposal: BatchProposal }> = [];
-    const fixesProposed: Array<{ id: string; proposal: FoodFixProposal }> = [];
+    const fixesProposed: Array<{ id: string; proposal: FoodFixProposal | MarkCheckedProposal }> = [];
     let rejected = false;
     for (const use of uses) {
       if (use.name === 'search_foods') {
@@ -458,8 +466,8 @@ export async function sendMessage(
       } else if (use.name === 'check_logged_foods' && ctx.foodCheck) {
         const r = runCheckLoggedFoods(use.input, ctx.foodCheck, ctx.db);
         results.push({ type: 'tool_result', tool_use_id: use.id, content: r.text, is_error: !r.ok });
-      } else if (use.name === 'propose_food_fix' && ctx.foodCheck) {
-        const r = validateFoodFix(use.input, ctx.foodCheck, ctx.db);
+      } else if ((use.name === 'propose_food_fix' || use.name === 'propose_mark_checked') && ctx.foodCheck) {
+        const r = use.name === 'propose_food_fix' ? validateFoodFix(use.input, ctx.foodCheck, ctx.db) : validateMarkChecked(use.input, ctx.foodCheck, ctx.db);
         if (r.ok) fixesProposed.push({ id: use.id, proposal: r.proposal });
         else {
           rejected = true;
@@ -492,7 +500,7 @@ export async function sendMessage(
       const shownRecipes = recipesProposed.map(({ proposal }): ShownRecipe => ({ ...proposal, id: `R${++recipes}` }));
       const shownPortions = portionsProposed.map(({ proposal }): ShownPortion => ({ ...proposal, id: `P${++portions}` }));
       const shownBatches = batchesProposed.map(({ proposal }): ShownBatch => ({ ...proposal, id: `B${++batches}` }));
-      const shownFixes = fixesProposed.map(({ proposal }): ShownFoodFix => ({ ...proposal, id: `F${++fixes}` }));
+      const shownFixes = fixesProposed.map(({ proposal }): ShownFoodFix | ShownMarkChecked => ({ ...proposal, id: `F${++fixes}` }));
       const cardOfUse = new Map<string, string>([
         ...proposals.map(({ id }, i) => [id, shown[i]!.id] as const),
         ...notesProposed.map(({ id }, i) => [id, shownNotes[i]!.id] as const),
@@ -593,8 +601,8 @@ export async function sendMessage(
     for (const { id } of portionsProposed) {
       results.push({ type: 'tool_result', tool_use_id: id, content: 'Not shown: another proposal in this response had errors. Call propose_portion again for this serving too.', is_error: true });
     }
-    for (const { id } of fixesProposed) {
-      results.push({ type: 'tool_result', tool_use_id: id, content: 'Not shown: another proposal in this response had errors. Call propose_food_fix again for this fix too.', is_error: true });
+    for (const { id, proposal } of fixesProposed) {
+      results.push({ type: 'tool_result', tool_use_id: id, content: `Not shown: another proposal in this response had errors. Call ${proposal.use === 'looks_right' ? 'propose_mark_checked' : 'propose_food_fix'} again for this card too.`, is_error: true });
     }
     for (const { id } of batchesProposed) {
       results.push({ type: 'tool_result', tool_use_id: id, content: 'Not shown: another proposal in this response had errors. Call propose_batch again for this batch too.', is_error: true });

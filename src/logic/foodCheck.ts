@@ -8,7 +8,7 @@ import type { FoodDb } from '../foods/foodDb';
 import { GOOD_FIT, kindMismatch, kindOf, labelFit } from '../foods/productMatch';
 import { hasOwnMicros, productLabel } from '../foods/products';
 import { refKey } from '../lib/refs';
-import type { Batch, FoodRef, LogEntry, Product } from '../storage/types';
+import type { Batch, FoodRef, HomePlace, LogEntry, Product } from '../storage/types';
 
 /**
  * Why a food is worth a look: it borrows from another kind of food (a drink from a food, tofu from
@@ -29,6 +29,8 @@ export interface CheckRow {
   grams: number;
   /** Recipes it was eaten in (cooked portions), by name. */
   recipes: string[];
+  /** Where it is at home, for things in the kitchen the check was asked to cover too. */
+  home?: HomePlace[];
   /** Label against the food it borrows from (0–1), for paired products. */
   fit?: number;
   /** With the 'kind' flag: how the food it borrows from is of another kind. */
@@ -66,10 +68,18 @@ export function checkSignature(ref: FoodRef, product?: Pick<Product, 'match' | '
   return m.parts ? `mix:${m.parts.map((p) => p.code).join(',')}` : m.code;
 }
 
+/** A thing at home with the food it is, for checking the kitchen too. */
+export interface HomeRef {
+  ref: FoodRef;
+  name: string;
+  place: HomePlace;
+}
+
 /**
- * Every BLS food and product eaten from `from` to `to` (day keys, inclusive), flagged ones first
- * (in FLAG_ORDER), then by how often, the ones the user checked (`checked`: refKey → checkSignature
- * when marked) last. Own foods carry their own values and are left out.
+ * Every BLS food and product eaten from `from` to `to` (day keys, inclusive), and each one at home
+ * in `home`, flagged ones first (in FLAG_ORDER), then by how often, the ones the user checked
+ * (`checked`: refKey → checkSignature when marked) last. Own foods carry their own values and are
+ * left out.
  */
 export function foodCheck(
   log: readonly LogEntry[],
@@ -79,6 +89,7 @@ export function foodCheck(
   from: string,
   to: string,
   checked: Readonly<Record<string, string>> = {},
+  home: readonly HomeRef[] = [],
 ): CheckRow[] {
   const rows = new Map<string, CheckRow>();
   const row = (ref: FoodRef, fallback: string) => {
@@ -118,6 +129,12 @@ export function foodCheck(
         if (!r.recipes.includes(batch.recipe.name)) r.recipes.push(batch.recipe.name);
       }
     }
+  }
+  for (const h of home) {
+    if (h.ref.source === 'custom') continue;
+    const r = row(h.ref, h.name);
+    if (!r.home) r.home = [];
+    if (!r.home.includes(h.place)) r.home.push(h.place);
   }
   // Checked ones last: the user has looked at them, whatever the flags say.
   const rank = (r: CheckRow) => {

@@ -43,7 +43,7 @@ const HABITS = `- Habits: the user keeps habits, listed by name in the app's not
 
 // Checking what was logged (docs/SPEC.md, "Check logged foods"): the app lists the foods and
 // flags odd pairings; the model judges each and proposes fixes as cards, never changing anything itself.
-const CHECK = `- Checking logged foods: when the user asks you to check what they logged ("check my foods from last week", "do the BLS foods make sense?"), call check_logged_foods with the days to look back (7 unless they say; 0 for everything). It lists every food eaten, once, flagged ones first: for products the label, categories, ingredients and the BLS food the vitamins and minerals come from, with how well the label fits it; for BLS foods what was eaten. Judge each pairing like a nutrition-savvy friend: is the BLS food the same kind of food (a beer needs a beer, not beer ham; a ready meal its dish or its ingredients)? Do the amounts look like what one person eats? For each pairing that is clearly wrong, call propose_food_fix (search_foods first for the right BLS food): use "bls" with the BLS code, "ingredients" to build a product from its ingredient list, or "label_only"; reason: one short line in plain words why (e.g. "A beer, not a ham"). A fix for a BLS food changes the entries logged by itself in that period (give the same days). Only propose what you are sure of; mention borderline ones and odd amounts in your text, and say when everything looks right. The app shows its own flags; a flag alone is not a reason to change a pairing that makes sense, but a pairing of another kind (a drink with a food, tofu with fish, a supplement with any food) is almost always wrong. Foods the user marked as checked are left out; include them only when the user asks to check everything again. To change an open fix card, call it again with replaces set to its id (F1, F2, …).`;
+const CHECK = `- Checking logged foods: when the user asks you to check what they logged ("check my foods from last week", "do the BLS foods make sense?"), call check_logged_foods with the days to look back (7 unless they say; 0 for everything). It lists every food eaten, once, flagged ones first: for products the label, categories, ingredients and the BLS food the vitamins and minerals come from, with how well the label fits it; for BLS foods what was eaten. Judge each pairing like a nutrition-savvy friend: is the BLS food the same kind of food (a beer needs a beer, not beer ham; a ready meal its dish or its ingredients)? Do the amounts look like what one person eats? For each pairing that is clearly wrong, call propose_food_fix (search_foods first for the right BLS food): use "bls" with the BLS code, "ingredients" to build a product from its ingredient list, or "label_only"; reason: one short line in plain words why (e.g. "A beer, not a ham"). A fix for a BLS food changes the entries logged by itself in that period (give the same days). Only propose what you are sure of; mention borderline ones and odd amounts in your text, and say when everything looks right. The app shows its own flags; a flag alone is not a reason to change a pairing that makes sense, but a pairing of another kind (a drink with a food, tofu with fish, a supplement with any food) is almost always wrong. Foods the user marked as checked are left out; include them only when the user asks to check everything again. After a check, call propose_mark_checked once with every food you judged right (not the ones you propose fixes for or have doubts about), so their next check covers only new foods. What the check covers is what the user included under Include my data: their food log (from the period they chose) and, with Kitchen ticked, what they have at home in the ticked places ("at home: …"); when the tool says something is not included, tell them to tick it there. To change an open fix card, call it again with replaces set to its id (F1, F2, …).`;
 
 const WATER = `- Water: plain water (tap, mineral, sparkling, nothing added) goes in propose_water with ml and time, not in a meal: it is kept apart so it never ends a fast. Every other drink (coffee, tea, juice, milk, soda, beer, smoothies) goes in a meal as a food, since the app counts the water in foods from the database. Glasses ≈ 250 ml, a small bottle 500 ml, a large bottle 1,500 ml (or what the user says). For "about two litres over the day", propose two or three cards spread over the day rather than one. To change an open water card, call propose_water again with replaces set to its id (W1, W2, …).`;
 
@@ -391,7 +391,7 @@ function tools({ off = false, usda = false, webSearch = false, journal = false, 
     ...(recipes ? [LIST_RECIPES, proposeRecipe(items, ideas), proposePortion(changeItems), proposeBatch(changeItems)] : []),
     ...(recipes && ideas ? [NUTRIENT_GAPS, checkRecipe(items)] : []),
     ...(insights ? INSIGHT_TOOLS : []),
-    ...(check ? [CHECK_LOGGED_FOODS, PROPOSE_FOOD_FIX] : []),
+    ...(check ? [CHECK_LOGGED_FOODS, PROPOSE_FOOD_FIX, PROPOSE_MARK_CHECKED] : []),
   ];
 }
 
@@ -739,7 +739,7 @@ function proposeHome(codeHelp: string): BetaTool {
 const CHECK_LOGGED_FOODS: BetaTool = {
   name: 'check_logged_foods',
   description:
-    'List every food the user logged in the last days (BLS foods, products, ingredients of cooked portions), once each, flagged ones first: for products the label, categories, ingredients, the BLS food their vitamins and minerals come from and how well the label fits it; what was eaten when. Foods the user already marked as checked are left out unless include_checked is true. Only when the user asks for a check: this reads their log.',
+    'List every food the user logged in the last days (BLS foods, products, ingredients of cooked portions) and, if they included their kitchen, every food at home in the places they ticked, once each, flagged ones first: for products the label, categories, ingredients, the BLS food their vitamins and minerals come from and how well the label fits it; what was eaten when. Foods the user already marked as checked are left out unless include_checked is true. Only when the user asks for a check: this reads their log and kitchen, as far as they included them.',
   input_schema: {
     type: 'object',
     properties: {
@@ -767,6 +767,23 @@ const PROPOSE_FOOD_FIX: BetaTool = {
       replaces: { type: 'string', description: 'Id of the open fix card this corrects (e.g. "F1"); empty for a new one.' },
     },
     required: ['food', 'use', 'code', 'days', 'reason', 'replaces'],
+    additionalProperties: false,
+  },
+};
+
+const PROPOSE_MARK_CHECKED: BetaTool = {
+  name: 'propose_mark_checked',
+  description:
+    'Show the user one card that marks foods from check_logged_foods as checked ("Looks right"), so later checks leave them out until their BLS food changes; nothing changes until they accept. List every food you judged right in one call.',
+  // Not strict: see STRICT_NESTED. The app validates the input itself and sends errors back.
+  input_schema: {
+    type: 'object',
+    properties: {
+      foods: { type: 'array', items: { type: 'string' }, description: 'The keys check_logged_foods gave: OFF:…, USDA:… or BLS:<code>.' },
+      reason: { type: 'string', description: 'One short line, in the user\'s language, e.g. "These look right".' },
+      replaces: { type: 'string', description: 'Id of the open card this corrects (e.g. "F3"); empty for a new one.' },
+    },
+    required: ['foods', 'reason', 'replaces'],
     additionalProperties: false,
   },
 };

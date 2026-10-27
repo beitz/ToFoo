@@ -157,7 +157,7 @@ export function restoreCard(summary: Summary, logged: boolean, ctx: RestoreConte
     case 'B':
       return { kind: 'batch', batch: c, logged };
     case 'F':
-      return { kind: 'fix', fix: c, logged };
+      return (o.use === 'looks_right' ? { kind: 'checked', checked: c, logged } : { kind: 'fix', fix: c, logged });
     default:
       return undefined;
   }
