@@ -8,6 +8,7 @@
  * scenes and small fixes. A pull request that changes what users see adds its line here in the same PR.
  */
 export const changesEn = {
+  'change.174': 'Home has a line at the bottom when foods you ate or have at home are worth a look, or ten or more are not checked yet. It opens Check logged foods, which now lists what is at home too, and a question under it lets the assistant check them with your food log and kitchen already ticked.',
   'change.173': 'Include my data in the assistant has a Kitchen box: tick all of it, or open it and pick the fridge, freezer, cupboard or spices. The food check then also covers what is at home in those places, and only what you ticked. After a check, one card marks every food the assistant found right as checked, so the next check covers only new foods.',
   'change.173.major': 'Kitchen in the assistant, and food checks that skip what was found right',
   'change.172': 'When the app was updated while it stayed open, the assistant no longer says "no connection": it says a new version needs a reload, and Reload keeps the message you typed.',

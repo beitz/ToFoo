@@ -8696,3 +8696,30 @@ button.link-row {
   margin: 4px 0 8px;
   padding-left: 20px;
 }
+/* Foods to check, at the bottom of Home: one quiet line, the assistant's question under it. */
+.check-home {
+  margin: 8px 0;
+}
+.check-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 10px 0 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  text-decoration: none;
+  font-size: 0.9rem;
+}
+.check-line > svg:first-child {
+  flex: none;
+  color: var(--text-muted);
+}
+.check-home .ask-chips {
+  margin-top: 8px;
+}
+.check-line-flagged > svg:first-child {
+  color: var(--warn);
+}

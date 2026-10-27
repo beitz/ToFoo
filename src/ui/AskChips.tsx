@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useData } from '../app/data';
-import { setAsk } from '../app/ask';
+import { setAsk, type AskData } from '../app/ask';
 import { navigate } from '../app/router';
 import { getAiSettings } from '../ai/client';
 import { t } from '../i18n';
@@ -33,7 +33,7 @@ export function useHasApiKey(on: boolean): boolean | undefined {
  * still presses Send, so a tap never costs anything. Hidden with the "Question shortcuts" setting off.
  * Without the assistant or its API key they stay and lead to setting it up (owner's ask, 2026-10-23).
  */
-export function AskChips({ questions, to = 'assistant', className, tour }: { questions: string[]; to?: 'assistant' | 'insights'; className?: string; tour?: string }) {
+export function AskChips({ questions, to = 'assistant', className, tour, data }: { questions: string[]; to?: 'assistant' | 'insights'; className?: string; tour?: string; data?: AskData }) {
   const d = useData();
   const assistant = isOn(d.settings.features, 'aiAssistant');
   const hasKey = useHasApiKey(assistant);
@@ -50,7 +50,7 @@ export function AskChips({ questions, to = 'assistant', className, tour }: { que
           className="ask-chip"
           onClick={() => {
             if (!ready) return navigate('settings', 'assistant', 'key');
-            setAsk(q);
+            setAsk(q, data);
             navigate(to);
           }}
         >

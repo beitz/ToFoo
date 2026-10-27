@@ -12,6 +12,7 @@ import { AskDays } from './AskDays';
 import { viewsOf } from '../../settings/views';
 import { Icon } from '../../ui/Icon';
 import { foodCheck } from '../../logic/foodCheck';
+import { useHomeRefs } from '../pantry/usePantry';
 import { addDays } from '../../lib/dates';
 
 /** A settings section folded to its title (owner's ask, 2026-10-23: the page was a lot of scrolling); closed until tapped. */
@@ -52,7 +53,8 @@ export function SettingsPage() {
   const p = d.profile;
   const hiddenCount = s.hiddenNutrients.length;
   const toCheck = d.products.filter(needsCheck).length;
-  const toLook = foodCheck(d.log, d.batchesById, d.productsById, d.foods, addDays(d.today, -6), d.today, d.settings.checkedFoods).filter((r) => !r.checked && r.flags.length).length;
+  const home = useHomeRefs();
+  const toLook = foodCheck(d.log, d.batchesById, d.productsById, d.foods, addDays(d.today, -6), d.today, d.settings.checkedFoods, home).filter((r) => !r.checked && r.flags.length).length;
   return (
     <section>
       <header className="page-head">

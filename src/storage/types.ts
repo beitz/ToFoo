@@ -89,6 +89,7 @@ export type FeatureKey =
   | 'bestNextBatch'
   | 'advancedNumbers'
   | 'yesterdayNudge'
+  | 'checkNudge'
   | 'fillUnloggedDays'
   | 'backupReminder'
   | 'autoBackup'

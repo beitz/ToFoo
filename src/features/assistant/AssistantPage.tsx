@@ -84,7 +84,7 @@ import { refKey } from '../../lib/refs';
 import { itemIngredient } from '../../logic/ingredients';
 import { checkPortion, describeCheck, describeStatus, gapFoods, oftenEaten, portionIntake, recipeInfos } from '../../logic/recipeIdeas';
 import type { AppData } from '../../app/data';
-import { takeAsk } from '../../app/ask';
+import { takeAsk, takeAskData } from '../../app/ask';
 import { openCardIds, reopenChat, type Reopened } from './reopen';
 import { ChangeButton, DoneRow } from './CardFrame';
 import { pairingName } from '../food/pairingName';
@@ -291,6 +291,8 @@ function Chat({
   const textRef = useRef<HTMLTextAreaElement>(null);
   // A question shortcut's question starts in the box, for the user to send or change.
   const [text, setText] = useState(() => takeAsk() ?? '');
+  /** What the question that opened the chat ticks under Include my data (the food check: the food log and kitchen). */
+  const [askData] = useState(() => takeAskData());
   const [images, setImages] = useState<ComposerPhoto[]>([]);
   /** Photos sent so far, so numbers stay unique across the chat, and their size (base64 characters). */
   const [photoCount, setPhotoCount] = useState(was?.photoCount ?? 0);
@@ -335,13 +337,17 @@ function Chat({
   // Include my data (Patterns on): what the user ticks, and once sent, what the chat holds (fixed).
   const dataOn = !recipe && isOn(d.settings.features, 'insights');
   const kinds = availableKinds(d.settings.features);
-  const [choice, setChoice] = useState<DataChoice>(() => ({ open: patterns, period: '3m', kinds: patterns ? kinds : [], privateJournal: false, kitchen: [], kitchenOpen: false }));
+  const kitchenOn = dataOn && isOn(d.settings.features, 'atHome');
+  const [choice, setChoice] = useState<DataChoice>(() =>
+    askData && dataOn
+      ? { open: true, period: askData.period, kinds: kinds.filter((k) => askData.kinds.includes(k)), privateJournal: false, kitchen: askData.kitchen && kitchenOn ? [...HOME_PLACES] : [], kitchenOpen: false }
+      : { open: patterns, period: '3m', kinds: patterns ? kinds : [], privateJournal: false, kitchen: [], kitchenOpen: false },
+  );
   const shared = dataOn ? conversation.shared : undefined;
   const insightData = useInsightData(dataOn && (choice.open || choice.kinds.length + choice.kitchen.length > 0 || !!shared));
   /** The next message goes with data to look for patterns in (ticked, or the chat already has it). */
   const withData = dataOn && (!!shared?.kinds.length || choice.kinds.length > 0);
   // The kitchen can be included too (with At home on), place by place.
-  const kitchenOn = dataOn && isOn(d.settings.features, 'atHome');
   const pantry = useLiveQuery(() => (kitchenOn ? repo.db.pantry.toArray() : []), [kitchenOn]);
   const pantryLeft = usePantryLeft();
   const kitchenCounts = kitchenOn && pantry ? countByPlace(pantry, pantryLeft) : undefined;

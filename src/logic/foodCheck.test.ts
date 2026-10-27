@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Food } from '../foods/foodDb';
 import type { Batch, LogEntry, Product } from '../storage/types';
-import { checkSignature, foodCheck, productFlags } from './foodCheck';
+import { CHECK_PILE_UP, checkNudge, checkSignature, foodCheck, productFlags, type CheckRow } from './foodCheck';
 
 const food = (code: string, nameEn: string, per100: Food['per100']): Food => ({ code, nameEn, nameDe: nameEn, group: code.charAt(0), per100, provenance: {} });
 const foods = {
@@ -117,5 +117,15 @@ describe('checking what was logged', () => {
     ]);
     // Only the kitchen: nothing eaten is listed.
     expect(foodCheck([], new Map(), productsById, foods, '2026-10-20', '2026-10-26', {}, home).map((r) => r.name)).toEqual(['Helles', 'Onion raw']);
+  });
+
+  it('asks Home for a look while a food is flagged, or once enough unchecked ones piled up', () => {
+    const row = (key: string, flags: CheckRow['flags'], checked = false) => ({ key, flags, checked }) as CheckRow;
+    expect(checkNudge([])).toBeUndefined();
+    expect(checkNudge([row('a', []), row('b', ['auto'], true)])).toBeUndefined();
+    expect(checkNudge([row('a', []), row('b', ['misfit'])])).toEqual({ unchecked: 2, flagged: 1 });
+    const many = Array.from({ length: CHECK_PILE_UP }, (_, i) => row(`k${i}`, []));
+    expect(checkNudge(many)).toEqual({ unchecked: CHECK_PILE_UP, flagged: 0 });
+    expect(checkNudge(many.slice(1))).toBeUndefined();
   });
 });
