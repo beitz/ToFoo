@@ -8,6 +8,7 @@
  * scenes and small fixes. A pull request that changes what users see adds its line here in the same PR.
  */
 export const changesEn = {
+  'change.169': 'Settings → Check logged foods: every food you logged in the last 7 days, 4 weeks or ever, with the BLS food its vitamins and minerals come from. Labels that don\'t fit their BLS food, products without one and the app\'s unchecked picks come first, saying why.',
   'change.167': 'Ready meals from Open Food Facts are now built from their ingredient list: rice, chicken, tomatoes and so on, each as its BLS food at its share of the pack, instead of one similar food. The product page shows the parts, what was left out and how the energy compares with the label; Change still lets you pick one food. Products saved earlier get a button to fetch their list.',
   'change.167.major': 'Ready meals built from their ingredients',
   'change.166': 'Packaged ready meals get a better similar BLS food: the app now checks fat, protein and carbs against the label, so a butter chicken is no longer paired with chicken fat. Borrowed fatty and amino acids follow the label\'s fat and protein, and vitamins or minerals Open Food Facts lists as 0 count as not on the label instead of zero.',
