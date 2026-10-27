@@ -212,7 +212,7 @@ test('a ready meal is built from its ingredient list, shown on its page', async 
   expect(errors).toEqual([]);
 });
 
-test('the check list puts the app\'s unchecked pick first, and "Looks right" moves it', async ({ page }) => {
+test('the check list puts the app\'s unchecked pick first, and "Looks right" marks it checked', async ({ page }) => {
   const errors = watchErrors(page);
   await page.route('https://world.openfoodfacts.org/api/v3/product/**', (route) => route.fulfill({ json: BUTTER_CHICKEN }));
   await firstLaunch(page);
@@ -236,7 +236,15 @@ test('the check list puts the app\'s unchecked pick first, and "Looks right" mov
   await expect(page.getByText('Picked by the app, not checked yet')).toBeVisible();
   await expect(page.getByText('from its ingredients (14 BLS foods)')).toBeVisible();
   await expect(page.getByText('Oat flakes', { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Looks right' }).click();
+  const meal = page.locator('.check-row', { hasText: 'Butter Chicken' });
+  await meal.getByRole('button', { name: 'Looks right' }).click();
+  await expect(page.getByRole('heading', { name: 'Checked by you (1)' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Looks fine (1)' })).toBeVisible();
+  await expect(page.getByText('Picked by the app, not checked yet')).toHaveCount(0);
+  // Uncheck: no longer marked, but it stays the user's own pick, so it looks fine.
+  await meal.getByRole('button', { name: 'Uncheck' }).click();
   await expect(page.getByRole('heading', { name: 'Looks fine (2)' })).toBeVisible();
+  await page.goto('./#/settings');
+  await expect(page.getByText('Last 7 days: all look fine')).toBeVisible();
   expect(errors).toEqual([]);
 });

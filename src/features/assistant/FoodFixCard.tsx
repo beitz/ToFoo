@@ -4,6 +4,7 @@ import { href } from '../../app/router';
 import { t } from '../../i18n';
 import { labelValues, mixedFood } from '../../foods/products';
 import { formatDay } from '../../lib/dates';
+import { checkSignature } from '../../logic/foodCheck';
 import { repo } from '../../storage/repo';
 import type { LogEntry, Product } from '../../storage/types';
 import { Icon } from '../../ui/Icon';
@@ -32,21 +33,29 @@ export function FoodFixCard({ card, toast, onLogged, register }: CardProps<Extra
   async function save(): Promise<Undo | undefined> {
     if (!valid || saving) return;
     setSaving(true);
+    // The user picked the fix, so the food counts as checked with it (the assistant's next check leaves it out).
+    const checked = d.settings.checkedFoods ?? {};
     try {
       if (product) {
         const old: Pick<Product, 'match' | 'labelOnly'> = { ...(product.match ? { match: product.match } : {}), ...(product.labelOnly ? { labelOnly: true as const } : {}) };
-        await repo.setProductMatch(product.id, newMatch ? { match: newMatch } : { labelOnly: true });
+        const next = newMatch ? { match: newMatch } : { labelOnly: true as const };
+        await repo.setProductMatch(product.id, next);
+        await repo.setFoodChecked(product.id, checkSignature({ source: product.source, code: product.code }, next));
         onLogged(true, { food: fix.food, now: newName });
         return async () => {
           await repo.setProductMatch(product.id, old);
+          await repo.setFoodChecked(product.id, checked[product.id]);
           onLogged(false);
         };
       }
       const food = d.foods.byCode.get(fix.code!)!;
+      const key = `BLS:${food.code}`;
       for (const e of entries) await repo.updateLog({ ...e, ref: { source: 'BLS', version: d.foods.version, code: food.code }, label: food.nameEn });
+      await repo.setFoodChecked(key, 'BLS');
       onLogged(true, { food: fix.food, now: newName, entries: entries.length });
       return async () => {
         for (const e of entries) await repo.updateLog(e);
+        await repo.setFoodChecked(key, checked[key]);
         onLogged(false);
       };
     } finally {

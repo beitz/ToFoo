@@ -153,6 +153,8 @@ export interface Settings extends Versioned {
   favouriteMeals?: FavouriteMeal[];
   /** Activities pinned in the activity sheet; one tap fills the sheet with them. */
   favouriteActivities?: FavouriteActivity[];
+  /** Foods marked "Looks right" on Check logged foods: refKey → what the mark holds for (logic/foodCheck checkSignature). */
+  checkedFoods?: Record<string, string>;
   /** Log screen sections the user closed (true) or opened (false), by section key; unset = open. */
   logCollapsed?: Record<string, boolean>;
   /** Recipe ideas: diet, likes, kitchen, time, batch size, in the user's words (guidance for the assistant, not a filter). */

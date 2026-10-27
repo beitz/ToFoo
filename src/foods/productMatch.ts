@@ -44,6 +44,76 @@ const DISH = /\b(meals?|dishes|soups?|stews?|pizzas?|lasagnas?|salads?|sandwiche
  */
 const ALCOHOLIC = /^(?!(ginger|root) beer)(alcoholic beverages|(\S+ )*beers?|(\S+ )*wines?|spirits|liqueurs)$/i;
 
+/**
+ * The kind of food a product is, from its categories and name, so a word shared by two kinds of
+ * food never pairs them (owner's find, 2026-10-27: after the beer and beer sausage, a check of 800
+ * popular products found smoked tofu → smoked carp, tomato spread → mackerel in tomato sauce, oat
+ * drink → vegetarian goulash). A drink only gets a drink; a food never gets a BLS drink; fish and
+ * meat (groups T, U, V, W) only go to a product that names fish or meat, and never to a meat or
+ * dairy alternative; vitamin and mineral supplements get no food at all (their label is all there
+ * is). Without categories nothing is known, and nothing is ruled out.
+ */
+export type Kind = { drink: 'drink' | 'food' | 'unknown'; fish: boolean; meat: boolean; supplement: boolean };
+/**
+ * Open Food Facts' own category for drinks. Beverage preparations (powders, instant coffee) are not
+ * drunk as sold, and a product also filed as a food (soy sauce among "Beverages") is left open.
+ */
+const BEVERAGES = /^beverages$/i;
+const PREPARATION = /\b(powders?|beverage preparations|beverages preparations|dehydrated beverages|instant beverages|syrups)\b/i;
+const SOME_BEVERAGE = /\b(beverages?|drinks?)\b/i;
+const FOOD_TOP = /^(condiments|sauces|spreads|snacks|meals|dairies|desserts|groceries)$/i;
+const SUPPLEMENT = /\b(vitamin|mineral|multivitamin)\b.*\bsupplements$/i;
+const ALTERNATIVE = /\b(alternatives?|analogues?|substitutes?|vegan|vegetarian|veggie|imitations?)\b|vegetarisch|vegane?\b/i;
+const FISH_CATEGORY = /\b(fish|fishes|seafoods?|tunas?|salmons?|mackerels?|sardines?|herrings?|trouts?|anchovies|shrimps?|prawns?|mussels?|crustaceans|molluscs|surimi|cods?|pollock)\b/i;
+const MEAT_CATEGORY = /\b(meats?|poultry|poultries|chickens?|turkeys?|beef|pork|hams?|sausages?|salamis?|bacon|ducks?|lamb|veal|game|livers?|pâtés?|pates?|charcuteries?|cold cuts|chorizo|frankfurters?|burgers?|kebabs?|nuggets?)\b/i;
+// German and English words inside product names ("Thunfisch", "Hähnchenbrust", "Leberwurst").
+const FISH_NAME = /fisch|lachs|hering|makrele|forelle|sardin|garnele|krabbe|muschel|kabeljau|matjes|scampi|shrimp|tuna|salmon|fish/i;
+const MEAT_NAME = /fleisch|wurst|würst|schinken|salami|speck|hähnchen|huhn|hühn|puten|rind|schwein|kalb|lamm|leber|hack|frikadell|chicken|beef|pork|bacon|turkey|meat|\bham\b/i;
+/**
+ * BLS foods drunk as they are, in whatever group (juices in F, plant drinks in C and H, milk and
+ * kefir in M): the name's head (before a comma, "with" or "from") names a drink.
+ */
+const BLS_DRINK = /\b(drinks?|beverages?|juices?|nectars?|smoothies?|lemonade|shakes?|lassi|kefir|ayran|buttermilk|whey|milk|water)\b/i;
+const NOT_DRUNK = /\b(soup|jelly|aspic|chocolate|rolls?|cake|bread|crispbread|ice|porridge|pancakes?|dressing|substitute|powder|cap|cheese|camembert)\b/i;
+
+export function kindOf(product: Pick<Product, 'name' | 'categories'>): Kind {
+  const cats = product.categories;
+  if (!cats.length) return { drink: 'unknown', fish: true, meat: true, supplement: false };
+  const alternative = ALTERNATIVE.test(product.name) || cats.some((c) => ALTERNATIVE.test(c));
+  const named = (category: RegExp, name: RegExp) => !alternative && (cats.some((c) => category.test(c)) || name.test(product.name));
+  const beverage = cats.some((c) => BEVERAGES.test(c));
+  const open = cats.some((c) => PREPARATION.test(c) || (SOME_BEVERAGE.test(c) && !/foods and beverages$/i.test(c)));
+  return {
+    drink: beverage && !cats.some((c) => PREPARATION.test(c) || FOOD_TOP.test(c)) ? 'drink' : open ? 'unknown' : 'food',
+    fish: named(FISH_CATEGORY, FISH_NAME),
+    meat: named(MEAT_CATEGORY, MEAT_NAME),
+    supplement: cats.some((c) => SUPPLEMENT.test(c)),
+  };
+}
+
+const isBlsDrink = (food: Pick<Food, 'code' | 'nameEn'>) => {
+  if ('NP'.includes(food.code.charAt(0))) return true;
+  const head = food.nameEn.split(/,| with | from | made | for | in | of | \(| min\.| max\.| < | > |\d/)[0]!.trim();
+  return BLS_DRINK.test(head) && !NOT_DRUNK.test(head);
+};
+
+/** Fish and meat in BLS names outside their groups (dishes in X and Y, "Ravioli (meat filling)"). */
+const BLS_FISH = /\b(fish|salmon|tuna|herring|mackerel|trout|carp|cod|pollock|saithe|sardines?|anchov\w*|shrimps?|prawns?|mussels?|crabs?|lobster|squid|octopus|seafood|plaice|redfish|eel)\b/i;
+const BLS_MEAT = /\b(meat|beef|pork|veal|lamb|mutton|chicken|turkey|duck|goose|ham|bacon|sausages?|salami|liver|game|venison|rabbit|meatballs?|mince)\b/i;
+const BLS_MEATLESS = /\b(coconut|substitute|meat-free|meatless|vegetarian|vegan|plant-based|imitation)\b/i;
+
+/** Why a BLS food is not the kind of food the product is, or undefined when it may be. */
+export function kindMismatch(kind: Kind, food: Pick<Food, 'code' | 'nameEn'>): 'supplement' | 'drink' | 'food' | 'fish' | 'meat' | undefined {
+  if (kind.supplement) return 'supplement';
+  const group = food.code.charAt(0);
+  if (kind.drink === 'drink' && !isBlsDrink(food)) return 'drink';
+  if (kind.drink === 'food' && 'NP'.includes(group)) return 'food';
+  const meatless = BLS_MEATLESS.test(food.nameEn);
+  if (!kind.fish && (group === 'T' || (!meatless && BLS_FISH.test(food.nameEn)))) return 'fish';
+  if (!kind.meat && ('UVW'.includes(group) || (!meatless && BLS_MEAT.test(food.nameEn)))) return 'meat';
+  return undefined;
+}
+
 function cleanQuery(text: string, drop: ReadonlySet<string>): string {
   // "Milch 1,5%" → "milch 1.5", which BLS writes as "1.5 % fat"; other numbers (pack sizes, "No. 5") say nothing.
   return normalize(text.replace(/(\d),(\d)/g, '$1.$2').replace(/%/g, ' '))
@@ -102,16 +172,22 @@ export function rankMatches(
     queries.push([q, w]);
   }
   const alcoholic = product.categories.some((c) => ALCOHOLIC.test(c));
-  const groupBoost = alcoholic
+  const kind = kindOf(product);
+  const byGroup = alcoholic
     ? (key: string) => (key.charAt(0) === 'P' ? 1 : 0)
     : dish
       ? (key: string) => ('XY'.includes(key.charAt(0)) ? 1 : (boost?.(key) ?? 1))
-      : boost;
+      : (key: string) => boost?.(key) ?? 1;
+  // A food of another kind scores 0 and is left out.
+  const groupBoost = (key: string) => {
+    const food = foods.byCode.get(key);
+    return food && kindMismatch(kind, food) ? 0 : byGroup(key);
+  };
   const total = new Map<string, number>();
   for (const [q, weight] of queries) {
     const n = q.split(' ').filter(Boolean).length;
     if (!n) continue;
-    for (const r of looseSearch(index, q, { limit: PER_QUERY, rare: true, ...(groupBoost ? { boost: groupBoost } : {}) })) {
+    for (const r of looseSearch(index, q, { limit: PER_QUERY, rare: true, boost: groupBoost })) {
       if (!r.score) continue;
       total.set(r.key, (total.get(r.key) ?? 0) + (weight * r.score) / (WORD_SCORE * n));
     }

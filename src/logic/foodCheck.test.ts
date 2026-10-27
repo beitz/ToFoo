@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Food } from '../foods/foodDb';
 import type { Batch, LogEntry, Product } from '../storage/types';
-import { foodCheck, productFlags } from './foodCheck';
+import { checkSignature, foodCheck, productFlags } from './foodCheck';
 
 const food = (code: string, nameEn: string, per100: Food['per100']): Food => ({ code, nameEn, nameDe: nameEn, group: code.charAt(0), per100, provenance: {} });
 const foods = {
@@ -55,6 +55,12 @@ describe('checking what was logged', () => {
     expect(productFlags({ ...water, labelOnly: true }, foods).flags).toEqual([]);
   });
 
+  it('flags a food of another kind first: a beer paired with beer ham', () => {
+    const beer = { ...helles, categories: ['Beverages', 'Alcoholic beverages', 'Beers'] };
+    expect(productFlags(beer, foods)).toMatchObject({ kind: 'drink', flags: ['kind', 'misfit'] });
+    expect(productFlags({ ...beer, match: { version: '4.0', code: 'P161000' } }, foods).flags).toEqual([]);
+  });
+
   it('lists every food of the period once, flagged ones first, with portions by recipe', () => {
     const batch = {
       id: 'b1',
@@ -74,5 +80,25 @@ describe('checking what was logged', () => {
     expect(rows.map((r) => r.name)).toEqual(['Helles', 'Mineralwasser', 'Pils', 'Onion raw', 'Oat flakes']);
     expect(rows[3]).toMatchObject({ count: 2, grams: 80, recipes: [] });
     expect(rows[4]).toMatchObject({ count: 0, grams: 0, recipes: ['Porridge'] });
+  });
+
+  it('puts the foods the user checked last, while they still have the food they were checked with', () => {
+    const log: LogEntry[] = [
+      entry('2026-10-21', { source: 'OFF', code: '1' }, 500),
+      entry('2026-10-21', { source: 'BLS', version: '4.0', code: 'G480100' }, 30),
+      entry('2026-10-22', { source: 'OFF', code: '2' }, 500),
+    ];
+    const checked = { 'OFF:1': checkSignature(helles, helles), 'BLS:G480100': 'BLS' };
+    expect(checked['OFF:1']).toBe('W271000');
+    const rows = foodCheck(log, new Map(), productsById, foods, '2026-10-20', '2026-10-26', checked);
+    expect(rows.map((r) => [r.name, r.checked])).toEqual([
+      ['Pils', false],
+      ['Helles', true],
+      ['Onion raw', true],
+    ]);
+    // A new food for it takes the mark off.
+    const changed = new Map(productsById).set(helles.id, { ...helles, match: { version: '4.0', code: 'P161000' } });
+    expect(foodCheck(log, new Map(), changed, foods, '2026-10-20', '2026-10-26', checked).find((r) => r.name === 'Helles')!.checked).toBe(false);
+    expect(checkSignature(water, { labelOnly: true })).toBe('label');
   });
 });

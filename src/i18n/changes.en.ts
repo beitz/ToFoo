@@ -8,6 +8,7 @@
  * scenes and small fixes. A pull request that changes what users see adds its line here in the same PR.
  */
 export const changesEn = {
+  'change.171': 'Packaged products are only paired with the same kind of food: a drink with a drink, fish and meat only with fish and meat (smoked tofu no longer gets smoked carp), supplements with nothing. Check logged foods flags pairings of another kind, and Looks right on any row moves it to Checked by you, which the assistant\'s check leaves out.',
   'change.170': 'The assistant can check the foods you logged: tap the question on Check logged foods, and it proposes a fix for each wrong pairing as a card you apply with one tap (a beer paired with beer ham, garlic that was an onion).',
   'change.169': 'Settings → Check logged foods: every food you logged in the last 7 days, 4 weeks or ever, with the BLS food its vitamins and minerals come from. Labels that don\'t fit their BLS food, products without one and the app\'s unchecked picks come first, saying why.',
   'change.167': 'Ready meals from Open Food Facts are now built from their ingredient list: rice, chicken, tomatoes and so on, each as its BLS food at its share of the pack, instead of one similar food. The product page shows the parts, what was left out and how the energy compares with the label; Change still lets you pick one food. Products saved earlier get a button to fetch their list.',

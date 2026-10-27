@@ -167,6 +167,15 @@ export function createRepo(db: ToFooDB) {
       });
     },
 
+    /** Mark a food "Looks right" on Check logged foods with what the mark holds for, or take the mark off (undefined). */
+    async setFoodChecked(key: string, signature: string | undefined): Promise<void> {
+      await db.transaction('rw', db.settings, async () => {
+        const s = (await db.settings.get('settings')) ?? defaultSettings();
+        const { [key]: _old, ...rest } = s.checkedFoods ?? {};
+        await db.settings.put({ ...s, checkedFoods: signature === undefined ? rest : { ...rest, [key]: signature }, id: 'settings', schemaVersion: v });
+      });
+    },
+
     /** Pin an activity in the activity sheet, at `index` (undo puts it back where it was) or at the end. */
     async addFavouriteActivity(fav: FavouriteActivity, index?: number): Promise<void> {
       await db.transaction('rw', db.settings, async () => {

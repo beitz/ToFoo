@@ -52,7 +52,7 @@ export function SettingsPage() {
   const p = d.profile;
   const hiddenCount = s.hiddenNutrients.length;
   const toCheck = d.products.filter(needsCheck).length;
-  const toLook = foodCheck(d.log, d.batchesById, d.productsById, d.foods, addDays(d.today, -6), d.today).filter((r) => r.flags.length).length;
+  const toLook = foodCheck(d.log, d.batchesById, d.productsById, d.foods, addDays(d.today, -6), d.today, d.settings.checkedFoods).filter((r) => !r.checked && r.flags.length).length;
   return (
     <section>
       <header className="page-head">

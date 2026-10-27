@@ -136,6 +136,10 @@ export const settingsSchema = z.object({
   favourites: z.array(foodRef).optional(),
   favouriteMeals: z.array(favouriteMeal).optional(),
   favouriteActivities: z.array(favouriteActivity).optional().describe('Activities pinned in the activity sheet: what, usual minutes and effort, Compendium row, outside, sun skin; no time'),
+  checkedFoods: z
+    .record(z.string(), z.string())
+    .optional()
+    .describe('Foods marked "Looks right" on Check logged foods: food key (BLS:<code>, OFF:<barcode>, USDA:<id>) → the BLS code, mix or "label" it was right with'),
   logCollapsed: z.record(z.string(), z.boolean()).optional(),
   cookingPreferences: z.string().optional(),
   potGrams: z.number().positive().optional(),
