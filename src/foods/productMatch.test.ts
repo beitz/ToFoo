@@ -14,7 +14,7 @@ const product = (name: string, brand: string, categories: string[], extra: Parti
   code: '1',
   name,
   brand,
-  per100: { ENERCC: 500 },
+  per100: {},
   categories,
   fetchedAt: 0,
   ...extra,
@@ -117,8 +117,21 @@ describe.runIf(existsSync(file))('pairing products with a similar BLS food', () 
   it('compares fat, protein and carbohydrate', () => {
     expect(macroSimilarity({ FAT: 7.1, PROT625: 5.3, CHO: 14.1 }, { FAT: 100, PROT625: 't', CHO: 0 })).toBeCloseTo(1 - 112.3 / 126.5);
     expect(macroSimilarity({ FAT: 1, PROT625: 2, CHO: 3 }, { FAT: 1, PROT625: 2, CHO: 3 })).toBe(1);
-    // Too little to compare: no say.
-    expect(macroSimilarity({ ENERCC: 500 }, { FAT: 1, PROT625: 2 })).toBe(1);
+    // Too few of them on the label: energy decides, else no say.
+    expect(macroSimilarity({ ENERCC: 42, CHO: 3 }, { ENERCC: 250, FAT: 20, PROT625: 15, CHO: 0 })).toBeCloseTo(1 - 208 / 292);
+    expect(macroSimilarity({ CHO: 3 }, { FAT: 1, PROT625: 2 })).toBe(1);
+  });
+
+  it('pairs beer with a BLS beer, never with beer ham or Bierwurst', () => {
+    // Real Open Food Facts products (fetched 2026-10-27); "Helles" first got light pork tongue sausage.
+    const beer = (name: string, brand: string, categories: string[], per100: Product['per100']) => best(product(name, brand, categories, { per100 }));
+    const german = ['Beverages', 'Alcoholic beverages', 'Beers', 'Country specific beers', 'Beers from Germany'];
+    expect(beer('Oettinger Helles', 'Oettinger', [...german, 'Bavarian beers'], { ENERCC: 42, CHO: 3 })).toBe('Pale beer');
+    expect(beer('Pils', "Beck's", german, { ENERCC: 38, FAT: 0.01, PROT625: 0.37, CHO: 2.2 })).toBe('Pilsner beer');
+    expect(beer('Sternburg Export', 'Sternburg', german, { ENERCC: 41, FAT: 0, PROT625: 0.5, CHO: 2.1 })).toBe('Pale export beer');
+    expect(beer('Paulaner Weissbier', 'Paulaner', ['Beverages', 'Alcoholic beverages', 'Beers', 'Lagers', 'Wheat beers', 'Beers from Germany'], { ENERCC: 42, CHO: 3.2 })).toMatch(/^Wheat beer/);
+    // No beer fits: nothing, rather than something else with "beer" in its name.
+    expect(beer('Beers', '', ['Beverages', 'Alcoholic beverages', 'Beers'], { ENERCC: 250, FAT: 20, PROT625: 15, CHO: 0 })).toBeUndefined();
   });
 
   it('picks nothing when nothing fits well enough', () => {

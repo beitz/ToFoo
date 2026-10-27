@@ -37,6 +37,12 @@ const MACROS = ['FAT', 'PROT625', 'CHO'] as const;
 const FIT = 0.75;
 /** Categories that make a product a dish, so BLS dishes (groups X, Y) are not pushed back. */
 const DISH = /\b(meals?|dishes|soups?|stews?|pizzas?|lasagnas?|salads?|sandwiches)\b/i;
+/**
+ * Categories of beer, wine and spirits: only BLS alcoholic drinks (group P, alcohol-free beer
+ * included) can stand for them, so "Helles" or "Beers" never lands on beer ham or Bierwurst
+ * (ginger and root beer are soft drinks).
+ */
+const ALCOHOLIC = /^(?!(ginger|root) beer)(alcoholic beverages|(\S+ )*beers?|(\S+ )*wines?|spirits|liqueurs)$/i;
 
 function cleanQuery(text: string, drop: ReadonlySet<string>): string {
   // "Milch 1,5%" → "milch 1.5", which BLS writes as "1.5 % fat"; other numbers (pack sizes, "No. 5") say nothing.
@@ -48,7 +54,13 @@ function cleanQuery(text: string, drop: ReadonlySet<string>): string {
 
 const amount = (v: RawValue | undefined) => (typeof v === 'number' ? v : v === 't' ? 0 : undefined);
 
-/** How alike two foods are in fat, protein and carbohydrate (0–1); 1 when fewer than two can be compared. */
+const closeness = (x: number, y: number) => (x + y === 0 ? 1 : 1 - Math.abs(x - y) / (x + y));
+
+/**
+ * How alike two foods are in fat, protein and carbohydrate (0–1). With fewer than two of them on
+ * both, energy decides instead (a beer label giving only kcal and carbohydrate is no sausage);
+ * 1 when that is missing too.
+ */
 export function macroSimilarity(a: Readonly<Record<string, RawValue>>, b: Readonly<Record<string, RawValue>>): number {
   let diff = 0;
   let sum = 0;
@@ -61,7 +73,10 @@ export function macroSimilarity(a: Readonly<Record<string, RawValue>>, b: Readon
     sum += x + y;
     n++;
   }
-  return n < 2 || sum === 0 ? 1 : 1 - diff / sum;
+  if (n >= 2) return sum === 0 ? 1 : 1 - diff / sum;
+  const x = amount(a.ENERCC);
+  const y = amount(b.ENERCC);
+  return x === undefined || y === undefined ? 1 : closeness(x, y);
 }
 
 type MatchInput = Pick<Product, 'name' | 'brand' | 'categories'> & Partial<Pick<Product, 'per100'>>;
@@ -86,12 +101,18 @@ export function rankMatches(
     seen.add(q);
     queries.push([q, w]);
   }
-  const groupBoost = dish ? (key: string) => ('XY'.includes(key.charAt(0)) ? 1 : (boost?.(key) ?? 1)) : boost;
+  const alcoholic = product.categories.some((c) => ALCOHOLIC.test(c));
+  const groupBoost = alcoholic
+    ? (key: string) => (key.charAt(0) === 'P' ? 1 : 0)
+    : dish
+      ? (key: string) => ('XY'.includes(key.charAt(0)) ? 1 : (boost?.(key) ?? 1))
+      : boost;
   const total = new Map<string, number>();
   for (const [q, weight] of queries) {
     const n = q.split(' ').filter(Boolean).length;
     if (!n) continue;
     for (const r of looseSearch(index, q, { limit: PER_QUERY, rare: true, ...(groupBoost ? { boost: groupBoost } : {}) })) {
+      if (!r.score) continue;
       total.set(r.key, (total.get(r.key) ?? 0) + (weight * r.score) / (WORD_SCORE * n));
     }
   }
