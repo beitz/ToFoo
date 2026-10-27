@@ -1077,6 +1077,16 @@
                         ]
                       }
                     },
+                    "checkedFoods": {
+                      "description": "Foods marked \"Looks right\" on Check logged foods: food key (BLS:<code>, OFF:<barcode>, USDA:<id>) → the BLS code, mix or \"label\" it was right with",
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    },
                     "logCollapsed": {
                       "type": "object",
                       "propertyNames": {

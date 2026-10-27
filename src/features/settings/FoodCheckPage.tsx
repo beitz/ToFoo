@@ -4,12 +4,11 @@ import { href } from '../../app/router';
 import { useToast } from '../../app/toast';
 import { t, type MessageKey } from '../../i18n';
 import { pairedFood } from '../../foods/productMatch';
-import { labelValues, productLabel } from '../../foods/products';
+import { labelValues } from '../../foods/products';
 import { addDays } from '../../lib/dates';
 import { fmtGrams } from '../../lib/format';
-import { foodCheck, type CheckFlag, type CheckRow } from '../../logic/foodCheck';
+import { checkSignature, foodCheck, type CheckFlag, type CheckRow } from '../../logic/foodCheck';
 import { repo } from '../../storage/repo';
-import type { Product } from '../../storage/types';
 import { Segmented } from '../../ui/controls';
 import { AskChips } from '../../ui/AskChips';
 import { Icon } from '../../ui/Icon';
@@ -25,7 +24,8 @@ const PERIODS: Period[] = ['7', '28', 'all'];
 const periodFrom = (period: Period, today: string, log: ReadonlyArray<{ day: string }>) =>
   period === 'all' ? log.reduce((a, e) => (e.day < a ? e.day : a), today) : addDays(today, -Number(period) + 1);
 
-const FLAG_TEXT: Record<CheckFlag, MessageKey> = { misfit: 'check.misfit', none: 'check.none', auto: 'check.auto' };
+const FLAG_TEXT: Record<Exclude<CheckFlag, 'kind'>, MessageKey> = { misfit: 'check.misfit', none: 'check.none', auto: 'check.auto' };
+const flagText = (f: CheckFlag, r: CheckRow) => t(f === 'kind' ? (`check.kind.${r.kind}` as MessageKey) : FLAG_TEXT[f]);
 /**
  * Every food logged in a period with the BLS food its vitamins and minerals come from (owner's ask,
  * 2026-10-27, after a beer was paired with a beer sausage). Flagged ones first: a label that does
@@ -35,15 +35,31 @@ export function FoodCheckPage() {
   const d = useData();
   const toast = useToast();
   const [period, setPeriod] = useState<Period>('7');
-  const rows = foodCheck(d.log, d.batchesById, d.productsById, d.foods, periodFrom(period, d.today, d.log), d.today);
-  const flagged = rows.filter((r) => r.flags.length);
-  const fine = rows.filter((r) => !r.flags.length);
+  const checkedFoods = d.settings.checkedFoods ?? {};
+  const rows = foodCheck(d.log, d.batchesById, d.productsById, d.foods, periodFrom(period, d.today, d.log), d.today, checkedFoods);
+  const flagged = rows.filter((r) => !r.checked && r.flags.length);
+  const fine = rows.filter((r) => !r.checked && !r.flags.length);
+  const checked = rows.filter((r) => r.checked);
 
-  async function confirm(p: Product) {
-    if (!p.match) return;
-    const { auto: _a, ...match } = p.match;
-    await repo.setProductMatch(p.id, { match });
-    toast(t('match.saved', { name: productLabel(p), food: pairingName(p.match, d.foods) }), () => repo.setProductMatch(p.id, { match: p.match }));
+  /** "Looks right": the mark holds for the food it has now; an app pick becomes the user's own. */
+  async function confirm(r: CheckRow) {
+    const p = r.product;
+    const before = checkedFoods[r.key];
+    if (p?.match?.auto) {
+      const { auto: _a, ...match } = p.match;
+      await repo.setProductMatch(p.id, { match });
+    }
+    await repo.setFoodChecked(r.key, checkSignature(r.ref, p));
+    toast(t('check.marked', { name: r.name }), async () => {
+      if (p?.match?.auto) await repo.setProductMatch(p.id, { match: p.match });
+      await repo.setFoodChecked(r.key, before);
+    });
+  }
+
+  async function uncheck(r: CheckRow) {
+    const before = checkedFoods[r.key];
+    await repo.setFoodChecked(r.key, undefined);
+    toast(t('check.unmarked', { name: r.name }), () => repo.setFoodChecked(r.key, before));
   }
 
   const source = (r: CheckRow) => {
@@ -64,12 +80,13 @@ export function FoodCheckPage() {
           <span className="small">
             <FoodSourceTag foodRef={r.ref} product={p} /> {source(r)}
           </span>
-          {r.flags.map((f) => (
-            <span key={f} className="small check-flag">
-              <Icon name="warning" size={14} /> {t(FLAG_TEXT[f])}
-            </span>
-          ))}
-          {r.flags.includes('misfit') && p && food && (
+          {!r.checked &&
+            r.flags.map((f) => (
+              <span key={f} className="small check-flag">
+                <Icon name="warning" size={14} /> {flagText(f, r)}
+              </span>
+            ))}
+          {!r.checked && (r.flags.includes('misfit') || r.flags.includes('kind')) && p && food && (
             <span className="muted small check-compare">
               {t('check.label')}: {makeUp(labelValues(p))}
               <br />
@@ -78,8 +95,12 @@ export function FoodCheckPage() {
           )}
           {eaten && <span className="muted small">{eaten}</span>}
         </a>
-        {p?.match?.auto && (
-          <button className="btn btn-small btn-secondary" onClick={() => void confirm(p)}>
+        {r.checked ? (
+          <button className="btn btn-small btn-ghost" onClick={() => void uncheck(r)}>
+            {t('check.uncheck')}
+          </button>
+        ) : (
+          <button className="btn btn-small btn-secondary" onClick={() => void confirm(r)}>
             {t('match.confirm')}
           </button>
         )}
@@ -103,6 +124,13 @@ export function FoodCheckPage() {
         <>
           <h2 className="section-title">{t('check.sectionFine', { n: fine.length })}</h2>
           <ul className="result-list card product-check">{fine.map(row)}</ul>
+        </>
+      )}
+      {checked.length > 0 && (
+        <>
+          <h2 className="section-title">{t('check.sectionChecked', { n: checked.length })}</h2>
+          <p className="muted small">{t('check.checkedNote')}</p>
+          <ul className="result-list card product-check">{checked.map(row)}</ul>
         </>
       )}
     </SubPage>

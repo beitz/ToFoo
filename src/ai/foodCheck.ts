@@ -23,6 +23,8 @@ export interface FoodCheckData {
   log: readonly LogEntry[];
   batchesById: ReadonlyMap<string, Batch>;
   productsById: ReadonlyMap<string, Product>;
+  /** Foods the user marked "Looks right" (refKey → checkSignature); left out unless asked for. */
+  checked?: Readonly<Record<string, string>>;
 }
 
 /** Entries listed per food; the rest is counted. */
@@ -43,6 +45,13 @@ function entriesOf(key: string, from: string, to: string, log: readonly LogEntry
 }
 
 const FLAG_TEXT = { misfit: 'LABEL AND ITS BLS FOOD DIFFER A LOT', none: 'NO BLS FOOD: only the label counts', auto: 'picked by the app, not checked' } as const;
+const KIND_TEXT = {
+  drink: 'A DRINK PAIRED WITH A FOOD',
+  food: 'A FOOD PAIRED WITH A DRINK',
+  fish: 'PAIRED WITH FISH BUT IS NOT FISH',
+  meat: 'PAIRED WITH MEAT BUT IS NOT MEAT',
+  supplement: 'A SUPPLEMENT PAIRED WITH A FOOD (should be label only)',
+} as const;
 
 function describeRow(r: CheckRow, data: FoodCheckData, db: Pick<FoodDb, 'byCode' | 'groups'>, from: string, to: string): string {
   const parts: string[] = [];
@@ -58,7 +67,8 @@ function describeRow(r: CheckRow, data: FoodCheckData, db: Pick<FoodDb, 'byCode'
     const food = r.ref.source === 'BLS' ? db.byCode.get(r.ref.code) : undefined;
     parts.push(food ? `BLS:${describeFood(food, db)}` : `${r.key} | ${r.name}`);
   }
-  for (const f of r.flags) parts.push(FLAG_TEXT[f]);
+  if (r.checked) parts.push('checked by the user');
+  else for (const f of r.flags) parts.push(f === 'kind' ? KIND_TEXT[r.kind!] : FLAG_TEXT[f]);
   const entries = entriesOf(r.key, from, to, data.log);
   if (entries.length) {
     const shown = entries.slice(0, ENTRIES_SHOWN).map((e) => `${e.day} ${fmtNumber(e.grams, 0)} g${e.pieces ? ` (${e.pieces} pieces)` : ''}`);
@@ -68,19 +78,22 @@ function describeRow(r: CheckRow, data: FoodCheckData, db: Pick<FoodDb, 'byCode'
   return parts.join(' | ');
 }
 
-const checkInput = z.object({ days: z.number().int().min(0).max(3650) });
+const checkInput = z.object({ days: z.number().int().min(0).max(3650), include_checked: z.boolean().optional() });
 
 /** Run `check_logged_foods`: every food eaten in the period, flagged ones first. */
 export function runCheckLoggedFoods(input: unknown, data: FoodCheckData, db: Pick<FoodDb, 'byCode' | 'groups'>): { ok: boolean; text: string } {
   const parsed = checkInput.safeParse(input);
-  if (!parsed.success) return { ok: false, text: 'Invalid input: expected {"days": 7} (0 for everything logged).' };
+  if (!parsed.success) return { ok: false, text: 'Invalid input: expected {"days": 7, "include_checked": false} (days 0 for everything logged).' };
   const { from, to } = period(parsed.data.days, data);
-  const rows = foodCheck(data.log, data.batchesById, data.productsById, db, from, to);
-  if (!rows.length) return { ok: true, text: `Nothing was logged from ${from} to ${to}.` };
-  const flagged = rows.filter((r) => r.flags.length).length;
+  const all = foodCheck(data.log, data.batchesById, data.productsById, db, from, to, data.checked);
+  const rows = parsed.data.include_checked ? all : all.filter((r) => !r.checked);
+  const skipped = all.length - rows.length;
+  const note = skipped ? ` ${skipped} more the user already checked are left out (include_checked: true lists them too).` : '';
+  if (!rows.length) return { ok: true, text: `Nothing ${skipped ? 'left to check' : 'was logged'} from ${from} to ${to}.${note}` };
+  const flagged = rows.filter((r) => !r.checked && r.flags.length).length;
   return {
     ok: true,
-    text: `Foods logged from ${from} to ${to}: ${rows.length}, ${flagged} flagged by the app. One line each: key, the food or product, its BLS food and what was eaten. Keys are BLS:<code> for BLS foods and OFF:/USDA: for products.\n${rows.map((r) => describeRow(r, data, db, from, to)).join('\n')}`,
+    text: `Foods logged from ${from} to ${to}: ${rows.length}, ${flagged} flagged by the app.${note} One line each: key, the food or product, its BLS food and what was eaten. Keys are BLS:<code> for BLS foods and OFF:/USDA: for products.\n${rows.map((r) => describeRow(r, data, db, from, to)).join('\n')}`,
   };
 }
 

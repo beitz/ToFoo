@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import type { Product } from '../storage/types';
 import type { BlsFile } from './blsTypes';
 import { buildFoodDb, groupSearchBoost } from './foodDb';
-import { autoMatches, bestMatch, bestPairing, ingredientMix, initialChoice, macroSimilarity, mixDetail, withChoice, wantsAutoMatch } from './productMatch';
+import { autoMatches, bestMatch, bestPairing, ingredientMix, initialChoice, kindMismatch, kindOf, macroSimilarity, mixDetail, withChoice, wantsAutoMatch } from './productMatch';
 import { buildIndex } from './search';
 
 const product = (name: string, brand: string, categories: string[], extra: Partial<Product> = {}): Product => ({
@@ -132,6 +132,46 @@ describe.runIf(existsSync(file))('pairing products with a similar BLS food', () 
     expect(beer('Paulaner Weissbier', 'Paulaner', ['Beverages', 'Alcoholic beverages', 'Beers', 'Lagers', 'Wheat beers', 'Beers from Germany'], { ENERCC: 42, CHO: 3.2 })).toMatch(/^Wheat beer/);
     // No beer fits: nothing, rather than something else with "beer" in its name.
     expect(beer('Beers', '', ['Beverages', 'Alcoholic beverages', 'Beers'], { ENERCC: 250, FAT: 20, PROT625: 15, CHO: 0 })).toBeUndefined();
+  });
+
+  it('pairs a product only with the same kind of food: drinks with drinks, fish and meat only with fish and meat', () => {
+    // Real Open Food Facts products (fetched 2026-10-27), each first paired with another kind of food (in the comment).
+    const pick = (name: string, brand: string, categories: string[], per100: Product['per100']) => best(product(name, brand, categories, { per100 }));
+    const plant = ['Plant-based foods and beverages', 'Plant-based foods'];
+    const tomato = [...plant, 'Fruits and vegetables based foods', 'Vegetable-based foods and beverages', 'Condiments', 'Vegetables based foods', 'Tomatoes and their products', 'Sauces'];
+    // Smoked carp.
+    expect(pick('Räuchertofu Black Forest', 'Taifun', [...plant, 'Legumes and their products', 'Meat alternatives', 'Meat analogues', 'Tofu', 'Smoked tofu'], { ENERCC: 170, FAT: 8.4, PROT625: 19, CHO: 3.8 }) ?? '').not.toMatch(/carp|fish|beef|pork/i);
+    // Mackerel in tomato sauce, then common mussel in tomato sauce.
+    expect(pick("Caviar de Tomates à l'Ail", 'Saclà', [...tomato, 'Canned foods', 'Tomato sauces', 'Tomato purées', 'Tomato caviar', 'Groceries'], { ENERCC: 189, FAT: 15.9, PROT625: 2.2, CHO: 7.5 }) ?? '').not.toMatch(/mackerel/i);
+    expect(pick('Marinara', "Rao's Homemade", [...tomato, 'Pasta sauces', 'Tomato sauces', 'Groceries'], { ENERCC: 80, FAT: 5.6, PROT625: 1.6, CHO: 4.8 })).toMatch(/^Tomato sauce/);
+    // Ginger ale.
+    expect(pick('Gingembre confit', 'Seeberger', [...plant, 'Snacks', 'Condiments', 'Sweet snacks', 'Confectioneries', 'Dried products', 'Herbs and spices', 'Spices', 'Candied fruits', 'Dried fruits', 'Ginger', 'Crystallized ginger'], { ENERCC: 32, FAT: 0, PROT625: 0, CHO: 8 })).toMatch(/^Ginger root/);
+    // Multi-fruit juice: a supplement's label is all there is.
+    expect(pick('Multivitamin', 'Mivolis', ['Dietary supplements', 'Mineral supplements', 'Vitamin supplements', 'Flavoured dietary supplements', 'Multivitamin and mineral supplements'], { ENERCC: 214, FAT: 0.5, PROT625: 0.5, CHO: 17 })).toBeUndefined();
+    // Drinks keep their drinks, in whatever BLS group; instant coffee and milk (not filed as drinks) too.
+    const drinks = ['Beverages and beverages preparations', 'Beverages'];
+    expect(pick('Bio Hafermilch', 'Lidl', [...drinks, ...plant, 'Dairy substitutes', 'Milk substitutes', 'Plant-based beverages', 'Cereal-based drinks', 'Oat-based drinks'], { ENERCC: 33, FAT: 1.5, PROT625: 0.6, CHO: 3.7 })).toBe('Oat drink unsweetened');
+    expect(pick('Coca-Cola Original', 'Coca-Cola', [...drinks, 'Carbonated drinks', 'Sodas', 'Colas', 'Sweetened beverages'], { ENERCC: 42, FAT: 0, PROT625: 0, CHO: 10.6 })).toBe('Cola beverage caffeinated');
+    expect(pick('Nescafé classic natural', 'Nestlé', ['Beverages and beverages preparations', ...plant, 'Beverage preparations', 'Instant beverages', 'Coffees', 'Instant coffees'], { ENERCC: 2, FAT: 0, PROT625: 0.2, CHO: 0.1 })).toMatch(/^Coffee/);
+    expect(pick('Latte parzialmente scremato', 'Arborea', ['Dairies', 'Milks (liquid and powder)', 'Milks'], { ENERCC: 47, FAT: 1.55, PROT625: 3.3, CHO: 4.9 })).toMatch(/milk/i);
+  });
+
+  it('tells why a BLS food is another kind of food', () => {
+    const food = (code: string) => db.byCode.get(code)!;
+    const drink = kindOf(product('Hafer Drink', '', ['Beverages', 'Plant-based beverages', 'Oat-based drinks']));
+    expect(drink.drink).toBe('drink');
+    expect(kindMismatch(drink, food('C660000'))).toBeUndefined(); // Oat drink
+    expect(kindMismatch(drink, food('G950900'))).toBe('drink'); // Vegetarian goulash
+    const tofu = kindOf(product('Räuchertofu', '', ['Plant-based foods', 'Meat alternatives', 'Tofu', 'Smoked tofu']));
+    expect(kindMismatch(tofu, food('T501600'))).toBe('fish'); // Carp smoked
+    expect(kindMismatch(tofu, food('H861000'))).toBeUndefined(); // Tofu
+    const sausage = kindOf(product('Leberwurst fein', '', ['Meats', 'Prepared meats', 'Sausages']));
+    expect(kindMismatch(sausage, food('W327000'))).toBeUndefined();
+    expect(kindMismatch(sausage, food('P161000'))).toBe('food'); // Pale beer
+    expect(kindMismatch(kindOf(product('Pesto', '', ['Sauces', 'Pestos'])), food('T832900'))).toBe('fish'); // Common mussel in tomato sauce
+    expect(kindMismatch(kindOf(product('Pesto', '', ['Sauces', 'Pestos'])), food('E901000'))).toBe('meat'); // Ravioli (meat filling)
+    // No categories: nothing is known, nothing is ruled out.
+    expect(kindMismatch(kindOf(product('Thing', '', [])), food('T501600'))).toBeUndefined();
   });
 
   it('picks nothing when nothing fits well enough', () => {

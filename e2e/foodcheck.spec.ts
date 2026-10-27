@@ -62,5 +62,7 @@ test('the assistant checks the logged foods from the check list and a fix card c
 
   await page.goto('./#/settings/check');
   await expect(page.getByText('Oat whole grain, raw', { exact: true })).toBeVisible();
+  // Fixed by the user: checked, so the next check leaves it out.
+  await expect(page.getByRole('heading', { name: 'Checked by you (1)' })).toBeVisible();
   expect(errors).toEqual([]);
 });

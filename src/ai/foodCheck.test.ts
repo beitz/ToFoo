@@ -72,6 +72,18 @@ describe('the assistant checks what was logged', () => {
     expect(runCheckLoggedFoods({ days: 'week' }, data, db).ok).toBe(false);
   });
 
+  it('leaves out what the user already checked, unless asked to include it', () => {
+    const checked = { ...data, checked: { 'BLS:G490100': 'BLS' } };
+    const r = runCheckLoggedFoods({ days: 7 }, checked, db).text;
+    expect(r).toContain('1 more the user already checked are left out');
+    expect(r).not.toContain('Garlic raw');
+    const all = runCheckLoggedFoods({ days: 7, include_checked: true }, checked, db).text;
+    expect(all).toContain('BLS:G490100 | Garlic raw');
+    expect(all).toContain('checked by the user');
+    // A beer filed as a beer, paired with ham: the kind of food is named.
+    expect(runCheckLoggedFoods({ days: 7 }, data, db).text).toContain('A DRINK PAIRED WITH A FOOD');
+  });
+
   it('checks a fix: known keys and codes, BLS foods only by another BLS food, with the entries it changes', () => {
     expect(validateFoodFix({ food: helles.id, use: 'bls', code: 'P161000', days: 7, reason: 'A beer, not a ham', replaces: '' }, data, db)).toEqual({
       ok: true,

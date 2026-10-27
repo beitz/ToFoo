@@ -482,7 +482,7 @@ function Chat({
               ...(atHome ? { pantry: atHome } : {}),
               recipes: recipeTools(),
               ...(insights ? { insights } : {}),
-              foodCheck: { today: d.today, log: d.log, batchesById: d.batchesById, productsById: d.productsById },
+              foodCheck: { today: d.today, log: d.log, batchesById: d.batchesById, productsById: d.productsById, checked: d.settings.checkedFoods ?? {} },
             }),
       };
       // Photos whose cards are all saved leave the chat, so this and later requests don't pay for them again.
