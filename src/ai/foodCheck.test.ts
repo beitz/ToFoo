@@ -4,7 +4,7 @@ import type { Food } from '../foods/foodDb';
 import { buildIndex } from '../foods/search';
 import type { LogEntry, Product } from '../storage/types';
 import { emptyConversation, requestParams, sendMessage, type CreateMessage } from './assistant';
-import { runCheckLoggedFoods, validateFoodFix, type FoodCheckData } from './foodCheck';
+import { runCheckLoggedFoods, validateFoodFix, validateMarkChecked, type FoodCheckData } from './foodCheck';
 import type { ToolContext } from './tools';
 
 const food = (code: string, nameEn: string, per100: Food['per100']): Food => ({ code, nameEn, nameDe: `${nameEn} (de)`, group: code.charAt(0), per100, provenance: {} });
@@ -103,7 +103,7 @@ describe('the assistant checks what was logged', () => {
   it('offers the tools in the main chat only, and shows fixes as F cards', async () => {
     const names = (sources: Parameters<typeof requestParams>[2]) => (requestParams('claude-opus-5-5', [], sources).tools ?? []).map((t) => ('name' in t ? t.name : ''));
     expect(names({})).not.toContain('check_logged_foods');
-    expect(names({ check: true })).toEqual(expect.arrayContaining(['check_logged_foods', 'propose_food_fix']));
+    expect(names({ check: true })).toEqual(expect.arrayContaining(['check_logged_foods', 'propose_food_fix', 'propose_mark_checked']));
     expect(String(requestParams('claude-opus-5-5', [], { check: true }).system)).toContain('Checking logged foods');
 
     const reply = (content: Beta.BetaContentBlock[], stop_reason: Beta.BetaStopReason) =>
@@ -124,5 +124,50 @@ describe('the assistant checks what was logged', () => {
     expect(conversation.fixes).toBe(1);
     // The list went back to the model as the tool's result.
     expect(JSON.stringify(requests[1]!.messages)).toContain('Oettinger Helles');
+  });
+
+  it('reads only what the user included: the food log from its period, the kitchen in the ticked places', () => {
+    const onions = { ref: { source: 'BLS', version: '4.0', code: 'G480100' }, name: 'Onions', place: 'cupboard' } as const;
+    const nothing = runCheckLoggedFoods({ days: 7 }, { ...data, scope: { log: false, kitchen: false } }, db);
+    expect(nothing.text).toContain('has not included their food log or their kitchen');
+    // The kitchen only: no entries are listed, and the model is told the log is not included.
+    const kitchen = runCheckLoggedFoods({ days: 7 }, { ...data, scope: { log: false, kitchen: { places: ['cupboard'], items: [onions] } } }, db).text;
+    expect(kitchen).toContain('Foods at home (cupboard): 1');
+    expect(kitchen).toContain('BLS:G480100 | Onion raw');
+    expect(kitchen).toContain('at home: cupboard');
+    expect(kitchen).toContain('did not include their food log');
+    expect(kitchen).not.toContain('Helles');
+    // The log from its period only (3 days), and a note that the kitchen could be ticked too.
+    const both = runCheckLoggedFoods({ days: 0 }, { ...data, scope: { log: '2026-10-25', kitchen: false } }, db).text;
+    expect(both).toContain('Foods logged from 2026-10-25 to 2026-10-27: 2');
+    expect(both).toContain('from 2026-10-25 on only');
+    expect(both).toContain('The kitchen is not included');
+    expect(both).not.toContain('2026-10-10');
+    const all = runCheckLoggedFoods({ days: 7 }, { ...data, scope: { log: '2026-01-01', kitchen: { places: ['cupboard', 'fridge'], items: [onions] } } }, db).text;
+    expect(all).toContain('Foods logged from 2026-10-21 to 2026-10-27 and at home (cupboard, fridge): 3');
+    // A BLS food only at home is changed in the Kitchen, not by a fix.
+    const fix = validateFoodFix({ food: 'BLS:G480100', use: 'bls', code: 'G490100', days: 7 }, { ...data, scope: { log: false, kitchen: { places: ['cupboard'], items: [onions] } } }, db);
+    expect(!fix.ok && fix.error).toContain('changes it in the Kitchen');
+  });
+
+  it('marks the foods the check found right in one card: known keys, each once, not checked already', () => {
+    expect(validateMarkChecked({ foods: ['BLS:G490100', helles.id, 'BLS:G490100'], reason: 'These look right', replaces: '' }, data, db)).toEqual({
+      ok: true,
+      proposal: {
+        use: 'looks_right',
+        foods: [
+          { key: 'BLS:G490100', name: 'Garlic raw' },
+          { key: helles.id, name: 'Oettinger Helles' },
+        ],
+        reason: 'These look right',
+      },
+    });
+    // Older entries count too: the card is about the foods, not the days.
+    expect(validateMarkChecked({ foods: ['BLS:G490100'] }, { ...data, log: [log[2]!] }, db)).toMatchObject({ ok: true });
+    expect(validateMarkChecked({ foods: ['BLS:G480100'] }, data, db)).toMatchObject({ ok: false });
+    expect(validateMarkChecked({ foods: [] }, data, db)).toMatchObject({ ok: false });
+    const checked = { ...data, checked: { 'BLS:G490100': 'BLS' } };
+    expect(validateMarkChecked({ foods: ['BLS:G490100', helles.id] }, checked, db)).toMatchObject({ ok: true, proposal: { foods: [{ key: helles.id }] } });
+    expect(validateMarkChecked({ foods: ['BLS:G490100'] }, checked, db)).toMatchObject({ ok: false });
   });
 });

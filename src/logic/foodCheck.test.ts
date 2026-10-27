@@ -101,4 +101,21 @@ describe('checking what was logged', () => {
     expect(foodCheck(log, new Map(), changed, foods, '2026-10-20', '2026-10-26', checked).find((r) => r.name === 'Helles')!.checked).toBe(false);
     expect(checkSignature(water, { labelOnly: true })).toBe('label');
   });
+
+  it('adds the things at home it was asked to cover, with their places, beside what was eaten', () => {
+    const log: LogEntry[] = [entry('2026-10-21', { source: 'BLS', version: '4.0', code: 'G480100' }, 30)];
+    const home = [
+      { ref: { source: 'BLS', version: '4.0', code: 'G480100' }, name: 'Onions', place: 'cupboard' },
+      { ref: { source: 'OFF', code: '1' }, name: 'Helles', place: 'fridge' },
+      { ref: { source: 'OFF', code: '1' }, name: 'Helles', place: 'cupboard' },
+      { ref: { source: 'custom', id: 'x' }, name: 'Own muesli', place: 'cupboard' },
+    ] as const;
+    const rows = foodCheck(log, new Map(), productsById, foods, '2026-10-20', '2026-10-26', {}, home);
+    expect(rows.map((r) => [r.name, r.count, r.home])).toEqual([
+      ['Helles', 0, ['fridge', 'cupboard']],
+      ['Onion raw', 1, ['cupboard']],
+    ]);
+    // Only the kitchen: nothing eaten is listed.
+    expect(foodCheck([], new Map(), productsById, foods, '2026-10-20', '2026-10-26', {}, home).map((r) => r.name)).toEqual(['Helles', 'Onion raw']);
+  });
 });

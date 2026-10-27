@@ -169,10 +169,19 @@ export function createRepo(db: ToFooDB) {
 
     /** Mark a food "Looks right" on Check logged foods with what the mark holds for, or take the mark off (undefined). */
     async setFoodChecked(key: string, signature: string | undefined): Promise<void> {
+      await repo.setFoodsChecked({ [key]: signature });
+    },
+
+    /** Several marks at once (undefined takes a mark off): the assistant's "Looks right" card and its undo. */
+    async setFoodsChecked(marks: Readonly<Record<string, string | undefined>>): Promise<void> {
       await db.transaction('rw', db.settings, async () => {
         const s = (await db.settings.get('settings')) ?? defaultSettings();
-        const { [key]: _old, ...rest } = s.checkedFoods ?? {};
-        await db.settings.put({ ...s, checkedFoods: signature === undefined ? rest : { ...rest, [key]: signature }, id: 'settings', schemaVersion: v });
+        const checkedFoods = { ...s.checkedFoods };
+        for (const [key, signature] of Object.entries(marks)) {
+          if (signature === undefined) delete checkedFoods[key];
+          else checkedFoods[key] = signature;
+        }
+        await db.settings.put({ ...s, checkedFoods, id: 'settings', schemaVersion: v });
       });
     },
 

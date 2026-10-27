@@ -45,7 +45,7 @@ import { piecesToGrams } from '../../foods/pieces';
 import { findProduct, findUsda } from '../../foods/findProduct';
 import { loadOffIndex, searchOffIndex } from '../../foods/offIndex';
 import { productLabel, productPageUrl, productRef } from '../../foods/products';
-import { KETONE_TYPES, type Batch, type FoodRef, type Ingredient, type KetoneType, type LogEntry, type Product } from '../../storage/types';
+import { HOME_PLACES, KETONE_TYPES, type Batch, type FoodRef, type HomePlace, type Ingredient, type KetoneType, type LogEntry, type PantryItem, type Product } from '../../storage/types';
 import { barcodesInPhoto } from '../log/barcode';
 import type { EntryConfidence } from '../../model/types';
 import { isOn } from '../../settings/features';
@@ -67,13 +67,17 @@ import { cardId, cardOf, cardTitle, useRegister, type Bubble, type Card, type Ca
 import { RecipeCard } from './RecipeCard';
 import { ShoppingCard } from './ShoppingCard';
 import { HomeCard } from './HomeCard';
-import { leftOf, usageOf } from '../../logic/pantry';
+import { leftOf, leftText, usageOf, type Left } from '../../logic/pantry';
 import { BatchCard, PortionCard } from './BatchCards';
 import { ProposalGroup, cardAnchor } from './ProposalGroup';
 import { CardFrame, useCardIntake } from './CardFrame';
 import { ForgottenAsk } from './ForgottenAsk';
 import { WeightProposalCard } from './WeightCard';
 import { FoodFixCard } from './FoodFixCard';
+import { MarkCheckedCard } from './MarkCheckedCard';
+import { kitchenNote, type KitchenThing } from '../../ai/kitchen';
+import type { FoodCheckData } from '../../ai/foodCheck';
+import { usePantryLeft } from '../pantry/usePantry';
 import { HabitsProposalCard } from './HabitsCard';
 import { addAnswer } from '../../ai/segments';
 import { refKey } from '../../lib/refs';
@@ -331,11 +335,16 @@ function Chat({
   // Include my data (Patterns on): what the user ticks, and once sent, what the chat holds (fixed).
   const dataOn = !recipe && isOn(d.settings.features, 'insights');
   const kinds = availableKinds(d.settings.features);
-  const [choice, setChoice] = useState<DataChoice>(() => ({ open: patterns, period: '3m', kinds: patterns ? kinds : [], privateJournal: false }));
+  const [choice, setChoice] = useState<DataChoice>(() => ({ open: patterns, period: '3m', kinds: patterns ? kinds : [], privateJournal: false, kitchen: [], kitchenOpen: false }));
   const shared = dataOn ? conversation.shared : undefined;
-  const insightData = useInsightData(dataOn && (choice.open || choice.kinds.length > 0 || !!shared));
-  /** The next message goes with data (ticked, or the chat already has it). */
-  const withData = dataOn && (!!shared || choice.kinds.length > 0);
+  const insightData = useInsightData(dataOn && (choice.open || choice.kinds.length + choice.kitchen.length > 0 || !!shared));
+  /** The next message goes with data to look for patterns in (ticked, or the chat already has it). */
+  const withData = dataOn && (!!shared?.kinds.length || choice.kinds.length > 0);
+  // The kitchen can be included too (with At home on), place by place.
+  const kitchenOn = dataOn && isOn(d.settings.features, 'atHome');
+  const pantry = useLiveQuery(() => (kitchenOn ? repo.db.pantry.toArray() : []), [kitchenOn]);
+  const pantryLeft = usePantryLeft();
+  const kitchenCounts = kitchenOn && pantry ? countByPlace(pantry, pantryLeft) : undefined;
 
   useEffect(() => {
     endRef.current?.scrollIntoView?.({ block: 'end', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
@@ -401,16 +410,31 @@ function Chat({
     // Include my data: whatever is ticked goes with this message, then the choice is fixed for the chat.
     const sharing: SharedData | undefined = !dataOn
       ? undefined
-      : (shared ?? (choice.kinds.length ? { from: periodStart(insightData, choice.period, d.today), kinds: choice.kinds, privateJournal: choice.privateJournal } : undefined));
+      : (shared ??
+        (choice.kinds.length || choice.kitchen.length
+          ? { from: periodStart(insightData, choice.period, d.today), kinds: choice.kinds, privateJournal: choice.privateJournal, ...(kitchenOn && choice.kitchen.length ? { kitchen: choice.kitchen } : {}) }
+          : undefined));
     if (sharing && !insightData) return;
     // What the pattern tools can read: only the period and the kinds ticked, enforced here rather than asked of the model.
-    const insights = sharing && insightData ? shareInsightData(insightData, sharing.from, new Set(sharing.kinds), { privateJournal: sharing.privateJournal }) : undefined;
-    let share: string | undefined;
+    const insights = sharing?.kinds.length && insightData ? shareInsightData(insightData, sharing.from, new Set(sharing.kinds), { privateJournal: sharing.privateJournal }) : undefined;
+    const notes: string[] = [];
     if (insights && sharing && !shared) {
       const whole = overview(insightData!, sharing.from, d.today);
       const privateLeftOut = sharing.kinds.includes('journal') && !sharing.privateJournal && whole.privateJournalEntries > 0;
-      share = shareNote(overview(insights, sharing.from, d.today), kinds.filter((k) => !sharing.kinds.includes(k)), privateLeftOut, insights.habits);
+      notes.push(shareNote(overview(insights, sharing.from, d.today), kinds.filter((k) => !sharing.kinds.includes(k)), privateLeftOut, insights.habits));
     }
+    // The kitchen: only the ticked places, listed once with the message it is first included with.
+    const places = kitchenOn ? (sharing?.kitchen ?? []) : [];
+    const home = (pantry ?? []).filter((i) => places.includes(i.place));
+    if (places.length && !shared) notes.push(kitchenNote(places, home.map((i) => kitchenThing(i, pantryLeft(i), d))));
+    const share = notes.length ? notes.join(' ') : undefined;
+    // With Patterns on, the food check reads only what is ticked under Include my data.
+    const scope: FoodCheckData['scope'] = dataOn
+      ? {
+          log: sharing?.kinds.includes('food') ? sharing.from : false,
+          ...(kitchenOn ? { kitchen: places.length ? { places, items: home.flatMap((i) => (i.ref && !pantryLeft(i).out ? [{ ref: i.ref, name: i.name, place: i.place }] : [])) } : false } : {}),
+        }
+      : undefined;
     const all = [...cards.values()];
     const note = appNote({
       now: Date.now(),
@@ -484,7 +508,14 @@ function Chat({
               ...(atHome ? { pantry: atHome } : {}),
               recipes: recipeTools(),
               ...(insights ? { insights } : {}),
-              foodCheck: { today: d.today, log: d.log, batchesById: d.batchesById, productsById: d.productsById, checked: d.settings.checkedFoods ?? {} },
+              foodCheck: {
+                today: d.today,
+                log: d.log,
+                batchesById: d.batchesById,
+                productsById: d.productsById,
+                checked: d.settings.checkedFoods ?? {},
+                ...(scope ? { scope } : {}),
+              },
             }),
       };
       // Photos whose cards are all saved leave the chat, so this and later requests don't pay for them again.
@@ -548,7 +579,7 @@ function Chat({
         ...outcome.recipes.map((r): Card => ({ kind: 'recipe', recipe: r, logged: false })),
         ...outcome.portions.map((p): Card => ({ kind: 'portion', portion: p, logged: false })),
         ...outcome.batches.map((b): Card => ({ kind: 'batch', batch: b, logged: false })),
-        ...outcome.fixes.map((f): Card => ({ kind: 'fix', fix: f, logged: false })),
+        ...outcome.fixes.map((f): Card => (f.use === 'looks_right' ? { kind: 'checked', checked: f, logged: false } : { kind: 'fix', fix: f, logged: false })),
       ];
       // In the order the assistant proposed them, so a day reads in order and related cards sit together.
       const rank = (c: Card) => outcome.order.indexOf(cardId(c));
@@ -833,7 +864,7 @@ function Chat({
           </div>
         )}
         <UsageLine chat={chatTokens} turn={turnTokens} model={model} />
-        {shared && bubbles.length > 0 && <p className="muted small disclaimer">{t('insights.disclaimer')}</p>}
+        {!!shared?.kinds.length && bubbles.length > 0 && <p className="muted small disclaimer">{t('insights.disclaimer')}</p>}
         {/* Also after a first message that failed: the saved chat holds the error to share. */}
         {recorder.enabled && (bubbles.length > 0 || !!error) && !busy && <ChatExport recorder={recorder} />}
         <div ref={endRef} />
@@ -880,6 +911,7 @@ function Chat({
             onChoice={setChoice}
             data={insightData}
             kinds={kinds}
+            {...(kitchenCounts ? { kitchen: kitchenCounts } : {})}
             {...(shared ? { shared } : {})}
             onLook={() => void send({ text: t('insights.lookPrompt'), dictated: false })}
             canLook={!busy && !dictation.busy && !!insightData}
@@ -1057,6 +1089,7 @@ function CardView({ card, ...rest }: CardProps<Card>) {
   if (card.kind === 'portion') return <PortionCard card={card} {...rest} />;
   if (card.kind === 'batch') return <BatchCard card={card} {...rest} />;
   if (card.kind === 'fix') return <FoodFixCard card={card} {...rest} />;
+  if (card.kind === 'checked') return <MarkCheckedCard card={card} {...rest} />;
   return <NoteCard card={card} {...rest} />;
 }
 
@@ -1711,6 +1744,32 @@ function IngredientsCard({ card, toast, onLogged, register, recipe }: CardProps<
       </div>
     </div>
   );
+}
+
+/** Things at home not used up, per place, for the Kitchen boxes under Include my data. */
+function countByPlace(items: readonly PantryItem[], left: (i: PantryItem) => Left): Record<HomePlace, number> {
+  const counts = Object.fromEntries(HOME_PLACES.map((p) => [p, 0])) as Record<HomePlace, number>;
+  for (const i of items) if (!left(i).out) counts[i.place]++;
+  return counts;
+}
+
+/** A thing at home as the assistant is told about it: amount left in plain words, and the food it is. */
+function kitchenThing(item: PantryItem, left: Left, d: Pick<AppData, 'foods' | 'productsById' | 'customFoodsById'>): KitchenThing {
+  const ref = item.ref;
+  const name = !ref
+    ? undefined
+    : ref.source === 'BLS'
+      ? d.foods.byCode.get(ref.code)?.nameEn
+      : ref.source === 'custom'
+        ? d.customFoodsById.get(ref.id)?.name
+        : d.productsById.get(refKey(ref)) && productLabel(d.productsById.get(refKey(ref))!);
+  return {
+    name: item.name,
+    place: item.place,
+    left: leftText(item, left, (n) => `${n} left`),
+    ...(left.out ? { status: 'out' as const } : left.low ? { status: 'low' as const } : {}),
+    ...(ref ? { food: `${refKey(ref)}${name ? ` ${name}` : ''}` } : {}),
+  };
 }
 
 /** Foods at home and not used up, by food key (refKey). */

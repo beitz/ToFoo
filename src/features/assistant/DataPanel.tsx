@@ -5,8 +5,10 @@ import { href } from '../../app/router';
 import { t } from '../../i18n';
 import { addDays, formatDay } from '../../lib/dates';
 import { overview, type InsightData, type ShareKind } from '../../logic/insights';
+import { HOME_PLACES, type HomePlace } from '../../storage/types';
 import { Segmented } from '../../ui/controls';
 import { Icon } from '../../ui/Icon';
+import { placeName } from '../pantry/usePantry';
 
 export type Period = '2w' | '4w' | '3m' | 'all';
 const PERIOD_DAYS: Record<Exclude<Period, 'all'>, number> = { '2w': 14, '4w': 28, '3m': 91 };
@@ -21,6 +23,10 @@ export interface DataChoice {
   period: Period;
   kinds: ShareKind[];
   privateJournal: boolean;
+  /** The places at home ticked under Kitchen. */
+  kitchen: HomePlace[];
+  /** The Kitchen box is open to its places. */
+  kitchenOpen: boolean;
 }
 
 /** The first day of the chosen period (all: the first day there is data for). */
@@ -31,9 +37,12 @@ export function periodStart(data: InsightData | undefined, period: Period, today
   return start > data.first ? start : data.first;
 }
 
-/** The kinds as named in a line ("food log, journal with private entries"). */
-export function kindNames(kinds: readonly ShareKind[], privateJournal: boolean): string {
-  return kinds.map((k) => (k === 'journal' && privateJournal ? t('insights.kind.journalPrivate') : t(`insights.kind.${k}`))).join(', ');
+/** The kinds as named in a line ("food log, journal with private entries, kitchen (fridge, cupboard)"). */
+export function kindNames(kinds: readonly ShareKind[], privateJournal: boolean, kitchen: readonly HomePlace[] = []): string {
+  const names = kinds.map((k) => (k === 'journal' && privateJournal ? t('insights.kind.journalPrivate') : t(`insights.kind.${k}`)));
+  if (kitchen.length === HOME_PLACES.length) names.push(t('data.kitchenName'));
+  else if (kitchen.length) names.push(t('data.kitchenSome', { places: kitchen.map((p) => placeName(p).toLocaleLowerCase('en-GB')).join(', ') }));
+  return names.join(', ');
 }
 
 /**
@@ -46,6 +55,7 @@ export function DataPanel({
   onChoice,
   data,
   kinds,
+  kitchen,
   shared,
   onLook,
   canLook,
@@ -56,6 +66,8 @@ export function DataPanel({
   data: InsightData | undefined;
   /** The kinds there are to send (the food log and each tracker that is on). */
   kinds: ShareKind[];
+  /** With At home on: how many things there are in each place (not used up). */
+  kitchen?: Readonly<Record<HomePlace, number>>;
   /** What this chat already sent: the choice is fixed. */
   shared?: SharedData;
   onLook: () => void;
@@ -67,7 +79,7 @@ export function DataPanel({
     return (
       <p className="composer-note data-shared small" role="status">
         <Icon name="lock" size={16} />
-        <span className="grow">{t('data.shared', { from: formatDay(shared.from, d.today), kinds: kindNames(shared.kinds, shared.privateJournal) })}</span>
+        <span className="grow">{t(shared.kinds.length ? 'data.shared' : 'data.sharedKitchen', { from: formatDay(shared.from, d.today), kinds: kindNames(shared.kinds, shared.privateJournal, shared.kitchen) })}</span>
         <button type="button" className="btn btn-small btn-ghost" onClick={onNew}>
           {t('data.newChat')}
         </button>
@@ -76,10 +88,12 @@ export function DataPanel({
   }
 
   const toggleOpen = () => onChoice((c) => ({ ...c, open: !c.open }));
-  const label = choice.kinds.length ? t('data.chipOn', { kinds: kindNames(choice.kinds, choice.privateJournal), period: t(PERIOD_LABEL[choice.period]) }) : t('data.chip');
+  const any = choice.kinds.length + choice.kitchen.length > 0;
+  const names = kindNames(choice.kinds, choice.privateJournal, choice.kitchen);
+  const label = choice.kinds.length ? t('data.chipOn', { kinds: names, period: t(PERIOD_LABEL[choice.period]) }) : any ? t('data.chipKitchen', { kinds: names }) : t('data.chip');
   const chip = (
-    <button type="button" className={`data-chip${choice.kinds.length ? ' data-chip-on' : ''}`} aria-expanded={choice.open} onClick={toggleOpen} data-tour="assistant.data">
-      <Icon name={choice.kinds.length ? 'check' : 'plus'} size={16} />
+    <button type="button" className={`data-chip${any ? ' data-chip-on' : ''}`} aria-expanded={choice.open} onClick={toggleOpen} data-tour="assistant.data">
+      <Icon name={any ? 'check' : 'plus'} size={16} />
       <span className="grow">{label}</span>
       <span className={choice.open ? 'data-chip-turn-up' : 'data-chip-turn'} aria-hidden="true">
         <Icon name="chevron" size={16} />
@@ -135,6 +149,7 @@ export function DataPanel({
                   )}
                 </Fragment>
               ))}
+              {kitchen && <KitchenTicks choice={choice} onChoice={onChoice} counts={kitchen} />}
             </fieldset>
             {thin && <p className="muted small">{t('insights.thin')}</p>}
           </>
@@ -143,11 +158,56 @@ export function DataPanel({
         )}
       </div>
       <p className="muted small data-panel-note">
-        {t(choice.kinds.length ? 'data.sendNote' : 'data.noneNote')} <a href={href('about', 'sent')}>{t('sent.more')}</a>
+        {t(any ? 'data.sendNote' : 'data.noneNote')} <a href={href('about', 'sent')}>{t('sent.more')}</a>
       </p>
       <button type="button" className="btn btn-primary" disabled={!canLook || !choice.kinds.length} onClick={onLook}>
         <Icon name="insights" size={18} /> {t('insights.open')}
       </button>
     </div>
+  );
+}
+
+/**
+ * Kitchen: one box for every place at home (ticked when all are, half when some are), opening to
+ * a box per place (owner's ask, 2026-10-27: to leave out the spices).
+ */
+function KitchenTicks({ choice, onChoice, counts }: { choice: DataChoice; onChoice: (update: (c: DataChoice) => DataChoice) => void; counts: Readonly<Record<HomePlace, number>> }) {
+  const all = choice.kitchen.length === HOME_PLACES.length;
+  const some = choice.kitchen.length > 0 && !all;
+  const total = HOME_PLACES.reduce((n, p) => n + counts[p], 0);
+  const tick = (p: HomePlace, on: boolean) => onChoice((c) => ({ ...c, kitchen: HOME_PLACES.filter((x) => (x === p ? on : c.kitchen.includes(x))) }));
+  return (
+    <>
+      <div className="data-kitchen">
+        <label className="radio-row small grow">
+          <input
+            type="checkbox"
+            checked={all}
+            ref={(el) => {
+              if (el) el.indeterminate = some;
+            }}
+            onChange={(e) => onChoice((c) => ({ ...c, kitchen: e.target.checked ? [...HOME_PLACES] : [] }))}
+          />{' '}
+          {t(total === 1 ? 'data.kitchenOne' : 'data.kitchen', { n: total })}
+        </label>
+        <button
+          type="button"
+          className="btn btn-ghost data-kitchen-more"
+          aria-expanded={choice.kitchenOpen}
+          aria-label={t(choice.kitchenOpen ? 'data.kitchenLess' : 'data.kitchenMore')}
+          onClick={() => onChoice((c) => ({ ...c, kitchenOpen: !c.kitchenOpen }))}
+        >
+          <span className={choice.kitchenOpen ? 'data-chip-turn-up' : 'data-chip-turn'} aria-hidden="true">
+            <Icon name="chevron" size={16} />
+          </span>
+        </button>
+      </div>
+      {choice.kitchenOpen &&
+        HOME_PLACES.map((p) => (
+          <label key={p} className="radio-row small insights-share-sub">
+            <input type="checkbox" checked={choice.kitchen.includes(p)} onChange={(e) => tick(p, e.target.checked)} /> {t('data.kitchenPlace', { place: placeName(p), n: counts[p] })}
+          </label>
+        ))}
+    </>
   );
 }
