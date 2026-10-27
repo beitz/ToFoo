@@ -246,7 +246,8 @@ export function effectiveDayStatus(days: readonly string[], explicit: Readonly<R
   return out;
 }
 
-function typicalFractionFor(req: ResolvedRequirements) {
+/** The typical share taken up per nutrient, consistent with the requirements (iron: its derived share). */
+export function typicalFractionFor(req: ResolvedRequirements) {
   return (id: string): number => {
     const r = req.byNutrient.get(id);
     if (id === 'FE' && r && r.recommended > 0) return r.physiological / r.recommended;

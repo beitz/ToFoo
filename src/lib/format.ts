@@ -56,3 +56,8 @@ export function fmtTokens(n: number): string {
   if (n >= 1000) return `${fmtNumber(n / 1000, 1)}k`;
   return fmtNumber(n);
 }
+
+/** A nutrient name inside a sentence: "Vitamin B12" → "vitamin B12"; abbreviations ("EPA + DHA") stay. */
+export function nameInSentence(name: string): string {
+  return /^[A-Z][A-Z]/.test(name) ? name : name.charAt(0).toLowerCase() + name.slice(1);
+}

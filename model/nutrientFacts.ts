@@ -68,3 +68,60 @@ export const bodyMakes: Record<string, BodyMakesFact> = {
   CR: NOT_MADE,
   MO: NOT_MADE,
 };
+
+/**
+ * How fast the body's level follows a change in intake, where a study measured it (owner's question,
+ * 2026-10-27: how fast can I fill up on omega-3?). Shown as quick facts; the model's own window for
+ * these nutrients is `slowWindow` in parameters.ts.
+ */
+export interface TurnoverFact extends Cited {
+  value: {
+    /** Where the measured level sits. */
+    where: 'redCells';
+    /** Days until half of a change in intake shows. */
+    halfLifeDays: number;
+    /** Days until the level stops moving. */
+    steadyDays: number;
+  };
+}
+
+export const turnover: Record<string, TurnoverFact> = {
+  EPADHA: {
+    value: { where: 'redCells', halfLifeDays: 28, steadyDays: 180 },
+    source: 'Katan MB et al. (1997): Kinetics of the incorporation of dietary fatty acids into serum cholesteryl esters, erythrocyte membranes, and adipose tissue: an 18-month controlled study. J Lipid Res 38:2012–2022',
+    url: 'https://pubmed.ncbi.nlm.nih.gov/9374124/',
+    confidence: 'medium',
+    note: 'Checked (abstract, 2026-10-27): EPA in red blood cells "showed a half-life of 28 days; a steady state was reached after 180 days". Measured for EPA; DHA is assumed to follow alike. Arterburn 2006 (PMID 16841856): "Limited storage of the n-3 fatty acids in adipose tissue", so no store size in grams is given.',
+  },
+};
+
+/**
+ * The omega-3 index (EPA + DHA as % of the fatty acids in red blood cells) after about five months of a
+ * daily EPA + DHA amount, in BLS units (g per day), for adults who started at 4.3 % on average.
+ */
+export const omega3Index: Cited & { value: { start: number; months: number; doses: ReadonlyArray<readonly [number, number]> } } = {
+  value: {
+    start: 4.3,
+    months: 5,
+    doses: [
+      [0, 4.35],
+      [0.3, 6.19],
+      [0.6, 6.82],
+      [0.9, 7.53],
+      [1.8, 9.49],
+    ],
+  },
+  source: 'Flock MR et al. (2013): Determinants of erythrocyte omega-3 fatty acid content in response to fish oil supplementation: a dose-response randomized controlled trial. J Am Heart Assoc 2:e000513, Table 4',
+  url: 'https://pubmed.ncbi.nlm.nih.gov/24252845/',
+  confidence: 'high',
+  note: 'Checked (full text, 2026-10-27): 115 healthy adults, fish oil capsules for about 5 months; baseline 4.3 % (2.3–6.8 %). The authors: "at least 1 g/day of EPA+DHA for 5 months" to reach 8 %. Fish is assumed to count like capsules gram for gram (Walker 2019, PMID 31396625, found the form matters by about 1 point).',
+};
+
+/** Omega-3 index levels: at or above `good` the most protection, at or below `poor` the least. */
+export const omega3IndexLevels: Cited & { value: { good: number; poor: number } } = {
+  value: { good: 8, poor: 4 },
+  source: 'Harris WS, von Schacky C (2004): The Omega-3 Index: a new risk factor for death from coronary heart disease? Prev Med 39:212–220',
+  url: 'https://pubmed.ncbi.nlm.nih.gov/15208005/',
+  confidence: 'medium',
+  note: 'Checked (abstract, 2026-10-27): "An Omega-3 Index of ≥ 8% was associated with the greatest cardioprotection, whereas an index of ≤ 4% was associated with the least."',
+};

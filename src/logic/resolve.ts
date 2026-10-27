@@ -42,7 +42,7 @@ export function ingredientFood(ing: Ingredient, ctx: FoodContext & { salt: Profi
   return foodForRef(ing.ref, ctx);
 }
 
-function partFromFood(food: Food, grams: number, preparation: FoodPart['preparation'], storage: FoodPart['storage']): FoodPart {
+export function partFromFood(food: Food, grams: number, preparation: FoodPart['preparation'], storage: FoodPart['storage']): FoodPart {
   return {
     label: food.nameEn,
     code: food.code,

@@ -32,8 +32,8 @@ const RATIO_NEUTRAL =
   'Ratio-neutral: the DGE value is an intake that already assumes typical absorption, so intake and requirement are both multiplied by this fraction and the status does not depend on it. Used only to show absorbed amounts.';
 const NOT_SEPARATE = 'Absorption not modelled separately (1.0); the status compares intake with the DGE intake value.';
 
-const fixed = (value: number, source: string, confidence: Cited['confidence'], note?: string, range?: [number, number]): NutrientParams => ({
-  typicalAbsorption: { value, source, confidence, note: note ? `${note} ${RATIO_NEUTRAL}` : RATIO_NEUTRAL, ...(range ? { range } : {}) },
+const fixed = (value: number, source: string, confidence: Cited['confidence'], note?: string, range?: [number, number], url?: string): NutrientParams => ({
+  typicalAbsorption: { value, source, ...(url ? { url } : {}), confidence, note: note ? `${note} ${RATIO_NEUTRAL}` : RATIO_NEUTRAL, ...(range ? { range } : {}) },
   rule: { type: 'fixed' },
 });
 const one = (): NutrientParams => ({
@@ -53,7 +53,14 @@ export const nutrientParams: Record<string, NutrientParams> = {
   FASAT: one(),
   'F18:2CN6': one(),
   'F18:3CN3': one(),
-  EPADHA: one(),
+  EPADHA: fixed(
+    0.75,
+    'Lawson LD, Hughes BG (1988): Biochem Biophys Res Commun 152:328–335 and 156:960–963 — EPA and DHA from fish oil triglycerides absorbed 68 % and 57 % as well as free fatty acids (≥ 95 %) with a low-fat meal; with a high-fat meal EPA rose "from 69% to 90%", DHA did not improve',
+    'low',
+    'Checked (both abstracts, 2026-10-27). Measured with fish oil, not fish; central 0.75 sits between the low-fat and high-fat results.',
+    [0.55, 0.9],
+    'https://pubmed.ncbi.nlm.nih.gov/2847723/',
+  ),
   HIS: one(),
   ILE: one(),
   LEU: one(),
