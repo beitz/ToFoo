@@ -8,6 +8,8 @@
  * scenes and small fixes. A pull request that changes what users see adds its line here in the same PR.
  */
 export const changesEn = {
+  'change.173': 'Include my data in the assistant has a Kitchen box: tick all of it, or open it and pick the fridge, freezer, cupboard or spices. The food check then also covers what is at home in those places, and only what you ticked. After a check, one card marks every food the assistant found right as checked, so the next check covers only new foods.',
+  'change.173.major': 'Kitchen in the assistant, and food checks that skip what was found right',
   'change.172': 'When the app was updated while it stayed open, the assistant no longer says "no connection": it says a new version needs a reload, and Reload keeps the message you typed.',
   'change.171': 'Packaged products are only paired with the same kind of food: a drink with a drink, fish and meat only with fish and meat (smoked tofu no longer gets smoked carp), supplements with nothing. Check logged foods flags pairings of another kind, and Looks right on any row moves it to Checked by you, which the assistant\'s check leaves out.',
   'change.170': 'The assistant can check the foods you logged: tap the question on Check logged foods, and it proposes a fix for each wrong pairing as a card you apply with one tap (a beer paired with beer ham, garlic that was an onion).',
