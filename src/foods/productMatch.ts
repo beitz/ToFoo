@@ -8,7 +8,7 @@ import type { RawValue } from '../model/types';
 import type { MixPart, Product } from '../storage/types';
 import type { Food, FoodDb } from './foodDb';
 import { ingredientFoods } from './ingredientFoods';
-import { hasOwnMicros, mixedFood } from './products';
+import { hasOwnMicros, labelValues, mixedFood } from './products';
 import { looseSearch, normalize, type SearchIndex } from './search';
 
 /** Words that say nothing about which food it is. */
@@ -209,6 +209,21 @@ export function bestPairing(product: MatchInput & Pick<Product, 'ingredients'>, 
   }
   return code ? { code } : undefined;
 }
+
+/** The food a product borrows from: the mix from its ingredients, or its one similar food. */
+export function pairedFood(match: Pick<NonNullable<Product['match']>, 'code' | 'parts'>, foods: Pick<FoodDb, 'byCode'>): Food | undefined {
+  return match.parts ? mixedFood(match.parts, foods) : foods.byCode.get(match.code);
+}
+
+/**
+ * How well a product's label fits the food it borrows from (0–1, as macroSimilarity), undefined
+ * without one; below `GOOD_FIT` the pairing is worth a second look (the check list in Settings).
+ */
+export function labelFit(product: Pick<Product, 'source' | 'per100' | 'match'>, foods: Pick<FoodDb, 'byCode'>): number | undefined {
+  const food = product.match && pairedFood(product.match, foods);
+  return food ? macroSimilarity(labelValues(product), food.per100) : undefined;
+}
+export const GOOD_FIT = FIT;
 
 const sameParts = (a?: readonly MixPart[], b?: readonly MixPart[]) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
 

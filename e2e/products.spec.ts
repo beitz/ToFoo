@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { firstLaunch, todayKcal, watchErrors } from './helpers';
+import { firstLaunch, logFood, todayKcal, watchErrors } from './helpers';
 
 // What Open Food Facts answers for PiCK UP! Choco minis (trimmed from a real response, 2026-10-23).
 const PICK_UP = {
@@ -209,5 +209,34 @@ test('a ready meal is built from its ingredient list, shown on its page', async 
   await expect(page.locator('.mix-list')).toContainText('Chicken breast fillet, raw');
   await page.getByRole('button', { name: 'Looks right' }).click();
   await expect(page.getByText('Picked by the app')).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test('the check list puts the app\'s unchecked pick first, and "Looks right" moves it', async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.route('https://world.openfoodfacts.org/api/v3/product/**', (route) => route.fulfill({ json: BUTTER_CHICKEN }));
+  await firstLaunch(page);
+  await page.goto('./#/settings');
+  await page.getByText('Food sources').click();
+  const toggle = page.getByRole('switch', { name: /^Open Food Facts lookup/ });
+  await toggle.click();
+  await expect(toggle).toBeChecked();
+  await logFood(page, 'oat flakes', /^Oat flakes/, '100 g');
+  await page.goto('./#/log');
+  await page.getByPlaceholder('Search foods').pressSequentially('youcook butter chicken', { delay: 30 });
+  await page.locator('.off-results').getByRole('button').first().click();
+  await page.getByRole('button', { name: '200 g' }).click();
+  await page.getByRole('button', { name: 'Add', exact: true }).click();
+  await expect.poll(() => todayKcal(page)).toBeGreaterThan(288);
+
+  await page.goto('./#/settings');
+  await expect(page.getByText('Last 7 days: 1 worth a look')).toBeVisible();
+  await page.getByRole('link', { name: /Check logged foods/ }).click();
+  await expect(page.getByRole('heading', { name: 'Worth a look (1)' })).toBeVisible();
+  await expect(page.getByText('Picked by the app, not checked yet')).toBeVisible();
+  await expect(page.getByText('from its ingredients (14 BLS foods)')).toBeVisible();
+  await expect(page.getByText('Oat flakes', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Looks right' }).click();
+  await expect(page.getByRole('heading', { name: 'Looks fine (2)' })).toBeVisible();
   expect(errors).toEqual([]);
 });

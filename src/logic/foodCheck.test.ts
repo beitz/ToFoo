@@ -1,0 +1,78 @@
+import { describe, expect, it } from 'vitest';
+import type { Food } from '../foods/foodDb';
+import type { Batch, LogEntry, Product } from '../storage/types';
+import { foodCheck, productFlags } from './foodCheck';
+
+const food = (code: string, nameEn: string, per100: Food['per100']): Food => ({ code, nameEn, nameDe: nameEn, group: code.charAt(0), per100, provenance: {} });
+const foods = {
+  byCode: new Map(
+    [
+      food('P161000', 'Pale beer', { ENERCC: 36, FAT: 0, PROT625: 0.4, CHO: 2.3 }),
+      food('W271000', 'Beer ham', { ENERCC: 161, FAT: 10.5, PROT625: 16.6, CHO: 0.1 }),
+      food('C133000', 'Oat flakes', { ENERCC: 370, FAT: 7, PROT625: 13.5, CHO: 58.7 }),
+      food('G480100', 'Onion raw', { ENERCC: 30, FAT: 0.2, PROT625: 1.2, CHO: 5 }),
+    ].map((f) => [f.code, f]),
+  ),
+};
+
+const product = (code: string, name: string, extra: Partial<Product> = {}): Product => ({
+  id: `OFF:${code}`,
+  schemaVersion: 1,
+  source: 'OFF',
+  code,
+  name,
+  per100: { ENERCC: 42, FAT: 0, PROT625: 0.5, CHO: 3 },
+  categories: [],
+  fetchedAt: 0,
+  ...extra,
+});
+const helles = product('1', 'Helles', { match: { version: '4.0', code: 'W271000' } });
+const pils = product('2', 'Pils', { match: { version: '4.0', code: 'P161000', auto: true } });
+const water = product('3', 'Mineralwasser', { per100: { ENERCC: 0 } });
+const productsById = new Map([helles, pils, water].map((p) => [p.id, p]));
+
+let n = 0;
+const entry = (day: string, ref: Extract<LogEntry, { kind: 'food' }>['ref'], grams: number): LogEntry => ({
+  id: `e${n++}`,
+  schemaVersion: 1,
+  kind: 'food',
+  ref,
+  grams,
+  preparation: 'raw',
+  time: 0,
+  day,
+  confidence: 'A',
+  label: 'typed',
+});
+
+describe('checking what was logged', () => {
+  it('flags a label that does not fit its food, a product without one, and unchecked picks', () => {
+    expect(productFlags(helles, foods).flags).toEqual(['misfit']);
+    expect(productFlags(pils, foods)).toMatchObject({ flags: ['auto'] });
+    expect(productFlags(pils, foods).fit).toBeGreaterThan(0.75);
+    expect(productFlags(water, foods).flags).toEqual(['none']);
+    // "Label values only" was the user's choice: nothing to flag.
+    expect(productFlags({ ...water, labelOnly: true }, foods).flags).toEqual([]);
+  });
+
+  it('lists every food of the period once, flagged ones first, with portions by recipe', () => {
+    const batch = {
+      id: 'b1',
+      recipe: { name: 'Porridge', portions: 2, ingredients: [{ ref: { source: 'BLS', version: '4.0', code: 'C133000' }, name: 'Oats', grams: 100, preparation: 'raw' }] },
+    } as unknown as Batch;
+    const log: LogEntry[] = [
+      entry('2026-10-20', { source: 'BLS', version: '4.0', code: 'G480100' }, 50),
+      entry('2026-10-21', { source: 'BLS', version: '4.0', code: 'G480100' }, 30),
+      entry('2026-10-21', { source: 'OFF', code: '2' }, 500),
+      entry('2026-10-22', { source: 'OFF', code: '1' }, 500),
+      entry('2026-10-22', { source: 'OFF', code: '3' }, 750),
+      entry('2026-10-01', { source: 'BLS', version: '4.0', code: 'C133000' }, 60), // before the period
+      { ...entry('2026-10-22', { source: 'custom', id: 'x' }, 0), kind: 'custom', customFoodId: 'x', servings: 1 } as LogEntry,
+      { id: 'p', schemaVersion: 1, kind: 'portion', batchId: 'b1', storage: 'fridge', portions: 1, time: 0, day: '2026-10-23', confidence: 'A', label: 'Porridge' },
+    ];
+    const rows = foodCheck(log, new Map([['b1', batch]]), productsById, foods, '2026-10-20', '2026-10-26');
+    expect(rows.map((r) => r.name)).toEqual(['Helles', 'Mineralwasser', 'Pils', 'Onion raw', 'Oat flakes']);
+    expect(rows[3]).toMatchObject({ count: 2, grams: 80, recipes: [] });
+    expect(rows[4]).toMatchObject({ count: 0, grams: 0, recipes: ['Porridge'] });
+  });
+});

@@ -11,6 +11,8 @@ import { AccentPicker } from './AccentPicker';
 import { AskDays } from './AskDays';
 import { viewsOf } from '../../settings/views';
 import { Icon } from '../../ui/Icon';
+import { foodCheck } from '../../logic/foodCheck';
+import { addDays } from '../../lib/dates';
 
 /** A settings section folded to its title (owner's ask, 2026-10-23: the page was a lot of scrolling); closed until tapped. */
 function Fold({ title, note, children }: { title: string; note?: string; children: ReactNode }) {
@@ -50,6 +52,7 @@ export function SettingsPage() {
   const p = d.profile;
   const hiddenCount = s.hiddenNutrients.length;
   const toCheck = d.products.filter(needsCheck).length;
+  const toLook = foodCheck(d.log, d.batchesById, d.productsById, d.foods, addDays(d.today, -6), d.today).filter((r) => r.flags.length).length;
   return (
     <section>
       <header className="page-head">
@@ -66,6 +69,7 @@ export function SettingsPage() {
         <LinkRow to={['settings', 'nutrients']} label={t('settings.nutrients')} detail={hiddenCount ? t('settings.hidden', { n: hiddenCount }) : t('settings.allVisible')} />
         <LinkRow to={['settings', 'saved']} label={t('settings.saved')} detail={t('settings.savedDetail', { n: d.customFoods.length })} />
         {d.products.length > 0 && <LinkRow to={['settings', 'products']} label={t('match.title')} detail={toCheck ? t('match.settingsDetailCheck', { n: d.products.length, c: toCheck }) : t('match.settingsDetail', { n: d.products.length })} />}
+        {d.log.length > 0 && <LinkRow to={['settings', 'check']} label={t('check.title')} detail={toLook ? t('check.settingsDetail', { n: toLook }) : t('check.settingsDetailFine')} />}
         <LinkRow to={['settings', 'backup']} tour="settings.backup" label={t('settings.backup')} detail={isOn(s.features, 'autoBackup') ? t('backup.linkOn') : t('backup.linkOff')} />
         <LinkRow to={['settings', 'assistant']} label={t('ai.settingsTitle')} detail={isOn(s.features, 'aiAssistant') ? t('ai.statusOn') : t('ai.statusOff')} />
         <LinkRow to={['settings', 'usda']} label={t('usda.heading')} detail={isOn(s.features, 'usda') ? t('ai.statusOn') : t('ai.statusOff')} />

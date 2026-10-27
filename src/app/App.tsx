@@ -40,6 +40,7 @@ import { ProfilePage } from '../features/settings/ProfilePage';
 import { SunPage } from '../features/settings/SunPage';
 import { DiagnosticsPage } from '../features/settings/DiagnosticsPage';
 import { SavedChatsPage } from '../features/settings/SavedChatsPage';
+import { FoodCheckPage } from '../features/settings/FoodCheckPage';
 import { ProductsPage } from '../features/settings/ProductsPage';
 import { BackupPage, ExclusionsPage, NutrientVisibilityPage, SavedPage, StartPage } from '../features/settings/MorePages';
 import { FirstLaunch } from '../features/onboarding/FirstLaunch';
@@ -120,6 +121,8 @@ function Page({ route }: { route: string[] }) {
           return <SavedChatsPage />;
         case 'products':
           return <ProductsPage />;
+        case 'check':
+          return <FoodCheckPage />;
         default:
           return <SettingsPage />;
       }

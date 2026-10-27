@@ -56,6 +56,9 @@ export function ProductsPage() {
   return (
     <SubPage title={t('match.title')}>
       <p className="muted small">{t('match.intro')}</p>
+      <p className="small">
+        <a href={href('settings', 'check')}>{t('check.link')}</a>
+      </p>
       <h2 className="section-title">{t('match.sectionCheck')}</h2>
       {toCheck.length ? <ul className="result-list card product-check">{toCheck.map((p) => row(p, true))}</ul> : <p className="muted">{t('match.allChecked')}</p>}
       {checked.length > 0 && (
