@@ -1276,6 +1276,9 @@ textarea:focus-visible,
 .check-compare {
   font-variant-numeric: tabular-nums;
 }
+.check-ask {
+  margin-top: 12px;
+}
 .match-auto {
   gap: 8px;
   margin-top: 4px;

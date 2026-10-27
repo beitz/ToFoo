@@ -28,7 +28,7 @@ const FLOWS: Flow[] = [
     title: 'sent.chatTitle',
     feature: ['aiAssistant'],
     when: 'sent.chatWhen',
-    what: ['sent.chatWhat1', 'sent.chatWhat2', 'sent.chatWhat3', 'sent.chatWhat4', 'sent.chatWhat5'],
+    what: ['sent.chatWhat1', 'sent.chatWhat2', 'sent.chatWhat3', 'sent.chatWhat4', 'sent.chatWhat6', 'sent.chatWhat5'],
     not: 'sent.chatNot',
     terms: { text: ANTHROPIC_TERMS.text, links: [...ANTHROPIC_TERMS.links] },
   },

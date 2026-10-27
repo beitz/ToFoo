@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import type { useToast } from '../../app/toast';
-import type { RecipeSoFar, ShownActivity, ShownBatch, ShownIngredients, ShownNote, ShownPortion, ShownProposal, ShownHome, ShownRecipe, ShownShopping, ShownSleep, ShownWater, ShownKetone, ShownWeight, ShownHabits } from '../../ai/assistant';
+import type { RecipeSoFar, ShownActivity, ShownBatch, ShownIngredients, ShownNote, ShownPortion, ShownProposal, ShownHome, ShownRecipe, ShownShopping, ShownSleep, ShownWater, ShownKetone, ShownWeight, ShownHabits, ShownFoodFix } from '../../ai/assistant';
 import type { ProposedItem } from '../../ai/tools';
 import type { AudioClip } from '../../ai/chatRecord';
 import type { Check } from '../../ai/insights';
@@ -16,7 +16,8 @@ import { KETONE_TYPE_KEY, ketoneValueText } from '../fast/ketoneFormat';
  * A proposed meal (M1, …), journal entry (J1, …), sleep (S1, …), activity (A1, …), water (W1, …), ketone measurement (K1, …), weigh-in (G1, …), habit answers (T1, …),
  * things for the shopping list (L1, …), things bought or running low at home (H1, …),
  * recipe ingredients (R1, …, recipe editor), recipe for the book (R1, …, main chat), serving from
- * stock (P1, …) or cooked batch (B1, …), and whether the user logged, saved or added it.
+ * stock (P1, …), cooked batch (B1, …) or fix from a check of the logged foods (F1, …), and whether
+ * the user logged, saved, added or applied it.
  */
 export type Card =
   | { kind: 'meal'; proposal: ShownProposal; logged: boolean }
@@ -32,7 +33,8 @@ export type Card =
   | { kind: 'ingredients'; ingredients: ShownIngredients; logged: boolean }
   | { kind: 'recipe'; recipe: ShownRecipe; logged: boolean }
   | { kind: 'portion'; portion: ShownPortion; logged: boolean }
-  | { kind: 'batch'; batch: ShownBatch; logged: boolean };
+  | { kind: 'batch'; batch: ShownBatch; logged: boolean }
+  | { kind: 'fix'; fix: ShownFoodFix; logged: boolean };
 
 export function cardOf(c: Card) {
   switch (c.kind) {
@@ -64,6 +66,8 @@ export function cardOf(c: Card) {
       return c.portion;
     case 'batch':
       return c.batch;
+    case 'fix':
+      return c.fix;
   }
 }
 export const cardId = (c: Card) => cardOf(c).id;
@@ -101,6 +105,8 @@ export function cardTitle(c: Card): string {
       return c.portion.name;
     case 'batch':
       return t(c.batch.batchId ? 'ai.potTitle' : 'ai.batchTitle', { name: c.batch.name });
+    case 'fix':
+      return `${t('fix.title')} · ${c.fix.name}`;
   }
 }
 

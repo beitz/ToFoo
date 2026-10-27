@@ -3,17 +3,18 @@ import { useData } from '../../app/data';
 import { href } from '../../app/router';
 import { useToast } from '../../app/toast';
 import { t, type MessageKey } from '../../i18n';
-import type { RawValue } from '../../model/types';
 import { pairedFood } from '../../foods/productMatch';
 import { labelValues, productLabel } from '../../foods/products';
 import { addDays } from '../../lib/dates';
-import { fmtGrams, fmtNumber } from '../../lib/format';
+import { fmtGrams } from '../../lib/format';
 import { foodCheck, type CheckFlag, type CheckRow } from '../../logic/foodCheck';
 import { repo } from '../../storage/repo';
 import type { Product } from '../../storage/types';
 import { Segmented } from '../../ui/controls';
+import { AskChips } from '../../ui/AskChips';
 import { Icon } from '../../ui/Icon';
 import { FoodSourceTag } from '../food/FoodSourceTag';
+import { makeUp } from '../food/makeUp';
 import { pairingName } from '../food/pairingName';
 import { SubPage } from './ProfilePage';
 
@@ -25,19 +26,6 @@ const periodFrom = (period: Period, today: string, log: ReadonlyArray<{ day: str
   period === 'all' ? log.reduce((a, e) => (e.day < a ? e.day : a), today) : addDays(today, -Number(period) + 1);
 
 const FLAG_TEXT: Record<CheckFlag, MessageKey> = { misfit: 'check.misfit', none: 'check.none', auto: 'check.auto' };
-const MACROS = [
-  ['FAT', 'check.fat'],
-  ['PROT625', 'check.protein'],
-  ['CHO', 'check.carbs'],
-] as const;
-
-/** "42 kcal · fat – · protein 0.5 g · carbs 3 g": what is compared, per 100 g. */
-function makeUp(per100: Readonly<Record<string, RawValue>>): string {
-  const g = (v: RawValue | undefined) => (typeof v === 'number' ? fmtGrams(v) : v === 't' ? '0 g' : '–');
-  const kcal = per100.ENERCC;
-  return [typeof kcal === 'number' ? `${fmtNumber(kcal)} kcal` : '– kcal', ...MACROS.map(([id, key]) => `${t(key)} ${g(per100[id])}`)].join(' · ');
-}
-
 /**
  * Every food logged in a period with the BLS food its vitamins and minerals come from (owner's ask,
  * 2026-10-27, after a beer was paired with a beer sausage). Flagged ones first: a label that does
@@ -104,6 +92,7 @@ export function FoodCheckPage() {
       <p className="muted small">{t('check.intro')}</p>
       <Segmented label={t('check.period')} value={period} onChange={setPeriod} options={PERIODS.map((value) => ({ value, label: t(`check.period.${value}` as MessageKey) }))} />
       {!rows.length && <p className="muted">{t('check.empty')}</p>}
+      {rows.length > 0 && <AskChips className="check-ask" questions={[period === 'all' ? t('check.askTextAll') : t('check.askText', { days: Number(period) })]} />}
       {flagged.length > 0 && (
         <>
           <h2 className="section-title">{t('check.sectionLook', { n: flagged.length })}</h2>
