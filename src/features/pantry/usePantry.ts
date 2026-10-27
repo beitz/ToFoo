@@ -8,6 +8,8 @@ import { newId } from '../../lib/id';
 import { refKey } from '../../lib/refs';
 import { guessPlace, leftOf, packGrams, leftText, onShoppingList, usageOf, withStatus, type Left } from '../../logic/pantry';
 import { planAdd, sectionOfRef, type NewShoppingItem } from '../../logic/shopping';
+import type { HomeRef } from '../../logic/foodCheck';
+import { isOn } from '../../settings/features';
 import { repo, type HomeUndo } from '../../storage/repo';
 import { CURRENT_SCHEMA_VERSION, type FoodRef, type HomePlace, type PantryItem, type ShoppingItem } from '../../storage/types';
 import { useShopFoods } from '../shopping/useShopping';
@@ -25,6 +27,15 @@ export function usePantryLeft(): (item: PantryItem) => Left {
 }
 
 export const placeName = (p: HomePlace) => t(`pantry.place.${p}` as MessageKey);
+
+/** The foods at home and not used up, for checking them with what was eaten; none with At home off. */
+export function useHomeRefs(): HomeRef[] {
+  const d = useData();
+  const pantry = usePantry();
+  const left = usePantryLeft();
+  if (!isOn(d.settings.features, 'atHome')) return [];
+  return (pantry ?? []).flatMap((i) => (i.ref && !left(i).out ? [{ ref: i.ref, name: i.name, place: i.place }] : []));
+}
 
 /** How much is left, as shown ("2 left", "350 g"). */
 export const leftLabel = (item: PantryItem, left: Left) => leftText(item, left, (n) => t('pantry.piecesLeft', { n }));

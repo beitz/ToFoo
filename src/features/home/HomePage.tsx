@@ -23,6 +23,7 @@ import { FastCard, FastChip } from './FastCard';
 import { NextToCook } from './NextToCook';
 import { RecentDays } from './RecentDays';
 import { HomeCards } from './HomeCards';
+import { CheckLine } from './CheckLine';
 import { formatDate, parseDay } from '../../lib/dates';
 
 /** Energy and the macronutrients: today's rings at the top, not in the 7-day list; fibre too (owner's ask). */
@@ -113,6 +114,7 @@ export function HomePage() {
       )}
 
       <RecentDays />
+      <CheckLine />
       <p className="muted small disclaimer">{t('home.disclaimer')}</p>
       <AskChips className="ask-chips-wrap" tour="home.chips" questions={[t('ask.howAmIDoing'), t('ask.whatNext')]} />
     </section>

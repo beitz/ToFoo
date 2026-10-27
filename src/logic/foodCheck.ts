@@ -144,3 +144,16 @@ export function foodCheck(
   };
   return [...rows.values()].sort((a, b) => rank(a) - rank(b) || b.count - a.count || a.name.localeCompare(b.name));
 }
+
+/** Unchecked foods that pile up before Home asks for a look, when none is flagged (owner's pick, 2026-10-27). */
+export const CHECK_PILE_UP = 10;
+
+/**
+ * What Home's "foods to check" line says: foods not checked yet and those worth a look among
+ * them; shown while any is worth a look or CHECK_PILE_UP have piled up (undefined: no line).
+ */
+export function checkNudge(rows: readonly CheckRow[]): { unchecked: number; flagged: number } | undefined {
+  const open = rows.filter((r) => !r.checked);
+  const flagged = open.filter((r) => r.flags.length).length;
+  return flagged > 0 || open.length >= CHECK_PILE_UP ? { unchecked: open.length, flagged } : undefined;
+}

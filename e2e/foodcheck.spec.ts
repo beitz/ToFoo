@@ -88,6 +88,7 @@ test('the check covers the ticked kitchen places, and what it found right is mar
   await page.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(page.getByText('API key saved.')).toBeVisible();
   await page.getByRole('switch', { name: /^Patterns/ }).click();
+  await expect(page.getByRole('switch', { name: /^Patterns/ })).toBeChecked();
 
   const bodies: string[] = [];
   await page.route('https://api.anthropic.com/**', async (route) => {
@@ -127,5 +128,69 @@ test('the check covers the ticked kitchen places, and what it found right is mar
   await expect(page.getByText('1 food marked as checked.').first()).toBeVisible();
   await page.goto('./#/settings/check');
   await expect(page.getByRole('heading', { name: 'Checked by you (1)' })).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+// A small spice jar as Open Food Facts answers (made up in the shape of a real response).
+const PAPRIKA = {
+  code: '4002674044201',
+  status: 'success',
+  product: {
+    code: '4002674044201',
+    product_name: 'Paprika edelsüß',
+    brands: 'Ostmann',
+    quantity: '12,5 g',
+    categories_tags_en: ['Condiments', 'Spices', 'Paprika'],
+    nutriments: { 'energy-kcal_100g': 330, fat_100g: 13, 'saturated-fat_100g': 2, carbohydrates_100g: 19, sugars_100g: 10, fiber_100g: 35, proteins_100g: 14, salt_100g: 0.1 },
+    last_modified_t: 1787068844,
+  },
+};
+
+test('Home says when foods are worth a look, with the check page and the assistant one tap away', async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.route('https://world.openfoodfacts.org/api/v3/product/**', (route) => route.fulfill({ json: PAPRIKA }));
+  await firstLaunch(page);
+  const line = page.locator('.check-line');
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+  await expect(line).toHaveCount(0);
+
+  // A scanned jar at home gets the app's own pick: worth a look, though nothing was eaten.
+  await page.goto('./#/settings');
+  await page.getByText('Food sources').click();
+  await page.getByRole('switch', { name: /^Open Food Facts lookup/ }).click();
+  await page.goto('./#/kitchen');
+  await page.getByRole('button', { name: 'Add to Spices and herbs' }).click();
+  await page.locator('.card-add-box').getByRole('button', { name: 'Scan a barcode' }).click();
+  await page.getByLabel('Barcode number').fill(PAPRIKA.code);
+  await page.getByRole('button', { name: 'Look up' }).click();
+  await expect(page.locator('.home-row', { hasText: 'Paprika edelsüß' })).toBeVisible();
+
+  await page.goto('./#/settings/assistant');
+  await page.getByRole('switch', { name: /^Use the AI assistant/ }).click();
+  await page.getByLabel('API key').fill('sk-ant-test');
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(page.getByText('API key saved.')).toBeVisible();
+  const patterns = page.getByRole('switch', { name: /^Patterns/ });
+  await patterns.click();
+  await expect(patterns).toBeChecked();
+
+  await page.goto('./');
+  await expect(line).toContainText('1 food to check · 1 worth a look');
+  // The question opens the assistant with the food log and kitchen ticked, and waits for Send.
+  await page.getByRole('button', { name: 'Check my foods that are not checked yet' }).click();
+  await expect(page.getByRole('textbox', { name: /why am I tired/ })).toHaveValue('Check my foods that are not checked yet');
+  await expect(page.getByRole('checkbox', { name: /days with food logged/ })).toBeChecked();
+  await expect(page.getByRole('checkbox', { name: 'Kitchen: 1 thing' })).toBeChecked();
+
+  // Or by hand: the line opens the check page, where the jar is listed as at home.
+  await page.goto('./');
+  await line.click();
+  const row = page.locator('.check-row', { hasText: 'Paprika edelsüß' });
+  await expect(row).toContainText('at home: Spices and herbs');
+  await row.getByRole('button', { name: 'Looks right' }).click();
+  await expect(page.getByRole('heading', { name: 'Checked by you (1)' })).toBeVisible();
+  await page.goto('./');
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+  await expect(line).toHaveCount(0);
   expect(errors).toEqual([]);
 });

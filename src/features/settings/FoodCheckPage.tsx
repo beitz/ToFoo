@@ -16,9 +16,13 @@ import { FoodSourceTag } from '../food/FoodSourceTag';
 import { makeUp } from '../food/makeUp';
 import { pairingName } from '../food/pairingName';
 import { SubPage } from './ProfilePage';
+import { placeName, useHomeRefs } from '../pantry/usePantry';
 
 type Period = '7' | '28' | 'all';
 const PERIODS: Period[] = ['7', '28', 'all'];
+
+/** The food log the assistant gets for each period (Include my data): the shortest that covers it. */
+const ASK_PERIOD = { '7': '2w', '28': '4w', all: 'all' } as const;
 
 /** Days to look back for each period; "all" starts at the first entry. */
 const periodFrom = (period: Period, today: string, log: ReadonlyArray<{ day: string }>) =>
@@ -36,7 +40,9 @@ export function FoodCheckPage() {
   const toast = useToast();
   const [period, setPeriod] = useState<Period>('7');
   const checkedFoods = d.settings.checkedFoods ?? {};
-  const rows = foodCheck(d.log, d.batchesById, d.productsById, d.foods, periodFrom(period, d.today, d.log), d.today, checkedFoods);
+  // What is at home counts in every period: it may be eaten any day (owner's ask, 2026-10-27).
+  const home = useHomeRefs();
+  const rows = foodCheck(d.log, d.batchesById, d.productsById, d.foods, periodFrom(period, d.today, d.log), d.today, checkedFoods, home);
   const flagged = rows.filter((r) => !r.checked && r.flags.length);
   const fine = rows.filter((r) => !r.checked && !r.flags.length);
   const checked = rows.filter((r) => r.checked);
@@ -72,7 +78,13 @@ export function FoodCheckPage() {
   const row = (r: CheckRow) => {
     const p = r.product;
     const food = p?.match && pairedFood(p.match, d.foods);
-    const eaten = [r.count ? t('check.eaten', { n: r.count, grams: fmtGrams(r.grams) }) : '', r.recipes.length ? t('check.inRecipes', { names: r.recipes.join(', ') }) : ''].filter(Boolean).join(' · ');
+    const eaten = [
+      r.count ? t('check.eaten', { n: r.count, grams: fmtGrams(r.grams) }) : '',
+      r.recipes.length ? t('check.inRecipes', { names: r.recipes.join(', ') }) : '',
+      r.home ? t('check.atHome', { places: r.home.map(placeName).join(', ') }) : '',
+    ]
+      .filter(Boolean)
+      .join(' · ');
     return (
       <li key={r.key} className="fav-row check-row">
         <a className="result" href={href('food', p ? p.id : r.ref.source === 'BLS' ? r.ref.code : '')}>
@@ -113,7 +125,13 @@ export function FoodCheckPage() {
       <p className="muted small">{t('check.intro')}</p>
       <Segmented label={t('check.period')} value={period} onChange={setPeriod} options={PERIODS.map((value) => ({ value, label: t(`check.period.${value}` as MessageKey) }))} />
       {!rows.length && <p className="muted">{t('check.empty')}</p>}
-      {rows.length > 0 && <AskChips className="check-ask" questions={[period === 'all' ? t('check.askTextAll') : t('check.askText', { days: Number(period) })]} />}
+      {rows.length > 0 && (
+        <AskChips
+          className="check-ask"
+          questions={[period === 'all' ? t('check.askTextAll') : t('check.askText', { days: Number(period) })]}
+          data={{ kinds: ['food'], period: ASK_PERIOD[period], kitchen: false }}
+        />
+      )}
       {flagged.length > 0 && (
         <>
           <h2 className="section-title">{t('check.sectionLook', { n: flagged.length })}</h2>

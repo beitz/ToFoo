@@ -39,6 +39,7 @@ export const TOURS: Record<TourId, Tour> = {
       { target: 'home.stores', text: 'tour.home.stores' },
       { target: 'home.info', text: 'tour.home.info' },
       { target: 'home.next', text: 'tour.home.next' },
+      { target: 'home.check', text: 'tour.home.check' },
       { target: 'home.chips', text: 'tour.home.chips' },
       { target: 'settings-button', text: 'tour.home.settings', profileButton: true },
       { target: 'round-button', text: 'tour.home.round' },
