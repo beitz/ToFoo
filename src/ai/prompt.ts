@@ -41,6 +41,10 @@ const WEIGHT = `- Weight: when the user says what they weighed ("82.4 kg this mo
 // Habits (docs/SPEC.md, "Habits"): answered only from what the user says; not answered is not "no".
 const HABITS = `- Habits: the user keeps habits, listed by name in the app's note on their message: do habits (did true = done, false = not done), avoid habits (did true = had some or did it, false = none) and minutes habits, which the app counts from logged activities. When the user says whether they kept a do or avoid habit ("flossed", "no alcohol yesterday", "didn't stretch"), propose the answers with propose_habits: the habit's name exactly as listed, the day as local "YYYY-MM-DD" (empty for today) and did; all answers of a message in one card. Only what the user says about it (their words "had two beers" answer a habit about alcohol); never answer one from photos, the food log or a guess, and leave habits they did not mention unanswered: not answered is not "no". For a minutes habit, propose the activity with propose_activity; it counts by itself. Habits are created and changed in the app (Habits page), not here. To change an open habit card, call propose_habits again with the complete answers and replaces set to its id (T1, T2, …).`;
 
+// Checking what was logged (docs/SPEC.md, "Check logged foods"): the app lists the foods and
+// flags odd pairings; the model judges each and proposes fixes as cards, never changing anything itself.
+const CHECK = `- Checking logged foods: when the user asks you to check what they logged ("check my foods from last week", "do the BLS foods make sense?"), call check_logged_foods with the days to look back (7 unless they say; 0 for everything). It lists every food eaten, once, flagged ones first: for products the label, categories, ingredients and the BLS food the vitamins and minerals come from, with how well the label fits it; for BLS foods what was eaten. Judge each pairing like a nutrition-savvy friend: is the BLS food the same kind of food (a beer needs a beer, not beer ham; a ready meal its dish or its ingredients)? Do the amounts look like what one person eats? For each pairing that is clearly wrong, call propose_food_fix (search_foods first for the right BLS food): use "bls" with the BLS code, "ingredients" to build a product from its ingredient list, or "label_only"; reason: one short line in plain words why (e.g. "A beer, not a ham"). A fix for a BLS food changes the entries logged by itself in that period (give the same days). Only propose what you are sure of; mention borderline ones and odd amounts in your text, and say when everything looks right. The app shows its own flags; a flag alone is not a reason to change a pairing that makes sense. To change an open fix card, call it again with replaces set to its id (F1, F2, …).`;
+
 const WATER = `- Water: plain water (tap, mineral, sparkling, nothing added) goes in propose_water with ml and time, not in a meal: it is kept apart so it never ends a fast. Every other drink (coffee, tea, juice, milk, soda, beer, smoothies) goes in a meal as a food, since the app counts the water in foods from the database. Glasses ≈ 250 ml, a small bottle 500 ml, a large bottle 1,500 ml (or what the user says). For "about two litres over the day", propose two or three cards spread over the day rather than one. To change an open water card, call propose_water again with replaces set to its id (W1, W2, …).`;
 
 export interface PromptSources {
@@ -78,6 +82,8 @@ export interface PromptSources {
   forgotten?: boolean;
   /** The user included some of their data in this chat (Include my data): the pattern tools read it. */
   insights?: boolean;
+  /** The main chat: the assistant may check the foods the user logged and propose fixes. */
+  check?: boolean;
 }
 
 // Without Include my data the chat sees none of the user's days, and should say how to share them.
@@ -146,7 +152,7 @@ Style: brief, friendly, plain text (no headings or tables). Answer in the langua
 
 function systemPrompt(sources: PromptSources): string {
   if (sources.recipe) return recipeSystemPrompt(sources);
-  const { off = false, usda = false, webSearch = false, journal = false, sleep = false, activity = false, water = false, ketones = false, weight = false, habits = false, shopping = false, pantry = false, recipes = false, ideas = false, forgotten = false, insights = false } = sources;
+  const { off = false, usda = false, webSearch = false, journal = false, sleep = false, activity = false, water = false, ketones = false, weight = false, habits = false, shopping = false, pantry = false, recipes = false, ideas = false, forgotten = false, insights = false, check = false } = sources;
   const extra = [
     off && ' Packaged products can also be looked up by barcode in Open Food Facts.',
     usda && ' Foods the BLS lacks can be searched in USDA FoodData Central.',
@@ -172,7 +178,7 @@ Your job: work out which foods the user ate and how many grams of each, then cal
 How to work:
 - Find foods with search_foods. Search short, generic terms, in English and German (e.g. ["milk roll", "Milchbrötchen"]); send several queries in one call. Only use codes that search_foods returned.
 ${off ? BRANDED_WITH_PRODUCTS('propose_meal') : BRANDED_BLS_ONLY}
-${off && webSearch ? `${WEB_SEARCH}\n` : ''}${usda ? `${USDA('propose_meal')}\n` : ''}${journal ? `${JOURNAL(activity)}\n` : ''}${sleep ? `${SLEEP(journal)}\n` : ''}${activity ? `${ACTIVITY}\n` : ''}${water ? `${WATER}\n` : ''}${ketones ? `${KETONES}\n` : ''}${weight ? `${WEIGHT}\n` : ''}${habits ? `${HABITS}\n` : ''}${shopping ? `${SHOPPING(recipes)}\n` : ''}${pantry ? `${PANTRY(off)}\n` : ''}${recipes ? `${RECIPES(ideas)}\n${PAGES}\n` : ''}- Mixed dishes (restaurant meals, a hotpot, a bowl): use a matching BLS dish if there is one, otherwise split it into ingredients with estimated grams. Include what changes the result most: cooking oil, sauces, broth that was actually eaten.
+${off && webSearch ? `${WEB_SEARCH}\n` : ''}${usda ? `${USDA('propose_meal')}\n` : ''}${journal ? `${JOURNAL(activity)}\n` : ''}${sleep ? `${SLEEP(journal)}\n` : ''}${activity ? `${ACTIVITY}\n` : ''}${water ? `${WATER}\n` : ''}${ketones ? `${KETONES}\n` : ''}${weight ? `${WEIGHT}\n` : ''}${habits ? `${HABITS}\n` : ''}${shopping ? `${SHOPPING(recipes)}\n` : ''}${pantry ? `${PANTRY(off)}\n` : ''}${recipes ? `${RECIPES(ideas)}\n${PAGES}\n` : ''}${check ? `${CHECK}\n` : ''}- Mixed dishes (restaurant meals, a hotpot, a bowl): use a matching BLS dish if there is one, otherwise split it into ingredients with estimated grams. Include what changes the result most: cooking oil, sauces, broth that was actually eaten.
 ${forgotten ? `${FORGOTTEN}\n` : ''}- Amounts: use what the user said, label weights, counts of standard items, and visual cues (plate size, cutlery, hands, packaging). Think about the portion one person ate, not the whole shared dish.
 - Pieces: when the user counts pieces of a food ("one piece of chewing gum", "2 bars", "a handful of 5 sweets"), set pieces to the count. Foods list "1 piece = … g" when the weight of one is known (the user's own, or the label's): then grams is pieces × that weight and the app uses that weight. "weight of one piece unknown": estimate grams for all the pieces from the pack (its weight ÷ the number of pieces printed on it, from a photo or the label data) or what such a piece usually weighs, and say the estimate in assumptions (e.g. "1 piece ≈ 1.4 g: 14 g pack of 10"); the user can save the real weight in the app.
 - Ask when the answer would noticeably change the result (an unknown main food, a portion that could easily be double or half, whether shared food was all eaten). Ask one short question at a time and offer a default the user can just accept, e.g. "About one bowl, roughly 400 ml?". Do not ask about details that barely matter. Do not ask for more photos (barcode, label, packaging) when you can work with what you have: the user often cannot take them. If one would clearly change the result, mention it once alongside your proposal, not instead of it. If the user cannot know, estimate and record the assumption.
@@ -189,10 +195,10 @@ ${insights ? '' : `${NO_DATA}\n`}
 ${insights ? `\n${INSIGHT_GUIDE}\n\n` : ''}Style: brief, friendly, plain text (no headings or tables). Answer in the language the user writes in.`;
 }
 
-const key = ({ off = false, usda = false, webSearch = false, journal = false, sleep = false, activity = false, water = false, ketones = false, weight = false, habits = false, shopping = false, pantry = false, recipe = false, recipes = false, ideas = false, forgotten = false, insights = false }: PromptSources) =>
+const key = ({ off = false, usda = false, webSearch = false, journal = false, sleep = false, activity = false, water = false, ketones = false, weight = false, habits = false, shopping = false, pantry = false, recipe = false, recipes = false, ideas = false, forgotten = false, insights = false, check = false }: PromptSources) =>
   recipe
     ? `r${off ? 1 : 0}${usda ? 1 : 0}${off && webSearch ? 1 : 0}`
-    : `${off ? 1 : 0}${usda ? 1 : 0}${off && webSearch ? 1 : 0}${journal ? 1 : 0}${sleep ? 1 : 0}${activity ? 1 : 0}${water ? 1 : 0}${ketones ? 1 : 0}${shopping ? 1 : 0}${pantry ? 1 : 0}${recipes ? 1 : 0}${recipes && ideas ? 1 : 0}${forgotten ? 1 : 0}${weight ? 1 : 0}${habits ? 1 : 0}${insights ? 1 : 0}`;
+    : `${off ? 1 : 0}${usda ? 1 : 0}${off && webSearch ? 1 : 0}${journal ? 1 : 0}${sleep ? 1 : 0}${activity ? 1 : 0}${water ? 1 : 0}${ketones ? 1 : 0}${shopping ? 1 : 0}${pantry ? 1 : 0}${recipes ? 1 : 0}${recipes && ideas ? 1 : 0}${forgotten ? 1 : 0}${weight ? 1 : 0}${habits ? 1 : 0}${insights ? 1 : 0}${check ? 1 : 0}`;
 const prompts = new Map<string, string>();
 const toolSets = new Map<string, BetaToolUnion[]>();
 
@@ -280,7 +286,7 @@ export const WEB_SEARCH_TOOL: BetaWebSearchTool20250305 = {
   user_location: { type: 'approximate', country: 'DE' },
 };
 
-function tools({ off = false, usda = false, webSearch = false, journal = false, sleep = false, activity = false, water = false, ketones = false, weight = false, habits = false, shopping = false, pantry = false, recipe = false, recipes = false, ideas = false, forgotten = false, insights = false }: PromptSources): BetaToolUnion[] {
+function tools({ off = false, usda = false, webSearch = false, journal = false, sleep = false, activity = false, water = false, ketones = false, weight = false, habits = false, shopping = false, pantry = false, recipe = false, recipes = false, ideas = false, forgotten = false, insights = false, check = false }: PromptSources): BetaToolUnion[] {
   const withProducts = off || usda;
   const codeHelp = off && usda ? 'BLS code from search_foods, or an OFF: or USDA: code from lookup_barcode, search_usda or search_foods.' : off ? 'BLS code from search_foods, or OFF: product code from lookup_barcode or search_foods.' : usda ? 'BLS code from search_foods, or USDA: code from search_usda or search_foods.' : 'BLS code from search_foods.';
   const items = {
@@ -385,6 +391,7 @@ function tools({ off = false, usda = false, webSearch = false, journal = false, 
     ...(recipes ? [LIST_RECIPES, proposeRecipe(items, ideas), proposePortion(changeItems), proposeBatch(changeItems)] : []),
     ...(recipes && ideas ? [NUTRIENT_GAPS, checkRecipe(items)] : []),
     ...(insights ? INSIGHT_TOOLS : []),
+    ...(check ? [CHECK_LOGGED_FOODS, PROPOSE_FOOD_FIX] : []),
   ];
 }
 
@@ -728,6 +735,40 @@ function proposeHome(codeHelp: string): BetaTool {
     },
   };
 }
+
+const CHECK_LOGGED_FOODS: BetaTool = {
+  name: 'check_logged_foods',
+  description:
+    'List every food the user logged in the last days (BLS foods, products, ingredients of cooked portions), once each, flagged ones first: for products the label, categories, ingredients, the BLS food their vitamins and minerals come from and how well the label fits it; what was eaten when. Only when the user asks for a check: this reads their log.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      days: { type: 'integer', description: 'Days to look back, today included: 7 unless the user says; 0 for everything logged.' },
+    },
+    required: ['days'],
+    additionalProperties: false,
+  },
+};
+
+const PROPOSE_FOOD_FIX: BetaTool = {
+  name: 'propose_food_fix',
+  description:
+    "Show the user one fix for a food from check_logged_foods, as a card for the user to check and accept; nothing changes until they do. For a product: the BLS food its vitamins and minerals come from (bls), its ingredient list (ingredients) or the label alone (label_only); it applies to every entry of the product. For a BLS food: another BLS food for its entries in that period. After a correction, call it again with replaces set to the card id.",
+  // Not strict: see STRICT_NESTED. The app validates the input itself and sends errors back.
+  input_schema: {
+    type: 'object',
+    properties: {
+      food: { type: 'string', description: 'The key check_logged_foods gave: OFF:…, USDA:… or BLS:<code>.' },
+      use: { type: 'string', enum: ['bls', 'ingredients', 'label_only'] },
+      code: { type: 'string', description: 'For bls: the BLS code from search_foods. Empty otherwise.' },
+      days: { type: 'integer', description: 'The days of the check (BLS foods: which entries change).' },
+      reason: { type: 'string', description: 'One short line why, in the user\'s language, e.g. "A beer, not a ham".' },
+      replaces: { type: 'string', description: 'Id of the open fix card this corrects (e.g. "F1"); empty for a new one.' },
+    },
+    required: ['food', 'use', 'code', 'days', 'reason', 'replaces'],
+    additionalProperties: false,
+  },
+};
 
 const SEARCH_FOODS: BetaTool = {
   name: 'search_foods',

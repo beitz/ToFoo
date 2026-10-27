@@ -156,6 +156,8 @@ export function restoreCard(summary: Summary, logged: boolean, ctx: RestoreConte
       return { kind: 'portion', portion: c, logged };
     case 'B':
       return { kind: 'batch', batch: c, logged };
+    case 'F':
+      return { kind: 'fix', fix: c, logged };
     default:
       return undefined;
   }
@@ -196,6 +198,7 @@ export function rebuildConversation(messages: Beta.BetaMessageParam[], events: r
     recipes: highest('R'),
     portions: highest('P'),
     batches: highest('B'),
+    fixes: highest('F'),
   };
 }
 

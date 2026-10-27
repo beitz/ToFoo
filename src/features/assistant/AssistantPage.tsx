@@ -72,6 +72,7 @@ import { ProposalGroup, cardAnchor } from './ProposalGroup';
 import { CardFrame, useCardIntake } from './CardFrame';
 import { ForgottenAsk } from './ForgottenAsk';
 import { WeightProposalCard } from './WeightCard';
+import { FoodFixCard } from './FoodFixCard';
 import { HabitsProposalCard } from './HabitsCard';
 import { addAnswer } from '../../ai/segments';
 import { refKey } from '../../lib/refs';
@@ -481,6 +482,7 @@ function Chat({
               ...(atHome ? { pantry: atHome } : {}),
               recipes: recipeTools(),
               ...(insights ? { insights } : {}),
+              foodCheck: { today: d.today, log: d.log, batchesById: d.batchesById, productsById: d.productsById },
             }),
       };
       // Photos whose cards are all saved leave the chat, so this and later requests don't pay for them again.
@@ -544,6 +546,7 @@ function Chat({
         ...outcome.recipes.map((r): Card => ({ kind: 'recipe', recipe: r, logged: false })),
         ...outcome.portions.map((p): Card => ({ kind: 'portion', portion: p, logged: false })),
         ...outcome.batches.map((b): Card => ({ kind: 'batch', batch: b, logged: false })),
+        ...outcome.fixes.map((f): Card => ({ kind: 'fix', fix: f, logged: false })),
       ];
       // In the order the assistant proposed them, so a day reads in order and related cards sit together.
       const rank = (c: Card) => outcome.order.indexOf(cardId(c));
@@ -751,6 +754,7 @@ function Chat({
                     isOn(d.settings.features, 'shoppingList') && t('ai.introShopping'),
                     isOn(d.settings.features, 'atHome') && t('ai.introPantry'),
                     t('ai.introRecipes'),
+                    t('ai.introCheck'),
                   ]
                     .filter(Boolean)
                     .join(', ')}
@@ -1045,6 +1049,7 @@ function CardView({ card, ...rest }: CardProps<Card>) {
   if (card.kind === 'recipe') return <RecipeCard card={card} {...rest} />;
   if (card.kind === 'portion') return <PortionCard card={card} {...rest} />;
   if (card.kind === 'batch') return <BatchCard card={card} {...rest} />;
+  if (card.kind === 'fix') return <FoodFixCard card={card} {...rest} />;
   return <NoteCard card={card} {...rest} />;
 }
 
