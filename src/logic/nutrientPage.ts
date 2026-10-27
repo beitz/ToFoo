@@ -243,3 +243,39 @@ export function periodDays(
     return { day, value, missing: totals.missing.has(id) };
   });
 }
+
+/** A food eaten on the given days that has no value for one nutrient (unknown, not zero). */
+export interface MissingFood {
+  label: string;
+  /** For a recipe or meal of several parts: the parts without a value. */
+  parts: string[];
+  /** The latest entry of this label, to open it. */
+  entryId: string;
+  times: number;
+}
+
+/**
+ * The foods behind "some food had no value" on the nutrient page: entries on `days` whose food has no
+ * value for `id`, by name, most often first. Uses the model's own rule (entryIntake), so the list and
+ * the model's missing days always agree.
+ */
+export function missingFoods(days: readonly string[], entries: readonly ModelEntry[], id: string): MissingFood[] {
+  const inDays = new Set(days);
+  const byLabel = new Map<string, MissingFood & { time: number }>();
+  for (const e of entries) {
+    if (!inDays.has(e.dayKey)) continue;
+    if (!entryIntake(e, 'central', { retention: false }).missing.includes(id)) continue;
+    const parts = e.parts.length > 1 ? e.parts.filter((p) => p.grams > 0 && p.per100[id] == null).map((p) => p.label) : [];
+    const seen = byLabel.get(e.label);
+    if (!seen) {
+      byLabel.set(e.label, { label: e.label, parts, entryId: e.id, times: 1, time: e.time });
+      continue;
+    }
+    seen.times++;
+    for (const p of parts) if (!seen.parts.includes(p)) seen.parts.push(p);
+    if (e.time > seen.time) Object.assign(seen, { entryId: e.id, time: e.time });
+  }
+  return [...byLabel.values()]
+    .sort((a, b) => b.times - a.times || b.time - a.time)
+    .map(({ time: _time, ...m }) => m);
+}

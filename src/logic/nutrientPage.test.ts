@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { DailyTotals, MealSummary } from '../model/simulate';
-import type { ModelEntry } from '../model/types';
-import { cameFrom, contributorsOver, periodDays, storeAhead, tileTop, timesEaten, uptakeDays, weekMarks, windowDays, type WindowDay } from './nutrientPage';
+import type { FoodPart, ModelEntry } from '../model/types';
+import { cameFrom, contributorsOver, missingFoods, periodDays, storeAhead, tileTop, timesEaten, uptakeDays, weekMarks, windowDays, type WindowDay } from './nutrientPage';
 
 const totals = (intake: number, absorbed: number, missing = false): DailyTotals => ({
   absorbed: {
@@ -199,5 +199,30 @@ describe('weekMarks', () => {
     expect(weeks.map((w) => w.dot)).toEqual(['known', 'known', 'estimated']);
     expect(weeks.map((w) => w.missing)).toEqual([true, false, false]);
     expect(weekMarks(Array.from({ length: 7 }, (_, i) => day(i, 'leftOut')))[0]!.dot).toBe('leftOut');
+  });
+
+  it('names the foods that have no value for a nutrient, and the parts of a recipe that lack it', () => {
+    const part = (label: string, value: number | null) => ({ label, grams: 100, per100: { EPADHA: value }, preparation: 'raw', storage: 'fresh' }) as FoodPart;
+    const entry = (id: string, label: string, day: string, time: number, parts: FoodPart[]): ModelEntry => ({
+      id,
+      label,
+      time,
+      dayKey: day,
+      confidence: 'A',
+      isSupplement: false,
+      parts,
+    });
+    const entries = [
+      entry('a', 'Herring', '2026-10-27', 1, [part('Herring', 1.9)]),
+      entry('b', 'Ice cream', '2026-10-27', 2, [part('Vanilla ice cream, BLS', null)]),
+      entry('c', 'Lasagne', '2026-10-27', 3, [part('Pasta', 0), part('Parmesan', null), part('Tomato', null)]),
+      entry('d', 'Ice cream', '2026-10-27', 4, [part('Ice cream', null)]),
+      entry('e', 'Ice cream', '2026-10-20', 5, [part('Ice cream', null)]),
+    ];
+    expect(missingFoods(['2026-10-27'], entries, 'EPADHA')).toEqual([
+      { label: 'Ice cream', parts: [], entryId: 'd', times: 2 },
+      { label: 'Lasagne', parts: ['Parmesan', 'Tomato'], entryId: 'c', times: 1 },
+    ]);
+    expect(missingFoods(['2026-10-26'], entries, 'EPADHA')).toEqual([]);
   });
 });
