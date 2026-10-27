@@ -1,4 +1,6 @@
 /** Browser glue for the assistant: the API client, its settings on the device, and error texts. */
+import { isStaleBuildError } from '../app/staleBuild';
+import { markReloadNeeded } from '../app/update';
 import { repo } from '../storage/repo';
 import { diag } from '../app/diagnostics';
 import { errorText } from '../lib/shareFile';
@@ -50,7 +52,7 @@ export function makeCreate(apiKey: string): CreateMessage {
   return async (params) => (await client).beta.messages.stream(params).finalMessage();
 }
 
-export type AiErrorKind = 'auth' | 'rateLimit' | 'overloaded' | 'network' | 'webSearchOff' | 'rejected' | 'app' | 'other';
+export type AiErrorKind = 'auth' | 'rateLimit' | 'overloaded' | 'network' | 'webSearchOff' | 'rejected' | 'app' | 'update' | 'other';
 
 /** What went wrong, for the user (kind picks the message) and in full (detail: status, type, the service's own words). */
 export interface AiFailure {
@@ -79,6 +81,11 @@ function apiMessage(body: unknown): string | undefined {
  * The SDK is already loaded when a request has failed, so importing it here costs nothing.
  */
 export async function describeAiError(e: unknown): Promise<AiFailure> {
+  // The app was updated while open and the SDK's file is gone: a reload, not the connection.
+  if (isStaleBuildError(e)) {
+    markReloadNeeded();
+    return { kind: 'update', detail: errorText(e) };
+  }
   let Anthropic;
   try {
     ({ default: Anthropic } = await import('@anthropic-ai/sdk'));

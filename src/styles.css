@@ -8672,3 +8672,7 @@ button.link-row {
   border-radius: 50%;
   background: var(--hc);
 }
+
+.reload-btn {
+  margin: 4px 0 8px;
+}

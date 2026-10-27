@@ -119,6 +119,11 @@ export async function checkForUpdate(): Promise<UpdateStatus> {
   return state.status;
 }
 
+/** This page's own files are gone (a newer version replaced them, see staleBuild.ts): only a reload helps. */
+export function markReloadNeeded() {
+  if (state.status !== 'ready') void onReady();
+}
+
 /** Loads the new version (it is already in place; the page only has to reload). */
 export function applyUpdate() {
   window.location.reload();

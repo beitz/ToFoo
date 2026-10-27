@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useData } from '../../app/data';
+import { reloadForUpdate } from '../../app/staleBuild';
 import { useToast } from '../../app/toast';
 import { href, navigate, replaceRoute } from '../../app/router';
 import { useBackCloses } from '../../app/history';
@@ -213,6 +214,7 @@ const ERROR_TEXT: Record<string, MessageKey> = {
   webSearchOff: 'ai.error.webSearchOff',
   rejected: 'ai.error.rejected',
   app: 'ai.error.app',
+  update: 'ai.error.update',
   other: 'ai.error.other',
   refusal: 'ai.error.refusal',
   tooLong: 'ai.error.tooLong',
@@ -821,6 +823,11 @@ function Chat({
             <Icon name="alert" size={18} />
             <div>
               <p>{t(error.key)}</p>
+              {error.key === 'ai.error.update' && (
+                <button className="btn btn-primary btn-small reload-btn" onClick={() => reloadForUpdate(text)}>
+                  {t('ai.error.reload')}
+                </button>
+              )}
               {error.detail && <p className="small error-detail">{t('ai.error.detail', { detail: error.detail })}</p>}
             </div>
           </div>
