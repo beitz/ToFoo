@@ -7,7 +7,7 @@ import { pairedFood } from '../../foods/productMatch';
 import { labelValues } from '../../foods/products';
 import { addDays } from '../../lib/dates';
 import { fmtGrams } from '../../lib/format';
-import { checkSignature, foodCheck, type CheckFlag, type CheckRow } from '../../logic/foodCheck';
+import { checkSignature, foodCheck, marksOf, type CheckFlag, type CheckRow } from '../../logic/foodCheck';
 import { repo } from '../../storage/repo';
 import { Segmented } from '../../ui/controls';
 import { AskChips } from '../../ui/AskChips';
@@ -28,7 +28,7 @@ const ASK_PERIOD = { '7': '2w', '28': '4w', all: 'all' } as const;
 const periodFrom = (period: Period, today: string, log: ReadonlyArray<{ day: string }>) =>
   period === 'all' ? log.reduce((a, e) => (e.day < a ? e.day : a), today) : addDays(today, -Number(period) + 1);
 
-const FLAG_TEXT: Record<Exclude<CheckFlag, 'kind'>, MessageKey> = { misfit: 'check.misfit', none: 'check.none', auto: 'check.auto' };
+const FLAG_TEXT: Record<Exclude<CheckFlag, 'kind'>, MessageKey> = { doubt: 'check.doubt', misfit: 'check.misfit', none: 'check.none', auto: 'check.auto' };
 const flagText = (f: CheckFlag, r: CheckRow) => t(f === 'kind' ? (`check.kind.${r.kind}` as MessageKey) : FLAG_TEXT[f]);
 /**
  * Every food logged in a period with the BLS food its vitamins and minerals come from (owner's ask,
@@ -39,18 +39,18 @@ export function FoodCheckPage() {
   const d = useData();
   const toast = useToast();
   const [period, setPeriod] = useState<Period>('7');
-  const checkedFoods = d.settings.checkedFoods ?? {};
   // What is at home counts in every period: it may be eaten any day (owner's ask, 2026-10-27).
   const home = useHomeRefs();
-  const rows = foodCheck(d.log, d.batchesById, d.productsById, d.foods, periodFrom(period, d.today, d.log), d.today, checkedFoods, home);
+  const rows = foodCheck(d.log, d.batchesById, d.productsById, d.foods, periodFrom(period, d.today, d.log), d.today, d.settings, home);
   const flagged = rows.filter((r) => !r.checked && r.flags.length);
   const fine = rows.filter((r) => !r.checked && !r.flags.length);
   const checked = rows.filter((r) => r.checked);
+  const doubted = rows.filter((r) => r.doubted);
 
   /** "Looks right": the mark holds for the food it has now; an app pick becomes the user's own. */
   async function confirm(r: CheckRow) {
     const p = r.product;
-    const before = checkedFoods[r.key];
+    const before = marksOf(d.settings, [r.key]);
     if (p?.match?.auto) {
       const { auto: _a, ...match } = p.match;
       await repo.setProductMatch(p.id, { match });
@@ -58,14 +58,22 @@ export function FoodCheckPage() {
     await repo.setFoodChecked(r.key, checkSignature(r.ref, p));
     toast(t('check.marked', { name: r.name }), async () => {
       if (p?.match?.auto) await repo.setProductMatch(p.id, { match: p.match });
-      await repo.setFoodChecked(r.key, before);
+      await repo.setFoodMarks(before);
     });
   }
 
-  async function uncheck(r: CheckRow) {
-    const before = checkedFoods[r.key];
-    await repo.setFoodChecked(r.key, undefined);
-    toast(t('check.unmarked', { name: r.name }), () => repo.setFoodChecked(r.key, before));
+  /** "Not right": first under Worth a look, and the assistant's check always lists it, until a new food or Looks right. */
+  async function doubt(r: CheckRow) {
+    const before = marksOf(d.settings, [r.key]);
+    await repo.setFoodDoubted(r.key, checkSignature(r.ref, r.product));
+    toast(t('check.doubted', { name: r.name }), () => repo.setFoodMarks(before));
+  }
+
+  /** Take the "Looks right" or "Not right" off. */
+  async function clear(r: CheckRow) {
+    const before = marksOf(d.settings, [r.key]);
+    await repo.setFoodMarks({ [r.key]: {} });
+    toast(t(r.doubted ? 'check.undoubted' : 'check.unmarked', { name: r.name }), () => repo.setFoodMarks(before));
   }
 
   const source = (r: CheckRow) => {
@@ -107,15 +115,26 @@ export function FoodCheckPage() {
           )}
           {eaten && <span className="muted small">{eaten}</span>}
         </a>
-        {r.checked ? (
-          <button className="btn btn-small btn-ghost" onClick={() => void uncheck(r)}>
-            {t('check.uncheck')}
-          </button>
-        ) : (
-          <button className="btn btn-small btn-secondary" onClick={() => void confirm(r)}>
-            {t('match.confirm')}
-          </button>
-        )}
+        <div className="check-actions">
+          {r.checked ? (
+            <button className="btn btn-small btn-ghost" onClick={() => void clear(r)}>
+              {t('check.uncheck')}
+            </button>
+          ) : (
+            <button className="btn btn-small btn-secondary" onClick={() => void confirm(r)}>
+              {t('match.confirm')}
+            </button>
+          )}
+          {r.doubted ? (
+            <button className="btn btn-small btn-ghost" onClick={() => void clear(r)}>
+              {t('check.undoubt')}
+            </button>
+          ) : (
+            <button className="btn btn-small btn-ghost" onClick={() => void doubt(r)}>
+              {t('check.doubt.button')}
+            </button>
+          )}
+        </div>
       </li>
     );
   };
@@ -128,8 +147,8 @@ export function FoodCheckPage() {
       {rows.length > 0 && (
         <AskChips
           className="check-ask"
-          questions={[period === 'all' ? t('check.askTextAll') : t('check.askText', { days: Number(period) })]}
-          data={{ kinds: ['food'], period: ASK_PERIOD[period], kitchen: false }}
+          questions={[...(doubted.length ? [t('check.askDoubted')] : []), period === 'all' ? t('check.askTextAll') : t('check.askText', { days: Number(period) })]}
+          data={{ kinds: ['food'], period: doubted.length ? 'all' : ASK_PERIOD[period], kitchen: doubted.some((r) => r.home) }}
         />
       )}
       {flagged.length > 0 && (

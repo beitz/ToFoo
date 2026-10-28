@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useData } from '../../app/data';
 import { href } from '../../app/router';
 import { t } from '../../i18n';
-import { checkSignature } from '../../logic/foodCheck';
+import { checkSignature, marksOf } from '../../logic/foodCheck';
 import { repo } from '../../storage/repo';
 import { Icon } from '../../ui/Icon';
 import { ChangeButton, DoneRow } from './CardFrame';
@@ -23,7 +23,6 @@ export function MarkCheckedCard({ card, toast, onLogged, register }: CardProps<E
     if (saving) return;
     setSaving(true);
     try {
-      const before = d.settings.checkedFoods ?? {};
       const marks: Record<string, string> = {};
       for (const { key } of checked.foods) {
         if (key.startsWith('BLS:')) marks[key] = 'BLS';
@@ -32,10 +31,11 @@ export function MarkCheckedCard({ card, toast, onLogged, register }: CardProps<E
           if (product) marks[key] = checkSignature({ source: product.source, code: product.code }, product);
         }
       }
+      const before = marksOf(d.settings, Object.keys(marks));
       await repo.setFoodsChecked(marks);
       onLogged(true, { marked: Object.keys(marks).length });
       return async () => {
-        await repo.setFoodsChecked(Object.fromEntries(Object.keys(marks).map((k) => [k, before[k]])));
+        await repo.setFoodMarks(before);
         onLogged(false);
       };
     } finally {

@@ -172,16 +172,30 @@ export function createRepo(db: ToFooDB) {
       await repo.setFoodsChecked({ [key]: signature });
     },
 
-    /** Several marks at once (undefined takes a mark off): the assistant's "Looks right" card and its undo. */
+    /** Several "Looks right" marks at once (undefined takes a mark off); a mark takes a "Not right" off. */
     async setFoodsChecked(marks: Readonly<Record<string, string | undefined>>): Promise<void> {
+      await repo.setFoodMarks(Object.fromEntries(Object.entries(marks).map(([key, checked]) => [key, checked === undefined ? {} : { checked }])), Object.keys(marks));
+    },
+
+    /** Mark a food "Not right" with what the mark holds for, taking its "Looks right" off; undefined takes it off. */
+    async setFoodDoubted(key: string, signature: string | undefined): Promise<void> {
+      await repo.setFoodMarks({ [key]: signature === undefined ? {} : { doubted: signature } });
+    },
+
+    /** Both marks of these foods exactly as given (missing: no mark), for setting them and for undo. */
+    async setFoodMarks(marks: Readonly<Record<string, { checked?: string; doubted?: string }>>, keys: readonly string[] = Object.keys(marks)): Promise<void> {
       await db.transaction('rw', db.settings, async () => {
         const s = (await db.settings.get('settings')) ?? defaultSettings();
         const checkedFoods = { ...s.checkedFoods };
-        for (const [key, signature] of Object.entries(marks)) {
-          if (signature === undefined) delete checkedFoods[key];
-          else checkedFoods[key] = signature;
+        const doubtedFoods = { ...s.doubtedFoods };
+        for (const key of keys) {
+          const m = marks[key] ?? {};
+          if (m.checked === undefined) delete checkedFoods[key];
+          else checkedFoods[key] = m.checked;
+          if (m.doubted === undefined) delete doubtedFoods[key];
+          else doubtedFoods[key] = m.doubted;
         }
-        await db.settings.put({ ...s, checkedFoods, id: 'settings', schemaVersion: v });
+        await db.settings.put({ ...s, checkedFoods, doubtedFoods, id: 'settings', schemaVersion: v });
       });
     },
 

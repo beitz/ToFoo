@@ -73,7 +73,7 @@ describe('the assistant checks what was logged', () => {
   });
 
   it('leaves out what the user already checked, unless asked to include it', () => {
-    const checked = { ...data, checked: { 'BLS:G490100': 'BLS' } };
+    const checked = { ...data, marks: { checkedFoods: { 'BLS:G490100': 'BLS' } } };
     const r = runCheckLoggedFoods({ days: 7 }, checked, db).text;
     expect(r).toContain('1 more the user already checked are left out');
     expect(r).not.toContain('Garlic raw');
@@ -166,8 +166,18 @@ describe('the assistant checks what was logged', () => {
     expect(validateMarkChecked({ foods: ['BLS:G490100'] }, { ...data, log: [log[2]!] }, db)).toMatchObject({ ok: true });
     expect(validateMarkChecked({ foods: ['BLS:G480100'] }, data, db)).toMatchObject({ ok: false });
     expect(validateMarkChecked({ foods: [] }, data, db)).toMatchObject({ ok: false });
-    const checked = { ...data, checked: { 'BLS:G490100': 'BLS' } };
+    const checked = { ...data, marks: { checkedFoods: { 'BLS:G490100': 'BLS' } } };
     expect(validateMarkChecked({ foods: ['BLS:G490100', helles.id] }, checked, db)).toMatchObject({ ok: true, proposal: { foods: [{ key: helles.id }] } });
     expect(validateMarkChecked({ foods: ['BLS:G490100'] }, checked, db)).toMatchObject({ ok: false });
+  });
+
+  it('always lists what the user marked "Not right", first, and keeps it out of a Looks right card', () => {
+    const marks = { ...data, marks: { doubtedFoods: { 'BLS:G490100': 'BLS' } } };
+    const lines = runCheckLoggedFoods({ days: 7 }, marks, db).text.split('\n');
+    expect(lines[1]).toContain('BLS:G490100 | Garlic raw');
+    expect(lines[1]).toContain('THE USER MARKED THIS AS NOT RIGHT');
+    expect(lines[0]).toContain('2 flagged');
+    const card = validateMarkChecked({ foods: ['BLS:G490100', helles.id] }, marks, db);
+    expect(!card.ok && card.error).toContain('marked BLS:G490100 as not right');
   });
 });

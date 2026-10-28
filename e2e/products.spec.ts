@@ -246,5 +246,15 @@ test('the check list puts the app\'s unchecked pick first, and "Looks right" mar
   await expect(page.getByRole('heading', { name: 'Looks fine (2)' })).toBeVisible();
   await page.goto('./#/settings');
   await expect(page.getByText('Last 7 days: all look fine')).toBeVisible();
+
+  // Not right: first under Worth a look, with what to do next, until it is cleared.
+  await page.goto('./#/settings/check');
+  const oats = page.locator('.check-row', { hasText: 'Oat flakes' });
+  await oats.getByRole('button', { name: 'Not right' }).click();
+  await expect(page.getByRole('heading', { name: 'Worth a look (1)' })).toBeVisible();
+  await expect(oats).toContainText('You marked this as not right');
+  await expect(page.getByRole('button', { name: 'Fix the foods I marked as not right' })).toBeVisible();
+  await oats.getByRole('button', { name: 'Clear mark' }).click();
+  await expect(page.getByRole('heading', { name: 'Looks fine (2)' })).toBeVisible();
   expect(errors).toEqual([]);
 });

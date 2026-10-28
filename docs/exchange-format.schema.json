@@ -1087,6 +1087,16 @@
                         "type": "string"
                       }
                     },
+                    "doubtedFoods": {
+                      "description": "Foods marked \"Not right\" on Check logged foods, to be fixed: food key → the BLS code, mix or \"label\" it was wrong with",
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    },
                     "logCollapsed": {
                       "type": "object",
                       "propertyNames": {

@@ -8,14 +8,19 @@ import type { FoodDb } from '../foods/foodDb';
 import { GOOD_FIT, kindMismatch, kindOf, labelFit } from '../foods/productMatch';
 import { hasOwnMicros, productLabel } from '../foods/products';
 import { refKey } from '../lib/refs';
-import type { Batch, FoodRef, HomePlace, LogEntry, Product } from '../storage/types';
+import type { Batch, FoodRef, HomePlace, LogEntry, Product, Settings } from '../storage/types';
 
 /**
- * Why a food is worth a look: it borrows from another kind of food (a drink from a food, tofu from
- * fish), its label does not fit the food it borrows from, it borrows from none (only the label
- * counts), or the app picked that food and nobody checked it yet.
+ * Why a food is worth a look: the user marked it "Not right" (owner's ask, 2026-10-28: "I can say
+ * looks right, I can't say doesn't look right or check again please"), it borrows from another
+ * kind of food (a drink from a food, tofu from fish), its label does not fit the food it borrows
+ * from, it borrows from none (only the label counts), or the app picked that food and nobody
+ * checked it yet.
  */
-export type CheckFlag = 'kind' | 'misfit' | 'none' | 'auto';
+export type CheckFlag = 'doubt' | 'kind' | 'misfit' | 'none' | 'auto';
+
+/** What the user said about foods: "Looks right" and "Not right", each refKey → checkSignature when marked. */
+export type FoodMarks = Pick<Settings, 'checkedFoods' | 'doubtedFoods'>;
 export type KindReason = NonNullable<ReturnType<typeof kindMismatch>>;
 
 export interface CheckRow {
@@ -38,9 +43,11 @@ export interface CheckRow {
   flags: CheckFlag[];
   /** Marked "Looks right" by the user (or fixed by them) with the food it has now. */
   checked: boolean;
+  /** Marked "Not right" by the user with the food it has now (the 'doubt' flag). */
+  doubted: boolean;
 }
 
-const FLAG_ORDER: readonly CheckFlag[] = ['kind', 'misfit', 'none', 'auto'];
+const FLAG_ORDER: readonly CheckFlag[] = ['doubt', 'kind', 'misfit', 'none', 'auto'];
 
 /** The flags of one product, most serious first. */
 export function productFlags(p: Product, foods: Pick<FoodDb, 'byCode'>): { fit?: number; kind?: KindReason; flags: CheckFlag[] } {
@@ -58,8 +65,8 @@ export function productFlags(p: Product, foods: Pick<FoodDb, 'byCode'>): { fit?:
 }
 
 /**
- * What a "Looks right" holds for: a BLS food itself, a product with the food it borrows from now.
- * When the pairing changes (the app's better pick, a fix), the mark no longer holds.
+ * What a "Looks right" (or "Not right") holds for: a BLS food itself, a product with the food it
+ * borrows from now. When the pairing changes (the app's better pick, a fix), the mark no longer holds.
  */
 export function checkSignature(ref: FoodRef, product?: Pick<Product, 'match' | 'labelOnly'>): string {
   if (!product) return ref.source;
@@ -77,8 +84,8 @@ export interface HomeRef {
 
 /**
  * Every BLS food and product eaten from `from` to `to` (day keys, inclusive), and each one at home
- * in `home`, flagged ones first (in FLAG_ORDER), then by how often, the ones the user checked
- * (`checked`: refKey → checkSignature when marked) last. Own foods carry their own values and are
+ * in `home`, flagged ones first (in FLAG_ORDER, the ones the user marked "Not right" first), then by
+ * how often, the ones the user checked last (`marks`). Own foods carry their own values and are
  * left out.
  */
 export function foodCheck(
@@ -88,7 +95,7 @@ export function foodCheck(
   foods: Pick<FoodDb, 'byCode'>,
   from: string,
   to: string,
-  checked: Readonly<Record<string, string>> = {},
+  marks: FoodMarks = {},
   home: readonly HomeRef[] = [],
 ): CheckRow[] {
   const rows = new Map<string, CheckRow>();
@@ -98,6 +105,10 @@ export function foodCheck(
     if (!r) {
       const product = ref.source === 'OFF' || ref.source === 'USDA' ? productsById.get(key) : undefined;
       const name = product ? productLabel(product) : ref.source === 'BLS' ? (foods.byCode.get(ref.code)?.nameEn ?? fallback) : fallback;
+      const signature = checkSignature(ref, product);
+      const flagged = product ? productFlags(product, foods) : { flags: [] as CheckFlag[] };
+      // "Not right" wins over a "Looks right" that is somehow there too; setting one clears the other.
+      const doubted = marks.doubtedFoods?.[key] === signature;
       r = {
         key,
         ref,
@@ -106,8 +117,10 @@ export function foodCheck(
         count: 0,
         grams: 0,
         recipes: [],
-        ...(product ? productFlags(product, foods) : { flags: [] }),
-        checked: checked[key] === checkSignature(ref, product),
+        ...flagged,
+        flags: doubted ? ['doubt', ...flagged.flags] : flagged.flags,
+        checked: !doubted && marks.checkedFoods?.[key] === signature,
+        doubted,
       };
       rows.set(key, r);
     }
@@ -156,4 +169,15 @@ export function checkNudge(rows: readonly CheckRow[]): { unchecked: number; flag
   const open = rows.filter((r) => !r.checked);
   const flagged = open.filter((r) => r.flags.length).length;
   return flagged > 0 || open.length >= CHECK_PILE_UP ? { unchecked: open.length, flagged } : undefined;
+}
+
+/** Both marks of these foods as they are now, to put back on undo (repo.setFoodMarks). */
+export function marksOf(marks: FoodMarks, keys: readonly string[]): Record<string, { checked?: string; doubted?: string }> {
+  return Object.fromEntries(
+    keys.map((k) => {
+      const checked = marks.checkedFoods?.[k];
+      const doubted = marks.doubtedFoods?.[k];
+      return [k, { ...(checked !== undefined ? { checked } : {}), ...(doubted !== undefined ? { doubted } : {}) }];
+    }),
+  );
 }

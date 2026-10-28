@@ -156,6 +156,8 @@ export interface Settings extends Versioned {
   favouriteActivities?: FavouriteActivity[];
   /** Foods marked "Looks right" on Check logged foods: refKey → what the mark holds for (logic/foodCheck checkSignature). */
   checkedFoods?: Record<string, string>;
+  /** Foods marked "Not right" on Check logged foods, for the user or the assistant to fix: refKey → what the mark holds for, like checkedFoods. */
+  doubtedFoods?: Record<string, string>;
   /** Log screen sections the user closed (true) or opened (false), by section key; unset = open. */
   logCollapsed?: Record<string, boolean>;
   /** Recipe ideas: diet, likes, kitchen, time, batch size, in the user's words (guidance for the assistant, not a filter). */
