@@ -6,7 +6,7 @@ import { search } from '../../foods/search';
 import { productLabel } from '../../foods/products';
 import { newId } from '../../lib/id';
 import { refKey } from '../../lib/refs';
-import { guessPlace, leftOf, packGrams, leftText, onShoppingList, usageOf, withStatus, type Left } from '../../logic/pantry';
+import { guessPlace, leftOf, packGrams, leftText, onShoppingList, pieceUnitsOf, usageOf, withStatus, type Left, type PieceUnits } from '../../logic/pantry';
 import { planAdd, sectionOfRef, type NewShoppingItem } from '../../logic/shopping';
 import type { HomeRef } from '../../logic/foodCheck';
 import { isOn } from '../../settings/features';
@@ -19,10 +19,18 @@ export function usePantry(): PantryItem[] | undefined {
   return useLiveQuery(() => repo.db.pantry.toArray(), []);
 }
 
+/** Piece and pack weights by food key, so a log in pieces takes that many off at home. */
+export function usePieceUnits(): (key: string) => PieceUnits | undefined {
+  const d = useData();
+  const saved = useLiveQuery(() => repo.pieceWeights(), []);
+  return useMemo(() => pieceUnitsOf(d.productsById, saved), [d.productsById, saved]);
+}
+
 /** What is left of each thing, worked out from the log and the cooked batches. */
 export function usePantryLeft(): (item: PantryItem) => Left {
   const d = useData();
-  const usage = useMemo(() => usageOf(d.log, d.batches), [d.log, d.batches]);
+  const units = usePieceUnits();
+  const usage = useMemo(() => usageOf(d.log, d.batches, units), [d.log, d.batches, units]);
   return (item) => leftOf(item, usage);
 }
 

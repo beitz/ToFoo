@@ -5,7 +5,7 @@
  */
 import { refKey } from '../lib/refs';
 import type { Batch, Ingredient, LogEntry, PantryItem, Pot, Recipe, Settings } from '../storage/types';
-import { leftOf, usageOf, type Left } from './pantry';
+import { leftOf, usageOf, type Left, type PieceUnits } from './pantry';
 
 /** Where one box of the pot goes: eaten now (logged with the batch), the fridge or the freezer. */
 export type Box = 'now' | 'fridge' | 'freezer';
@@ -68,9 +68,16 @@ export interface HomeUse {
  * kitchen will show once this pot counts. Nothing is stored for it: the kitchen works out what is
  * left from the log and the cooked pots (logic/pantry.ts), so cooking updates it by itself.
  */
-export function takenFromHome(ingredients: readonly Ingredient[], items: readonly PantryItem[], log: readonly LogEntry[], batches: readonly Batch[], now: number): HomeUse[] {
-  const before = usageOf(log, batches);
-  const after = usageOf(log, [...batches, { cookedAt: now, recipe: { ingredients: [...ingredients] } }]);
+export function takenFromHome(
+  ingredients: readonly Ingredient[],
+  items: readonly PantryItem[],
+  log: readonly LogEntry[],
+  batches: readonly Batch[],
+  now: number,
+  units?: (key: string) => PieceUnits | undefined,
+): HomeUse[] {
+  const before = usageOf(log, batches, units);
+  const after = usageOf(log, [...batches, { cookedAt: now, recipe: { ingredients: [...ingredients] } }], units);
   const out: HomeUse[] = [];
   for (const ingredient of ingredients) {
     if (ingredient.isSalt) continue;
