@@ -8,6 +8,8 @@
  * scenes and small fixes. A pull request that changes what users see adds its line here in the same PR.
  */
 export const changesEn = {
+  'change.177': 'The assistant knows what research says about sleep (how long, waking in the night, naps, regular times, caffeine, alcohol, when to see a doctor) and names its sources. With sleep included, it checks your nights against those norms and mentions only what happens on 3 or more nights a week.',
+  'change.177.major': 'Sleep answers backed by research, checked against your nights',
   'change.176': 'Nutrient pages show what one meal can give, how big the body store is and how fast it refills, under What it does; tap a fact for its source. When a store or omega-3 is low, a Filling up card says how long it takes to get back to fine, at your recent rate and with a few portions a week of a food; for omega-3, what each daily amount did to the omega-3 index in a study, in portions of what you eat.',
   'change.176.major': 'Filling up: how fast a low store or omega-3 comes back',
   'change.175': 'On a nutrient page, "days with gaps" is now "foods without a value": tap it to see which foods have no value for that nutrient and open them.',
