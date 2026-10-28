@@ -4,6 +4,7 @@
  * editor), each kept stable so prompt caching works.
  */
 import type { BetaTool, BetaToolUnion, BetaWebSearchTool20250305 } from '@anthropic-ai/sdk/resources/beta/messages/messages';
+import { SLEEP_FACTS } from '../../model/sleep';
 import { ACTIVITY_KINDS, INTENSITIES } from '../storage/types';
 import { INSIGHT_GUIDE, INSIGHT_TOOLS } from './insightsPrompt';
 import { FORGOTTEN as FORGOTTEN_KINDS, PREPARATIONS } from './tools';
@@ -87,6 +88,10 @@ export interface PromptSources {
 }
 
 // Without Include my data the chat sees none of the user's days, and should say how to share them.
+// What research says about sleep (model/sleep.ts), so answers about it rest on sources rather than general knowledge (owner's report 2026-10-28: generic answers).
+const SLEEP_BACKGROUND = `Sleep background: what research says, checked for this app. Use it to tell what is normal and what is worth acting on, and name the source in short when you use a fact ("NSF panel, 2017"). Beyond it, say that you answer from general knowledge. These lines are for healthy people and describe groups, not a diagnosis of one person.
+${SLEEP_FACTS.map((f) => `- ${f.topic}: ${f.text} (${f.source})`).join('\n')}`;
+
 const NO_DATA = `- Their data: you cannot see the user's journal, sleep, activity, water or past days. If they ask about those or about patterns in their days, say they can tap "Include my data" above the message box (it needs Patterns on in Settings → AI assistant), tick what to share and ask again.`;
 
 // Forgotten foods (docs/SPEC.md, "Forgotten foods"): logs come out short mostly from what is
@@ -190,7 +195,7 @@ ${forgotten ? `${FORGOTTEN}\n` : ''}- Amounts: use what the user said, label wei
 - assumptions: short phrases the user should see, e.g. "ate about a quarter of the shared pot".
 
 ${recipes ? '- Questions: when the user just asks something (about their food, the app, nutrition), answer briefly in text. Numbers about their nutrients come only from tools.\n' : ''}- General knowledge: when you answer from general knowledge rather than from the app's tools (what a nutrient does, what research says), say so, and name where it comes from (the DGE, EFSA, the WHO, a well-known review) only when you are sure; never make up a study, a link or a number. Values for foods and their nutrients come from the app, never from you.
-${insights ? '' : `${NO_DATA}\n`}
+${insights ? '' : `${NO_DATA}\n`}${sleep ? `\n${SLEEP_BACKGROUND}\n` : ''}
 
 ${insights ? `\n${INSIGHT_GUIDE}\n\n` : ''}Style: brief, friendly, plain text (no headings or tables). Answer in the language the user writes in.`;
 }

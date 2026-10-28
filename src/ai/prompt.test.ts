@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { STRICT_NESTED, toolsFor, type PromptSources } from './prompt';
+import { STRICT_NESTED, systemPromptFor, toolsFor, type PromptSources } from './prompt';
 
 /** Does this JSON schema hold a list of objects (a list of foods, changes, …)? */
 function hasObjectList(schema: unknown): boolean {
@@ -30,5 +30,16 @@ describe('input of tools that are not strict', () => {
     const { recipeProposalInput, portionProposalInput } = await import('./tools');
     expect(recipeProposalInput.parse({ kind: 'own', name: 'Curry', portions: 4, items: [{ code: 'X1', grams: 100, preparation: 'raw' }] })).toMatchObject({ assumptions: [], items: [{ note: '' }] });
     expect(portionProposalInput.parse({ batch_id: 'b1', portions: 1 })).toMatchObject({ grams: 0, changes: [], assumptions: [] });
+  });
+});
+
+describe('sleep background', () => {
+  it('goes with the prompt only while Sleep is on, and the sleep check only with shared data', () => {
+    expect(systemPromptFor({ sleep: true })).toContain('Sleep background: what research says');
+    expect(systemPromptFor({ sleep: true })).toContain('(Ohayon 2017 (NSF sleep quality recommendations))');
+    expect(systemPromptFor({})).not.toContain('Sleep background');
+    const names = (s: PromptSources) => (toolsFor(s) as Array<{ name: string }>).map((t) => t.name);
+    expect(names({ sleep: true })).not.toContain('sleep_check');
+    expect(names({ sleep: true, insights: true })).toContain('sleep_check');
   });
 });

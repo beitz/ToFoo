@@ -10,6 +10,7 @@ import { groupMeals, type DailyTotals } from '../model/simulate';
 import type { DayStatus, ModelEntry } from '../model/types';
 import type { ActivityRecord, Habit, HabitKind, JournalEntry, SleepRecord, WaterRecord } from '../storage/types';
 import { habitDay, habitStart, type HabitData } from './habits';
+import type { SleepAgeGroup } from '../../model/sleep';
 import { sleepByDay, wakeUps } from './sleep';
 
 export interface InsightInput {
@@ -26,6 +27,8 @@ export interface InsightInput {
   today: string;
   /** Habits with their answers (docs/SPEC.md, "Habits"); absent while Habits is off. */
   habits?: { list: readonly Habit[]; data: HabitData };
+  /** For the sleep lines; absent while Sleep is off. */
+  sleepProfile?: SleepProfile;
 }
 
 export type MeasureGroup = 'food' | 'sleep' | 'activity' | 'water' | 'journal';
@@ -72,6 +75,8 @@ export interface DayEntry {
   /** Grams of the foods in it; missing for manual entries and supplements. */
   grams?: number;
   supplement: boolean;
+  /** Normalised names of the entry and each food in it (English and German), for matching words. */
+  text?: string;
 }
 
 export interface DayFacts {
@@ -108,8 +113,20 @@ export interface InsightHabit {
   kind: HabitKind;
 }
 
+/** What the sleep lines depend on: the user's sleep need and age group (shared with sleep only). */
+export interface SleepProfile {
+  needHours: number;
+  /** The user set their own need in Profile (otherwise the default from model/parameters.ts). */
+  ownNeed: boolean;
+  ageGroup: SleepAgeGroup;
+  /** No birth year in the profile: the adult lines are used. */
+  ageUnknown: boolean;
+}
+
 export interface InsightData {
   days: ReadonlyMap<string, DayFacts>;
+  /** Absent when sleep is not shared or not tracked. */
+  sleepProfile?: SleepProfile;
   /** The user's habits, archived ones too (their answers are history). */
   habits: readonly InsightHabit[];
   /** First day with any data. */
@@ -227,6 +244,7 @@ export function buildInsightData(input: InsightInput): InsightData {
         label: e.label,
         ...(e.parts.length ? { grams: e.parts.reduce((n, p) => n + p.grams, 0) } : {}),
         supplement: e.isSupplement,
+        text: ` ${[e.label, ...e.parts.flatMap((p) => [p.label, p.nameEn ?? '', p.nameDe ?? ''])].map(normalize).join(' | ')} `,
       })),
       journal: notes.map((n) => ({ time: n.time, text: n.text, ...(n.private ? { private: true } : {}) })),
       ...(night ? { night } : {}),
@@ -239,7 +257,13 @@ export function buildInsightData(input: InsightInput): InsightData {
       habits,
     });
   }
-  return { days, habits: habitList.map((h) => ({ name: h.name, kind: h.kind })), first, today: input.today };
+  return {
+    days,
+    habits: habitList.map((h) => ({ name: h.name, kind: h.kind })),
+    first,
+    today: input.today,
+    ...(input.sleepProfile && since.sleep ? { sleepProfile: input.sleepProfile } : {}),
+  };
 }
 
 /**
@@ -286,7 +310,7 @@ export function conditionProblem(c: Condition): string | undefined {
 
 type Tri = boolean | null;
 
-const hasWord = (text: string, words: readonly string[]) => words.some((w) => normalize(w) && text.includes(normalize(w)));
+export const hasWord = (text: string, words: readonly string[]) => words.some((w) => normalize(w) && text.includes(normalize(w)));
 
 /** One condition on one day, before offset and span: true, false, or null when it cannot be told. */
 function holdsOn(c: Condition, day: string, data: InsightData): Tri {
@@ -528,7 +552,13 @@ export function shareInsightData(data: InsightData, from: string, kinds: Readonl
       missing: new Set([...f.missing].filter((id) => !hidden.has(id))),
     });
   }
-  return { days, habits: kinds.has('habits') ? data.habits : [], first, today: data.today };
+  return {
+    days,
+    habits: kinds.has('habits') ? data.habits : [],
+    first,
+    today: data.today,
+    ...(kinds.has('sleep') && data.sleepProfile ? { sleepProfile: data.sleepProfile } : {}),
+  };
 }
 
 /** What a period's data consists of: the user sees it before asking, the assistant gets it with the question. */
