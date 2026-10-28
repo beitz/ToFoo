@@ -67,7 +67,7 @@ import { cardId, cardOf, cardTitle, useRegister, type Bubble, type Card, type Ca
 import { RecipeCard } from './RecipeCard';
 import { ShoppingCard } from './ShoppingCard';
 import { HomeCard } from './HomeCard';
-import { leftOf, leftText, usageOf, type Left } from '../../logic/pantry';
+import { leftOf, leftText, pieceUnitsOf, usageOf, type Left } from '../../logic/pantry';
 import { BatchCard, PortionCard } from './BatchCards';
 import { ProposalGroup, cardAnchor } from './ProposalGroup';
 import { CardFrame, useCardIntake } from './CardFrame';
@@ -490,7 +490,7 @@ function Chat({
             }
           : undefined;
       // What is at home (not used up), so search_foods can mark it.
-      const atHome = !recipe && isOn(d.settings.features, 'atHome') ? await homeFoodKeys(d.log, d.batches) : undefined;
+      const atHome = !recipe && isOn(d.settings.features, 'atHome') ? await homeFoodKeys(d.log, d.batches, d.productsById) : undefined;
       const ctx = {
         db: d.foods,
         index: d.searchIndex,
@@ -1779,8 +1779,8 @@ function kitchenThing(item: PantryItem, left: Left, d: Pick<AppData, 'foods' | '
 }
 
 /** Foods at home and not used up, by food key (refKey). */
-async function homeFoodKeys(log: readonly LogEntry[], batches: readonly Batch[]): Promise<ReadonlySet<string>> {
-  const usage = usageOf(log, batches);
+async function homeFoodKeys(log: readonly LogEntry[], batches: readonly Batch[], products: ReadonlyMap<string, Product>): Promise<ReadonlySet<string>> {
+  const usage = usageOf(log, batches, pieceUnitsOf(products, await repo.pieceWeights()));
   const items = await repo.db.pantry.toArray();
   return new Set(items.flatMap((i) => (i.ref && !leftOf(i, usage).out ? [refKey(i.ref)] : [])));
 }

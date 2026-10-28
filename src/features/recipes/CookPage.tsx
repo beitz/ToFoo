@@ -16,7 +16,7 @@ import { Field, NumberInput, Sheet, Toggle } from '../../ui/controls';
 import { DateInput } from '../../ui/DateInputs';
 import { Icon } from '../../ui/Icon';
 import { defaultTimeFor } from '../log/time';
-import { leftLabel, placeName, usePantry } from '../pantry/usePantry';
+import { leftLabel, placeName, usePantry, usePieceUnits } from '../pantry/usePantry';
 import { IngredientChanges } from './IngredientChanges';
 
 const STEPS = ['gather', 'cook', 'weigh', 'store'] as const;
@@ -115,7 +115,8 @@ function Cooking({ recipe }: { recipe: Recipe }) {
   const plan = planOf(draft.boxes);
   const pot = (d.settings.pots ?? []).find((p) => p.id === draft.potId);
   const homeOn = isOn(d.settings.features, 'atHome');
-  const taken = useMemo(() => (homeOn && pantry ? takenFromHome(draft.ingredients, pantry, d.log, d.batches, Date.now()) : []), [homeOn, pantry, draft.ingredients, d.log, d.batches]);
+  const units = usePieceUnits();
+  const taken = useMemo(() => (homeOn && pantry ? takenFromHome(draft.ingredients, pantry, d.log, d.batches, Date.now(), units) : []), [homeOn, pantry, draft.ingredients, d.log, d.batches, units]);
   const stepIndex = STEPS.indexOf(draft.step);
 
   function close() {

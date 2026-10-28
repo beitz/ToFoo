@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { Batch, FoodRef, LogEntry, PantryItem, ShoppingItem } from '../storage/types';
-import { amountField, byPlace, fromShopping, guessPlace, leftOf, leftText, loggable, packGrams, piecesAsGrams, scannedAmount, onShoppingList, pantrySuggestions, parseStock, placeFromWords, placeOfCode, planReports, planStock, stockAmount, toBuy, usageOf, withAmount, withStatus } from './pantry';
+import type { Batch, FoodRef, LogEntry, PantryItem, Product, ShoppingItem } from '../storage/types';
+import { amountField, byPlace, fromShopping, guessPlace, leftOf, leftText, loggable, packGrams, piecesAsGrams, scannedAmount, onShoppingList, pantrySuggestions, parseStock, placeFromWords, pieceUnitsOf, piecesOfLog, placeOfCode, planReports, planStock, stockAmount, toBuy, usageOf, withAmount, withStatus } from './pantry';
 
 const bls = (code: string): FoodRef => ({ source: 'BLS', version: '4.0', code });
 const lasagne: FoodRef = { source: 'OFF', code: '4001' };
@@ -8,7 +8,7 @@ const oats = bls('C133000');
 let n = 0;
 const id = () => `p${++n}`;
 const item = (o: Partial<PantryItem> & { name: string }): PantryItem => ({ id: o.name, schemaVersion: 1, place: 'cupboard', since: 100, addedAt: 100, ...o });
-const food = (ref: FoodRef, grams: number, time: number): LogEntry => ({ id: `e${time}`, schemaVersion: 1, kind: 'food', ref, grams, preparation: 'asListed', time, day: '2026-10-21', confidence: 'A', label: '' });
+const food = (ref: FoodRef, grams: number, time: number): Extract<LogEntry, { kind: 'food' }> => ({ id: `e${time}`, schemaVersion: 1, kind: 'food', ref, grams, preparation: 'asListed', time, day: '2026-10-21', confidence: 'A', label: '' });
 const pot = (ref: FoodRef, grams: number, cookedAt: number): Batch => ({
   id: `b${cookedAt}`,
   schemaVersion: 1,
@@ -28,6 +28,46 @@ describe('what is left', () => {
     const l = leftOf(item({ name: 'Lasagne', ref: lasagne, pieces: 3 }), usage);
     expect(l).toEqual({ pieces: 2, out: false, low: false });
     expect(leftOf(item({ name: 'Lasagne', ref: lasagne, pieces: 1 }), usage)).toEqual({ pieces: 0, out: true, low: false });
+  });
+
+  it('takes as many pieces off as were logged, and gives them back when the log is gone', () => {
+    // Owner's find (2026-10-28): 4 yogurts, 1 eaten, then 3 logged as "3 pieces" left 2 instead of 0.
+    const yogurt = bls('M141100');
+    const four = item({ name: 'Yogurt', ref: yogurt, pieces: 4 });
+    const one = food(yogurt, 150, 200);
+    const three: LogEntry = { ...food(yogurt, 450, 300), pieces: 3 };
+    expect(leftOf(four, usageOf([one], []))).toMatchObject({ pieces: 3, out: false });
+    expect(leftOf(four, usageOf([one, three], []))).toMatchObject({ pieces: 0, out: true });
+    // Deleting or changing an entry changes the log, and what is left follows it.
+    expect(leftOf(four, usageOf([one, { ...three, pieces: 2, grams: 300 }], []))).toMatchObject({ pieces: 1 });
+  });
+
+  it('counts a log in grams that weighs a whole number of pieces as that many', () => {
+    const yogurt = bls('M141100');
+    const units = () => ({ piece: 150 });
+    const four = item({ name: 'Yogurt', ref: yogurt, pieces: 4 });
+    expect(leftOf(four, usageOf([food(yogurt, 300, 200)], [], units))).toMatchObject({ pieces: 2 });
+    expect(leftOf(four, usageOf([food(yogurt, 450.1, 200)], [], units))).toMatchObject({ pieces: 1 });
+    // Not a whole number of pieces, or no piece weight: one per log, as before.
+    expect(leftOf(four, usageOf([food(yogurt, 200, 200)], [], units))).toMatchObject({ pieces: 3 });
+    expect(leftOf(four, usageOf([food(yogurt, 300, 200)], []))).toMatchObject({ pieces: 3 });
+  });
+
+  it('counts a pack of many small pieces by the share of the pack eaten', () => {
+    expect(piecesOfLog({ grams: 4.2, pieces: 3 }, { piece: 1.4, pack: 70 })).toBeCloseTo(0.06);
+    expect(piecesOfLog({ grams: 1.4 }, { piece: 1.4, pack: 70 })).toBeCloseTo(0.02);
+    // A 4-pack of yogurts is counted one by one.
+    expect(piecesOfLog({ grams: 300, pieces: 2 }, { piece: 150, pack: 600 })).toBe(2);
+    expect(piecesOfLog({ grams: 300, pieces: 2 }, undefined)).toBe(2);
+  });
+
+  it('finds piece weights: the saved one first, then the label', () => {
+    const gum = { id: 'OFF:4009900482806', name: 'Extra Peppermint 50 Stk', quantity: '70 g' } as Product;
+    const units = pieceUnitsOf(new Map([[gum.id, gum]]), new Map([['M141100', 150]]));
+    expect(units('BLS:M141100')).toEqual({ piece: 150 });
+    expect(units('OFF:4009900482806')).toEqual({ piece: 1.4, pack: 70 });
+    expect(units('BLS:C133000')).toBeUndefined();
+    expect(pieceUnitsOf(new Map([[gum.id, gum]]), new Map([['OFF:4009900482806', 2]]))('OFF:4009900482806')).toEqual({ piece: 2, pack: 70 });
   });
 
   it('takes grams off for what was eaten and cooked, and never goes below zero', () => {

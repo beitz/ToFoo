@@ -4,9 +4,10 @@
  * what is left is worked out from the log and the cooked batches since then, like the stores are
  * worked out from the log. Pure; tested in pantry.test.ts. The repository applies the changes.
  */
+import { labelPiece, packHints } from '../foods/pieces';
 import { normalize, type SearchItem } from '../foods/search';
 import { refKey } from '../lib/refs';
-import { HOME_PLACES, type Batch, type FoodRef, type HomePlace, type LogEntry, type PantryItem, type ShopSection, type ShoppingItem } from '../storage/types';
+import { HOME_PLACES, type Batch, type FoodRef, type HomePlace, type LogEntry, type PantryItem, type Product, type ShopSection, type ShoppingItem } from '../storage/types';
 import { commonSection, fmtShopGrams, isOpen, namedFoods, parseAmount, parseEntry, sameThing } from './shopping';
 
 /** What is added: something bought, before it is on the list. */
@@ -44,10 +45,56 @@ interface Use {
   grams: number;
 }
 
-/** Uses of every food, by food key (refKey): one piece per log entry or pot, the grams eaten or cooked. */
+/** Uses of every food, by food key (refKey): the pieces and grams of each log entry, one piece per pot. */
 export type Usage = ReadonlyMap<string, readonly Use[]>;
 
-export function usageOf(log: readonly LogEntry[], batches: ReadonlyArray<Pick<Batch, 'cookedAt'> & { recipe: Pick<Batch['recipe'], 'ingredients'> }>): Usage {
+/** What one piece of a food weighs and, for a product, its whole pack; for counting a log in pieces. */
+export interface PieceUnits {
+  piece?: number;
+  pack?: number;
+}
+
+/**
+ * A pack of this many pieces or more (chewing gum, mints) is counted at home by the pack, not the
+ * piece: nobody counts 50 pieces of gum into the kitchen. Fewer (a 4-pack of yogurts, 10 eggs) are
+ * counted one by one, as bought.
+ */
+const PACK_OF_MANY = 20;
+
+/**
+ * How many pieces at home one log of a food takes: the pieces logged ("3 pieces" takes 3; owner's
+ * find, 2026-10-28), or as many as its grams weigh when that is a whole number of pieces (300 g of a
+ * 150 g yogurt takes 2), else one, as before. A pack of many pieces counts what share of the pack was
+ * eaten (3 of 50 pieces of gum take 0.06 of the pack).
+ */
+export function piecesOfLog(entry: { grams: number; pieces?: number }, units: PieceUnits | undefined): number {
+  const { piece, pack } = units ?? {};
+  if (piece && pack && pack >= PACK_OF_MANY * piece) return entry.grams / pack;
+  if (entry.pieces !== undefined) return entry.pieces;
+  if (piece) {
+    const n = Math.round(entry.grams / piece);
+    // Within a tenth of a gram, or 1 %: logged weights are rounded (piecesToGrams).
+    if (n >= 2 && Math.abs(entry.grams - n * piece) <= Math.max(0.1, entry.grams / 100)) return n;
+  }
+  return 1;
+}
+
+/** Piece and pack weights by food key: the user's own piece weight (by food code), else the product's label. */
+export function pieceUnitsOf(products: ReadonlyMap<string, Product>, pieceWeights: ReadonlyMap<string, number> | undefined): (key: string) => PieceUnits | undefined {
+  return (key) => {
+    const product = products.get(key);
+    // Saved piece weights go by food code: the BLS code, or the product's id (its key).
+    const piece = pieceWeights?.get(key.startsWith('BLS:') ? key.slice(4) : key) ?? (product ? labelPiece(product)?.grams : undefined);
+    const pack = product && !product.perMl ? packHints(product).grams : undefined;
+    return piece || pack ? { ...(piece ? { piece } : {}), ...(pack ? { pack } : {}) } : undefined;
+  };
+}
+
+export function usageOf(
+  log: readonly LogEntry[],
+  batches: ReadonlyArray<Pick<Batch, 'cookedAt'> & { recipe: Pick<Batch['recipe'], 'ingredients'> }>,
+  units: (key: string) => PieceUnits | undefined = () => undefined,
+): Usage {
   const usage = new Map<string, Use[]>();
   const add = (key: string, use: Use) => {
     const list = usage.get(key);
@@ -55,7 +102,10 @@ export function usageOf(log: readonly LogEntry[], batches: ReadonlyArray<Pick<Ba
     else usage.set(key, [use]);
   };
   for (const e of log) {
-    if (e.kind === 'food') add(refKey(e.ref), { time: e.time, pieces: 1, grams: e.grams });
+    if (e.kind === 'food') {
+      const key = refKey(e.ref);
+      add(key, { time: e.time, pieces: piecesOfLog(e, units(key)), grams: e.grams });
+    }
     // Saved items (supplements, own foods) are logged in servings, without grams.
     else if (e.kind === 'custom') add(refKey({ source: 'custom', id: e.customFoodId }), { time: e.time, pieces: e.servings, grams: 0 });
   }
