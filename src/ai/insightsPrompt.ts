@@ -104,6 +104,25 @@ export const INSIGHT_TOOLS: BetaTool[] = [
       additionalProperties: false,
     },
   },
+  {
+    name: 'sleep_check',
+    description:
+      "The user's nights in a period against the research lines for their age group (sleep length against their own need and the NSF duration lines; wake-ups, time awake and share asleep against the NSF sleep quality lines; timing and its spread; naps; and, with words, how long before falling asleep the last caffeine was), with the lines crossed often enough to be worth mentioning. Needs sleep shared.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        from: DAY,
+        to: DAY,
+        caffeine_words: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Word stems in food names that mean caffeine, in English and German (e.g. "kaffee", "coffee", "espresso", "cola", "mate", "energy"); empty to leave caffeine out.',
+        },
+      },
+      required: ['from', 'to', 'caffeine_words'],
+      additionalProperties: false,
+    },
+  },
 ];
 
 const GROUP_TITLE: Record<MeasureGroup, string> = {
@@ -132,6 +151,7 @@ Tools for this:
 - count_days: on how many of the days where the group conditions hold (e.g. the night before was short) the outcome conditions held too (e.g. the journal mentions a headache), against the other days, with a chance check.
 - compare_measures: a measure (sleep, energy, a nutrient, …) on the group days against the other days, or over all days of a period.
 - day_details: everything logged on given days, to look at them closely or show them to the user, including each sleep of a night with the wake-ups between them.
+- sleep_check: the user's nights against the research lines for their age group (see the sleep background), with the lines crossed often enough to mention. Use it once over the period whenever sleep is shared and the question or the look-through touches sleep, with caffeine words matching what the user eats.
 - daily_table: day-by-day values of chosen measures over a period. Only when the user asks for a deep look, day-by-day values, spikes or the full data, never for everyday questions, as it costs many times more. From it you may name single days and spikes you see; counts, averages and chance checks still come from count_days and compare_measures.
 
 Conditions: journal (words in that day's journal entries), food (words in the names of the foods and dishes logged that day, English or German), measure (a measure compared with a number), weekday, status (the food log status of the day), or habit (one of the user's habits was kept that day; the habits are listed in the app's note when the user shares them). offset moves a condition in time: -1 checks the day before the day being counted, 1 the day after. span widens it to several days ending at the offset day: it holds if it holds on any of them (a measure: its average over them). negate reverses it. All conditions in a list must hold. Give every field of a condition (empty lists, "", 0, false and span 1 where they do not apply). Words match parts of words, ignoring case and accents, so use stems and both languages: ["kopfschm", "kopfweh", "headache", "migr"]. Read the journal first to see which words the user actually uses.
@@ -146,6 +166,7 @@ Unknown stays unknown: a day whose food log is not complete, or a tracker before
 How to look through the data:
 - Keep it open: what is worth telling can be a connection between things, a trend over the weeks, a change in routine, single days or spikes that stand out, something steady and good, a gap in what was logged, or anything else that would interest this person. Get an overview first (read_journal over the period unless the question is not about the journal, and compare_measures over all days for the measures that matter), then follow what looks interesting, and say what you found most worth knowing, not everything you checked.
 - Ideas for connections, not a list to work through: what recurs in the journal (symptoms, energy, mood, sleep complaints, digestion) and what might go with it; sleep the night before (its length, and waking up in the night: wake_ups, awake_minutes); alcohol and coffee (food words such as "kaffee", "coffee", "espresso", "cola") the same day and the day before; late, early or skipped meals; energy, protein, sugar, fibre; particular foods in the one or two days before; activity; water; habits; the weekday. Delayed effects matter: try offset -1, and spans of 2 or 3 days where it makes sense. Compare several candidates at once, with several tool calls in one response.
+- Sleep against the norms: tell what sleep_check marks as worth mentioning, with its counts, the line and its source in short ("NSF panel, 2017"); a line it does not mark is not worth a remark unless the user asks about it. If nothing is marked and the user did not ask about sleep, say nothing about it (asked: one short line that it looks fine against the norms). The asleep share reads higher than a sleep lab's efficiency, as the app knows no time in bed or time to fall asleep, and wake-ups count only when logged as separate sleeps: say so when it matters. Causes in the data (caffeine, alcohol the evening before, late meals, activity, the weekday) are found with count_days and compare_measures as usual.
 - Trends and changes: compare the first and second half of the period, or recent weeks against earlier ones, with compare_measures over each part.
 - With one person and a few weeks of data many patterns are chance. The chance check says how often a split at least this uneven turns up by chance alone: under ${CHANCE_PATTERN * 100} % is worth mentioning as a possible pattern, ${CHANCE_PATTERN * 100} to ${CHANCE_HINT * 100} % is at most a hint, above that there is no clear pattern. The more comparisons you try, the more look striking by luck, so say roughly how many you looked at, and prefer patterns that are both lopsided and rest on more days.
 - A connection between two things gives the counts and days the tools gave ("headache on 4 of the 6 days after less than 6 h of sleep, on 3 of the other 25"), and the chance check in plain words. These are possible patterns, never causes: no medical advice or diagnoses. If something sounds like it needs a doctor (a symptom that keeps coming back or gets worse), say once, briefly, that it is worth checking with one.

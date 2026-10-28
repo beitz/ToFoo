@@ -1,6 +1,8 @@
 import { useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useData } from '../../app/data';
+import { sleepNeed } from '../../../model/parameters';
+import { sleepAgeGroup } from '../../../model/sleep';
 import { buildInsightData, SHARE_KINDS, type InsightData, type ShareKind } from '../../logic/insights';
 import { isOn } from '../../settings/features';
 import { repo } from '../../storage/repo';
@@ -14,6 +16,7 @@ import { useHabits } from '../habits/useHabits';
 export function useInsightData(enabled: boolean): InsightData | undefined {
   const d = useData();
   const f = d.settings.features;
+  const p = d.profile;
   const journal = useJournal();
   const sleep = useLiveQuery(() => repo.db.sleep.toArray(), []);
   const activities = useLiveQuery(() => repo.db.activities.toArray(), []);
@@ -34,8 +37,19 @@ export function useInsightData(enabled: boolean): InsightData | undefined {
       mealWindowMinutes: d.settings.mealWindowMinutes,
       today: d.today,
       ...(isOn(f, 'habits') ? { habits: { list: habits.all, data: habits.data } } : {}),
+      ...(isOn(f, 'sleep')
+        ? {
+            sleepProfile: {
+              needHours: p.sleepNeedMinutes ? p.sleepNeedMinutes / 60 : sleepNeed.hours.value,
+              ownNeed: !!p.sleepNeedMinutes,
+              // Without a birth year: the adult lines (26–64), the widest group.
+              ageGroup: p.birthYear ? sleepAgeGroup(Number(d.today.slice(0, 4)) - p.birthYear) : 'adult',
+              ageUnknown: !p.birthYear,
+            },
+          }
+        : {}),
     });
-  }, [enabled, d.modelDays, d.model, d.modelEntries, d.settings.mealWindowMinutes, d.today, f, journal, sleep, activities, water, habits]);
+  }, [enabled, d.modelDays, d.model, d.modelEntries, d.settings.mealWindowMinutes, d.today, f, journal, sleep, activities, water, habits, p.sleepNeedMinutes, p.birthYear]);
 }
 
 /** The kinds of data there are to send: the food log, and each tracker that is on. */

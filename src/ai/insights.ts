@@ -24,6 +24,8 @@ import {
   type ShareKind,
   type Stats,
 } from '../logic/insights';
+import { sleepCheck, type Bands, type SleepCheck, type StandOutLine } from '../logic/sleepCheck';
+import { caffeineGapHours, napLines, oftenNights, sleepDuration, sleepQuality, SLEEP_AGE_FROM } from '../../model/sleep';
 import { INSIGHT_TOOLS, WEEKDAYS } from './insightsPrompt';
 
 /** The pattern tools' names, which the assistant's loop hands to runInsightTool. */
@@ -61,6 +63,7 @@ const countInput = z.object({ ...period, group: z.array(conditionInput), outcome
 const compareInput = z.object({ ...period, group: z.array(conditionInput).default([]), measures: z.array(z.string()).min(1) });
 const detailsInput = z.object({ days: z.array(dayKey).min(1) });
 const tableInput = z.object({ ...period, measures: z.array(z.string()).min(1) });
+const sleepInput = z.object({ ...period, caffeine_words: z.array(z.string()).default([]) });
 
 function toCondition(c: z.infer<typeof conditionInput>): Condition {
   const common = { offset: c.offset, span: c.span, negate: c.negate };
@@ -156,7 +159,75 @@ export function runInsightTool(name: string, input: unknown, data: InsightData):
       return { ok: false, text: `${days.length} days × ${measures.length} measures is more than ${MAX_TABLE_CELLS} values: choose fewer measures or a shorter period.` };
     return { ok: true, text: tableText(data, days, measures) };
   }
+  if (name === 'sleep_check') {
+    const p = sleepInput.safeParse(input);
+    if (!p.success) return { ok: false, text: zodError(p.error) };
+    const bad = periodProblem(p.data.from, p.data.to);
+    if (bad) return { ok: false, text: bad };
+    if (!data.sleepProfile) return { ok: false, text: 'Sleep is not shared in this chat (or nothing is logged yet), so there are no nights to check.' };
+    return { ok: true, text: sleepCheckText(sleepCheck(data, p.data.from, p.data.to, data.sleepProfile, p.data.caffeine_words), p.data.from, p.data.to) };
+  }
   return { ok: false, text: `Unknown tool ${name}.` };
+}
+
+const AGE_TEXT = { young: `young adults (${SLEEP_AGE_FROM.young}–${SLEEP_AGE_FROM.adult - 1})`, adult: `adults (${SLEEP_AGE_FROM.adult}–${SLEEP_AGE_FROM.older - 1})`, older: `older adults (${SLEEP_AGE_FROM.older} and over)` };
+
+const STAND_OUT_TEXT: Record<StandOutLine, string> = {
+  underNeed: 'under their sleep need',
+  tooShort: 'shorter than the NSF recommends for their age',
+  tooLong: 'longer than the NSF recommends for their age',
+  wakeUps: 'woken often (NSF: not good sleep quality)',
+  awake: 'awake long in the night (NSF: not good sleep quality)',
+  share: 'a low share of the night asleep (NSF: not good sleep quality)',
+  longNaps: `naps of ${napLines.longMinutes.value} min or more a day (Yamada 2015)`,
+  caffeine: `caffeine less than ${fmtNumber(caffeineGapHours.value, 1)} h before falling asleep (Gardiner 2023)`,
+};
+
+const hm = (minutes: number) => `${Math.floor(Math.round(minutes) / 60)} h ${String(Math.round(minutes) % 60).padStart(2, '0')} min`;
+const bands = (b: Bands, labels: [string, string, string | undefined]) =>
+  [`${labels[0]} on ${b.good}`, `${labels[1]} on ${b.between}`, ...(labels[2] ? [`${labels[2]} on ${b.poor}`] : [])].join(', ');
+
+/** sleep_check's answer: the counts per line, each line with its source, and what is worth mentioning. */
+function sleepCheckText(c: SleepCheck, from: string, to: string): string {
+  const g = c.profile.ageGroup;
+  const q = sleepQuality;
+  const dur = sleepDuration.value;
+  const lines = [
+    `Sleep check ${from} to ${to}: ${c.nights} nights logged of ${c.days} days.`,
+    `Lines for ${AGE_TEXT[g]}${c.profile.ageUnknown ? ' (no birth year in the profile, so the adult lines)' : ', the user\'s age group'}; the user's sleep need: ${fmtNumber(c.profile.needHours, 1)} h (${c.profile.ownNeed ? 'their own, set in Profile' : 'the default: AASM/SRS consensus, Watson 2015'}).`,
+  ];
+  if (!c.nights) return [...lines, 'No nights to check.'].join('\n');
+  const L = c.length!;
+  lines.push(
+    `Length: average ${fmtNumber(L.mean, 1)} h asleep. Under the user's need on ${L.underNeed} nights; under ${dur.notBelow[g]} h (NSF: not recommended, Hirshkowitz 2015) on ${L.tooShort}; over ${dur.notAbove[g]} h (not recommended) on ${L.tooLong}. NSF recommends ${dur.recommended[g][0]}–${dur.recommended[g][1]} h.`,
+    `Wake-ups over ${q.awakenings.value.minMinutes} min (logged as separate sleeps), NSF sleep quality lines (Ohayon 2017): ${bands(c.wakeUps, [`${q.awakenings.value.goodMax[g]} or fewer (good)`, 'in between (no agreed line)', `${q.awakenings.value.poorMin} or more (not good)`])}.`,
+    `Awake in the night in all: ${bands(c.awake, [`${q.awakeMinutes.value.goodMax} min or less (good)`, q.awakeMinutes.value.poorMin[g] === null ? 'more (the panel agreed on no poor line for this age)' : 'in between', q.awakeMinutes.value.poorMin[g] === null ? undefined : `${q.awakeMinutes.value.poorMin[g]} min or more (not good)`])}.`,
+    `Share asleep from first falling asleep to last waking up${c.share.mean !== undefined ? `, average ${Math.round(c.share.mean)} %` : ''}: ${bands(c.share, [`${q.efficiency.value.goodMin} % or more (good)`, 'in between', `${q.efficiency.value.poorMax[g]} % or less (not good)`])}. The panel's sleep efficiency counts from getting into bed, which the app does not know, so a measured efficiency would be lower.`,
+  );
+  const t = c.timing;
+  if (t)
+    lines.push(
+      `Timing: first asleep median ${fmtMeasure('bedtime', t.bed.median)}, varying by ${hm(t.bed.sd * 60)} (standard deviation); up median ${fmtMeasure('wake_time', t.up.median)}, varying by ${hm(t.up.sd * 60)}.${t.weekend ? ` Middle of the night on weekend nights (ending Saturday or Sunday; the app does not know the user's work days) ${hm(Math.abs(t.weekend.shiftMinutes))} ${t.weekend.shiftMinutes >= 0 ? 'later' : 'earlier'} than on the other nights (${t.weekend.nights} and ${t.weekend.otherNights} nights).` : ''} No sourced line for either: compare with the user's own weeks.`,
+    );
+  const n = c.naps;
+  lines.push(
+    `Naps: on ${n.napDays} of ${n.trackedDays} days; ${napLines.longMinutes.value} min or more in a day (Yamada 2015: linked to more heart disease) on ${n.longDays}; a nap over ${napLines.tooLongMinutes.value} min (NSF: not good) on ${n.tooLong}; ${napLines.manyPerDay.value} or more naps (NSF: not good) on ${n.many}.`,
+  );
+  if (c.caffeine) {
+    const k = c.caffeine;
+    lines.push(
+      `Caffeine (food names with ${k.words.map((w) => `"${w}"`).join(', ')}), within 24 h before falling asleep: on ${k.known} nights it can be told (complete food log or a match); less than ${fmtNumber(caffeineGapHours.value, 1)} h before (Gardiner 2023: shortens sleep) on ${k.within}; none in those 24 h on ${k.none}${k.medianGapHours !== undefined ? `; median ${fmtNumber(k.medianGapHours, 1)} h before` : ''}.`,
+    );
+  }
+  const { perWeek, minNights } = oftenNights.value;
+  lines.push(
+    c.standsOut.length
+      ? `Worth mentioning (on ${perWeek} or more nights a week on average): ${c.standsOut.map((s) => `${STAND_OUT_TEXT[s.line]} on ${s.count} of ${s.of}`).join('; ')}.`
+      : c.nights < minNights
+        ? `Too few nights (under ${minNights}) to call anything frequent.`
+        : `Nothing crosses a line on ${perWeek} or more nights a week: nothing worth mentioning against the norms.`,
+  );
+  return lines.join('\n');
 }
 
 const WEEKDAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
