@@ -140,6 +140,10 @@ export const settingsSchema = z.object({
     .record(z.string(), z.string())
     .optional()
     .describe('Foods marked "Looks right" on Check logged foods: food key (BLS:<code>, OFF:<barcode>, USDA:<id>) → the BLS code, mix or "label" it was right with'),
+  doubtedFoods: z
+    .record(z.string(), z.string())
+    .optional()
+    .describe('Foods marked "Not right" on Check logged foods, to be fixed: food key → the BLS code, mix or "label" it was wrong with'),
   logCollapsed: z.record(z.string(), z.boolean()).optional(),
   cookingPreferences: z.string().optional(),
   potGrams: z.number().positive().optional(),

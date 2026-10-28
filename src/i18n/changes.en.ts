@@ -8,6 +8,7 @@
  * scenes and small fixes. A pull request that changes what users see adds its line here in the same PR.
  */
 export const changesEn = {
+  'change.178': 'Check logged foods has Not right next to Looks right: the food goes first under Worth a look, a question asks the assistant to fix it, and the assistant\'s check always looks at it first.',
   'change.177': 'The assistant knows what research says about sleep (how long, waking in the night, naps, regular times, caffeine, alcohol, when to see a doctor) and names its sources. With sleep included, it checks your nights against those norms and mentions only what happens on 3 or more nights a week.',
   'change.177.major': 'Sleep answers backed by research, checked against your nights',
   'change.176': 'Nutrient pages show what one meal can give, how big the body store is and how fast it refills, under What it does; tap a fact for its source. When a store or omega-3 is low, a Filling up card says how long it takes to get back to fine, at your recent rate and with a few portions a week of a food; for omega-3, what each daily amount did to the omega-3 index in a study, in portions of what you eat.',

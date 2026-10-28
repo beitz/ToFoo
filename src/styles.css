@@ -8797,3 +8797,10 @@ button.link-row {
   margin-left: -1px;
   background: var(--text);
 }
+/* Looks right and Not right on Check logged foods, one above the other beside the food. */
+.check-actions {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 4px;
+}

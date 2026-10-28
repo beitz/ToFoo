@@ -23,10 +23,10 @@ export function CheckLine() {
   const nudge = useMemo(() => {
     if (!on) return undefined;
     const first = d.log.reduce((a, e) => (e.day < a ? e.day : a), d.today);
-    return checkNudge(foodCheck(d.log, d.batchesById, d.productsById, d.foods, first, d.today, d.settings.checkedFoods ?? {}, home));
+    return checkNudge(foodCheck(d.log, d.batchesById, d.productsById, d.foods, first, d.today, d.settings, home));
     // `home` is new each render; its content (homeKey) is what counts.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [on, homeKey, d.log, d.batchesById, d.productsById, d.foods, d.today, d.settings.checkedFoods]);
+  }, [on, homeKey, d.log, d.batchesById, d.productsById, d.foods, d.today, d.settings.checkedFoods, d.settings.doubtedFoods]);
   if (!nudge) return null;
   const head = t(nudge.unchecked === 1 ? 'check.homeOne' : 'check.home', { n: nudge.unchecked });
   const look = nudge.flagged ? t('check.homeLook', { n: nudge.flagged }) : '';

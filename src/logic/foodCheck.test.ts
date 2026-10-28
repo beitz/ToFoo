@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Food } from '../foods/foodDb';
 import type { Batch, LogEntry, Product } from '../storage/types';
-import { CHECK_PILE_UP, checkNudge, checkSignature, foodCheck, productFlags, type CheckRow } from './foodCheck';
+import { CHECK_PILE_UP, checkNudge, checkSignature, foodCheck, marksOf, productFlags, type CheckRow } from './foodCheck';
 
 const food = (code: string, nameEn: string, per100: Food['per100']): Food => ({ code, nameEn, nameDe: nameEn, group: code.charAt(0), per100, provenance: {} });
 const foods = {
@@ -88,8 +88,8 @@ describe('checking what was logged', () => {
       entry('2026-10-21', { source: 'BLS', version: '4.0', code: 'G480100' }, 30),
       entry('2026-10-22', { source: 'OFF', code: '2' }, 500),
     ];
-    const checked = { 'OFF:1': checkSignature(helles, helles), 'BLS:G480100': 'BLS' };
-    expect(checked['OFF:1']).toBe('W271000');
+    const checked = { checkedFoods: { 'OFF:1': checkSignature(helles, helles), 'BLS:G480100': 'BLS' } };
+    expect(checked.checkedFoods['OFF:1']).toBe('W271000');
     const rows = foodCheck(log, new Map(), productsById, foods, '2026-10-20', '2026-10-26', checked);
     expect(rows.map((r) => [r.name, r.checked])).toEqual([
       ['Pils', false],
@@ -127,5 +127,24 @@ describe('checking what was logged', () => {
     const many = Array.from({ length: CHECK_PILE_UP }, (_, i) => row(`k${i}`, []));
     expect(checkNudge(many)).toEqual({ unchecked: CHECK_PILE_UP, flagged: 0 });
     expect(checkNudge(many.slice(1))).toBeUndefined();
+  });
+
+  it('puts what the user marked "Not right" first, until the food changes', () => {
+    const log: LogEntry[] = [entry('2026-10-21', { source: 'OFF', code: '2' }, 500), entry('2026-10-21', { source: 'BLS', version: '4.0', code: 'G480100' }, 30)];
+    const marks = { doubtedFoods: { 'BLS:G480100': 'BLS' }, checkedFoods: { 'BLS:G480100': 'BLS' } };
+    const rows = foodCheck(log, new Map(), productsById, foods, '2026-10-20', '2026-10-26', marks);
+    expect(rows.map((r) => [r.name, r.flags, r.checked, r.doubted])).toEqual([
+      ['Onion raw', ['doubt'], false, true],
+      ['Pils', ['auto'], false, false],
+    ]);
+    expect(checkNudge(rows)).toEqual({ unchecked: 2, flagged: 2 });
+    // A product's mark holds for the food it had: a new one takes it off.
+    const pils = { doubtedFoods: { 'OFF:2': 'W271000' } };
+    expect(foodCheck(log, new Map(), productsById, foods, '2026-10-20', '2026-10-26', pils)[0]!.doubted).toBe(false);
+    expect(foodCheck(log, new Map(), productsById, foods, '2026-10-20', '2026-10-26', { doubtedFoods: { 'OFF:2': 'P161000' } })[0]).toMatchObject({ name: 'Pils', flags: ['doubt', 'auto'] });
+  });
+
+  it('keeps both marks of some foods for undo', () => {
+    expect(marksOf({ checkedFoods: { a: 'BLS' }, doubtedFoods: { b: 'X1' } }, ['a', 'b', 'c'])).toEqual({ a: { checked: 'BLS' }, b: { doubted: 'X1' }, c: {} });
   });
 });

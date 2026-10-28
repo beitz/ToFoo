@@ -16,7 +16,7 @@ import { productLabel } from '../foods/products';
 import { addDays } from '../lib/dates';
 import { fmtNumber } from '../lib/format';
 import { refKey } from '../lib/refs';
-import { foodCheck, type CheckRow, type HomeRef } from '../logic/foodCheck';
+import { foodCheck, type CheckRow, type FoodMarks, type HomeRef } from '../logic/foodCheck';
 import type { Batch, HomePlace, LogEntry, MixPart, Product } from '../storage/types';
 import { describeFood, describeProduct } from './tools';
 
@@ -26,8 +26,8 @@ export interface FoodCheckData {
   log: readonly LogEntry[];
   batchesById: ReadonlyMap<string, Batch>;
   productsById: ReadonlyMap<string, Product>;
-  /** Foods the user marked "Looks right" (refKey → checkSignature); left out unless asked for. */
-  checked?: Readonly<Record<string, string>>;
+  /** Foods the user marked "Looks right" (left out unless asked for) or "Not right" (always listed, first). */
+  marks?: FoodMarks;
   /**
    * What the user included under Include my data (Patterns on): the food log from this day on
    * (false: not included), and the things at home in the ticked places (false: the kitchen is
@@ -54,7 +54,7 @@ const kitchenOf = (data: FoodCheckData) => data.scope?.kitchen || undefined;
 /** The rows of the check: what was eaten in the days asked for and what is at home, as included. */
 function rowsOf(days: number, data: FoodCheckData, db: Pick<FoodDb, 'byCode'>) {
   const { from, to, log } = scoped(days, data);
-  return { from, to, log, rows: foodCheck(log, data.batchesById, data.productsById, db, from, to, data.checked, kitchenOf(data)?.items ?? []) };
+  return { from, to, log, rows: foodCheck(log, data.batchesById, data.productsById, db, from, to, data.marks, kitchenOf(data)?.items ?? []) };
 }
 
 const NOT_INCLUDED =
@@ -67,7 +67,9 @@ function entriesOf(key: string, from: string, to: string, log: readonly LogEntry
     .sort((a, b) => a.time - b.time);
 }
 
-const FLAG_TEXT = { misfit: 'LABEL AND ITS BLS FOOD DIFFER A LOT', none: 'NO BLS FOOD: only the label counts', auto: 'picked by the app, not checked' } as const;
+const FLAG_TEXT = {
+  doubt: 'THE USER MARKED THIS AS NOT RIGHT: find the right food and propose a fix, or say why it is right after all',
+  misfit: 'LABEL AND ITS BLS FOOD DIFFER A LOT', none: 'NO BLS FOOD: only the label counts', auto: 'picked by the app, not checked' } as const;
 const KIND_TEXT = {
   drink: 'A DRINK PAIRED WITH A FOOD',
   food: 'A FOOD PAIRED WITH A DRINK',
@@ -206,6 +208,8 @@ export function validateMarkChecked(input: unknown, data: FoodCheckData, db: Pic
   const keys = [...new Set(parsed.data.foods.map((f) => f.trim()))];
   const unknown = keys.filter((k) => !byKey.has(k));
   if (unknown.length) return { ok: false, error: `Not in the list from check_logged_foods: ${unknown.join(', ')}. Use the keys it gave (OFF:…, USDA:… or BLS:…).` };
+  const doubted = keys.filter((k) => byKey.get(k)!.doubted);
+  if (doubted.length) return { ok: false, error: `The user marked ${doubted.join(', ')} as not right: propose a fix for each, or say in your text why it is right after all; leave them out of this card.` };
   const rows = keys.map((k) => byKey.get(k)!).filter((r) => !r.checked);
   if (!rows.length) return { ok: false, error: 'The user already checked all of these.' };
   const { reason = '', replaces } = parsed.data;

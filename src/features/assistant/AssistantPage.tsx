@@ -519,7 +519,7 @@ function Chat({
                 log: d.log,
                 batchesById: d.batchesById,
                 productsById: d.productsById,
-                checked: d.settings.checkedFoods ?? {},
+                marks: d.settings,
                 ...(scope ? { scope } : {}),
               },
             }),
