@@ -8,7 +8,7 @@ const oats = bls('C133000');
 let n = 0;
 const id = () => `p${++n}`;
 const item = (o: Partial<PantryItem> & { name: string }): PantryItem => ({ id: o.name, schemaVersion: 1, place: 'cupboard', since: 100, addedAt: 100, ...o });
-const food = (ref: FoodRef, grams: number, time: number): LogEntry => ({ id: `e${time}`, schemaVersion: 1, kind: 'food', ref, grams, preparation: 'asListed', time, day: '2026-10-21', confidence: 'A', label: '' });
+const food = (ref: FoodRef, grams: number, time: number): Extract<LogEntry, { kind: 'food' }> => ({ id: `e${time}`, schemaVersion: 1, kind: 'food', ref, grams, preparation: 'asListed', time, day: '2026-10-21', confidence: 'A', label: '' });
 const pot = (ref: FoodRef, grams: number, cookedAt: number): Batch => ({
   id: `b${cookedAt}`,
   schemaVersion: 1,
