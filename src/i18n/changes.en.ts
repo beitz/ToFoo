@@ -8,6 +8,7 @@
  * scenes and small fixes. A pull request that changes what users see adds its line here in the same PR.
  */
 export const changesEn = {
+  'change.180': 'Tapping energy, protein, fat, carbs or fibre on Home opens today only, with a band at the top saying so, instead of the average of your last days.',
   'change.179': 'Kitchen: logging 3 pieces of something at home takes 3 off, not 1, and a weight of several pieces (300 g of 150 g yogurts) counts as that many. Packs of many small pieces, like chewing gum, go down by the share eaten.',
   'change.178': 'Check logged foods has Not right next to Looks right: the food goes first under Worth a look, a question asks the assistant to fix it, and the assistant\'s check always looks at it first.',
   'change.177': 'The assistant knows what research says about sleep (how long, waking in the night, naps, regular times, caffeine, alcohol, when to see a doctor) and names its sources. With sleep included, it checks your nights against those norms and mentions only what happens on 3 or more nights a week.',
