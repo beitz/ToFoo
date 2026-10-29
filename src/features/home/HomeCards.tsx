@@ -55,7 +55,7 @@ export function HomeCards({
   return (
     <>
       <ListCard id="today" tour="home.today" title={t('home.today')} note={t('home.todayNote')} info={t('home.todayInfo')} sources={todaySources(t)}>
-        {views.macros === 'rings' ? <MacroRings values={today} defaultBased={defaultBased} today /> : <TodayCells defaultBased={defaultBased} />}
+        {views.macros === 'rings' ? <MacroRings values={today} defaultBased={defaultBased} today open={openToday} /> : <TodayCells defaultBased={defaultBased} />}
       </ListCard>
       {rest.length > 0 && (
         <ListCard id="week" tour="home.week" title={title} note={t('home.weekNote')} info={`${t('home.weekInfo', { n: windowDays })}${comets ? ` ${t('home.cometLegend')}` : ''}`} sources={weekSources(t)}>
@@ -86,6 +86,9 @@ export function HomeCards({
     </>
   );
 }
+
+/** Today's energy and macros open today only (owner's ask, 2026-10-29), not the usual last days. */
+const openToday = (id: string) => navigate('nutrient', id, 'today');
 
 /** A card with its heading, a short note on what the numbers are, and an ⓘ that opens why, with the sources to check it. */
 function ListCard({ id, tour, title, note, info, sources, children }: { id: string; tour: string; title: string; note: string; info: string; sources: HomeSource[]; children: ReactNode }) {
@@ -165,7 +168,7 @@ function TodayCells({ defaultBased }: { defaultBased: (id: string) => boolean })
           // No mark while in progress, nor on grams without a target: the narrow cell needs the room for the number.
           const icon = status === 'progress' || status === 'info' ? null : <Icon name={status === 'tooHigh' ? 'up' : 'check'} size={14} />;
           return (
-            <button key={id} className={`cgauge cgauge-cell gauge-${goal?.max ? 'limit' : goal ? 'rolling' : 'info'} gauge-${status}`} onClick={() => navigate('nutrient', id)} aria-label={spoken}>
+            <button key={id} className={`cgauge cgauge-cell gauge-${goal?.max ? 'limit' : goal ? 'rolling' : 'info'} gauge-${status}`} onClick={() => openToday(id)} aria-label={spoken}>
               <span className="cgauge-line">
                 <span className="cgauge-name">
                   {def?.short ?? id}

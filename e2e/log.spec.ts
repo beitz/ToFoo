@@ -12,6 +12,11 @@ test('a new user logs a food, sees it on Home and in the diary, and can undo it'
   expect(kcal).toBeGreaterThan(300);
   expect(kcal).toBeLessThan(400);
 
+  // Home's energy is today so far, and a tap on it opens today only, not the last days' average.
+  await page.locator('.today-big').click();
+  await expect(page).toHaveURL(/#\/nutrient\/ENERCC\/today$/);
+  await expect(page.getByText('Today only, so far')).toBeVisible();
+
   await page.goto('./#/diary');
   await expect(page.getByText('Oat flakes').first()).toBeVisible();
 
