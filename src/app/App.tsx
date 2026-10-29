@@ -87,6 +87,7 @@ function Page({ route }: { route: string[] }) {
     case 'nutrient':
       if (c === 'foods') return <NutrientFoodsPage key={b} id={b ?? ''} />;
       if (c === 'why') return <WhyPage key={b} id={b ?? ''} />;
+      if (c === 'today') return <NutrientRangePage key={route.join('/')} id={b ?? ''} today />;
       if (c === 'range') return <NutrientRangePage key={route.join('/')} id={b ?? ''} from={e} to={f} />;
       return <NutrientPage key={route.join('/')} id={b ?? ''} context={splitContext(c, e)} />;
     case 'food':

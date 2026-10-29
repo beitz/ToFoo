@@ -17,6 +17,7 @@ const ROUTES = [
   'nutrient/FE',
   'nutrient/K',
   'nutrient/K/why',
+  'nutrient/PROT625/today',
   'nutrient/PROT625/foods',
   'food/C133000',
   'fasting',

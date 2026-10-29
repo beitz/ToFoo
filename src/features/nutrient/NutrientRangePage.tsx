@@ -26,12 +26,13 @@ const DAY_KEY = /^\d{4}-\d{2}-\d{2}$/;
  * week's protein?"): opened from the nutrients of a period on Insights, it shows that period only,
  * with a band at the top saying so and a way to the usual view. Same numbers as the period's list
  * (model/period.ts): the average per counted day, what each day gave and where it came from.
- * Route: #/nutrient/<id>/range/<from>/<to>.
+ * Route: #/nutrient/<id>/range/<from>/<to>. Home's energy and macros, which show today so far, open
+ * the same view for today (owner's ask, 2026-10-29): #/nutrient/<id>/today, back to Home.
  */
-export function NutrientRangePage({ id, from: fromParam, to: toParam }: { id: string; from?: string; to?: string }) {
+export function NutrientRangePage({ id, from: fromParam, to: toParam, today = false }: { id: string; from?: string; to?: string; today?: boolean }) {
   const d = useData();
   const def = NUTRIENT_BY_ID.get(id);
-  const valid = !!fromParam && !!toParam && DAY_KEY.test(fromParam) && DAY_KEY.test(toParam) && fromParam <= toParam;
+  const valid = !today && !!fromParam && !!toParam && DAY_KEY.test(fromParam) && DAY_KEY.test(toParam) && fromParam <= toParam;
   const from = valid ? fromParam : d.today;
   const to = valid ? (toParam > d.today ? d.today : toParam) : d.today;
   const impute = isOn(d.settings.features, 'fillUnloggedDays');
@@ -57,7 +58,9 @@ export function NutrientRangePage({ id, from: fromParam, to: toParam }: { id: st
   );
 
   if (!def || !base) return <p>{t('nutrient.unknown')}</p>;
-  const r = { ...base, contributors };
+  // Today isn't over: below the need is not yet "low" (as on Home), so it shows without a judgement.
+  const open = today && (base.status === 'low' || base.status === 'gettingLow');
+  const r = { ...base, contributors, status: open ? ('info' as const) : base.status };
   const counted = period.countedDays;
   const noData = counted === 0 || hasNoData(r);
   const value = noData ? '–' : r.kind === 'info' ? `${fmtAmount(id, r.averageIntake)}/${t('nutrient.day')}` : fmtPercent(r.value.central);
@@ -72,14 +75,14 @@ export function NutrientRangePage({ id, from: fromParam, to: toParam }: { id: st
         <Icon name="calendar" size={18} />
         <span className="grow">
           <strong>{title}</strong>
-          <span className="range-banner-sub">{single ? t('nrange.oneDay') : t('nrange.days', { n: counted })}</span>
+          <span className="range-banner-sub">{today ? t('nrange.todayOnly') : single ? t('nrange.oneDay') : t('nrange.days', { n: counted })}</span>
         </span>
         <a className="icon-btn range-banner-x" href={href('nutrient', id)} aria-label={t('nrange.usual')}>
           <Icon name="close" size={18} />
         </a>
       </div>
       <header className="page-head row">
-        <BackButton to={['review', from, to]} />
+        <BackButton to={today ? [] : ['review', from, to]} />
         <h1 className="grow">{def.name}</h1>
       </header>
 
@@ -100,15 +103,15 @@ export function NutrientRangePage({ id, from: fromParam, to: toParam }: { id: st
             </p>
             <p className="big-number">{value}</p>
             {likely && showRange && <p className="muted small">{t('nutrient.likely', { range: likely })}</p>}
-            {r.kind !== 'info' && (
+            {r.kind !== 'info' && !open && (
               <p className="status-line">
                 <StatusMark status={noData ? 'unknown' : r.status} size={14} /> {statusLabel(noData ? 'unknown' : r.status).toLowerCase()}
               </p>
             )}
-            <p className="small muted">{single ? t('nrange.thatDay') : t('nrange.perDay', { n: counted })}</p>
+            <p className="small muted">{today ? t('nrange.soFar') : single ? t('nrange.thatDay') : t('nrange.perDay', { n: counted })}</p>
           </div>
           <InfoButton title={def.name} label={t('nutrient.heroInfo', { name: def.name })}>
-            <p>{t(single ? 'nrange.explainDay' : 'nrange.explain', { range: title, n: counted })}</p>
+            <p>{today ? t('nrange.explainToday') : t(single ? 'nrange.explainDay' : 'nrange.explain', { range: title, n: counted })}</p>
             <p>{t(impute ? 'review.hintFilled' : 'review.hint')}</p>
             {!noData && r.kind !== 'info' && req && (
               <p>
