@@ -129,9 +129,10 @@ export type StorageModel =
   | { kind: 'tankDays'; capacityDays: Valued<Range> }
   /**
    * Averaged over a window of days. 'short' and 'long' are set in Settings; 'slow' is for nutrients the
-   * body evens out over weeks to months, with the research behind it in `basis`.
+   * body evens out over weeks to months, with the research behind it in `basis`. A short or long window
+   * has a `basis` where research backs its length (the rest are a modelling proposal).
    */
-  | { kind: 'rolling'; window: 'short' | 'long' }
+  | { kind: 'rolling'; window: 'short' | 'long'; basis?: Cited }
   | { kind: 'rolling'; window: 'slow'; basis: Cited };
 
 export type Preparation = 'asListed' | 'raw' | 'boiled' | 'steamed' | 'baked' | 'fried';
