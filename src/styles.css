@@ -698,6 +698,15 @@ textarea:focus-visible,
   border-radius: 11px;
   min-height: 44px;
 }
+/* The food page's amounts: labels stay on one line, longer ones take more of the row. */
+.size-switch:not(.segmented-grid) button {
+  flex: 1 1 auto;
+  white-space: nowrap;
+}
+/* Four options: two rows of two, so none is left alone on a row. */
+.segmented.segmented-grid.segmented-two {
+  grid-template-columns: repeat(2, 1fr);
+}
 .segmented button.on,
 .segmented a.on {
   background: var(--accent);

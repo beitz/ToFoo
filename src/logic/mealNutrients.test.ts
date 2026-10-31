@@ -113,6 +113,13 @@ describe('nutrients of one meal', () => {
     expect(by.get('VITC')!.noData).toBe(true);
   });
 
+  it('per another amount (a pack, a piece): scaled from what was eaten, same reference', () => {
+    const b = breakdown([{ entryId: 'nuts' }], entries, meals, opts);
+    const fe = shareRows(b, ['FE'], requirements, 'per100', 50, 420)[0]!;
+    expect(fe.amount).toBeCloseTo(12.6); // 1.5 mg in 50 g → 12.6 mg in 420 g
+    expect(fe.share).toBeCloseTo(1.26);
+  });
+
   it('what 100 g is made of, and nothing for the rest when a part is unknown', () => {
     const b = { intake: { CHO: 17, SUGAR: 10, PROT625: 1.5, FAT: 0.1, FIBT: 0 }, absorbed: {}, missing: new Set<string>(), unresolved: 0, absorbedKnown: true, sources: {} };
     const c = composition(b, 22)!;
