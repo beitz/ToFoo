@@ -36,6 +36,8 @@ import { FoodActions } from '../food/FoodActions';
 import { FavouriteMealButton } from '../log/FavouriteButton';
 import { BackButton } from '../../ui/BackButton';
 import { pairingName } from '../food/pairingName';
+import { chosenSize, fmtSize, sizeButton, sizeValue, switchClass, useFoodSizes, type SizeChoice } from '../food/sizes';
+import type { Product } from '../../storage/types';
 
 const MACROS = ['PROT625', 'FAT', 'CHO', 'FIBT'];
 
@@ -245,7 +247,7 @@ export function EntryNutrientsPage({ entryId, part: partParam }: { entryId: stri
           </div>
         </>
       )}
-      {entry.kind !== 'drink' && <NutrientBreakdown b={b} weight={weight} nutrientHref={(id) => (parts.length > 0 ? href('nutrient', id, 'entry', entry.id) : href('nutrient', id))} />}
+      {entry.kind !== 'drink' && <NutrientBreakdown b={b} weight={weight} food={code ? { code, product: isProductCode(code) ? d.productsById.get(code) : undefined } : undefined} nutrientHref={(id) => (parts.length > 0 ? href('nutrient', id, 'entry', entry.id) : href('nutrient', id))} />}
       {editing && <EditEntrySheet entry={entry} nutrientsLink={false} onClose={() => setEditing(false)} />}
     </section>
   );
@@ -260,16 +262,21 @@ export type Weight = { grams: number; raw: boolean } | undefined;
  * What was eaten (default), the same per 100 g (when its weight is known) or its share of the day; the
  * energy and make-up at a glance; then every nutrient with data, grouped by type or by biggest share.
  */
-function NutrientBreakdown({ b, weight, nutrientHref }: { b: Breakdown; weight: Weight; nutrientHref: (id: string) => string }) {
+function NutrientBreakdown({ b, weight, food, nutrientHref }: { b: Breakdown; weight: Weight; food?: { code: string; product?: Product }; nutrientHref: (id: string) => string }) {
   const d = useData();
-  const [chosen, setBasis] = useState<Basis>('serving');
+  const [chosen, setBasis] = useState<Basis | SizeChoice>('serving');
+  // Other amounts of the one food behind the item (its pack, a piece…), when its eaten weight is known.
+  const unit = food?.product?.perMl ? 'ml' : 'g';
+  const sizes = useFoodSizes(weight ? food?.code : undefined, food?.product, { taken: weight ? [weight.grams] : [] });
+  const size = weight ? chosenSize(sizes, chosen) : undefined;
   const [order, setOrder] = useState<Order>('type');
   const [showEmpty, setShowEmpty] = useState(false);
-  const basis: Basis = chosen === 'per100' && !weight ? 'serving' : chosen;
-  const per100 = basis === 'per100';
+  const basis: Basis = size ? 'per100' : chosen.startsWith('size:') || (chosen === 'per100' && !weight) ? 'serving' : (chosen as Basis);
+  // Per 100 g proper; a size is shown the same way, scaled to its amount.
+  const per100 = basis === 'per100' && !size;
   const hidden = new Set(d.settings.hiddenNutrients);
   const ids = NUTRIENTS.map((n) => n.id).filter((id) => !hidden.has(id));
-  const rows = shareRows(b, ids, d.requirements, basis, weight?.grams);
+  const rows = shareRows(b, ids, d.requirements, basis, weight?.grams, size?.grams);
   const byId = new Map(rows.map((r) => [r.id, r]));
   const energy = byId.get('ENERCC');
   const eatenKcal = b.intake.ENERCC;
@@ -284,13 +291,15 @@ function NutrientBreakdown({ b, weight, nutrientHref }: { b: Breakdown; weight: 
 
   return (
     <>
-      <Segmented<Basis>
+      <Segmented<Basis | SizeChoice>
         label={t('mealNutrients.basis')}
-        value={basis}
+        className={switchClass((weight ? 2 + sizes.length : 1) + 1)}
+        value={size ? chosen : basis}
         onChange={setBasis}
         options={[
           { value: 'serving', label: servingLabel },
-          ...(weight ? [{ value: 'per100' as const, label: t('mealNutrients.per100Basis') }] : []),
+          ...(weight ? [{ value: 'per100' as const, label: t(unit === 'ml' ? 'size.per100ml' : 'mealNutrients.per100Basis') }] : []),
+          ...(weight ? sizes.map((s, i) => ({ value: sizeValue(i), label: sizeButton(s, unit) })) : []),
           { value: 'day', label: t('mealNutrients.dayBasis') },
         ]}
       />
@@ -298,10 +307,10 @@ function NutrientBreakdown({ b, weight, nutrientHref }: { b: Breakdown; weight: 
         {energy && (
           <p className="meal-energy">
             <strong>{amountText(energy)}</strong>
-            {per100 ? (
+            {per100 || size ? (
               <span className="muted small">
                 {' '}
-                {t('mealNutrients.per100Short')}
+                {size ? t('mealNutrients.inServing', { grams: fmtSize(size.grams, unit) }) : t('mealNutrients.per100Short')}
                 {eatenKcal !== undefined && weight ? ` · ${t('mealNutrients.youHad', { grams: fmtGrams(weight.grams), kcal: fmtAmount('ENERCC', eatenKcal) })}` : ''}
               </span>
             ) : basis === 'serving' ? (
@@ -326,11 +335,11 @@ function NutrientBreakdown({ b, weight, nutrientHref }: { b: Breakdown; weight: 
         )}
         {top.length > 0 && (
           <p className="small">
-            {t(per100 ? 'mealNutrients.richest' : basis === 'serving' ? 'mealNutrients.mostServing' : 'mealNutrients.most')}:{' '}
+            {t(per100 ? 'mealNutrients.richest' : basis === 'serving' || size ? 'mealNutrients.mostServing' : 'mealNutrients.most')}:{' '}
             {top.map((r) => `${NUTRIENT_BY_ID.get(r.id)?.short ?? r.id} ${fmtPercent(r.share!)}`).join(', ')}
           </p>
         )}
-        {per100 && weight?.raw && <p className="small muted">{t('mealNutrients.rawWeight')}</p>}
+        {basis === 'per100' && weight?.raw && <p className="small muted">{t('mealNutrients.rawWeight')}</p>}
         {basis === 'day' && !b.absorbedKnown && <p className="small muted">{t('mealNutrients.tooOld')}</p>}
         {!weight && basis === 'serving' && <p className="small muted">{t('mealNutrients.noWeight')}</p>}
         {b.unresolved > 0 && <p className="small notice">{t('mealNutrients.unresolved', { n: b.unresolved })}</p>}
@@ -357,7 +366,7 @@ function NutrientBreakdown({ b, weight, nutrientHref }: { b: Breakdown; weight: 
                   <GroupInfoButton group={group} />
                 </div>
               )}
-              <ShareLine row={r} basis={basis} sources={b.sources[r.id]} to={nutrientHref(r.id)} />
+              <ShareLine row={r} basis={size ? 'serving' : basis} sources={b.sources[r.id]} to={nutrientHref(r.id)} />
             </Fragment>
           );
         })}
@@ -368,7 +377,7 @@ function NutrientBreakdown({ b, weight, nutrientHref }: { b: Breakdown; weight: 
         )}
       </div>
       <p className="muted small">
-        {t(basis === 'serving' ? 'mealNutrients.legendServing' : per100 ? 'mealNutrients.legendPer100' : 'mealNutrients.legend')} {t('mealNutrients.legendSources')}
+        {size ? t('mealNutrients.legendSize', { size: fmtSize(size.grams, unit) }) : t(basis === 'serving' ? 'mealNutrients.legendServing' : per100 ? 'mealNutrients.legendPer100' : 'mealNutrients.legend')} {t('mealNutrients.legendSources')}
       </p>
     </>
   );

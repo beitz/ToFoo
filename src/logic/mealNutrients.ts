@@ -131,9 +131,12 @@ export interface ShareRow {
   noData: boolean;
 }
 
-/** One row per nutrient id, in the order given. 'per100' needs the eaten weight in grams. */
-export function shareRows(b: Breakdown, ids: readonly string[], req: Pick<ResolvedRequirements, 'byNutrient' | 'infoOnly'>, basis: Basis = 'day', grams?: number): ShareRow[] {
-  const factor = basis === 'per100' && grams && grams > 0 ? 100 / grams : 1;
+/**
+ * One row per nutrient id, in the order given. 'per100' needs the eaten weight in grams; `per` scales
+ * to another amount than 100 g instead (a 420 g pack, one piece), with the same shares of the reference.
+ */
+export function shareRows(b: Breakdown, ids: readonly string[], req: Pick<ResolvedRequirements, 'byNutrient' | 'infoOnly'>, basis: Basis = 'day', grams?: number, per = 100): ShareRow[] {
+  const factor = basis === 'per100' && grams && grams > 0 ? per / grams : 1;
   return ids.map((id) => {
     const r = req.byNutrient.get(id);
     const kind: ShareKind = !r || req.infoOnly.has(id) ? 'info' : r.limitOnly ? 'limit' : 'need';

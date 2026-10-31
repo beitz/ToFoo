@@ -209,6 +209,21 @@ test('a ready meal is built from its ingredient list, shown on its page', async 
   await expect(page.locator('.mix-list')).toContainText('Chicken breast fillet, raw');
   await page.getByRole('button', { name: 'Looks right' }).click();
   await expect(page.getByText('Picked by the app')).toHaveCount(0);
+
+  // The whole 420 g pack, or what was logged last time, instead of 100 g (owner's ask, 2026-10-31).
+  await expect(page.getByRole('heading', { name: 'Per 100 g' })).toBeVisible();
+  await page.getByRole('radio', { name: 'Pack 420 g' }).click();
+  await expect(page.getByRole('heading', { name: 'One pack, 420 g' })).toHaveCount(2);
+  await expect(page.locator('.portion-card')).toContainText('605 kcal');
+  await page.getByRole('radio', { name: 'Logged 200 g' }).click();
+  await expect(page.getByRole('heading', { name: 'What you logged last time, 200 g' }).first()).toBeVisible();
+
+  // The item page offers the pack beside what was eaten.
+  await page.goto('./#/diary');
+  await page.getByRole('link', { name: /Butter Chicken/ }).first().click();
+  await page.getByRole('radio', { name: 'Pack 420 g' }).click();
+  await expect(page.locator('.meal-energy')).toContainText('in 420 g');
+  await expect(page.locator('.meal-energy')).toContainText('you had 200 g');
   expect(errors).toEqual([]);
 });
 

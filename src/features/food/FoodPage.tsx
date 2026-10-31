@@ -1,4 +1,4 @@
-import { Fragment } from 'react';
+import { Fragment, useState } from 'react';
 import { useData } from '../../app/data';
 import { href } from '../../app/router';
 import { t } from '../../i18n';
@@ -16,6 +16,9 @@ import { nutrientType } from '../home/grouping';
 import { GroupInfoButton, groupTitle, hasGroupInfo } from '../info/GroupInfo';
 import { BackButton } from '../../ui/BackButton';
 import { FoodActions } from './FoodActions';
+import { Segmented } from '../../ui/controls';
+import type { FoodSize } from '../../foods/sizes';
+import { chosenSize, rememberedKind, rememberKind, sizeButton, sizeHeading, sizeValue, switchClass, useFoodSizes, type SizeChoice } from './sizes';
 
 /**
  * A food's nutrient profile per 100 g: a BLS food, or a scanned or USDA product (`OFF:<barcode>`,
@@ -25,8 +28,16 @@ export function FoodPage({ code }: { code: string }) {
   const d = useData();
   const product = isProductCode(code) ? d.productsById.get(code) : undefined;
   const food = product ? productFood(product, d.foods) : d.foods.byCode.get(code);
+  const sizes = useFoodSizes(food?.code, product, { logged: true });
+  const [picked, setPicked] = useState<SizeChoice | undefined>();
+  // Until one is picked here: the kind picked last time on any food (a pack opens on its pack).
+  const remembered = rememberedKind();
+  const choice: SizeChoice = picked ?? (remembered && remembered !== 'per100' && sizes.findIndex((s) => s.kind === remembered) >= 0 ? sizeValue(sizes.findIndex((s) => s.kind === remembered)) : 'per100');
   if (!food) return <p>{t('food.notFound')}</p>;
   const group = d.foods.groups[food.group];
+  const unit = product?.perMl ? 'ml' : 'g';
+  const size = chosenSize(sizes, choice);
+  const factor = size ? size.grams / 100 : 1;
   return (
     <section>
       <header className="page-head row">
@@ -45,15 +56,28 @@ export function FoodPage({ code }: { code: string }) {
       )}
       <FoodActions foodRef={product ? productRef(product) : { source: 'BLS', version: d.foods.version, code: food.code }} name={product ? productLabel(product) : food.nameEn} />
       <PieceWeightLine code={food.code} product={product} />
-      <PortionCard per100={food.per100} />
+      {sizes.length > 0 && (
+        <Segmented<SizeChoice>
+          label={t('size.switch')}
+          className={['size-switch', switchClass(sizes.length + 1)].filter(Boolean).join(' ')}
+          value={choice}
+          onChange={(v) => {
+            setPicked(v);
+            rememberKind(chosenSize(sizes, v)?.kind ?? 'per100');
+          }}
+          options={[{ value: 'per100', label: t(product?.perMl ? 'size.per100ml' : 'size.per100') }, ...sizes.map((s, i) => ({ value: sizeValue(i), label: sizeButton(s, unit) }))]}
+        />
+      )}
+      <PortionCard per100={food.per100} size={size} unit={unit} />
       <a className="btn btn-primary btn-block" href={href('log', d.today, food.code)}>
         <Icon name="plus" /> {t('food.log')}
       </a>
-      <h2 className="section-title">{t('food.per100')}</h2>
+      <h2 className="section-title">{size ? sizeHeading(size, unit) : t(product?.perMl ? 'size.per100ml' : 'food.per100')}</h2>
       <table className="nutrient-table card">
         <tbody>
           {NUTRIENTS.map((n, i) => {
-            const v = food.per100[n.id];
+            const raw = food.per100[n.id];
+            const v = typeof raw === 'number' ? raw * factor : raw;
             const req = d.requirements.byNutrient.get(n.id);
             const pct = typeof v === 'number' && req && !req.limitOnly && req.recommended > 0 ? v / req.recommended : undefined;
             const group = nutrientType(n.id);
@@ -102,9 +126,10 @@ const PORTION_MAX_CHIPS = 12;
  * "One portion gives" (design 2026-10-22): a typical portion's share of a day for the nutrients it
  * gives a lot of, biggest first, with your own gaps marked, each tapping through to its nutrient.
  */
-function PortionCard({ per100 }: { per100: Readonly<Record<string, RawValue>> }) {
+function PortionCard({ per100, size, unit }: { per100: Readonly<Record<string, RawValue>>; size?: FoodSize; unit: string }) {
   const d = useData();
-  const grams = portionGrams(per100);
+  // The amount picked above (a pack, a piece…), else a typical portion from the energy.
+  const grams = size?.grams ?? portionGrams(per100);
   const shares = NUTRIENTS.flatMap((n) => {
     const v = per100[n.id];
     const req = d.requirements.byNutrient.get(n.id);
@@ -119,7 +144,7 @@ function PortionCard({ per100 }: { per100: Readonly<Record<string, RawValue>> })
   return (
     <div className="card portion-card">
       <div className="card-head">
-        <h2>{t('food.portionTitle', { g: Math.round(grams) })}</h2>
+        <h2>{size ? sizeHeading(size, unit) : t('food.portionTitle', { g: Math.round(grams) })}</h2>
         {kcal !== undefined && <span className="card-note">{t('food.portionKcal', { kcal: fmtNumber(kcal) })}</span>}
       </div>
       {shares.length === 0 ? (
@@ -145,7 +170,7 @@ function PortionCard({ per100 }: { per100: Readonly<Record<string, RawValue>> })
         </div>
       )}
       <p className="muted small">
-        {t('food.portionNote', {
+        {size ? t('size.portionNote') : t('food.portionNote', {
           kcal: RANK_PORTION.kcal,
           min: RANK_PORTION.minGrams,
           max: RANK_PORTION.maxGrams,
