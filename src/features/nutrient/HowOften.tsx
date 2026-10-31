@@ -6,7 +6,7 @@ import { t, type MessageKey } from '../../i18n';
 import { fmtAmount } from '../../lib/format';
 import { coverExamples, slowBasis } from '../../logic/howOften';
 import { howOften } from '../../../model/howOften';
-import { slowWindow, vitaminKTurnover } from '../../../model/parameters';
+import { slowWindow, storage } from '../../../model/parameters';
 import { Sheet } from '../../ui/controls';
 import { Icon } from '../../ui/Icon';
 
@@ -75,27 +75,19 @@ function HowOftenNotes({ id, recommended }: { id: string; recommended: number })
   );
 }
 
-/** Why a nutrient's average spans the days it does, with its source; nothing for the usual windows. */
+/** Why a nutrient's average spans the days it does, with its source; nothing where no research backs the length. */
 export function WindowWhy({ id }: { id: string }) {
   const d = useData();
-  const basis = slowBasis(id);
+  const m = storage[id];
+  if (m?.kind !== 'rolling' || !m.basis) return null;
   const key = `window.${id}` as MessageKey;
-  if (basis) {
-    return (
-      <p>
-        {t('window.slow', { weeks: Math.round(slowWindow.value / 7), usual: d.settings.longWindowDays })} {t(key)}{' '}
-        <a href={basis.url} target="_blank" rel="noreferrer">
-          {t('window.sourceLink')}
-        </a>
-      </p>
-    );
-  }
-  return id === 'VITK' ? (
+  const days = m.window === 'short' ? d.settings.shortWindowDays : d.settings.longWindowDays;
+  return (
     <p>
-      {t(key, { days: d.settings.shortWindowDays })}{' '}
-      <a href={vitaminKTurnover.url} target="_blank" rel="noreferrer">
+      {m.window === 'slow' ? `${t('window.slow', { weeks: Math.round(slowWindow.value / 7), usual: d.settings.longWindowDays })} ${t(key)}` : t(key, { days })}{' '}
+      <a href={m.basis.url} target="_blank" rel="noreferrer">
         {t('window.sourceLink')}
       </a>
     </p>
-  ) : null;
+  );
 }

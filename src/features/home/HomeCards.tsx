@@ -22,8 +22,8 @@ const SCALE = 1.5;
 const byUrgency = (a: NutrientResult, b: NutrientResult) => urgencyRank(a.status) - urgencyRank(b.status) || a.value.central - b.value.central;
 
 /**
- * Home's three cards, named by how long each number is averaged over (owner, 2026-10-23), each heading
- * with an ⓘ that says why: today so far, the last 7 days, and the body stores. How they look follows
+ * Home's three cards, named by what each number is (owner, 2026-10-23, 2026-10-31), each heading with a note
+ * on its time span and an ⓘ that says why: today so far, the average per day (usually 7 days), and the body stores. How they look follows
  * Settings → Appearance: energy and macros as rings or bars, nutrients as comets or bars (the stores
  * then as tanks or rows).
  */
@@ -47,7 +47,9 @@ export function HomeCards({
   // Finished days so far (today joins once it is over): while fewer than the window, the heading says so.
   const daysSoFar = modelDays.length - 1;
   const tagged = rest.some((r) => windowTag(r, windowDays));
-  const title = daysSoFar > 0 && daysSoFar < windowDays ? t('home.firstDays', { n: daysSoFar }) : t('home.lastDays', { n: windowDays });
+  // The heading says what the lines are; the note names the usual window, and a line on another window carries
+  // its own tag (owner's ask, 2026-10-31: "Last 7 days" read as if every line were 7 days).
+  const windowNote = daysSoFar > 0 && daysSoFar < windowDays ? t('home.firstDays', { n: daysSoFar }) : t('home.lastDays', { n: windowDays });
   const today = useToday();
   const go = (id: string) => () => navigate('nutrient', id);
   const sortedStores = [...stores].sort((a, b) => urgencyRank(a.store.status) - urgencyRank(b.store.status) || a.store.fill.central - b.store.fill.central);
@@ -58,7 +60,7 @@ export function HomeCards({
         {views.macros === 'rings' ? <MacroRings values={today} defaultBased={defaultBased} today open={openToday} /> : <TodayCells defaultBased={defaultBased} />}
       </ListCard>
       {rest.length > 0 && (
-        <ListCard id="week" tour="home.week" title={title} note={t('home.weekNote')} info={`${t('home.weekInfo', { n: windowDays })}${comets ? ` ${t('home.cometLegend')}` : ''}`} sources={weekSources(t)}>
+        <ListCard id="week" tour="home.week" title={t('home.averages')} note={windowNote} info={`${t('home.weekInfo', { n: windowDays })}${comets ? ` ${t('home.cometLegend')}` : ''}`} sources={weekSources(t)}>
           {comets ? (
             <NutrientsSection results={rest} showRange={showRange} />
           ) : (

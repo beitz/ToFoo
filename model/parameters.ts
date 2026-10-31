@@ -330,23 +330,42 @@ export const storage: Record<string, StorageModel> = {
     confidence: 'low',
     note: 'Checked (abstract, 2026-10-26): body-fat vitamin E changed slowly and fell "only gradually" after a year of supplements; "≥ 2 y are required" for a new steady state. So the body keeps a large reserve; the model uses the same eight weeks as the fats rather than years, so a lasting change still shows.',
   } },
-  // Short: the liver holds little and loses it within days (Usui 1990, below).
-  VITK: { kind: 'rolling', window: 'short' },
+  VITK: { kind: 'rolling', window: 'short', basis: {
+    source: 'Usui Y et al. (1990): Vitamin K concentrations in the plasma and liver of surgical patients. Am J Clin Nutr 51:846–852',
+    url: 'https://pubmed.ncbi.nlm.nih.gov/2333843/',
+    confidence: 'medium',
+    note: 'Checked (abstract, 2026-10-26): liver phylloquinone fell from 28 to 6.8 pmol/g after 3 days of a low-vitamin-K diet; plasma "decreased rapidly". The body bridges days, not weeks, so the 7-day window fits better than 14.',
+  } },
   THIA: { kind: 'rolling', window: 'short' },
   RIBF: { kind: 'rolling', window: 'short' },
   NIAEQ: { kind: 'rolling', window: 'short' },
   PANTAC: { kind: 'rolling', window: 'short' },
   VITB6: { kind: 'rolling', window: 'short' },
   BIOT: { kind: 'rolling', window: 'short' },
-  VITC: { kind: 'rolling', window: 'long' },
+  VITC: { kind: 'rolling', window: 'long', basis: {
+    source: 'Kallner A et al. (1979): Steady-state turnover and body pool of ascorbic acid in man. Am J Clin Nutr 32:530–539; Hellman L, Burns JJ (1958): Metabolism of L-ascorbic acid-1-C14 in man. J Biol Chem 230:923–930',
+    url: 'https://pubmed.ncbi.nlm.nih.gov/420145/',
+    confidence: 'medium',
+    note: 'Checked (Kallner abstract and the JECFA monograph quoting both, 2026-10-31): body pool up to ~20 mg/kg (~1.5 g); half-life ~10 days at a turnover of 70 mg/day (Kallner), 16 days on average in three people (Hellman & Burns), longer at low intakes. Fourteen days is about one half-life, so a few days without fruit are bridged but a lasting gap shows.',
+  } },
   NA: { kind: 'rolling', window: 'short' },
   CLD: { kind: 'rolling', window: 'short' },
   K: { kind: 'rolling', window: 'short' },
   CA: { kind: 'rolling', window: 'long' },
   MG: { kind: 'rolling', window: 'long' },
   P: { kind: 'rolling', window: 'long' },
-  ZN: { kind: 'rolling', window: 'long' },
-  SE: { kind: 'rolling', window: 'long' },
+  ZN: { kind: 'rolling', window: 'long', basis: {
+    source: 'Gibson RS, Principles of Nutritional Assessment, 3rd ed., ch. 24c.12 (kinetic markers of zinc), citing King JC et al. (2001) and Krebs NF et al. (2003)',
+    url: 'https://med.libretexts.org/Bookshelves/Nutrition/Principles_of_Nutritional_Assessment_3e_(Gibson_et_al.)/28%3A_Zinc_(Chapter_24c)/28.12%3A_Kinetic_markers%3A_pool_sizes_and_turnover_rates_(24c.12)',
+    confidence: 'low',
+    note: 'Checked (chapter text, 2026-10-31): no zinc store (EFSA 2014), but an exchangeable pool of 150–200 mg "has a turnover rate of about 12.5 days"; severe restriction (< 1 mg/day for 4–5 weeks) cut that pool by 60 % and plasma zinc by 65 % (King 2001). Fourteen days covers one turnover. The 12.5 days carries no citation of its own in the chapter, hence low confidence.',
+  } },
+  SE: { kind: 'rolling', window: 'slow', basis: {
+    source: 'Griffiths NM, Stewart RDH, Robinson MF (1976): The metabolism of [75Se]selenomethionine in four women. Br J Nutr 35:373–382; Schrauzer GN (2000): Selenomethionine: a review of its nutritional significance, metabolism and toxicity. J Nutr 130:1653–1656',
+    url: 'https://doi.org/10.1079/BJN19760043',
+    confidence: 'low',
+    note: 'Checked (Griffiths abstract, 2026-10-31): after the first 8 weeks, "whole-body retention of 75Se decreased exponentially with a half-time of 207–290 d". Selenomethionine is the main form in food; selenite is kept shorter (~102 days, Schrauzer 2000 as quoted by Health Canada 2014). So the body holds selenium for months; as for vitamin E the model uses eight weeks rather than months, so a lasting change still shows. Four women and a tracer dose, hence low confidence.',
+  } },
   CU: { kind: 'rolling', window: 'long' },
   MN: { kind: 'rolling', window: 'long' },
   FD: { kind: 'rolling', window: 'long' },
@@ -367,19 +386,11 @@ export const slowWindow: Valued<number> = {
   note: 'Days. Reviewed 2026-10-26 with the owner: what makes most sense for the status; charts keep their usual 14-day span.',
 };
 
-/** Why vitamin K uses the short window. */
-export const vitaminKTurnover: Cited = {
-  source: 'Usui Y et al. (1990): Vitamin K concentrations in the plasma and liver of surgical patients. Am J Clin Nutr 51:846–852',
-  url: 'https://pubmed.ncbi.nlm.nih.gov/2333843/',
-  confidence: 'medium',
-  note: 'Checked (abstract, 2026-10-26): liver phylloquinone fell from 28 to 6.8 pmol/g after 3 days of a low-vitamin-K diet; plasma "decreased rapidly". The body bridges days, not weeks, so the 7-day window fits better than 14.',
-};
-
 export const storageNotes: Cited = {
   source: 'Modelling choice (docs/SPEC.md "Two kinds of nutrient")',
   confidence: 'assumption',
   note:
-    'Zinc is a rolling average because the body has no mobilisable zinc store (EFSA 2014). Vitamin C (body pool ~1.5 g, weeks) uses the long window. Reviewed 2026-10-26: omega-3, linoleic and alpha-linolenic acid and vitamin E moved to the slow window (sources on each), vitamin K to the short one (vitaminKTurnover). The other window lengths are a proposal.',
+    'Zinc is a rolling average because the body has no mobilisable zinc store (EFSA 2014). Reviewed 2026-10-26: omega-3, linoleic and alpha-linolenic acid and vitamin E moved to the slow window, vitamin K to the short one. Reviewed 2026-10-31: vitamin C and zinc keep the long window (one turnover), selenium moved to the slow one (sources on each). The other window lengths (short for the B vitamins, amino acids, sodium, potassium, chloride; long for the other minerals) are a proposal: the short one follows the DGE rule that reference values need only be met on average over a week.',
 };
 
 /** Reference body weights for scaling tank capacities. */

@@ -8,6 +8,7 @@
  * scenes and small fixes. A pull request that changes what users see adds its line here in the same PR.
  */
 export const changesEn = {
+  'change.182': 'Home: the nutrient card is now “Average per day”, last 7 days unless a line says otherwise. Selenium now averages over 8 weeks, like omega-3, since the body keeps it for months; vitamin C and zinc pages say why they use 14 days.',
   'change.181': 'Food and item pages: switch from per 100 g to the whole pack (a 420 g ready meal), the label serving, one piece or what you logged last time.',
   'change.180': 'Tapping energy, protein, fat, carbs or fibre on Home opens today only, with a band at the top saying so, instead of the average of your last days.',
   'change.179': 'Kitchen: logging 3 pieces of something at home takes 3 off, not 1, and a weight of several pieces (300 g of 150 g yogurts) counts as that many. Packs of many small pieces, like chewing gum, go down by the share eaten.',

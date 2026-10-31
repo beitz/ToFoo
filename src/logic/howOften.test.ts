@@ -30,11 +30,14 @@ describe('how often', () => {
     }
   });
 
-  it('explains every slow window, with a source', () => {
+  it('explains every window that research backs, with a source; every slow window has one', () => {
     for (const [id, m] of Object.entries(storage)) {
-      if (m.kind !== 'rolling' || m.window !== 'slow') continue;
+      if (m.kind !== 'rolling') continue;
+      if (m.window === 'slow') expect(m.basis, id).toBeDefined();
+      if (!m.basis) continue;
       expect(en[`window.${id}` as keyof typeof en], id).toBeTruthy();
       expect(m.basis.source.length).toBeGreaterThan(10);
+      expect(m.basis.url, id).toMatch(/^https:\/\//);
     }
   });
 });
