@@ -1,0 +1,33 @@
+import { expect, test } from '@playwright/test';
+import { firstLaunch, watchErrors } from './helpers';
+
+// Owner's ask 2026-11-03: "When you slept" opens every day with the times of each sleep and the total.
+test('When you slept opens a day-by-day page with the times of each sleep', async ({ page }) => {
+  const errors = watchErrors(page);
+  await firstLaunch(page);
+  await page.goto('./#/settings');
+  await page.getByText('What you track').click();
+  const toggle = page.getByRole('switch', { name: /^Sleep/ });
+  if (!(await toggle.isChecked())) await toggle.click();
+  await expect(toggle).toBeChecked();
+
+  // A night ending now (the sheet's default: the last 8 hours).
+  await page.goto('./#/diary');
+  await page.getByRole('button', { name: 'Sleep', exact: true }).click();
+  const sheet = page.getByRole('dialog', { name: 'Add sleep' });
+  await sheet.getByRole('button', { name: 'Save' }).click();
+  await expect(sheet).toHaveCount(0);
+
+  await page.goto('./#/nights');
+  await page.getByRole('link', { name: 'When you slept' }).click();
+  await expect(page).toHaveURL(/#\/nights\/days$/);
+  await expect(page.getByRole('heading', { name: 'When you slept', level: 1 })).toBeVisible();
+  const row = page.locator('.nights-row').first();
+  await expect(row.locator('.nights-times')).toHaveText(/^\d\d:\d\d–\d\d:\d\d$/);
+  await expect(row.locator('.nights-total')).toContainText('8 h');
+
+  // Back returns to the sleep page.
+  await page.getByRole('button', { name: 'Back' }).click();
+  await expect(page).toHaveURL(/#\/nights$/);
+  expect(errors).toEqual([]);
+});

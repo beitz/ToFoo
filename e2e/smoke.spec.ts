@@ -21,6 +21,8 @@ const ROUTES = [
   'nutrient/PROT625/foods',
   'food/C133000',
   'fasting',
+  'nights',
+  'nights/days',
   'weight',
   'habits',
   'habits/new',

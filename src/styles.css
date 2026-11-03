@@ -6775,6 +6775,62 @@ a.contributor-link > span:first-child {
 .nights-diff.is-over {
   color: var(--ok);
 }
+.nights-row.has-times {
+  grid-template-rows: auto auto;
+  row-gap: 2px;
+  padding: 4px 0;
+}
+/* The times sit under the bar and run on under the total, so a night woken from twice still fits on one line at 360 px. */
+.nights-times-cell {
+  grid-column: 2 / -1;
+  min-width: 0;
+}
+.nights-times {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 10px;
+  font-variant-numeric: tabular-nums;
+}
+.nights-month {
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.nights-rows > li.nights-month {
+  padding: 10px 0 2px;
+}
+/* The clock times stay in view while the days scroll under them. */
+.nights-days-axis {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  margin-inline: calc(-1 * var(--card-pad-x));
+  padding: 6px var(--card-pad-x) 4px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.nights-days .nights-legend {
+  margin: 0 0 4px;
+}
+.nights-days-end {
+  display: flex;
+  justify-content: center;
+  padding-top: 12px;
+}
+.nights-rows > li.nights-days-end {
+  padding: 12px 0 0;
+}
+/* A card heading that opens a page of its own: the whole title is the link, at least 44 px tall. */
+.card-head-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 44px;
+  color: inherit;
+  text-decoration: none;
+}
+.card-head-link svg {
+  color: var(--text-muted);
+}
 .nights-legend {
   display: flex;
   flex-wrap: wrap;

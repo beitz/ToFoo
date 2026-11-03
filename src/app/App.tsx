@@ -47,6 +47,7 @@ import { FirstLaunch } from '../features/onboarding/FirstLaunch';
 import { TourHost } from '../features/tour/TourHost';
 import { FastPage } from '../features/fast/FastPage';
 import { CookPage } from '../features/recipes/CookPage';
+import { SleepDaysPage } from '../features/sleep/SleepDaysPage';
 import { SleepPage } from '../features/sleep/SleepPage';
 import { CatchUpPage } from '../features/catchup/CatchUpPage';
 import { ActivityPage } from '../features/trackers/ActivityPage';
@@ -146,7 +147,7 @@ function Page({ route }: { route: string[] }) {
     case 'sleep':
       return <SleepShortcut />;
     case 'nights':
-      return <SleepPage />;
+      return b === 'days' ? <SleepDaysPage /> : <SleepPage />;
     case 'activity':
       return <ActivityPage />;
     case 'water':
