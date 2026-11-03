@@ -8,6 +8,7 @@
  * scenes and small fixes. A pull request that changes what users see adds its line here in the same PR.
  */
 export const changesEn = {
+  'change.183': 'Sleep: tap “When you slept” for every day back to your first logged sleep, with the times you fell asleep and woke up (each stretch of a broken night, and naps) under the bar and the total on the right. More days load as you scroll.',
   'change.182': 'Home: the nutrient card is now “Average per day”, last 7 days unless a line says otherwise. Selenium now averages over 8 weeks, like omega-3, since the body keeps it for months; vitamin C and zinc pages say why they use 14 days.',
   'change.181': 'Food and item pages: switch from per 100 g to the whole pack (a 420 g ready meal), the label serving, one piece or what you logged last time.',
   'change.180': 'Tapping energy, protein, fat, carbs or fibre on Home opens today only, with a band at the top saying so, instead of the average of your last days.',
