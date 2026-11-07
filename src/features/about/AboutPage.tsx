@@ -74,6 +74,13 @@ export function AboutPage() {
         <a href={href('about', 'sent')}>{t('about.sentLink')}</a>
       </p>
 
+      <h2>{t('about.iconsHeading')}</h2>
+      <p>
+        {t('about.icons')}{' '}
+        <a href="https://github.com/microsoft/fluentui-emoji" target="_blank" rel="noreferrer">
+          github.com/microsoft/fluentui-emoji
+        </a>
+      </p>
       <h2>{t('about.codeHeading')}</h2>
       <p>
         {t('about.code')}{' '}
