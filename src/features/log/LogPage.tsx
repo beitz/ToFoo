@@ -267,7 +267,7 @@ export function LogPage({ day: dayParam, foodCode }: { day?: string; foodCode?: 
 
           {homeTiles.length > 0 && (
             <LogSection id="stock" title={t(atHomeOn ? 'log.atHome' : 'stock.title')} count={homeTiles.length}>
-              <HomeTiles tiles={homeTiles} />
+              <HomeTiles tiles={homeTiles} hintId="home-tiles-hint" />
               <p id="home-tiles-hint" className="muted small home-tiles-hint">
                 {t('log.tilesHint')}
               </p>
@@ -379,7 +379,7 @@ export function LogPage({ day: dayParam, foodCode }: { day?: string; foodCode?: 
           {homeTiles.length > 0 && (
             <div className="log-home-matches">
               <h2 className="small muted">{t(atHomeOn ? 'log.atHome' : 'stock.title')}</h2>
-              <HomeTiles tiles={homeTiles} />
+              <HomeTiles tiles={homeTiles} hintId="home-tiles-hint" />
               <p id="home-tiles-hint" className="muted small home-tiles-hint">
                 {t('log.tilesHint')}
               </p>

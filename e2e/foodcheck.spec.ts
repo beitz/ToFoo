@@ -77,10 +77,10 @@ test('the check covers the ticked kitchen places, and what it found right is mar
   const main = page.locator('main');
   await add.fill('Wacholderbeeren');
   await page.getByRole('button', { name: 'Add', exact: true }).click();
-  await expect(main.locator('.home-row', { hasText: 'Wacholderbeeren' })).toBeVisible();
+  await expect(main.getByRole('button', { name: /^Wacholderbeeren/ })).toBeVisible();
   await add.fill('oat flakes');
   await page.getByRole('button', { name: /^Oat flakes/ }).first().click();
-  await expect(main.locator('.home-row', { hasText: /Oat flakes/ })).toBeVisible();
+  await expect(main.locator('.home-tile', { hasText: /Oat flakes/ })).toBeVisible();
 
   await page.goto('./#/settings/assistant');
   await page.getByRole('switch', { name: /^Use the AI assistant/ }).click();
@@ -163,7 +163,7 @@ test('Home says when foods are worth a look, with the check page and the assista
   await page.locator('.card-add-box').getByRole('button', { name: 'Scan a barcode' }).click();
   await page.getByLabel('Barcode number').fill(PAPRIKA.code);
   await page.getByRole('button', { name: 'Look up' }).click();
-  await expect(page.locator('.home-row', { hasText: 'Paprika edelsüß' })).toBeVisible();
+  await expect(page.locator('main').getByRole('button', { name: /^Paprika edelsüß/ })).toBeVisible();
 
   await page.goto('./#/settings/assistant');
   await page.getByRole('switch', { name: /^Use the AI assistant/ }).click();

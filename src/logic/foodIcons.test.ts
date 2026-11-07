@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FOOD_ICON_NAMES, iconFor, monogram, shortNames, type Nameable } from './foodIcons';
+import { FOOD_ICON_NAMES, homeLooks, iconFor, monogram, shortNames, type Nameable } from './foodIcons';
 import { FOOD_ICON_SVG } from '../ui/foodIconData';
 
 describe('iconFor', () => {
@@ -85,5 +85,32 @@ describe('shortNames', () => {
 
   it('keeps one name for things that really are the same', () => {
     expect(named([{ id: 'a', name: 'Milk', icon: 'glass-of-milk' }, { id: 'b', name: 'Milk', icon: 'glass-of-milk' }])).toEqual({ a: 'Milk', b: 'Milk' });
+  });
+});
+
+describe('homeLooks', () => {
+  it("keeps the user's own icon and name, and picks the rest", () => {
+    const looks = homeLooks([
+      { id: 'a', name: 'Tante Emmas Paste', icon: 'jar', short: 'Emma' },
+      { id: 'b', name: 'Pizza Diavola' },
+      { id: 'c', name: 'Pizza Margherita' },
+      { id: 'd', name: 'Lasagne vom Sonntag', fallback: 'pot-of-food' },
+      { id: 'e', name: 'Mystery', icon: 'not-an-icon', fallback: 'pot-of-food' },
+    ]);
+    expect(looks.get('a')).toMatchObject({ icon: 'jar', short: 'Emma', auto: { icon: undefined, short: 'Tante' } });
+    expect(looks.get('b')).toMatchObject({ icon: 'pizza', short: 'Diavola' });
+    expect(looks.get('c')).toMatchObject({ icon: 'pizza', short: 'Margherita' });
+    expect(looks.get('d')).toMatchObject({ icon: 'shallow-pan-of-food', short: 'Lasagne' });
+    expect(looks.get('e')).toMatchObject({ icon: 'pot-of-food', short: 'Mystery' });
+  });
+
+  it('tells things apart by the icon the user chose', () => {
+    // Moved to another icon, the second pizza no longer needs its second word.
+    const looks = homeLooks([
+      { id: 'b', name: 'Pizza Diavola' },
+      { id: 'c', name: 'Pizza Margherita', icon: 'cheese-wedge' },
+    ]);
+    expect(looks.get('b')!.short).toBe('Pizza');
+    expect(looks.get('c')!.short).toBe('Pizza');
   });
 });

@@ -4003,6 +4003,17 @@ button.week-row:focus-visible {
 .home-tile:active {
   background: var(--surface-2);
 }
+.home-tile.out img {
+  filter: grayscale(1);
+  opacity: 0.5;
+}
+.home-tile.out .food-icon {
+  border-style: dashed;
+}
+.home-tile.out .home-tile-name {
+  color: var(--text-faint);
+  text-decoration: line-through;
+}
 .home-tile-ring {
   position: relative;
 }
@@ -4049,6 +4060,61 @@ button.week-row:focus-visible {
 }
 .home-tiles-hint {
   margin: 4px 0 0;
+}
+.pantry-tile-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.pantry-tile-row input {
+  flex: 1;
+  min-width: 0;
+}
+.pantry-tile-icon,
+.icon-pick {
+  padding: 0;
+  border: 0;
+  background: none;
+  border-radius: 50%;
+  cursor: pointer;
+}
+.icon-picker {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(48px, 1fr));
+  gap: 6px;
+  margin-top: 10px;
+  max-height: 240px;
+  overflow-y: auto;
+  padding: 4px;
+}
+.icon-pick {
+  display: grid;
+  place-items: center;
+  min-height: 48px;
+}
+.icon-pick.on .food-icon,
+.icon-pick-auto.on {
+  outline: 2.5px solid var(--accent);
+  outline-offset: 1px;
+}
+.icon-pick-auto {
+  grid-column: span 2;
+  border: 1.5px solid var(--border);
+  border-radius: 999px;
+  font: inherit;
+  font-size: 0.8rem;
+  color: var(--text);
+}
+.kitchen-view {
+  display: flex;
+  justify-content: flex-end;
+  margin: 10px 0 0;
+}
+.kitchen-view .segmented {
+  min-width: 10rem;
+}
+.home-row .food-icon {
+  flex: none;
 }
 .log-home-matches {
   margin-top: 10px;

@@ -61,6 +61,7 @@ export const TOURS: Record<TourId, Tour> = {
       { target: 'kitchen.tiles', text: 'tour.kitchen.tiles' },
       { target: 'kitchen.shopping', text: 'tour.kitchen.shopping' },
       { target: 'kitchen.add', text: 'tour.kitchen.add' },
+      { target: 'kitchen.view', text: 'tour.kitchen.view' },
       { target: 'kitchen.recipes', text: 'tour.kitchen.recipes' },
     ],
   },

@@ -277,3 +277,46 @@ export function shortNames(items: readonly Nameable[]): Map<string, string> {
   }
   return out;
 }
+
+/** Whether a stored icon name is one the app has (a backup from a newer version may name others). */
+export const isFoodIcon = (name: string | undefined): name is FoodIconName => !!name && Object.hasOwn(ICON_WORDS, name);
+
+/** How a thing at home looks on a tile: its icon (or none: two letters) and short name. */
+export interface HomeLook {
+  icon?: FoodIconName;
+  short: string;
+  monogram: string;
+  /** What the app would pick by itself, shown when the user changes it. */
+  auto: { icon?: FoodIconName; short: string };
+}
+
+export interface HomeThing {
+  id: string;
+  name: string;
+  /** The BLS code of the food it is linked to (a product's similar food), for the group icon. */
+  code?: string;
+  english?: string;
+  /** The icon the app falls back on for this kind of thing (a cooked pot), before two letters. */
+  fallback?: FoodIconName;
+  /** The user's own choices (PantryItem `icon`, `short`); they win over the app's. */
+  icon?: string;
+  short?: string;
+}
+
+/**
+ * Icons and short names for everything at home at once, so names are unique across the whole
+ * kitchen and the same in Log meal and the Kitchen tab. The user's own icon and name win; the
+ * app's picks fill in the rest, telling look-alikes apart by the icons they end up with.
+ */
+export function homeLooks(things: readonly HomeThing[]): Map<string, HomeLook> {
+  const autoIcon = new Map(things.map((x) => [x.id, iconFor(x.name, x.code) ?? x.fallback]));
+  const icon = (x: HomeThing) => (isFoodIcon(x.icon) ? x.icon : autoIcon.get(x.id));
+  const auto = shortNames(things.map((x) => ({ id: x.id, name: x.name, icon: autoIcon.get(x.id), english: x.english })));
+  const shown = shortNames(things.map((x) => ({ id: x.id, name: x.name, icon: icon(x), english: x.english })));
+  const out = new Map<string, HomeLook>();
+  for (const x of things) {
+    const own = x.short?.trim();
+    out.set(x.id, { icon: icon(x), short: own || shown.get(x.id)!, monogram: monogram(own || x.name), auto: { icon: autoIcon.get(x.id), short: auto.get(x.id)! } });
+  }
+  return out;
+}

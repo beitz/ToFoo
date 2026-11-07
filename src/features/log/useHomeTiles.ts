@@ -8,7 +8,6 @@ import { normalize } from '../../foods/search';
 import { dayKey } from '../../lib/dates';
 import { fmtNumber } from '../../lib/format';
 import { refKey } from '../../lib/refs';
-import { iconFor, monogram, shortNames, type FoodIconName } from '../../logic/foodIcons';
 import { oneOf, type OneOf } from '../../logic/oneTap';
 import { loggable } from '../../logic/pantry';
 import { portionGrams } from '../../logic/batch';
@@ -17,6 +16,7 @@ import { isOn } from '../../settings/features';
 import { repo } from '../../storage/repo';
 import type { Batch, CustomFood, FoodRef, LogEntry, Product } from '../../storage/types';
 import { leftLabel, placeName, usePantry, usePantryLeft, usePieceUnits } from '../pantry/usePantry';
+import { potKey, useHomeLooks } from '../pantry/useHomeLooks';
 import { totalLeft } from '../home/StockChips';
 import type { HomeTile } from './HomeTiles';
 
@@ -30,8 +30,6 @@ const DAY_MS = 86_400_000;
 interface Thing {
   key: string;
   name: string;
-  icon?: FoodIconName;
-  english?: string;
   detail: string;
   pick: HomePick;
   /** What eating it counts as, for "most eaten first" and "+1": a food's key, or a pot's batch. */
@@ -63,9 +61,8 @@ export function useHomeTiles({ day, time, query, added, onPick, onLogged }: { da
       const storage = nextStorage(b, day);
       const name = b.recipe.name;
       out.push({
-        key: `batch:${b.id}`,
+        key: potKey(b),
         name,
-        icon: iconFor(name) ?? 'pot-of-food',
         detail: t('stock.left', { n: totalLeft(b) }),
         pick: { kind: 'portion', batch: b },
         eatenKey: `batch:${b.id}`,
@@ -92,7 +89,6 @@ export function useHomeTiles({ day, time, query, added, onPick, onLogged }: { da
           if (!food) continue;
           out.push({
             ...base,
-            icon: iconFor(item.name),
             pick: { kind: 'custom', food },
             one: async () => {
               const entry = await repo.addLog({ kind: 'custom', customFoodId: food.id, servings: 1, time, day: entryDay, confidence: food.confidence, label: food.name });
@@ -104,16 +100,12 @@ export function useHomeTiles({ day, time, query, added, onPick, onLogged }: { da
         const product = ref.source === 'BLS' ? undefined : d.productsById.get(refKey(ref));
         const food = ref.source === 'BLS' ? d.foods.byCode.get(ref.code) : undefined;
         if (!product && !food) continue;
-        const code = product?.match?.code ?? food?.code;
-        const linked = code ? d.foods.byCode.get(code) : undefined;
         // Products' last amount and piece weights go by the product's id, BLS foods' by their code.
         const lastKey = product ? product.id : food!.code;
         const amount = oneOf({ countedInPieces: item.pieces !== undefined, units: units(refKey(ref)), lastGrams: last.get(lastKey), servingGrams: product?.serving?.grams });
         const label = product ? productLabel(product) : food!.nameEn;
         out.push({
           ...base,
-          icon: iconFor(item.name, code),
-          english: linked?.nameEn,
           pick: product ? { kind: 'product', product } : { kind: 'food', food: food! },
           one: amount
             ? async () => {
@@ -139,7 +131,7 @@ export function useHomeTiles({ day, time, query, added, onPick, onLogged }: { da
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [atHomeOn, pantry, lastRows, units, d.log, d.batches, d.foods, d.customFoodsById, d.productsById, day, time]);
 
-  const shorts = useMemo(() => shortNames(things.map((x) => ({ id: x.key, name: x.name, icon: x.icon, english: x.english }))), [things]);
+  const looks = useHomeLooks();
 
   const tiles: HomeTile[] = useMemo(() => {
     const words = normalize(query).split(' ').filter(Boolean);
@@ -151,15 +143,16 @@ export function useHomeTiles({ day, time, query, added, onPick, onLogged }: { da
     return things
       .filter((x) => {
         if (!words.length) return true;
-        const text = normalize(`${x.name} ${shorts.get(x.key) ?? ''} ${x.english ?? ''}`);
+        const text = normalize(`${x.name} ${looks(x.key)?.short ?? ''}`);
         return words.every((w) => text.includes(w));
       })
       .map((x) => {
-        const short = shorts.get(x.key) ?? x.name;
+        const look = looks(x.key);
+        const short = look?.short ?? x.name;
         return {
           key: x.key,
-          icon: x.icon,
-          monogram: monogram(x.name),
+          icon: look?.icon,
+          monogram: look?.monogram ?? x.name.slice(0, 2),
           short,
           full: x.name,
           detail: x.detail,
@@ -171,7 +164,9 @@ export function useHomeTiles({ day, time, query, added, onPick, onLogged }: { da
           },
         };
       });
-  }, [things, shorts, query, added, onPick, onLogged]);
+    // looks changes with the kitchen, which `things` covers.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [things, query, added, onPick, onLogged]);
 
   return tiles;
 }

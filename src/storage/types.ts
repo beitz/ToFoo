@@ -160,6 +160,8 @@ export interface Settings extends Versioned {
   doubtedFoods?: Record<string, string>;
   /** Log screen sections the user closed (true) or opened (false), by section key; unset = open. */
   logCollapsed?: Record<string, boolean>;
+  /** The Kitchen tab as icons (default) or as the list of rows with amounts and source tags. */
+  kitchenView?: 'grid' | 'list';
   /** Recipe ideas: diet, likes, kitchen, time, batch size, in the user's words (guidance for the assistant, not a filter). */
   cookingPreferences?: string;
   /** Weight of the empty pot last weighed (g), offered when the next pot is weighed. */
@@ -584,6 +586,10 @@ export interface PantryItem extends Versioned {
   status?: 'low' | 'out';
   /** Epoch ms it was first added. */
   addedAt: number;
+  /** The icon the user chose for its tile (a name from src/logic/foodIcons.ts); missing: the app picks one. */
+  icon?: string;
+  /** The short name the user chose for its tile; missing: the app picks one. */
+  short?: string;
 }
 
 export const DEFAULT_AUTO_BACKUP_KEEP = 5;

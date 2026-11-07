@@ -63,6 +63,9 @@ test('a scanned spice jar is counted in exact grams', async ({ page }) => {
   await page.locator('.card-add-box').getByRole('button', { name: 'Scan a barcode' }).click();
   await page.getByLabel('Barcode number').fill(PAPRIKA.code);
   await page.getByRole('button', { name: 'Look up' }).click();
+  // Shown as an icon first; the list has its amount and where its numbers come from in words.
+  await expect(page.locator('main').getByRole('button', { name: /^Paprika edelsüß.*12.5 g/ })).toBeVisible();
+  await page.getByRole('radio', { name: 'List' }).click();
   const row = page.locator('.home-row', { hasText: 'Paprika edelsüß' });
   await expect(row).toContainText('12.5 g');
   // A small tag says it is an Open Food Facts product, paired with a BLS food or by its label alone.
@@ -108,6 +111,7 @@ test('a spice missing from the food database is found as a product, or kept by i
   await expect(page.getByText(/Not in the food lists/)).toBeVisible();
   await page.getByRole('button', { name: 'Add', exact: true }).click();
   const main = page.locator('main');
+  await page.getByRole('radio', { name: 'List' }).click();
   await expect(main.locator('.home-row', { hasText: 'Wacholderbeeren' })).toContainText('No food linked');
 
   // With it: the bundled product list offers the jar, and picking it counts the jar's grams.
@@ -129,7 +133,7 @@ test('marking something used up leaves the shopping list to the user', async ({ 
   await page.getByPlaceholder('Add what you bought').fill('Wacholderbeeren');
   await page.getByRole('button', { name: 'Add', exact: true }).click();
   const main = page.locator('main');
-  await main.locator('.home-row', { hasText: 'Wacholderbeeren' }).click();
+  await main.getByRole('button', { name: /^Wacholderbeeren/ }).click();
   await page.getByRole('radio', { name: 'Used up' }).click();
   await page.getByRole('button', { name: 'Save' }).click();
 
@@ -140,7 +144,7 @@ test('marking something used up leaves the shopping list to the user', async ({ 
 
   // One tap in its sheet puts it on the list.
   await page.goto('./#/kitchen');
-  await main.locator('.home-row', { hasText: 'Wacholderbeeren' }).click();
+  await main.getByRole('button', { name: /^Wacholderbeeren/ }).click();
   await page.getByRole('button', { name: 'Add to shopping list' }).click();
   await expect(page.getByText('On the shopping list', { exact: true })).toBeVisible();
   await page.goto('./#/shopping');
@@ -152,5 +156,37 @@ test('marking something used up leaves the shopping list to the user', async ({ 
   await expect(main.getByRole('heading', { name: /^Used up/ })).toHaveCount(0);
   await page.getByRole('button', { name: 'Undo' }).click();
   await expect(main.getByRole('heading', { name: 'Used up (1)' })).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test('things at home show as icons with short names, which can be changed, or as a list', async ({ page }) => {
+  const errors = watchErrors(page);
+  await firstLaunch(page);
+  await page.goto('./#/kitchen');
+  const add = page.getByPlaceholder('Add what you bought');
+  for (const name of ['Pizza Diavola', 'Pizza Margherita']) {
+    await add.fill(name);
+    await add.press('Enter');
+  }
+  // Two pizzas: the icon says pizza, the short names tell them apart.
+  const names = page.locator('main .home-tile-name');
+  await expect(names.filter({ hasText: /^Diavola$/ })).toBeVisible();
+  await expect(names.filter({ hasText: /^Margherita$/ })).toBeVisible();
+
+  // Its own short name, from the item's sheet.
+  await page.locator('main').getByRole('button', { name: /^Pizza Diavola/ }).click();
+  await page.getByLabel('Short name').fill('Spicy');
+  await page.getByRole('button', { name: 'Choose an icon' }).first().click();
+  await page.getByRole('button', { name: 'hot pepper' }).click();
+  await page.getByRole('button', { name: 'Save' }).click();
+  await expect(names.filter({ hasText: /^Spicy$/ })).toBeVisible();
+  // The other pizza has no look-alike left, so it is just the pizza.
+  await expect(names.filter({ hasText: /^Pizza$/ })).toBeVisible();
+
+  // The list, remembered.
+  await page.getByRole('radio', { name: 'List' }).click();
+  await expect(page.locator('main .home-row', { hasText: 'Pizza Margherita' })).toBeVisible();
+  await page.reload();
+  await expect(page.locator('main .home-row', { hasText: 'Pizza Diavola' })).toBeVisible();
   expect(errors).toEqual([]);
 });
