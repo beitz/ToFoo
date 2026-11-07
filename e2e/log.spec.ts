@@ -68,5 +68,14 @@ test('a food logged earlier is pinned and put in the freezer from its diary item
   await expect(page.locator('#log-favourites').getByText(/^Oat flakes/).first()).toBeVisible();
   await page.goto('./#/kitchen');
   await expect(page.getByText(/Oat flakes/).first()).toBeVisible();
+
+  // At home in Log meal is a tile: one tap adds one, here the 100 g logged last time, with Undo.
+  await page.goto('./#/log');
+  await page.getByRole('button', { name: /^Oat flakes, 500 g · Freezer/ }).click();
+  await expect(page.getByText('Added Oat flakes, 100 g.')).toBeVisible();
+  await expect(page.locator('.meal-so-far')).toContainText('100 g');
+  // Holding it opens the amount sheet instead.
+  await page.getByRole('button', { name: /^Oat flakes, 400 g · Freezer/ }).click({ button: 'right' });
+  await expect(page.getByRole('dialog')).toContainText('Oat flakes');
   expect(errors).toEqual([]);
 });

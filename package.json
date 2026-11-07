@@ -13,7 +13,8 @@
     "e2e": "playwright test",
     "typecheck": "tsc",
     "schema": "tsx scripts/gen-schema.ts",
-    "compendium": "tsx scripts/compendium.ts"
+    "compendium": "tsx scripts/compendium.ts",
+    "icons": "tsx scripts/food-icons.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.135.0",
@@ -26,6 +27,7 @@
     "zxing-wasm": "^3.1.6"
   },
   "devDependencies": {
+    "@iconify-json/fluent-emoji-flat": "^1.2.6",
     "@playwright/test": "^1.56.1",
     "@testing-library/react": "^16.3.3",
     "@types/node": "^22.20.5",

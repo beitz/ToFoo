@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useData } from '../../app/data';
 import { useToast } from '../../app/toast';
 import { href, navigate } from '../../app/router';
@@ -16,7 +16,6 @@ import { EditEntrySheet } from '../diary/EditEntrySheet';
 import { ProductList, productTag } from './ProductList';
 import { Icon } from '../../ui/Icon';
 import { isOn } from '../../settings/features';
-import { nextStorage, totalLeft } from '../home/StockChips';
 import { PortionSheet } from './PortionSheet';
 import { AmountSheet } from './AmountSheet';
 import { BarcodeSheet } from './BarcodeSheet';
@@ -31,8 +30,8 @@ import { LogSection } from './LogSection';
 import { FavouriteMealButton, FavouriteStar, useFavouriteMeals } from './FavouriteButton';
 import { refKey } from '../../lib/refs';
 import { WaterSheet } from '../water/WaterSheet';
-import { loggable } from '../../logic/pantry';
-import { leftLabel, placeName, usePantry, usePantryLeft } from '../pantry/usePantry';
+import { HomeTiles } from './HomeTiles';
+import { useHomeTiles, type HomePick } from './useHomeTiles';
 import { BackButton } from '../../ui/BackButton';
 
 type Selected =
@@ -124,34 +123,22 @@ export function LogPage({ day: dayParam, foodCode }: { day?: string; foodCode?: 
     setMealTime(time);
     for (const e of addedEntries) await repo.updateLog({ ...e, time, day: dayKey(new Date(time)) });
   }
-  const stock = d.batches.filter((b) => totalLeft(b) > 0);
-  // Bought things at home that are foods, with what tapping one opens.
   const atHomeOn = isOn(d.settings.features, 'atHome');
-  const pantry = usePantry();
-  const pantryLeft = usePantryLeft();
-  const homeFoods = useMemo(() => {
-    if (!atHomeOn) return [];
-    const out: Array<{ id: string; pick: Selected; name: string; detail: string }> = [];
-    for (const item of pantry ?? []) {
-      const left = pantryLeft(item);
-      if (!loggable(item, left) || !item.ref) continue;
-      const detail = [leftLabel(item, left), placeName(item.place)].filter(Boolean).join(' · ');
-      const ref = item.ref;
-      if (ref.source === 'BLS') {
-        const food = d.foods.byCode.get(ref.code);
-        if (food) out.push({ id: item.id, pick: { kind: 'food', food }, name: item.name, detail });
-      } else if (ref.source === 'custom') {
-        const food = d.customFoodsById.get(ref.id);
-        if (food) out.push({ id: item.id, pick: { kind: 'custom', food }, name: item.name, detail });
-      } else {
-        const product = d.productsById.get(refKey(ref));
-        if (product) out.push({ id: item.id, pick: { kind: 'product', product }, name: item.name, detail });
-      }
-    }
-    return out.sort((a, b) => a.name.localeCompare(b.name));
-    // pantryLeft changes with the log, which d.log covers.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [atHomeOn, pantry, d.log, d.batches, d.foods, d.customFoodsById, d.productsById]);
+  const pickHome = useCallback((pick: HomePick) => setSelected(pick), []);
+  const loggedHome = useCallback(
+    (entry: LogEntry, message: string) => {
+      setAdded((a) => [...a, entry.id]);
+      setMealTime(entry.time);
+      setQuery('');
+      toast(message, () => {
+        void repo.deleteLog(entry.id);
+        setAdded((a) => a.filter((x) => x !== entry.id));
+      });
+    },
+    [toast],
+  );
+  // Cooked pots and foods at home as tiles: one tap adds one, a hold opens the amount sheet.
+  const homeTiles = useHomeTiles({ day, time: mealTime, query, added: addedEntries, onPick: pickHome, onLogged: loggedHome });
 
   function onAdded(entry: LogEntry) {
     setAdded((a) => [...a, entry.id]);
@@ -278,38 +265,12 @@ export function LogPage({ day: dayParam, foodCode }: { day?: string; foodCode?: 
             )}
           </LogSection>
 
-          {stock.length + homeFoods.length > 0 && (
-            <LogSection id="stock" title={t(atHomeOn ? 'log.atHome' : 'stock.title')} count={stock.length + homeFoods.length}>
-              {stock.length > 0 && (
-                <div className="chips">
-                  {stock.map((b) => {
-                    const s = nextStorage(b, day);
-                    return (
-                      <button
-                        key={b.id}
-                        className="chip"
-                        disabled={!s}
-                        onClick={() => s && setSelected({ kind: 'portion', batch: b })}
-                      >
-                        <Icon name={s === 'freezer' ? 'snow' : s === 'fridge' ? 'fridge' : 'pot'} size={16} />
-                        {b.recipe.name} · {t('stock.left', { n: totalLeft(b) })}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-              {homeFoods.length > 0 && (
-                <ul className="result-list">
-                  {homeFoods.map((f) => (
-                    <li key={f.id}>
-                      <button className="result" onClick={() => setSelected(f.pick)}>
-                        <span className="result-name">{f.name}</span>
-                        <span className="muted small">{f.detail}</span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
+          {homeTiles.length > 0 && (
+            <LogSection id="stock" title={t(atHomeOn ? 'log.atHome' : 'stock.title')} count={homeTiles.length}>
+              <HomeTiles tiles={homeTiles} />
+              <p id="home-tiles-hint" className="muted small home-tiles-hint">
+                {t('log.tilesHint')}
+              </p>
               {atHomeOn && (
                 <a className="small log-home-link" href={href('kitchen')}>
                   {t('pantry.openPage')}
@@ -415,6 +376,15 @@ export function LogPage({ day: dayParam, foodCode }: { day?: string; foodCode?: 
 
       {query.trim() && (
         <>
+          {homeTiles.length > 0 && (
+            <div className="log-home-matches">
+              <h2 className="small muted">{t(atHomeOn ? 'log.atHome' : 'stock.title')}</h2>
+              <HomeTiles tiles={homeTiles} />
+              <p id="home-tiles-hint" className="muted small home-tiles-hint">
+                {t('log.tilesHint')}
+              </p>
+            </div>
+          )}
           {customMatches.length > 0 && (
             <ul className="result-list">
               {customMatches.map((c) => (
