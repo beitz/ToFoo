@@ -308,8 +308,9 @@ export const pantryItemSchema = z
     addedAt: z.number(),
     icon: z.string().optional().describe("The icon the user chose for its tile (Fluent Emoji name, e.g. 'pizza'); missing: the app picks one"),
     short: z.string().optional().describe('The short name the user chose for its tile; missing: the app picks one'),
+    kind: z.string().optional().describe("The kind the user chose for it, which colours its tile's ring: cooked, ready, ingredient, snack, drink or spice; missing: the app picks one"),
   })
-  .describe('Something at home: what, the food it is, where it is kept, how much there was at `since` (pieces, grams, or another amount as typed; what is left is worked out from the log and cooked batches from then on), whether the user marked it running low or used up, and the icon and short name the user chose for it; epoch ms');
+  .describe('Something at home: what, the food it is, where it is kept, how much there was at `since` (pieces, grams, or another amount as typed; what is left is worked out from the log and cooked batches from then on), whether the user marked it running low or used up, and the icon, short name and kind the user chose for it; epoch ms');
 
 export const ketoneSchema = z
   .object({ id: z.string(), ...versioned, time: z.number(), day, type: z.enum(['blood', 'breath', 'urine']), value: z.number().nonnegative() })

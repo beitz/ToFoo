@@ -590,6 +590,8 @@ export interface PantryItem extends Versioned {
   icon?: string;
   /** The short name the user chose for its tile; missing: the app picks one. */
   short?: string;
+  /** The kind the user chose (src/logic/homeKind.ts: the colour of its tile's ring); missing: the app picks one. */
+  kind?: string;
 }
 
 export const DEFAULT_AUTO_BACKUP_KEEP = 5;

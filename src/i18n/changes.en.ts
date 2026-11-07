@@ -8,6 +8,7 @@
  * scenes and small fixes. A pull request that changes what users see adds its line here in the same PR.
  */
 export const changesEn = {
+  'change.186': 'Kitchen icons: the ring\'s colour says what kind of thing it is (cooked by you, ready meal, ingredient, snack, drink or spice), and Log meal groups the icons under those headings. Change a thing\'s kind in its sheet.',
   'change.185': 'Kitchen: what you have shows as icons with short names in each place, with a switch back to the list with amounts. Give a thing your own icon or short name in its sheet.',
   'change.184': 'Log meal: what you have at home shows as round icons with short names (two pizzas: “Diavola” and “Margherita”), most eaten first, so many fit above the keyboard. One tap adds one, a piece, a pack or what you logged last time, and the message says how much, with Undo; hold a tile for the amount sheet. Typing filters the icons.',
   'change.184.major': 'At home in Log meal as icons: one tap adds one',

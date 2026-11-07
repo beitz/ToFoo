@@ -25,7 +25,7 @@ import { Segmented } from '../../ui/controls';
 import { FoodIcon } from '../../ui/FoodIcon';
 import { HomeTiles, type HomeTile } from '../log/HomeTiles';
 import { potKey, useHomeLooks } from '../pantry/useHomeLooks';
-import type { HomeLook } from '../../logic/foodIcons';
+import type { HomeTileLook } from '../pantry/useHomeLooks';
 
 const PLACE_ICON: Record<HomePlace, string> = { fridge: 'fridge', freezer: 'snow', cupboard: 'pantry', spices: 'leaf' };
 /** How many things of the shopping list the card lists before "and N more". */
@@ -67,6 +67,7 @@ export function KitchenPage() {
     return {
       key: i.id,
       icon: look?.icon,
+      ...(look ? { kind: look.kind } : {}),
       monogram: look?.monogram ?? i.name.slice(0, 2),
       short: look?.short ?? i.name,
       full: i.name,
@@ -81,6 +82,7 @@ export function KitchenPage() {
     return {
       key: potKey(batch),
       icon: look?.icon,
+      kind: 'cooked',
       monogram: look?.monogram ?? batch.recipe.name.slice(0, 2),
       short: look?.short ?? batch.recipe.name,
       full: batch.recipe.name,
@@ -299,10 +301,10 @@ export function KitchenPage() {
 }
 
 /** Cooked portions kept in one place: the dish, how many, and its recipe one tap away. */
-function PotRow({ batch, portions, look }: { batch: Batch; portions: number; look: HomeLook | undefined }) {
+function PotRow({ batch, portions, look }: { batch: Batch; portions: number; look: HomeTileLook | undefined }) {
   return (
     <a className="home-row" href={href('recipes', batch.recipeId)}>
-      <FoodIcon icon={look?.icon} monogram={look?.monogram ?? ''} size={36} />
+      <FoodIcon icon={look?.icon} monogram={look?.monogram ?? ''} size={36} kind={look?.kind} />
       <span className="shop-text">
         <span className="shop-name">{batch.recipe.name}</span>
         <span className="small muted">{t('kitchen.cooked', { day: formatDay(batch.cookedDay) })}</span>
@@ -316,13 +318,13 @@ function PotRow({ batch, portions, look }: { batch: Batch; portions: number; loo
  * One thing at home: its name, where its numbers come from (a small tag: BLS, Open Food Facts paired
  * with BLS or label only…), running low or used up in words, and how much is left.
  */
-function Row({ item, look, left, onList, onEdit }: { item: PantryItem; look: HomeLook | undefined; left: Left; onList: boolean; onEdit: () => void }) {
+function Row({ item, look, left, onList, onEdit }: { item: PantryItem; look: HomeTileLook | undefined; left: Left; onList: boolean; onEdit: () => void }) {
   const d = useData();
   const amount = leftLabel(item, left);
   const status = left.out ? t('pantry.out') : left.low ? t('pantry.low') : '';
   return (
     <button className={`home-row${left.out ? ' out' : ''}`} onClick={onEdit}>
-      <FoodIcon icon={look?.icon} monogram={look?.monogram ?? ''} size={36} />
+      <FoodIcon icon={look?.icon} monogram={look?.monogram ?? ''} size={36} kind={look?.kind} />
       <span className="shop-text">
         <span className="shop-name">{item.name}</span>
         <span className="small kitchen-meta">

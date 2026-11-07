@@ -4025,6 +4025,35 @@ button.week-row:focus-visible {
   background: var(--surface);
   box-sizing: border-box;
 }
+.kind-cooked { --kind: var(--habit-orange); }
+.kind-ready { --kind: var(--habit-violet); }
+.kind-ingredient { --kind: var(--habit-green); }
+.kind-snack { --kind: var(--habit-pink); }
+.kind-drink { --kind: var(--habit-blue); }
+.kind-spice { --kind: var(--t-journal); }
+.food-icon[class*='kind-'] {
+  border: 2.5px solid color-mix(in srgb, var(--kind) 75%, transparent);
+}
+.home-tiles-group + .home-tiles-group {
+  margin-top: 6px;
+}
+.home-tiles-kind {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.home-tiles-kind::before {
+  content: '';
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2.5px solid var(--kind);
+  box-sizing: border-box;
+}
 .food-icon img {
   display: block;
   pointer-events: none;

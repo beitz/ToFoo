@@ -20,6 +20,8 @@ import { pairingName } from '../food/pairingName';
 import { FOOD_ICON_NAMES, isFoodIcon, SHORT_NAME_FITS } from '../../logic/foodIcons';
 import { FoodIcon } from '../../ui/FoodIcon';
 import { useHomeLooks } from './useHomeLooks';
+import { HOME_KINDS, isHomeKind, type HomeKind } from '../../logic/homeKind';
+import { kindName } from '../log/HomeTiles';
 
 type Status = 'have' | 'low' | 'out';
 
@@ -50,6 +52,7 @@ export function PantryItemSheet({ item, onClose }: { item: PantryItem; onClose: 
   const [icon, setIcon] = useState<string | undefined>(isFoodIcon(item.icon) ? item.icon : undefined);
   const [short, setShort] = useState(item.short ?? '');
   const [choosingIcon, setChoosingIcon] = useState(false);
+  const [kind, setKind] = useState<HomeKind | undefined>(isHomeKind(item.kind) ? item.kind : undefined);
 
   async function pick(p: PickedFood) {
     setPicking(null);
@@ -72,6 +75,8 @@ export function PantryItemSheet({ item, onClose }: { item: PantryItem; onClose: 
     else delete next.icon;
     if (short.trim()) next.short = short.trim();
     else delete next.short;
+    if (kind) next.kind = kind;
+    else delete next.kind;
     // A new amount is counted from now; an unchanged one keeps counting from when it was set.
     const amountChanged = amount.trim() !== startAmount;
     if (amountChanged) next = withAmount(next, stockAmount(amount), now);
@@ -179,7 +184,7 @@ export function PantryItemSheet({ item, onClose }: { item: PantryItem; onClose: 
               <>
                 <div className="pantry-tile-row">
                   <button type="button" className="pantry-tile-icon" aria-expanded={choosingIcon} aria-label={t('pantry.chooseIcon')} onClick={() => setChoosingIcon(!choosingIcon)}>
-                    <FoodIcon icon={isFoodIcon(icon) ? icon : look?.auto.icon} monogram={look?.monogram ?? item.name.slice(0, 2)} size={52} />
+                    <FoodIcon icon={isFoodIcon(icon) ? icon : look?.auto.icon} monogram={look?.monogram ?? item.name.slice(0, 2)} size={52} kind={kind ?? look?.autoKind} />
                   </button>
                   <input id={id} value={short} maxLength={SHORT_NAME_FITS + 6} placeholder={look?.auto.short ?? ''} onChange={(e) => setShort(e.target.value)} aria-label={t('pantry.shortName')} />
                 </div>
@@ -196,6 +201,18 @@ export function PantryItemSheet({ item, onClose }: { item: PantryItem; onClose: 
                   </div>
                 )}
               </>
+            )}
+          </Field>
+          <Field label={t('pantry.kind')} hint={t('pantry.kindHint')}>
+            {(id) => (
+              <select id={id} value={kind ?? ''} onChange={(e) => setKind(isHomeKind(e.target.value) ? e.target.value : undefined)}>
+                <option value="">{t('pantry.kindAuto', { kind: look ? kindName(look.autoKind) : '' })}</option>
+                {HOME_KINDS.map((k) => (
+                  <option key={k} value={k}>
+                    {kindName(k)}
+                  </option>
+                ))}
+              </select>
             )}
           </Field>
           <div className="sheet-actions">

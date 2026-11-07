@@ -36,7 +36,7 @@ const PER_QUERY = 40;
 const MACROS = ['FAT', 'PROT625', 'CHO'] as const;
 const FIT = 0.75;
 /** Categories that make a product a dish, so BLS dishes (groups X, Y) are not pushed back. */
-const DISH = /\b(meals?|dishes|soups?|stews?|pizzas?|lasagnas?|salads?|sandwiches)\b/i;
+export const DISH = /\b(meals?|dishes|soups?|stews?|pizzas?|lasagnas?|salads?|sandwiches)\b/i;
 /**
  * Categories of beer, wine and spirits: only BLS alcoholic drinks (group P, alcohol-free beer
  * included) can stand for them, so "Helles" or "Beers" never lands on beer ham or Bierwurst
@@ -91,7 +91,7 @@ export function kindOf(product: Pick<Product, 'name' | 'categories'>): Kind {
   };
 }
 
-const isBlsDrink = (food: Pick<Food, 'code' | 'nameEn'>) => {
+export const isBlsDrink = (food: Pick<Food, 'code' | 'nameEn'>) => {
   if ('NP'.includes(food.code.charAt(0))) return true;
   const head = food.nameEn.split(/,| with | from | made | for | in | of | \(| min\.| max\.| < | > |\d/)[0]!.trim();
   return BLS_DRINK.test(head) && !NOT_DRUNK.test(head);
