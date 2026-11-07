@@ -178,7 +178,10 @@ test('things at home show as icons with short names, which can be changed, or as
   await page.getByLabel('Short name').fill('Spicy');
   await page.getByRole('button', { name: 'Choose an icon' }).first().click();
   await page.getByRole('button', { name: 'hot pepper' }).click();
+  // Its kind (the ring's colour): picked by the app, changed here.
+  await page.getByLabel('Kind').selectOption('ready');
   await page.getByRole('button', { name: 'Save' }).click();
+  await expect(page.locator('main').getByRole('button', { name: /^Pizza Diavola.*Ready meals/ })).toBeVisible();
   await expect(names.filter({ hasText: /^Spicy$/ })).toBeVisible();
   // The other pizza has no look-alike left, so it is just the pizza.
   await expect(names.filter({ hasText: /^Pizza$/ })).toBeVisible();

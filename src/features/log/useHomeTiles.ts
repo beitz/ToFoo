@@ -152,6 +152,7 @@ export function useHomeTiles({ day, time, query, added, onPick, onLogged }: { da
         return {
           key: x.key,
           icon: look?.icon,
+          ...(look ? { kind: look.kind } : {}),
           monogram: look?.monogram ?? x.name.slice(0, 2),
           short,
           full: x.name,
