@@ -17,6 +17,9 @@ import { FoodPicker, type PickedFood } from '../log/FoodPicker';
 import { useShopping } from '../shopping/useShopping';
 import { placeName, useListPantry, useMarkPantry, usePantryFoods, usePantryLeft } from './usePantry';
 import { pairingName } from '../food/pairingName';
+import { FOOD_ICON_NAMES, isFoodIcon, SHORT_NAME_FITS } from '../../logic/foodIcons';
+import { FoodIcon } from '../../ui/FoodIcon';
+import { useHomeLooks } from './useHomeLooks';
 
 type Status = 'have' | 'low' | 'out';
 
@@ -42,6 +45,11 @@ export function PantryItemSheet({ item, onClose }: { item: PantryItem; onClose: 
   const [place, setPlace] = useState<HomePlace>(item.place);
   const [status, setStatus] = useState<Status>(startStatus);
   const [picking, setPicking] = useState<'search' | 'scan' | null>(null);
+  // Its tile: the user's own icon and short name, or the app's (owner's ask 2026-11-07, "worst case… the AI").
+  const look = useHomeLooks()(item.id);
+  const [icon, setIcon] = useState<string | undefined>(isFoodIcon(item.icon) ? item.icon : undefined);
+  const [short, setShort] = useState(item.short ?? '');
+  const [choosingIcon, setChoosingIcon] = useState(false);
 
   async function pick(p: PickedFood) {
     setPicking(null);
@@ -60,6 +68,10 @@ export function PantryItemSheet({ item, onClose }: { item: PantryItem; onClose: 
     let next: PantryItem = { ...item, name: name.trim(), place };
     if (ref) next.ref = ref;
     else delete next.ref;
+    if (icon) next.icon = icon;
+    else delete next.icon;
+    if (short.trim()) next.short = short.trim();
+    else delete next.short;
     // A new amount is counted from now; an unchanged one keeps counting from when it was set.
     const amountChanged = amount.trim() !== startAmount;
     if (amountChanged) next = withAmount(next, stockAmount(amount), now);
@@ -162,6 +174,30 @@ export function PantryItemSheet({ item, onClose }: { item: PantryItem; onClose: 
             )}
           </Field>
           <Field label={t('pantry.name')}>{(id) => <input id={id} value={name} onChange={(e) => setName(e.target.value)} />}</Field>
+          <Field label={t('pantry.tile')} hint={t('pantry.tileHint')}>
+            {(id) => (
+              <>
+                <div className="pantry-tile-row">
+                  <button type="button" className="pantry-tile-icon" aria-expanded={choosingIcon} aria-label={t('pantry.chooseIcon')} onClick={() => setChoosingIcon(!choosingIcon)}>
+                    <FoodIcon icon={isFoodIcon(icon) ? icon : look?.auto.icon} monogram={look?.monogram ?? item.name.slice(0, 2)} size={52} />
+                  </button>
+                  <input id={id} value={short} maxLength={SHORT_NAME_FITS + 6} placeholder={look?.auto.short ?? ''} onChange={(e) => setShort(e.target.value)} aria-label={t('pantry.shortName')} />
+                </div>
+                {choosingIcon && (
+                  <div className="icon-picker" role="group" aria-label={t('pantry.chooseIcon')}>
+                    <button type="button" className={`icon-pick icon-pick-auto${icon ? '' : ' on'}`} aria-pressed={!icon} onClick={() => setIcon(undefined)}>
+                      {t('pantry.iconAuto')}
+                    </button>
+                    {FOOD_ICON_NAMES.map((n) => (
+                      <button key={n} type="button" className={`icon-pick${icon === n ? ' on' : ''}`} aria-pressed={icon === n} aria-label={n.replace(/-/g, ' ')} onClick={() => setIcon(n)}>
+                        <FoodIcon icon={n} monogram="" size={44} />
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </Field>
           <div className="sheet-actions">
             <button className="btn btn-danger-ghost" onClick={() => void remove()}>
               {t('pantry.remove')}

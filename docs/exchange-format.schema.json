@@ -1106,6 +1106,14 @@
                         "type": "boolean"
                       }
                     },
+                    "kitchenView": {
+                      "description": "The Kitchen tab as icons (default) or as a list",
+                      "type": "string",
+                      "enum": [
+                        "grid",
+                        "list"
+                      ]
+                    },
                     "cookingPreferences": {
                       "type": "string"
                     },
@@ -3059,6 +3067,14 @@
                   },
                   "addedAt": {
                     "type": "number"
+                  },
+                  "icon": {
+                    "description": "The icon the user chose for its tile (Fluent Emoji name, e.g. 'pizza'); missing: the app picks one",
+                    "type": "string"
+                  },
+                  "short": {
+                    "description": "The short name the user chose for its tile; missing: the app picks one",
+                    "type": "string"
                   }
                 },
                 "required": [
@@ -3069,7 +3085,7 @@
                   "since",
                   "addedAt"
                 ],
-                "description": "Something at home: what, the food it is, where it is kept, how much there was at `since` (pieces, grams, or another amount as typed; what is left is worked out from the log and cooked batches from then on), and whether the user marked it running low or used up; epoch ms"
+                "description": "Something at home: what, the food it is, where it is kept, how much there was at `since` (pieces, grams, or another amount as typed; what is left is worked out from the log and cooked batches from then on), whether the user marked it running low or used up, and the icon and short name the user chose for it; epoch ms"
               }
             },
             "ketones": {

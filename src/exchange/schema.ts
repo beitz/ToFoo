@@ -145,6 +145,7 @@ export const settingsSchema = z.object({
     .optional()
     .describe('Foods marked "Not right" on Check logged foods, to be fixed: food key → the BLS code, mix or "label" it was wrong with'),
   logCollapsed: z.record(z.string(), z.boolean()).optional(),
+  kitchenView: z.enum(['grid', 'list']).optional().describe('The Kitchen tab as icons (default) or as a list'),
   cookingPreferences: z.string().optional(),
   potGrams: z.number().positive().optional(),
   pots: z.array(z.object({ id: z.string(), name: z.string().min(1), grams: z.number().positive() })).optional().describe('Empty pots remembered by name'),
@@ -305,8 +306,10 @@ export const pantryItemSchema = z
     since: z.number(),
     status: z.enum(['low', 'out']).optional(),
     addedAt: z.number(),
+    icon: z.string().optional().describe("The icon the user chose for its tile (Fluent Emoji name, e.g. 'pizza'); missing: the app picks one"),
+    short: z.string().optional().describe('The short name the user chose for its tile; missing: the app picks one'),
   })
-  .describe('Something at home: what, the food it is, where it is kept, how much there was at `since` (pieces, grams, or another amount as typed; what is left is worked out from the log and cooked batches from then on), and whether the user marked it running low or used up; epoch ms');
+  .describe('Something at home: what, the food it is, where it is kept, how much there was at `since` (pieces, grams, or another amount as typed; what is left is worked out from the log and cooked batches from then on), whether the user marked it running low or used up, and the icon and short name the user chose for it; epoch ms');
 
 export const ketoneSchema = z
   .object({ id: z.string(), ...versioned, time: z.number(), day, type: z.enum(['blood', 'breath', 'urine']), value: z.number().nonnegative() })

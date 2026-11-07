@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useData } from '../../app/data';
 import { useToast } from '../../app/toast';
-import { href } from '../../app/router';
+import { href, navigate } from '../../app/router';
 import { t, type MessageKey } from '../../i18n';
 import { onShoppingList, type Left } from '../../logic/pantry';
 import { amountText, isOpen, onList } from '../../logic/shopping';
@@ -21,6 +21,11 @@ import { leftLabel, placeName, usePantry, usePantryLeft } from '../pantry/usePan
 import { SettingsButton } from '../../ui/SettingsButton';
 import { FoodSourceTag } from '../food/FoodSourceTag';
 import { PantryAdd } from './PantryAdd';
+import { Segmented } from '../../ui/controls';
+import { FoodIcon } from '../../ui/FoodIcon';
+import { HomeTiles, type HomeTile } from '../log/HomeTiles';
+import { potKey, useHomeLooks } from '../pantry/useHomeLooks';
+import type { HomeLook } from '../../logic/foodIcons';
 
 const PLACE_ICON: Record<HomePlace, string> = { fridge: 'fridge', freezer: 'snow', cupboard: 'pantry', spices: 'leaf' };
 /** How many things of the shopping list the card lists before "and N more". */
@@ -52,6 +57,38 @@ export function KitchenPage() {
   const [adding, setAdding] = useState<Adding | null>(null);
   const shoppingOn = isOn(d.settings.features, 'shoppingList');
   const homeOn = isOn(d.settings.features, 'atHome');
+  // Icons by default (owner's pick, 2026-11-07); the list keeps amounts and source tags in words.
+  const grid = (d.settings.kitchenView ?? 'grid') === 'grid';
+  const looks = useHomeLooks();
+  const itemTile = (i: PantryItem, out = false): HomeTile => {
+    const l = left(i);
+    const look = looks(i.id);
+    const status = l.out ? t('pantry.out') : l.low ? t('pantry.low') : '';
+    return {
+      key: i.id,
+      icon: look?.icon,
+      monogram: look?.monogram ?? i.name.slice(0, 2),
+      short: look?.short ?? i.name,
+      full: i.name,
+      detail: [leftLabel(i, l), status].filter(Boolean).join(' · '),
+      added: 0,
+      out,
+      onTap: () => setEditing(i),
+    };
+  };
+  const potTile = (batch: Batch, portions: number): HomeTile => {
+    const look = looks(potKey(batch));
+    return {
+      key: potKey(batch),
+      icon: look?.icon,
+      monogram: look?.monogram ?? batch.recipe.name.slice(0, 2),
+      short: look?.short ?? batch.recipe.name,
+      full: batch.recipe.name,
+      detail: `${t('kitchen.portions', { n: portions })} · ${t('kitchen.cooked', { day: formatDay(batch.cookedDay) })}`,
+      added: 0,
+      onTap: () => navigate('recipes', batch.recipeId),
+    };
+  };
 
   const items = all ?? [];
   const here = items.filter((i) => !left(i).out);
@@ -136,6 +173,20 @@ export function KitchenPage() {
 
       {homeOn && <PantryAdd />}
 
+      {homeOn && (items.length > 0 || places.some((p) => p.portions.length > 0)) && (
+        <div className="kitchen-view" data-tour="kitchen.view">
+          <Segmented
+            label={t('kitchen.view')}
+            value={grid ? 'grid' : 'list'}
+            onChange={(v) => void repo.updateSettings({ kitchenView: v })}
+            options={[
+              { value: 'grid', label: t('kitchen.viewGrid') },
+              { value: 'list', label: t('kitchen.viewList') },
+            ]}
+          />
+        </div>
+      )}
+
       {homeOn && all && items.length === 0 && d.batches.every((b) => b.remaining.fresh + b.remaining.fridge + b.remaining.freezer === 0) && <p className="muted empty">{t('pantry.empty')}</p>}
 
       {homeOn &&
@@ -152,16 +203,18 @@ export function KitchenPage() {
             )}
             {placeCount(p) === 0 ? (
               adding !== p.place && <p className="muted small">{t('kitchen.placeEmpty')}</p>
+            ) : grid ? (
+              <HomeTiles tiles={[...p.portions.map(({ batch, portions }) => potTile(batch, portions)), ...p.items.map((i) => itemTile(i))]} />
             ) : (
               <ul className="plain-list shop-list">
                 {p.portions.map(({ batch, portions }) => (
                   <li key={batch.id}>
-                    <PotRow batch={batch} portions={portions} place={p.place} />
+                    <PotRow batch={batch} portions={portions} look={looks(potKey(batch))} />
                   </li>
                 ))}
                 {p.items.map((i) => (
                   <li key={i.id}>
-                    <Row item={i} left={left(i)} onList={onShoppingList(i, shopping ?? [])} onEdit={() => setEditing(i)} />
+                    <Row item={i} look={looks(i.id)} left={left(i)} onList={onShoppingList(i, shopping ?? [])} onEdit={() => setEditing(i)} />
                   </li>
                 ))}
               </ul>
@@ -177,13 +230,17 @@ export function KitchenPage() {
               <Icon name="trash" size={20} />
             </button>
           </div>
-          <ul className="plain-list shop-list">
-            {usedUp.map((i) => (
-              <li key={i.id}>
-                <Row item={i} left={left(i)} onList={onShoppingList(i, shopping ?? [])} onEdit={() => setEditing(i)} />
-              </li>
-            ))}
-          </ul>
+          {grid ? (
+            <HomeTiles tiles={usedUp.map((i) => itemTile(i, true))} />
+          ) : (
+            <ul className="plain-list shop-list">
+              {usedUp.map((i) => (
+                <li key={i.id}>
+                  <Row item={i} look={looks(i.id)} left={left(i)} onList={onShoppingList(i, shopping ?? [])} onEdit={() => setEditing(i)} />
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
       {homeOn && items.length > 0 && <p className="muted small pantry-hint">{t('pantry.hint')}</p>}
@@ -242,10 +299,10 @@ export function KitchenPage() {
 }
 
 /** Cooked portions kept in one place: the dish, how many, and its recipe one tap away. */
-function PotRow({ batch, portions, place }: { batch: Batch; portions: number; place: HomePlace }) {
+function PotRow({ batch, portions, look }: { batch: Batch; portions: number; look: HomeLook | undefined }) {
   return (
     <a className="home-row" href={href('recipes', batch.recipeId)}>
-      <Icon name={place === 'freezer' ? 'snow' : 'pot'} size={18} />
+      <FoodIcon icon={look?.icon} monogram={look?.monogram ?? ''} size={36} />
       <span className="shop-text">
         <span className="shop-name">{batch.recipe.name}</span>
         <span className="small muted">{t('kitchen.cooked', { day: formatDay(batch.cookedDay) })}</span>
@@ -259,12 +316,13 @@ function PotRow({ batch, portions, place }: { batch: Batch; portions: number; pl
  * One thing at home: its name, where its numbers come from (a small tag: BLS, Open Food Facts paired
  * with BLS or label only…), running low or used up in words, and how much is left.
  */
-function Row({ item, left, onList, onEdit }: { item: PantryItem; left: Left; onList: boolean; onEdit: () => void }) {
+function Row({ item, look, left, onList, onEdit }: { item: PantryItem; look: HomeLook | undefined; left: Left; onList: boolean; onEdit: () => void }) {
   const d = useData();
   const amount = leftLabel(item, left);
   const status = left.out ? t('pantry.out') : left.low ? t('pantry.low') : '';
   return (
     <button className={`home-row${left.out ? ' out' : ''}`} onClick={onEdit}>
+      <FoodIcon icon={look?.icon} monogram={look?.monogram ?? ''} size={36} />
       <span className="shop-text">
         <span className="shop-name">{item.name}</span>
         <span className="small kitchen-meta">

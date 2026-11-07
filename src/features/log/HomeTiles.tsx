@@ -16,7 +16,10 @@ export interface HomeTile {
   /** How many were added to the meal being logged, shown as "+2". */
   added: number;
   onTap: () => void;
-  onHold: () => void;
+  /** What a hold opens; missing: a hold does what a tap does (the Kitchen tab opens the thing either way). */
+  onHold?: () => void;
+  /** Used up: the icon greyed out, the name struck through. */
+  out?: boolean;
 }
 
 /** How long a press is held before it opens the sheet instead of adding one. */
@@ -29,19 +32,19 @@ const MOVE_PX = 10;
  * keyboard where list rows did not. A tap adds one; holding (or a right click, or the context-menu
  * key) opens the amount sheet with the full name, as a tap did before.
  */
-export function HomeTiles({ tiles }: { tiles: readonly HomeTile[] }) {
+export function HomeTiles({ tiles, hintId }: { tiles: readonly HomeTile[]; hintId?: string }) {
   return (
     <ul className="home-tiles">
       {tiles.map((tile) => (
         <li key={tile.key}>
-          <Tile tile={tile} />
+          <Tile tile={tile} hintId={hintId} />
         </li>
       ))}
     </ul>
   );
 }
 
-function Tile({ tile }: { tile: HomeTile }) {
+function Tile({ tile, hintId }: { tile: HomeTile; hintId?: string }) {
   const press = useRef<{ x: number; y: number; timer: number } | null>(null);
   // Set once a hold has opened the sheet, so the click that may follow does not add one too.
   const held = useRef(false);
@@ -52,14 +55,14 @@ function Tile({ tile }: { tile: HomeTile }) {
   const hold = () => {
     cancel();
     held.current = true;
-    tile.onHold();
+    (tile.onHold ?? tile.onTap)();
   };
   return (
     <button
       type="button"
-      className="home-tile"
+      className={`home-tile${tile.out ? ' out' : ''}`}
       aria-label={`${tile.full}${tile.detail ? `, ${tile.detail}` : ''}${tile.added ? `, ${t('log.tileAdded', { n: tile.added })}` : ''}`}
-      aria-describedby="home-tiles-hint"
+      aria-describedby={hintId}
       onPointerDown={(e) => {
         held.current = false;
         cancel();

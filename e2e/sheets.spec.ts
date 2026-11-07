@@ -80,7 +80,7 @@ test("the phone's back button closes a kitchen sheet, also after the app was rel
   const add = page.getByPlaceholder('Add what you bought');
   await add.fill('oats 500 g');
   await add.press('Enter');
-  const row = page.locator('.home-row', { hasText: 'oats' });
+  const row = page.locator('main').getByRole('button', { name: /^oats/ });
   const sheet = page.getByRole('dialog', { name: 'oats' });
   // The sheet's history entry is added just after it opens; a person is never that quick.
   const entryAdded = () => expect.poll(() => page.evaluate(() => (history.state as { tofooLayer?: number } | null)?.tofooLayer)).toBe(1);
