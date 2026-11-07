@@ -61,7 +61,7 @@ const ICON_WORDS = {
   'pouring-liquid': 'ol oil rapsol sonnenblumenol speiseol essig vinegar',
   jar: 'marmelade konfiture jam pesto sauce sosse ketchup mayonnaise mayo senf mustard aufstrich spread nutella',
   'honey-pot': 'honig honey sirup syrup',
-  'chocolate-bar': 'schokolade chocolate schoko kakao cocoa',
+  'chocolate-bar': 'schokolade chocolate schoko kakao cocoa zartbitter edelbitter',
   cookie: 'keks kekse cookie cookies biscuit biscuits',
   candy: 'bonbon bonbons candy sweets gummibarchen fruchtgummi lakritz',
   doughnut: 'donut donuts doughnut krapfen berliner',
