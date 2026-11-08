@@ -1,19 +1,19 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import { useData } from '../../app/data';
 import { useToast } from '../../app/toast';
 import { href, navigate } from '../../app/router';
 import { t } from '../../i18n';
-import { dayKey, formatDay, formatTime } from '../../lib/dates';
+import { dayKey, formatDateTime, formatDay, formatTime, weekdayShort } from '../../lib/dates';
 import { search } from '../../foods/search';
 import type { Food } from '../../foods/foodDb';
 import { repo } from '../../storage/repo';
-import type { Batch, CustomFood, FoodRef, LogEntry, Product } from '../../storage/types';
-import { needsCheck, productLabel } from '../../foods/products';
+import type { Batch, CustomFood, LogEntry, Product } from '../../storage/types';
+import { needsCheck } from '../../foods/products';
 import { UsdaResults } from './UsdaResults';
 import { OffResults, useOffSearch } from './OffResults';
 import { FoodList } from './FoodList';
 import { EditEntrySheet } from '../diary/EditEntrySheet';
-import { ProductList, productTag } from './ProductList';
+import { ProductList } from './ProductList';
 import { Icon } from '../../ui/Icon';
 import { isOn } from '../../settings/features';
 import { PortionSheet } from './PortionSheet';
@@ -21,16 +21,21 @@ import { AmountSheet } from './AmountSheet';
 import { BarcodeSheet } from './BarcodeSheet';
 import { CustomSheet } from './CustomSheet';
 import { ManualSheet } from './ManualSheet';
-import { defaultTimeFor } from './time';
-import { TimeField } from './TimeField';
+import { defaultTimeFor, fromLocalInput, toLocalInput } from './time';
+import { DateTimeInput } from '../../ui/DateInputs';
 import { entryAmount } from './describe';
-import { logMealAgain, mealTitle } from './logAgain';
+import { logMealAgain } from './logAgain';
 import { recentMeals } from '../../logic/repeat';
 import { LogSection } from './LogSection';
-import { FavouriteMealButton, FavouriteStar, useFavouriteMeals } from './FavouriteButton';
+import { FavouriteMealButton, useFavouriteMeals } from './FavouriteButton';
 import { refKey } from '../../lib/refs';
 import { WaterSheet } from '../water/WaterSheet';
-import { HomeTiles } from './HomeTiles';
+import { HomeTiles, type HomeTile } from './HomeTiles';
+import { useFoodTiles } from './useFoodTiles';
+import { MealCards, MealSheet, mealWhen, type MealCard } from './MealCards';
+import { usePantry } from '../pantry/usePantry';
+import { InfoButton } from '../../ui/InfoButton';
+import type { FoodIconName } from '../../logic/foodIcons';
 import { useHomeTiles, type HomePick } from './useHomeTiles';
 import { BackButton } from '../../ui/BackButton';
 
@@ -43,10 +48,8 @@ type Selected =
   | { kind: 'portion'; batch: Batch }
   | null;
 
-/** Saved products shown under "Packaged products" when nothing is searched. */
-const RECENT_PRODUCTS = 6;
-/** Recent meals offered; enough to find the ones worth pinning as favourites. */
-const RECENT_MEALS = 5;
+/** Recent meals offered: two rows of three cards at 360 px, enough to find the ones worth pinning. */
+const RECENT_MEALS = 6;
 
 /** Log a meal: search foods, pick amounts; several items in a row form one meal. Route: #/log[/day]. */
 export function LogPage({ day: dayParam, foodCode }: { day?: string; foodCode?: string }) {
@@ -86,37 +89,20 @@ export function LogPage({ day: dayParam, foodCode }: { day?: string; foodCode?: 
   }, [query, d.products]);
   // Products not on this phone yet, from the bundled Open Food Facts list.
   const offSearch = useOffSearch(query, offOn, results);
-  const favourites = useMemo(() => {
-    const out: Array<{ key: string; ref: FoodRef; pick: Selected; name: string; detail: string }> = [];
-    for (const ref of d.settings.favourites ?? []) {
-      if (ref.source === 'BLS') {
-        const food = d.foods.byCode.get(ref.code);
-        if (food) out.push({ key: refKey(ref), ref, pick: { kind: 'food', food }, name: food.nameEn, detail: food.nameDe });
-      } else if (ref.source === 'OFF' || ref.source === 'USDA') {
-        const product = d.productsById.get(refKey(ref));
-        if (product) out.push({ key: refKey(ref), ref, pick: { kind: 'product', product }, name: productLabel(product), detail: productTag(product) });
-      } else if (ref.source === 'custom') {
-        const food = d.customFoodsById.get(ref.id);
-        if (food) out.push({ key: refKey(ref), ref, pick: { kind: 'custom', food }, name: food.name, detail: food.servingLabel });
-      }
-    }
-    return out;
-  }, [d.settings.favourites, d.foods, d.productsById, d.customFoodsById]);
   const { meals: pinnedMeals, pinnedOf, toggle: toggleMeal, unpin: unpinMeal } = useFavouriteMeals();
-  const favouriteMeals = useMemo(() => pinnedMeals.map(({ fav, meal }) => ({ fav, meal, title: mealTitle(meal) })), [pinnedMeals]);
-  const recent = useMemo(() => {
-    const pinned = new Set(favourites.map((f) => f.key));
-    return [...d.recentFoods.entries()]
-      .filter(([code, v]) => v > 0.3 && !pinned.has(`BLS:${code}`))
-      .slice(0, 8)
-      .map(([code]) => d.foods.byCode.get(code))
-      .filter((f): f is Food => !!f);
-  }, [d.recentFoods, d.foods, favourites]);
-  // The meal being logged right now is not a "recent meal" yet.
+  // The meal being logged right now is not a "recent meal" yet; one already pinned shows under Favourites.
   const pastMeals = useMemo(
-    () => recentMeals(added.length ? d.log.filter((e) => !added.includes(e.id)) : d.log, d.settings.mealWindowMinutes, d.batchesById, { limit: RECENT_MEALS }),
-    [d.log, added, d.settings.mealWindowMinutes, d.batchesById],
+    () =>
+      recentMeals(added.length ? d.log.filter((e) => !added.includes(e.id)) : d.log, d.settings.mealWindowMinutes, d.batchesById, { limit: RECENT_MEALS + pinnedMeals.length })
+        .filter((meal) => !pinnedOf(meal))
+        .slice(0, RECENT_MEALS),
+    // pinnedOf follows pinnedMeals.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [d.log, added, d.settings.mealWindowMinutes, d.batchesById, pinnedMeals],
   );
+  const favouriteCards: MealCard[] = pinnedMeals.map(({ fav, meal }) => ({ key: fav.id, meal, fav, when: meal.length === 1 ? entryAmount(meal[0]!, d) : t('log.items', { n: meal.length }) }));
+  const recentCards: MealCard[] = pastMeals.map((meal) => ({ key: meal[0]!.id, meal, when: mealWhen(meal[0]!, d.today) }));
+  const [mealOpen, setMealOpen] = useState<MealCard | null>(null);
   const addedEntries = added.map((id) => d.log.find((e) => e.id === id)).filter((e): e is LogEntry => !!e);
   /** A new meal time moves what this meal already has too: it is one meal. */
   async function changeMealTime(time: number) {
@@ -139,6 +125,11 @@ export function LogPage({ day: dayParam, foodCode }: { day?: string; foodCode?: 
   );
   // Cooked pots and foods at home as tiles: one tap adds one, a hold opens the amount sheet.
   const homeTiles = useHomeTiles({ day, time: mealTime, query, added: addedEntries, onPick: pickHome, onLogged: loggedHome });
+  // Favourites and recent foods as the same tiles; what is at home has its own tile already.
+  const pantry = usePantry();
+  const atHome = useMemo(() => new Set(atHomeOn ? (pantry ?? []).flatMap((p) => (p.ref ? [refKey(p.ref)] : [])) : []), [pantry, atHomeOn]);
+  const foodTiles = useFoodTiles({ time: mealTime, query, added: addedEntries, skip: atHome, onPick: pickHome, onLogged: loggedHome });
+  const [timeOpen, setTimeOpen] = useState(false);
 
   function onAdded(entry: LogEntry) {
     setAdded((a) => [...a, entry.id]);
@@ -158,15 +149,20 @@ export function LogPage({ day: dayParam, foodCode }: { day?: string; foodCode?: 
     setMealTime(entries[entries.length - 1]!.time);
   }
 
-  function unpinFood(ref: FoodRef, name: string) {
-    void repo.toggleFavourite(ref);
-    toast(t('fav.removed', { name }), () => void repo.toggleFavourite(ref));
-  }
-
   async function addDrink(drink: 'tea' | 'coffee') {
     const entry = await repo.addLog({ kind: 'drink', drink, time: mealTime, day, confidence: 'A', label: drink === 'tea' ? t('log.tea') : t('log.coffee') });
     onAdded(entry);
   }
+
+  // Drinks and other entries as the same round tiles; nothing to hold for, so a hold taps.
+  const quick = (key: string, name: string, onTap: () => void, look: { icon?: FoodIconName; picture?: ReactNode }): HomeTile => ({ key, short: name, full: name, detail: '', monogram: name.slice(0, 2), added: 0, onTap, ...look });
+  const quickTiles: HomeTile[] = [
+    quick('tea', t('log.tea'), () => void addDrink('tea'), { icon: 'teacup-without-handle' }),
+    quick('coffee', t('log.coffee'), () => void addDrink('coffee'), { icon: 'hot-beverage' }),
+    ...(isOn(d.settings.features, 'water') ? [quick('water', t('water.short'), () => setAddingWater(true), { icon: 'droplet' })] : []),
+    quick('supplement', t('log.supplement'), () => setSelected({ kind: 'manual', supplement: true }), { picture: <Icon name="pill" size={26} /> }),
+    quick('manual', t('log.manualShort'), () => setSelected({ kind: 'manual', supplement: false }), { picture: <Icon name="edit" size={26} /> }),
+  ];
 
   return (
     <section>
@@ -174,6 +170,48 @@ export function LogPage({ day: dayParam, foodCode }: { day?: string; foodCode?: 
         <BackButton />
         <h1>{day === d.today ? t('log.title') : t('log.titleDay', { day: formatDay(day, d.today) })}</h1>
       </header>
+
+      {/* Photo, meal time and search in one row (owner's ask, 2026-11-08); it stays at the top while scrolling. */}
+      <div className="log-top-wrap">
+        <div className="log-top">
+          {isOn(d.settings.features, 'aiAssistant') && (
+            <a className="icon-btn log-top-ai" href={href('assistant', day)} aria-label={t('ai.entry')} title={t('ai.entry')}>
+              <Icon name="camera" />
+            </a>
+          )}
+          <button type="button" className="chip log-time" aria-expanded={timeOpen} aria-controls="log-time-edit" aria-label={t('log.timeChip', { time: formatDateTime(mealTime, d.today) })} onClick={() => setTimeOpen((o) => !o)}>
+            <Icon name="clock" size={16} /> {timeChipText(mealTime, d.today)}
+          </button>
+          <div className="search-box log-search">
+            <Icon name="search" />
+            {/* Not focused on open, so the keyboard stays closed until the search is tapped (owner's ask, 2026-11-08). */}
+            <input type="search" placeholder={t('log.searchShort')} value={query} onChange={(e) => setQuery(e.target.value)} aria-label={t('log.searchPlaceholder')} />
+            {offOn && (
+              <button type="button" className="icon-btn search-scan" onClick={() => setSelected({ kind: 'barcode' })} aria-label={t('off.scan')} title={t('off.scan')}>
+                <Icon name="barcode" />
+              </button>
+            )}
+          </div>
+        </div>
+        {timeOpen && (
+          <div id="log-time-edit" className="meal-time-edit">
+            <label htmlFor="log-time-input">{t('log.mealAt')}</label>
+            <div className="row">
+              <DateTimeInput
+                id="log-time-input"
+                value={toLocalInput(mealTime)}
+                onChange={(e) => {
+                  const v = fromLocalInput(e.target.value);
+                  if (v !== undefined) void changeMealTime(v);
+                }}
+              />
+              <button type="button" className="btn btn-secondary" onClick={() => setTimeOpen(false)}>
+                {t('log.done')}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
 
       {addedEntries.length > 0 && (
         <div className="card meal-so-far">
@@ -200,190 +238,84 @@ export function LogPage({ day: dayParam, foodCode }: { day?: string; foodCode?: 
         </div>
       )}
 
-      {isOn(d.settings.features, 'aiAssistant') && (
-        <a className="btn btn-primary btn-block assistant-entry" href={href('assistant', day)}>
-          <Icon name="camera" /> {t('ai.entry')}
-        </a>
-      )}
-
-      {/* The meal's time, set once for everything added here (owner's ask, 2026-10-22). */}
-      <div className="meal-time">
-        <TimeField label={t('log.mealAt')} value={mealTime} onChange={(time) => void changeMealTime(time)} />
-      </div>
-
-      <div className="search-row">
-        <div className="search-box">
-          <Icon name="search" />
-          <input
-            type="search"
-            autoFocus
-            placeholder={t('log.searchPlaceholder')}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            aria-label={t('log.searchPlaceholder')}
-          />
-        </div>
-        {offOn && (
-          <button className="icon-btn scan-btn" onClick={() => setSelected({ kind: 'barcode' })} aria-label={t('off.scan')} title={t('off.scan')}>
-            <Icon name="barcode" />
-          </button>
-        )}
-      </div>
-
       {!query.trim() && (
         <>
-          <LogSection id="favourites" title={t('log.favourites')} count={favouriteMeals.length + favourites.length} icon={<Icon name="star" size={16} filled />}>
-            {favouriteMeals.length + favourites.length === 0 ? (
+          <LogSection id="favourites" title={t('log.favourites')} count={favouriteCards.length + foodTiles.favourites.length} icon={<Icon name="star" size={16} filled />}>
+            {favouriteCards.length + foodTiles.favourites.length === 0 ? (
               <p className="muted small">{t('log.favouritesEmpty')}</p>
             ) : (
-              <ul className="result-list">
-                {favouriteMeals.map(({ fav, meal, title }) => (
-                  <li key={fav.id} className="fav-row">
-                    <button className="result" onClick={() => void repeat(meal)}>
-                      <span className="result-name">
-                        <Icon name="repeat" size={16} /> {title}
-                      </span>
-                      <span className="muted small">{meal.length === 1 ? entryAmount(meal[0]!, d) : t('log.favMealDetail', { n: meal.length })}</span>
-                    </button>
-                    <button className="icon-btn fav-star on" aria-pressed aria-label={t('fav.unpinMeal', { name: title })} onClick={() => unpinMeal(fav)}>
-                      <Icon name="star" filled />
-                    </button>
-                  </li>
-                ))}
-                {favourites.map((f) => (
-                  <li key={f.key} className="fav-row">
-                    <button className="result" onClick={() => setSelected(f.pick)}>
-                      <span className="result-name">{f.name}</span>
-                      <span className="muted small">{f.detail}</span>
-                    </button>
-                    <button className="icon-btn fav-star on" aria-pressed aria-label={t('fav.unpin', { name: f.name })} onClick={() => unpinFood(f.ref, f.name)}>
-                      <Icon name="star" filled />
-                    </button>
-                  </li>
-                ))}
-              </ul>
+              <>
+                {favouriteCards.length > 0 && <MealCards cards={favouriteCards} onRepeat={(meal) => void repeat(meal)} onHold={setMealOpen} />}
+                {foodTiles.favourites.length > 0 && <HomeTiles tiles={foodTiles.favourites} hintId="log-tiles-hint" />}
+              </>
             )}
           </LogSection>
 
           {homeTiles.length > 0 && (
             <LogSection id="stock" title={t(atHomeOn ? 'log.atHome' : 'stock.title')} count={homeTiles.length}>
-              <HomeTiles tiles={homeTiles} hintId="home-tiles-hint" grouped />
-              <p id="home-tiles-hint" className="muted small home-tiles-hint">
-                {t('log.tilesHint')}
-              </p>
+              <HomeTiles tiles={homeTiles} hintId="log-tiles-hint" grouped />
+            </LogSection>
+          )}
+
+          {recentCards.length > 0 && (
+            <LogSection id="recentMeals" title={t('log.recentMeals')} count={recentCards.length}>
+              <MealCards cards={recentCards} onRepeat={(meal) => void repeat(meal)} onHold={setMealOpen} />
+            </LogSection>
+          )}
+
+          {foodTiles.recent.length > 0 && (
+            <LogSection id="recentFoods" title={t('log.recentFoods')} count={foodTiles.recent.length}>
+              <HomeTiles tiles={foodTiles.recent} hintId="log-tiles-hint" />
+            </LogSection>
+          )}
+
+          <LogSection id="quickAdd" title={t('log.quickAdd')} aside={<InfoButton title={t('log.drinksInfo')}><p>{t('log.drinksHint')}</p></InfoButton>}>
+            <HomeTiles tiles={quickTiles} />
+          </LogSection>
+          {addingWater && <WaterSheet defaultTime={mealTime} onClose={() => setAddingWater(false)} />}
+
+          <p id="log-tiles-hint" className="muted small home-tiles-hint">
+            {t('log.tilesHint')}
+          </p>
+          <p id="log-meals-hint" hidden>
+            {t('log.mealsHint')}
+          </p>
+          {(atHomeOn || productsToCheck > 0) && (
+            <p className="row wrap log-links">
               {atHomeOn && (
                 <a className="small log-home-link" href={href('kitchen')}>
                   {t('pantry.openPage')}
                 </a>
               )}
-            </LogSection>
-          )}
-
-          {pastMeals.length > 0 && (
-            <LogSection id="recentMeals" title={t('log.recentMeals')} count={pastMeals.length}>
-              <ul className="result-list">
-                {pastMeals.map((meal) => {
-                  const title = mealTitle(meal);
-                  const pinned = !!pinnedOf(meal);
-                  return (
-                    <li key={meal[0]!.id} className="fav-row">
-                      <button className="result" onClick={() => void repeat(meal)}>
-                        <span className="result-name">
-                          <Icon name="repeat" size={16} /> {title}
-                        </span>
-                        <span className="muted small">
-                          {formatDay(meal[0]!.day, d.today)} · {formatTime(meal[0]!.time)}
-                        </span>
-                      </button>
-                      <button
-                        className={`icon-btn fav-star${pinned ? ' on' : ''}`}
-                        aria-pressed={pinned}
-                        aria-label={t(pinned ? 'fav.unpinMeal' : 'fav.pinMeal', { name: title })}
-                        onClick={() => toggleMeal(meal)}
-                      >
-                        <Icon name="star" filled={pinned} />
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-              <p className="muted small">{t('log.recentMealsHint')}</p>
-            </LogSection>
-          )}
-
-          {recent.length > 0 && (
-            <LogSection id="recentFoods" title={t('log.recentFoods')} count={recent.length}>
-              <FoodList foods={recent} onPick={(food) => setSelected({ kind: 'food', food })} />
-            </LogSection>
-          )}
-
-
-          <LogSection id="quickAdd" title={t('log.quickAdd')}>
-            <div className="quick-actions">
-              <button className="btn btn-secondary" onClick={() => setSelected({ kind: 'manual', supplement: false })}>
-                <Icon name="edit" /> {t('log.manual')}
-              </button>
-              <button className="btn btn-secondary" onClick={() => setSelected({ kind: 'manual', supplement: true })}>
-                <Icon name="pill" /> {t('log.supplement')}
-              </button>
-              <button className="btn btn-secondary" onClick={() => void addDrink('tea')}>
-                <Icon name="cup" /> {t('log.tea')}
-              </button>
-              <button className="btn btn-secondary" onClick={() => void addDrink('coffee')}>
-                <Icon name="cup" /> {t('log.coffee')}
-              </button>
-              {isOn(d.settings.features, 'water') && (
-                <button className="btn btn-secondary" onClick={() => setAddingWater(true)}>
-                  <Icon name="drop" /> {t('water.short')}
-                </button>
-              )}
-            </div>
-            <p className="muted small">{t('log.drinksHint')}</p>
-          </LogSection>
-          {addingWater && <WaterSheet defaultTime={mealTime} onClose={() => setAddingWater(false)} />}
-
-          {d.customFoods.length > 0 && (
-            <LogSection id="saved" title={t('log.saved')} count={d.customFoods.length}>
-              <ul className="result-list">
-                {d.customFoods.map((c) => (
-                  <li key={c.id} className="fav-row">
-                    <button className="result" onClick={() => setSelected({ kind: 'custom', food: c })}>
-                      <span className="result-name">
-                        {c.isSupplement && <Icon name="pill" size={14} />} {c.name}
-                      </span>
-                      <span className="muted small">{c.servingLabel}</span>
-                    </button>
-                    <FavouriteStar foodRef={{ source: 'custom', id: c.id }} name={c.name} />
-                  </li>
-                ))}
-              </ul>
-            </LogSection>
-          )}
-
-          {(offOn || usdaOn) && d.products.length > 0 && (
-            <LogSection id="products" title={t(usdaOn ? 'products.saved' : 'off.products')}>
               {productsToCheck > 0 && (
-                <p className="small">
-                  <a href={href('settings', 'products')}>{t('match.toCheckLink', { n: productsToCheck })}</a>
-                </p>
+                <a className="small log-home-link" href={href('settings', 'products')}>
+                  {t('match.toCheckLink', { n: productsToCheck })}
+                </a>
               )}
-              <ProductList pinnable products={d.products.slice(0, RECENT_PRODUCTS)} onPick={(product) => setSelected({ kind: 'product', product })} />
-            </LogSection>
+            </p>
           )}
-
         </>
       )}
 
       {query.trim() && (
         <>
+          {/* Your own things that match, as tiles above the results: above the keyboard when it is open. */}
           {homeTiles.length > 0 && (
             <div className="log-home-matches">
               <h2 className="small muted">{t(atHomeOn ? 'log.atHome' : 'stock.title')}</h2>
-              <HomeTiles tiles={homeTiles} hintId="home-tiles-hint" grouped />
-              <p id="home-tiles-hint" className="muted small home-tiles-hint">
-                {t('log.tilesHint')}
-              </p>
+              <HomeTiles tiles={homeTiles} hintId="log-tiles-hint" grouped />
             </div>
+          )}
+          {foodTiles.favourites.length + foodTiles.recent.length > 0 && (
+            <div className="log-home-matches">
+              <h2 className="small muted">{t('log.yours')}</h2>
+              <HomeTiles tiles={[...foodTiles.favourites, ...foodTiles.recent]} hintId="log-tiles-hint" />
+            </div>
+          )}
+          {homeTiles.length + foodTiles.favourites.length + foodTiles.recent.length > 0 && (
+            <p id="log-tiles-hint" className="muted small home-tiles-hint">
+              {t('log.tilesHint')}
+            </p>
           )}
           {customMatches.length > 0 && (
             <ul className="result-list">
@@ -429,7 +361,29 @@ export function LogPage({ day: dayParam, foodCode }: { day?: string; foodCode?: 
       {selected?.kind === 'portion' && <PortionSheet batch={selected.batch} day={day} time={mealTime} onClose={() => setSelected(null)} onAdded={onAdded} />}
       {selected?.kind === 'custom' && <CustomSheet food={selected.food} day={day} time={mealTime} onClose={() => setSelected(null)} onAdded={onAdded} />}
       {editing && <EditEntrySheet entry={editing} onClose={() => setEditing(null)} />}
+      {mealOpen && (
+        <MealSheet
+          card={mealOpen}
+          pinned={!!mealOpen.fav || !!pinnedOf(mealOpen.meal)}
+          onRepeat={() => {
+            setMealOpen(null);
+            void repeat(mealOpen.meal);
+          }}
+          onToggleFavourite={() => {
+            if (mealOpen.fav) unpinMeal(mealOpen.fav);
+            else toggleMeal(mealOpen.meal);
+            setMealOpen(null);
+          }}
+          onClose={() => setMealOpen(null)}
+        />
+      )}
       {selected?.kind === 'manual' && <ManualSheet supplement={selected.supplement} day={day} time={mealTime} onClose={() => setSelected(null)} onAdded={onAdded} />}
     </section>
   );
+}
+
+/** The meal's time on its chip: "10:00" today, "Sat 19:30" on another day. */
+function timeChipText(time: number, today: string): string {
+  const key = dayKey(new Date(time));
+  return key === today ? formatTime(time) : `${weekdayShort(key)} ${formatTime(time)}`;
 }

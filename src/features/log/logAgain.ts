@@ -13,9 +13,3 @@ export async function logMealAgain(meal: readonly LogEntry[], time: number, batc
   toast(message, added.length ? () => void Promise.all(added.map((e) => repo.deleteLog(e.id))) : undefined);
   return added;
 }
-
-/** "Oats, Milk, Banana" — short enough for one line on a phone. */
-export function mealTitle(meal: readonly LogEntry[], max = 3): string {
-  const names = meal.map((e) => e.label);
-  return names.length > max ? `${names.slice(0, max).join(', ')} +${names.length - max}` : names.join(', ');
-}

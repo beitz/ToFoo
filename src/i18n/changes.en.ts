@@ -8,6 +8,8 @@
  * scenes and small fixes. A pull request that changes what users see adds its line here in the same PR.
  */
 export const changesEn = {
+  'change.187': 'Log meal is pictures instead of text: favourites and recent foods are round icons like At home (a tap adds one with Undo, hold for the amount), meals are small cards with their foods\' icons (tap logs it again, hold shows what is in it and the star), and tea, coffee, water, supplement and manual entry are icons too. Photo, meal time and search share one row at the top, and the keyboard no longer opens by itself. Typing shows your matching icons above the results.',
+  'change.187.major': 'Log meal as icons, with the keyboard closed until you search',
   'change.186': 'Kitchen icons: the ring\'s colour says what kind of thing it is (cooked by you, ready meal, ingredient, snack, drink or spice), and Log meal groups the icons under those headings. Change a thing\'s kind in its sheet.',
   'change.185': 'Kitchen: what you have shows as icons with short names in each place, with a switch back to the list with amounts. Give a thing your own icon or short name in its sheet.',
   'change.184': 'Log meal: what you have at home shows as round icons with short names (two pizzas: “Diavola” and “Margherita”), most eaten first, so many fit above the keyboard. One tap adds one, a piece, a pack or what you logged last time, and the message says how much, with Undo; hold a tile for the amount sheet. Typing filters the icons.',

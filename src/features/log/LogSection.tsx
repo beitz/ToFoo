@@ -5,23 +5,27 @@ import { Icon } from '../../ui/Icon';
 
 /**
  * A log screen section behind a tappable heading. Open or closed is remembered per section in the
- * settings, so a section the user never uses stays out of the way on every visit.
+ * settings, so a section the user never uses stays out of the way on every visit. `aside`: a small
+ * button beside the heading (an ⓘ), outside the toggle.
  */
-export function LogSection({ id, title, count, icon, children }: { id: string; title: string; count?: number; icon?: ReactNode; children: ReactNode }) {
+export function LogSection({ id, title, count, icon, aside, children }: { id: string; title: string; count?: number; icon?: ReactNode; aside?: ReactNode; children: ReactNode }) {
   const { settings } = useData();
   const collapsed = settings.logCollapsed?.[id] ?? false;
   const toggle = () => void repo.updateSettings({ logCollapsed: { ...settings.logCollapsed, [id]: !collapsed } });
   return (
     <div className="log-section">
-      <button className="fold-head" aria-expanded={!collapsed} aria-controls={`log-${id}`} onClick={toggle}>
-        <span className={collapsed ? 'chev' : 'chev chev-open'} aria-hidden>
-          <Icon name="chevron" size={16} />
-        </span>
-        {icon}
-        <span className="fold-title">
-          {title} {count !== undefined && <span className="fold-count">{count}</span>}
-        </span>
-      </button>
+      <div className="log-section-head">
+        <button className="fold-head" aria-expanded={!collapsed} aria-controls={`log-${id}`} onClick={toggle}>
+          <span className={collapsed ? 'chev' : 'chev chev-open'} aria-hidden>
+            <Icon name="chevron" size={16} />
+          </span>
+          {icon}
+          <span className="fold-title">
+            {title} {count !== undefined && <span className="fold-count">{count}</span>}
+          </span>
+        </button>
+        {aside}
+      </div>
       {!collapsed && <div id={`log-${id}`}>{children}</div>}
     </div>
   );

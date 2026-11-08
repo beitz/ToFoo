@@ -79,3 +79,29 @@ test('a food logged earlier is pinned and put in the freezer from its diary item
   await expect(page.getByRole('dialog')).toContainText('Oat flakes');
   expect(errors).toEqual([]);
 });
+
+test('Log meal shows recent foods and meals as icons: a tap adds the same again, a hold on a meal shows what is in it', async ({ page }) => {
+  const errors = watchErrors(page);
+  await firstLaunch(page);
+  await logFood(page, 'oat flakes', /^Oat flakes/, '100 g');
+  await logFood(page, 'banana', /^Banana/, '50 g');
+
+  // A fresh visit: what this visit added is "This meal", not a recent meal yet.
+  await page.goto('./#/');
+  await page.reload();
+  await page.goto('./#/log');
+  // The search isn't focused when the page opens, so the keyboard stays closed.
+  await expect(page.getByPlaceholder('Search foods')).not.toBeFocused();
+  await page.locator('#log-recentFoods').getByRole('button', { name: /^Oat flakes/ }).click();
+  await expect(page.getByText('Added Oat flakes, 100 g.')).toBeVisible();
+  await expect(page.locator('.meal-so-far')).toContainText('100 g');
+
+  // The two foods logged before are one meal: its card shows both, a hold opens it and stars it.
+  const card = page.locator('#log-recentMeals .meal-card').first();
+  await expect(card).toContainText('Oat flakes');
+  await card.click({ button: 'right' });
+  await expect(page.getByRole('dialog')).toContainText('Banana');
+  await page.getByRole('dialog').getByRole('button', { name: 'Add to favourites' }).click();
+  await expect(page.locator('#log-favourites .meal-card')).toHaveCount(1);
+  expect(errors).toEqual([]);
+});

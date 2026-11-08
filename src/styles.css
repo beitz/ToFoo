@@ -1248,7 +1248,7 @@ textarea:focus-visible,
 .log-section {
   margin-top: 10px;
 }
-.log-section > div {
+.log-section > div[id] {
   padding-top: 4px;
 }
 .fav-row {
@@ -5784,22 +5784,188 @@ a.contributor-link > span:first-child {
 .proposal .sheet-actions .btn {
   white-space: nowrap;
 }
-/* Log screen: the meal's time once, at the top. */
-.meal-time {
-  margin: 0 0 8px;
-  padding: 0 12px;
+/* Log screen: photo, meal time and search in one row (owner's ask, 2026-11-08), kept in view while scrolling. */
+.log-top-wrap {
+  position: sticky;
+  top: env(safe-area-inset-top);
+  z-index: 6;
+  margin: 0 calc(-1 * var(--gutter)) 4px;
+  padding: 6px var(--gutter);
+  background: var(--bg);
+}
+.log-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.log-top-ai {
+  width: 48px;
+  height: 48px;
+  background: var(--accent);
+  color: var(--accent-text);
+}
+.log-time {
+  flex: none;
+  min-height: 48px;
+  padding: 0 10px;
+  gap: 4px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.log-time[aria-expanded='true'] {
+  border-color: var(--accent);
+}
+.log-search {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+}
+.log-search svg {
+  left: 10px;
+}
+.log-search input {
+  padding-left: 36px;
+  padding-right: 42px;
+  text-overflow: ellipsis;
+}
+.search-scan {
+  position: absolute;
+  right: 0;
+  color: var(--text-muted);
+}
+.log-search .search-scan svg {
+  position: static;
+  color: inherit;
+}
+.meal-time-edit {
+  margin: 8px 0 2px;
+  padding: 8px 12px 10px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--surface);
 }
-.meal-time .field {
-  margin: 0;
-  min-height: 48px;
+.meal-time-edit label {
+  display: block;
+  margin-bottom: 4px;
+  font-weight: 600;
+}
+.meal-time-edit .row {
+  gap: 8px;
   align-items: center;
 }
-.meal-time .field .muted {
+.meal-time-edit input {
+  flex: 1;
+  min-width: 0;
+}
+.log-section-head {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+}
+.log-section-head .fold-head {
+  flex: 1;
+  min-width: 0;
+  border-bottom: none;
+}
+.log-links {
+  gap: 4px 16px;
+  margin: 0;
+}
+
+/* Log screen: meals as small cards with the icons of what was in them (owner's ask, 2026-11-08). Three a row at 360 px. */
+.meal-cards {
+  list-style: none;
+  margin: 6px 0 2px;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(98px, 1fr));
+  gap: 8px;
+}
+.meal-cards + .home-tiles {
+  margin-top: 6px;
+}
+.meal-card {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  width: 100%;
+  height: 100%;
+  min-height: 44px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
   color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: manipulation;
+}
+.meal-card:active {
+  background: var(--surface-2);
+}
+.meal-card:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 1px;
+}
+.meal-card-icons {
+  display: flex;
+  align-items: center;
+}
+.meal-card-icons .food-icon + .food-icon {
+  margin-left: -9px;
+}
+.meal-card-more {
+  margin-left: 4px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+.meal-card-name {
+  font-size: 0.78rem;
   font-weight: 600;
+  line-height: 1.25;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.meal-card-when {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+}
+.meal-card-when svg {
+  color: var(--accent);
+  flex: none;
+}
+.meal-sheet-items {
+  margin: 0 0 8px;
+}
+.meal-sheet-item {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 12px;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+.meal-sheet-item .food-icon {
+  grid-row: span 2;
+}
+.meal-sheet-name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
 }
 
 /* ── Nutrient page (design 2026-10-22) ── */
@@ -9048,4 +9214,10 @@ button.link-row {
   flex: none;
   flex-direction: column;
   gap: 4px;
+}
+/* Narrow phones: the time without its clock, so "Search foods" still fits beside it. */
+@media (max-width: 379px) {
+  .log-time svg {
+    display: none;
+  }
 }

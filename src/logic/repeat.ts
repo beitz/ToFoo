@@ -120,7 +120,7 @@ export function favouriteFromMeal(meal: readonly LogEntry[], id: string): Favour
 
 /**
  * A pinned meal as log entries that ended at time 0, so the same helpers serve it as a past meal:
- * `repeatMeal` re-times it, `mealTitle` names it, `mealSignature` matches it against Recent meals.
+ * `repeatMeal` re-times it, `mealSignature` matches it against Recent meals.
  */
 export function favouriteAsMeal(fav: FavouriteMeal): LogEntry[] {
   return fav.items.map(({ offsetMinutes, ...rest }, i) => ({ ...rest, id: `${fav.id}:${i}`, schemaVersion: 0, time: -offsetMinutes * MINUTE, day: '' }) as LogEntry);

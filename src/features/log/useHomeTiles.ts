@@ -3,12 +3,9 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { useData } from '../../app/data';
 import { t } from '../../i18n';
 import type { Food } from '../../foods/foodDb';
-import { productLabel, productRef } from '../../foods/products';
 import { normalize } from '../../foods/search';
 import { dayKey } from '../../lib/dates';
-import { fmtNumber } from '../../lib/format';
 import { refKey } from '../../lib/refs';
-import { oneOf, type OneOf } from '../../logic/oneTap';
 import { loggable } from '../../logic/pantry';
 import { portionGrams } from '../../logic/batch';
 import { bookingSlot, nextStorage } from '../../logic/stock';
@@ -19,6 +16,7 @@ import { leftLabel, placeName, usePantry, usePantryLeft, usePieceUnits } from '.
 import { potKey, useHomeLooks } from '../pantry/useHomeLooks';
 import { totalLeft } from '../home/StockChips';
 import type { HomeTile } from './HomeTiles';
+import { oneTapFor, type OneTap } from './oneTapEntry';
 
 /** What a hold opens (the sheets a tap opened before), and a first tap when no amount is known yet. */
 export type HomePick = { kind: 'food'; food: Food } | { kind: 'product'; product: Product } | { kind: 'custom'; food: CustomFood } | { kind: 'portion'; batch: Batch };
@@ -35,7 +33,7 @@ interface Thing {
   /** What eating it counts as, for "most eaten first" and "+1": a food's key, or a pot's batch. */
   eatenKey: string;
   /** Adds one of it right away; undefined when the sheet has to ask first. */
-  one?: () => Promise<{ entry: LogEntry; amount: string }>;
+  one?: OneTap;
 }
 
 /**
@@ -84,37 +82,15 @@ export function useHomeTiles({ day, time, query, added, onPick, onLogged }: { da
         const ref: FoodRef = item.ref;
         const detail = [leftLabel(item, l), placeName(item.place)].filter(Boolean).join(' · ');
         const base = { key: item.id, name: item.name, detail, eatenKey: refKey(ref) };
-        if (ref.source === 'custom') {
-          const food = d.customFoodsById.get(ref.id);
-          if (!food) continue;
-          out.push({
-            ...base,
-            pick: { kind: 'custom', food },
-            one: async () => {
-              const entry = await repo.addLog({ kind: 'custom', customFoodId: food.id, servings: 1, time, day: entryDay, confidence: food.confidence, label: food.name });
-              return { entry, amount: t('log.oneServing', { serving: food.servingLabel }) };
-            },
-          });
-          continue;
-        }
-        const product = ref.source === 'BLS' ? undefined : d.productsById.get(refKey(ref));
+        const custom = ref.source === 'custom' ? d.customFoodsById.get(ref.id) : undefined;
+        const product = ref.source === 'BLS' || ref.source === 'custom' ? undefined : d.productsById.get(refKey(ref));
         const food = ref.source === 'BLS' ? d.foods.byCode.get(ref.code) : undefined;
-        if (!product && !food) continue;
+        const pick: HomePick | undefined = custom ? { kind: 'custom', food: custom } : product ? { kind: 'product', product } : food ? { kind: 'food', food } : undefined;
+        if (!pick) continue;
         // Products' last amount and piece weights go by the product's id, BLS foods' by their code.
-        const lastKey = product ? product.id : food!.code;
-        const amount = oneOf({ countedInPieces: item.pieces !== undefined, units: units(refKey(ref)), lastGrams: last.get(lastKey), servingGrams: product?.serving?.grams });
-        const label = product ? productLabel(product) : food!.nameEn;
-        out.push({
-          ...base,
-          pick: product ? { kind: 'product', product } : { kind: 'food', food: food! },
-          one: amount
-            ? async () => {
-                const entry = await repo.addLog({ kind: 'food', ref: product ? productRef(product) : { source: 'BLS', version: d.foods.version, code: food!.code }, grams: amount.grams, preparation: 'asListed', ...(amount.pieces ? { pieces: amount.pieces } : {}), time, day: entryDay, confidence: 'A', label });
-                await repo.setMeta(`lastGrams:${lastKey}`, amount.grams);
-                return { entry, amount: amountText(amount) };
-              }
-            : undefined,
-        });
+        const lastKey = product ? product.id : food?.code;
+        const one = oneTapFor(pick, { time, day: entryDay, foodsVersion: d.foods.version, units: units(refKey(ref)), lastGrams: lastKey ? last.get(lastKey) : undefined, countedInPieces: item.pieces !== undefined });
+        out.push({ ...base, pick, one });
       }
     }
 
@@ -170,13 +146,4 @@ export function useHomeTiles({ day, time, query, added, onPick, onLogged }: { da
   }, [things, query, added, onPick, onLogged]);
 
   return tiles;
-}
-
-/** The amount one tap added, as the toast says it: "1 piece (60 g)", "1 pack (350 g)", "60 g". */
-function amountText(one: OneOf): string {
-  const g = `${fmtNumber(one.grams, 1)} g`;
-  if (one.what === 'piece') return t('log.onePiece', { g });
-  if (one.what === 'pack') return t('log.onePack', { g });
-  if (one.what === 'serving') return t('log.oneLabelServing', { g });
-  return g;
 }
