@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import { t } from '../../i18n';
 import type { FoodIconName } from '../../logic/foodIcons';
 import { HOME_KINDS, type HomeKind } from '../../logic/homeKind';
@@ -24,6 +24,8 @@ export interface HomeTile {
   out?: boolean;
   /** Its kind, the colour of its ring (src/logic/homeKind.ts). */
   kind?: HomeKind;
+  /** A drawn icon instead of a food picture (Log meal's Supplement, Manual entry). */
+  picture?: ReactNode;
 }
 
 /** A kind's name, as the group headings and screen readers say it. */
@@ -64,9 +66,13 @@ export function HomeTiles({ tiles, hintId, grouped }: { tiles: readonly HomeTile
   );
 }
 
-function Tile({ tile, hintId }: { tile: HomeTile; hintId?: string }) {
+/**
+ * A tap, or a hold (450 ms without moving, a right click or the context-menu key) for something else:
+ * the handlers for a button that does both. `onHold` missing: a hold does what a tap does.
+ */
+export function useHoldPress(onTap: () => void, onHold?: () => void) {
   const press = useRef<{ x: number; y: number; timer: number } | null>(null);
-  // Set once a hold has opened the sheet, so the click that may follow does not add one too.
+  // Set once a hold has acted, so the click that may follow does not tap too.
   const held = useRef(false);
   const cancel = () => {
     if (press.current) window.clearTimeout(press.current.timer);
@@ -75,40 +81,53 @@ function Tile({ tile, hintId }: { tile: HomeTile; hintId?: string }) {
   const hold = () => {
     cancel();
     held.current = true;
-    (tile.onHold ?? tile.onTap)();
+    (onHold ?? onTap)();
   };
+  return {
+    onPointerDown: (e: ReactPointerEvent) => {
+      held.current = false;
+      cancel();
+      press.current = { x: e.clientX, y: e.clientY, timer: window.setTimeout(hold, HOLD_MS) };
+    },
+    onPointerMove: (e: ReactPointerEvent) => {
+      if (press.current && Math.hypot(e.clientX - press.current.x, e.clientY - press.current.y) > MOVE_PX) cancel();
+    },
+    onPointerUp: cancel,
+    onPointerLeave: cancel,
+    onPointerCancel: cancel,
+    onContextMenu: (e: ReactMouseEvent) => {
+      // Android's long press, a right click and the context-menu key all end up here.
+      e.preventDefault();
+      if (!held.current) hold();
+    },
+    onClick: () => {
+      if (held.current) {
+        held.current = false;
+        return;
+      }
+      onTap();
+    },
+  };
+}
+
+function Tile({ tile, hintId }: { tile: HomeTile; hintId?: string }) {
+  const press = useHoldPress(tile.onTap, tile.onHold);
   return (
     <button
       type="button"
       className={`home-tile${tile.out ? ' out' : ''}`}
       aria-label={`${tile.full}${tile.detail ? `, ${tile.detail}` : ''}${tile.kind ? `, ${kindName(tile.kind)}` : ''}${tile.added ? `, ${t('log.tileAdded', { n: tile.added })}` : ''}`}
       aria-describedby={hintId}
-      onPointerDown={(e) => {
-        held.current = false;
-        cancel();
-        press.current = { x: e.clientX, y: e.clientY, timer: window.setTimeout(hold, HOLD_MS) };
-      }}
-      onPointerMove={(e) => {
-        if (press.current && Math.hypot(e.clientX - press.current.x, e.clientY - press.current.y) > MOVE_PX) cancel();
-      }}
-      onPointerUp={cancel}
-      onPointerLeave={cancel}
-      onPointerCancel={cancel}
-      onContextMenu={(e) => {
-        // Android's long press, a right click and the context-menu key all end up here.
-        e.preventDefault();
-        if (!held.current) hold();
-      }}
-      onClick={() => {
-        if (held.current) {
-          held.current = false;
-          return;
-        }
-        tile.onTap();
-      }}
+      {...press}
     >
       <span className="home-tile-ring">
-        <FoodIcon icon={tile.icon} monogram={tile.monogram} kind={tile.kind} />
+        {tile.picture ? (
+          <span className="food-icon" style={{ width: 56, height: 56 }} aria-hidden>
+            {tile.picture}
+          </span>
+        ) : (
+          <FoodIcon icon={tile.icon} monogram={tile.monogram} kind={tile.kind} />
+        )}
         {tile.added > 0 && (
           <span className="home-tile-added" aria-hidden>
             +{tile.added}

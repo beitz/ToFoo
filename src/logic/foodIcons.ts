@@ -218,6 +218,18 @@ function shownWords(name: string): string[] {
 
 const cap = (w: string) => w.charAt(0).toUpperCase() + w.slice(1);
 
+/**
+ * A name without brand, pack size, filler or what is in brackets, for a meal's card where several
+ * names share two lines: "Die Ofenfrische Pulled Pork · Dr. Oetker" → "Ofenfrische Pulled Pork",
+ * "Pizza margherita (with tomato sauce, mozzarella)" → "Pizza margherita", "Gouda cheese 48 % fat in dry
+ * matter" → "Gouda cheese".
+ */
+export function plainName(name: string): string {
+  // Up to the first amount too: "Gouda cheese 48 % fat in dry matter" → "Gouda cheese".
+  const head = name.split(' · ')[0]!.split(/\s\(/)[0]!.split(/\s\S*\d/)[0]!;
+  return cap(shownWords(head).join(' ')) || name.trim();
+}
+
 /** About what fits under a tile at 360 px. A longer name is cut with "…" on the screen. */
 export const SHORT_NAME_FITS = 10;
 

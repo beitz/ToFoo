@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FOOD_ICON_NAMES, homeLooks, iconFor, monogram, shortNames, type Nameable } from './foodIcons';
+import { FOOD_ICON_NAMES, homeLooks, iconFor, monogram, plainName, shortNames, type Nameable } from './foodIcons';
 import { FOOD_ICON_SVG } from '../ui/foodIconData';
 
 describe('iconFor', () => {
@@ -45,6 +45,20 @@ describe('monogram', () => {
   it('takes two letters of the first word worth showing', () => {
     expect(monogram('Tante Emmas Paste')).toBe('Ta');
     expect(monogram('Bio 500 g Ölmühle')).toBe('Öl');
+  });
+});
+
+describe('plainName', () => {
+  it('drops brand, filler, pack sizes and what is in brackets', () => {
+    expect(plainName('Die Ofenfrische Pulled Pork · Dr. Oetker')).toBe('Ofenfrische Pulled Pork');
+    expect(plainName('Pizza margherita (with tomato sauce, mozzarella)')).toBe('Pizza margherita');
+    expect(plainName('Heiße Zitrone · Krüger, Krüger Day by Day')).toBe('Heiße Zitrone');
+    expect(plainName('Oat flakes')).toBe('Oat flakes');
+    expect(plainName('Gouda cheese 48 % fat in dry matter')).toBe('Gouda cheese');
+    expect(plainName('Toffifee 30 szt250гр смотка · Storck')).toBe('Toffifee');
+  });
+  it('keeps the name when nothing is left', () => {
+    expect(plainName('500 g')).toBe('500 g');
   });
 });
 
