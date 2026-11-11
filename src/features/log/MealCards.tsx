@@ -1,10 +1,12 @@
+import { useState, type ReactNode } from 'react';
 import { useData } from '../../app/data';
 import { t } from '../../i18n';
-import { daysBetween, formatDate, formatDay, formatTime, weekdayShort } from '../../lib/dates';
+import { daysBetween, formatDate, formatDateTime, formatDay, formatTime, weekdayShort } from '../../lib/dates';
 import { refKey } from '../../lib/refs';
 import { iconFor, monogram, plainName, type FoodIconName } from '../../logic/foodIcons';
+import { pickFromMeal, repeatAmount, type RepeatUnit } from '../../logic/repeat';
 import type { FavouriteMeal, LogEntry } from '../../storage/types';
-import { Sheet } from '../../ui/controls';
+import { NumberInput, Sheet } from '../../ui/controls';
 import { FoodIcon } from '../../ui/FoodIcon';
 import { Icon } from '../../ui/Icon';
 import { entryAmount } from './describe';
@@ -49,7 +51,7 @@ export function mealWhen(e: Pick<LogEntry, 'day' | 'time'>, today: string): stri
 /**
  * Meals as small cards with the icons of what was in them (owner's ask, 2026-11-08: the Log screen
  * as pictures, not a wall of text): a meal never looks like a single food. A tap logs the whole meal
- * again; a hold shows what is in it, with Log again and the favourite star.
+ * again; a hold shows what is in it, to log all or part of it again, and the favourite star.
  */
 export function MealCards({ cards, onRepeat, onHold }: { cards: readonly MealCard[]; onRepeat: (meal: LogEntry[]) => void; onHold: (card: MealCard) => void }) {
   return (
@@ -94,29 +96,75 @@ function Card({ card, onRepeat, onHold }: { card: MealCard; onRepeat: (meal: Log
   );
 }
 
-/** What a hold on a meal's card opens: its items and amounts, Log again, and the favourite star. */
-export function MealSheet({ card, pinned, onRepeat, onToggleFavourite, onClose }: { card: MealCard; pinned: boolean; onRepeat: () => void; onToggleFavourite: () => void; onClose: () => void }) {
+/** The suffix of an item's amount field: grams, pieces, or a count of portions or servings. */
+const unitSuffix = (unit: RepeatUnit) => (unit === 'g' ? 'g' : unit === 'pieces' ? t('piece.pcs') : '×');
+
+/**
+ * A past meal to log again, all of it or part of it (owner's ask, 2026-11-11: "I had a large meal on
+ * Sunday and I'm eating leftovers now; I wanted to log just the soup"). Every item starts ticked with
+ * the amount it had; untick what is not eaten again and change an amount where it differs. A hold on
+ * a meal's card opens it on the Log screen, "Log again" on a meal in the diary too.
+ */
+export function MealSheet({ title, meal, time, onLog, onClose, actions }: { title: string; meal: readonly LogEntry[]; time: number; onLog: (picked: LogEntry[]) => void; onClose: () => void; actions?: ReactNode }) {
   const d = useData();
+  const [on, setOn] = useState<ReadonlySet<string>>(() => new Set(meal.map((e) => e.id)));
+  const [amounts, setAmounts] = useState<Readonly<Record<string, number | undefined>>>(() => Object.fromEntries(meal.map((e) => [e.id, repeatAmount(e)?.value])));
+  const picked = meal.filter((e) => on.has(e.id));
+  const valid = picked.length > 0 && picked.every((e) => !repeatAmount(e) || (amounts[e.id] ?? 0) > 0);
+  const whole = picked.length === meal.length && meal.every((e) => amounts[e.id] === repeatAmount(e)?.value);
+  function toggle(id: string, tick: boolean) {
+    setOn((s) => {
+      const next = new Set(s);
+      if (tick) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }
   return (
-    <Sheet title={card.fav ? t('log.favMeal') : t('log.pastMeal', { when: card.when })} onClose={onClose}>
+    <Sheet title={title} onClose={onClose}>
+      <p className="muted small">{t('repeat.pickHint')}</p>
       <ul className="plain-list meal-sheet-items">
-        {card.meal.map((e) => (
-          <li key={e.id} className="meal-sheet-item">
-            <FoodIcon icon={entryIcon(e, d)} monogram={monogram(e.label)} size={40} />
-            <span className="meal-sheet-name">{e.label}</span>
-            <span className="muted small">{entryAmount(e, d)}</span>
-          </li>
-        ))}
+        {meal.map((e) => {
+          const amount = repeatAmount(e);
+          const ticked = on.has(e.id);
+          return (
+            <li key={e.id} className={`meal-sheet-item${ticked ? '' : ' off'}`}>
+              <label className="meal-sheet-pick">
+                <input type="checkbox" checked={ticked} onChange={(ev) => toggle(e.id, ev.target.checked)} />
+                <FoodIcon icon={entryIcon(e, d)} monogram={monogram(e.label)} size={36} />
+                <span className="meal-sheet-text">
+                  <span className="meal-sheet-name">{e.label}</span>
+                  <span className="muted small">{entryAmount(e, d)}</span>
+                </span>
+              </label>
+              {amount && ticked && (
+                <div className="meal-sheet-amount">
+                  <label className="visually-hidden" htmlFor={`again-${e.id}`}>
+                    {t('repeat.amountLabel', { name: e.label })}
+                  </label>
+                  <NumberInput id={`again-${e.id}`} value={amounts[e.id]} onChange={(v) => setAmounts((a) => ({ ...a, [e.id]: v }))} suffix={unitSuffix(amount.unit)} min={0} />
+                </div>
+              )}
+            </li>
+          );
+        })}
       </ul>
-      <p className="muted small">{t('log.recentMealsHint')}</p>
+      <p className="muted small">{t('repeat.atTime', { time: formatDateTime(time, d.today) })}</p>
       <div className="row wrap">
-        <button type="button" className="btn btn-primary" onClick={onRepeat}>
-          <Icon name="repeat" /> {t('log.logAgain')}
+        <button type="button" className="btn btn-primary" disabled={!valid} onClick={() => onLog(pickFromMeal(meal, new Map(picked.map((e) => [e.id, amounts[e.id]])), d.batchesById))}>
+          <Icon name="repeat" /> {whole ? t('log.logAgain') : t('repeat.logPicked', { n: picked.length, total: meal.length })}
         </button>
-        <button type="button" className={`btn btn-ghost fav-btn${pinned ? ' on' : ''}`} aria-pressed={pinned} onClick={onToggleFavourite}>
-          <Icon name="star" size={18} filled={pinned} /> {pinned ? t('fav.on') : t('fav.add')}
-        </button>
+        {actions}
       </div>
     </Sheet>
+  );
+}
+
+/** The favourite star in a meal's sheet on the Log screen. */
+export function MealStar({ pinned, onToggle }: { pinned: boolean; onToggle: () => void }) {
+  return (
+    <button type="button" className={`btn btn-ghost fav-btn${pinned ? ' on' : ''}`} aria-pressed={pinned} onClick={onToggle}>
+      <Icon name="star" size={18} filled={pinned} /> {pinned ? t('fav.on') : t('fav.add')}
+    </button>
   );
 }

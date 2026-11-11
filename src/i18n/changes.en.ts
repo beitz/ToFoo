@@ -8,6 +8,7 @@
  * scenes and small fixes. A pull request that changes what users see adds its line here in the same PR.
  */
 export const changesEn = {
+  'change.188': 'Log again on a meal (in the diary, or hold a meal on Log meal) lets you pick which items to log and change their amounts, so you can log just the soup from a big meal as leftovers.',
   'change.187': 'Log meal is pictures instead of text: favourites and recent foods are round icons like At home (a tap adds one with Undo, hold for the amount), meals are small cards with their foods\' icons (tap logs it again, hold shows what is in it and the star), and tea, coffee, water, supplement and manual entry are icons too. Photo, meal time and search share one row at the top, and the keyboard no longer opens by itself. Typing shows your matching icons above the results.',
   'change.187.major': 'Log meal as icons, with the keyboard closed until you search',
   'change.186': 'Kitchen icons: the ring\'s colour says what kind of thing it is (cooked by you, ready meal, ingredient, snack, drink or spice), and Log meal groups the icons under those headings. Change a thing\'s kind in its sheet.',

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Batch, LogEntry } from '../storage/types';
-import { favouriteAsMeal, favouriteFromMeal, mealSignature, recentMeals, repeatMeal } from './repeat';
+import { favouriteAsMeal, favouriteFromMeal, mealSignature, pickFromMeal, recentMeals, repeatAmount, repeatMeal, withAmount } from './repeat';
 
 const H = 3_600_000;
 const T0 = Date.UTC(2026, 9, 14, 8);
@@ -103,5 +103,54 @@ describe('recentMeals', () => {
       ['f', 'g'],
       ['c', 'd'],
     ]);
+  });
+});
+
+describe('logging part of a meal again', () => {
+  const weighed = (remaining: Batch['remaining']): Batch => ({ ...batch(remaining), cookedGrams: 2400 });
+  const byWeight = (grams: number, portions = 1): LogEntry => ({ ...portion('s', T0, 'b1', portions), grams }) as LogEntry;
+
+  it('keeps only the picked items, with their new amounts, the last picked one at the new time', () => {
+    const meal = [food('roast', T0, 'U000000', 300), food('soup', T0 + 0.25 * H, 'S000000', 350), tea('t', T0 + 0.5 * H)];
+    const picked = pickFromMeal(meal, new Map([['soup', 250]]), new Map());
+    expect(picked.map((e) => [e.id, e.kind === 'food' && e.grams])).toEqual([['soup', 250]]);
+    const now = T0 + 72 * H;
+    const { entries } = repeatMeal(picked, now, dayOf, new Map());
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({ kind: 'food', grams: 250, time: now });
+  });
+
+  it('leaves an amount as it was when none is given, and keeps the spacing of the picked items', () => {
+    const meal = [food('soup', T0, 'S000000', 350), food('bread', T0 + 1000, 'B000000', 60), tea('t', T0 + 0.5 * H)];
+    const picked = pickFromMeal(meal, new Map([['soup', undefined], ['t', undefined]]), new Map());
+    expect(picked).toEqual([meal[0], meal[2]]);
+    const now = T0 + 72 * H;
+    expect(repeatMeal(picked, now, dayOf, new Map()).entries.map((e) => e.time)).toEqual([now - 0.5 * H, now]);
+  });
+
+  it('changes pieces with their grams, and portions or grams of a pot in their own unit', () => {
+    const gum: LogEntry = { ...food('g', T0, 'X', 2.8), pieces: 2 } as LogEntry;
+    expect(repeatAmount(gum)).toEqual({ value: 2, unit: 'pieces' });
+    expect(withAmount(gum, 3, new Map())).toMatchObject({ pieces: 3, grams: 4.2 });
+    expect(repeatAmount(portion('p', T0, 'b1', 2))).toEqual({ value: 2, unit: 'portions' });
+    expect(withAmount(portion('p', T0, 'b1', 2), 1, new Map())).toMatchObject({ portions: 1 });
+    // A pot of 2400 g in 6 portions: 800 g is two portions taken from stock.
+    const b = weighed({ fresh: 0, fridge: 3, freezer: 0 });
+    expect(repeatAmount(byWeight(400))).toEqual({ value: 400, unit: 'g' });
+    expect(withAmount(byWeight(400), 800, new Map([['b1', b]]))).toMatchObject({ grams: 800, portions: 2 });
+    // Eaten straight from the pot, taking no portion: still none.
+    expect(withAmount(byWeight(400, 0), 800, new Map([['b1', b]]))).toMatchObject({ grams: 800, portions: 0 });
+    expect(repeatAmount(tea('t', T0))).toBeUndefined();
+    expect(withAmount(food('f', T0, 'X', 100), 0, new Map())).toMatchObject({ grams: 100 });
+  });
+
+  it('takes the picked leftovers from the pot in stock', () => {
+    const b = weighed({ fresh: 0, fridge: 2, freezer: 0 });
+    const batches = new Map([['b1', b]]);
+    const meal = [food('roast', T0, 'U000000', 300), byWeight(400)];
+    const { entries, skipped } = repeatMeal(pickFromMeal(meal, new Map([['s', 400]]), batches), T0 + 72 * H, dayOf, batches);
+    expect(skipped).toEqual([]);
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({ kind: 'portion', batchId: 'b1', storage: 'fridge', grams: 400, portions: 1 });
   });
 });
