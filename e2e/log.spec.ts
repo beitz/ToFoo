@@ -103,5 +103,31 @@ test('Log meal shows recent foods and meals as icons: a tap adds the same again,
   await expect(page.getByRole('dialog')).toContainText('Banana');
   await page.getByRole('dialog').getByRole('button', { name: 'Add to favourites' }).click();
   await expect(page.locator('#log-favourites .meal-card')).toHaveCount(1);
+
+  // Only part of it again (owner's ask, 2026-11-11: just the soup of Sunday's meal): untick one, change the other's amount.
+  await page.locator('#log-favourites .meal-card').click({ button: 'right' });
+  const sheet = page.getByRole('dialog');
+  await sheet.getByRole('checkbox', { name: /Banana/ }).uncheck();
+  await sheet.getByLabel('Amount of Oat flakes this time').fill('60');
+  await sheet.getByRole('button', { name: 'Log 1 of 2 again' }).click();
+  await expect(page.getByText(/Logged Oat flakes.* again\./)).toBeVisible();
+  await expect(page.locator('.meal-so-far')).toContainText('60 g');
+  expect(errors).toEqual([]);
+});
+
+test('Log again on a meal in the diary picks items: just the soup of a big meal, as leftovers', async ({ page }) => {
+  const errors = watchErrors(page);
+  await firstLaunch(page);
+  await logFood(page, 'oat flakes', /^Oat flakes/, '100 g');
+  await logFood(page, 'banana', /^Banana/, '50 g');
+  await page.goto('./#/diary');
+  await page.getByRole('button', { name: 'Log all or part of this meal again now' }).click();
+  const sheet = page.getByRole('dialog');
+  await expect(sheet.getByRole('button', { name: 'Log again' })).toBeVisible();
+  await sheet.getByRole('checkbox', { name: /Oat flakes/ }).uncheck();
+  await sheet.getByRole('button', { name: 'Log 1 of 2 again' }).click();
+  await expect(page.getByText('Logged Banana', { exact: false })).toBeVisible();
+  await expect(page.locator('.meal .entry-label', { hasText: /^Banana/ })).toHaveCount(2);
+  await expect(page.locator('.meal .entry-label', { hasText: /^Oat flakes/ })).toHaveCount(1);
   expect(errors).toEqual([]);
 });

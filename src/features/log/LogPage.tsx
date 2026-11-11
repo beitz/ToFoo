@@ -32,7 +32,7 @@ import { refKey } from '../../lib/refs';
 import { WaterSheet } from '../water/WaterSheet';
 import { HomeTiles, type HomeTile } from './HomeTiles';
 import { useFoodTiles } from './useFoodTiles';
-import { MealCards, MealSheet, mealWhen, type MealCard } from './MealCards';
+import { MealCards, MealSheet, MealStar, mealWhen, type MealCard } from './MealCards';
 import { usePantry } from '../pantry/usePantry';
 import { InfoButton } from '../../ui/InfoButton';
 import type { FoodIconName } from '../../logic/foodIcons';
@@ -363,18 +363,24 @@ export function LogPage({ day: dayParam, foodCode }: { day?: string; foodCode?: 
       {editing && <EditEntrySheet entry={editing} onClose={() => setEditing(null)} />}
       {mealOpen && (
         <MealSheet
-          card={mealOpen}
-          pinned={!!mealOpen.fav || !!pinnedOf(mealOpen.meal)}
-          onRepeat={() => {
+          title={mealOpen.fav ? t('log.favMeal') : t('log.pastMeal', { when: mealOpen.when })}
+          meal={mealOpen.meal}
+          time={mealTime}
+          onLog={(picked) => {
             setMealOpen(null);
-            void repeat(mealOpen.meal);
-          }}
-          onToggleFavourite={() => {
-            if (mealOpen.fav) unpinMeal(mealOpen.fav);
-            else toggleMeal(mealOpen.meal);
-            setMealOpen(null);
+            void repeat(picked);
           }}
           onClose={() => setMealOpen(null)}
+          actions={
+            <MealStar
+              pinned={!!mealOpen.fav || !!pinnedOf(mealOpen.meal)}
+              onToggle={() => {
+                if (mealOpen.fav) unpinMeal(mealOpen.fav);
+                else toggleMeal(mealOpen.meal);
+                setMealOpen(null);
+              }}
+            />
+          }
         />
       )}
       {selected?.kind === 'manual' && <ManualSheet supplement={selected.supplement} day={day} time={mealTime} onClose={() => setSelected(null)} onAdded={onAdded} />}

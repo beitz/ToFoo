@@ -18,6 +18,7 @@ import { useMealBreakdown } from '../meal/MealNutrientsPage';
 import { SunEntrySheet } from './SunEntrySheet';
 import { sunSessionsFor } from '../../logic/resolve';
 import { logMealAgain } from '../log/logAgain';
+import { MealSheet, mealWhen } from '../log/MealCards';
 import { isOn } from '../../settings/features';
 import { JournalRow } from '../journal/JournalPage';
 import { JournalSheet } from '../journal/JournalSheet';
@@ -354,23 +355,31 @@ function MealCard({ meal, day, onEdit }: { meal: LogEntry[]; day: string; onEdit
   const d = useData();
   const toast = useToast();
   const kcal = useMealBreakdown(meal.map((e) => ({ entryId: e.id }))).intake.ENERCC;
+  // "Log again" opens the meal's items to pick from, to be logged at the time it was tapped.
+  const [againAt, setAgainAt] = useState<number>();
   return (
     <div className="card meal">
       <div className="meal-head">
         <strong>{formatTime(meal[0]!.time)}</strong>
         <span className="muted small">{t('diary.meal')}</span>
-        <button
-          className="btn btn-small btn-ghost meal-again"
-          aria-label={t('repeat.againLabel')}
-          onClick={async () => {
-            // The copy is logged now; show today's diary so it can be edited straight away.
-            const added = await logMealAgain(meal, Date.now(), d.batchesById, toast);
-            if (added.length && day !== d.today) navigate('diary');
-          }}
-        >
+        <button className="btn btn-small btn-ghost meal-again" aria-label={t('repeat.againLabel')} onClick={() => setAgainAt(Date.now())}>
           <Icon name="repeat" size={16} /> {t('repeat.again')}
         </button>
       </div>
+      {againAt !== undefined && (
+        <MealSheet
+          title={t('log.pastMeal', { when: mealWhen(meal[0]!, d.today) })}
+          meal={meal}
+          time={againAt}
+          onLog={async (picked) => {
+            setAgainAt(undefined);
+            // The copy is logged now; show today's diary so it can be edited straight away.
+            const added = await logMealAgain(picked, againAt, d.batchesById, toast);
+            if (added.length && day !== d.today) navigate('diary');
+          }}
+          onClose={() => setAgainAt(undefined)}
+        />
+      )}
       <ul className="plain-list">
         {meal.map((e) => (
           <li key={e.id} className="entry-line">

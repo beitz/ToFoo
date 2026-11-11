@@ -5,6 +5,7 @@
 import { groupMeals } from '../model/simulate';
 import { refKey } from '../lib/refs';
 import type { Batch, FavouriteMeal, FavouriteMealItem, LogEntry, NewLogEntry } from '../storage/types';
+import { stockPortionsFor } from './batch';
 import { bookingSlot, nextStorage } from './stock';
 
 export interface RepeatResult {
@@ -58,6 +59,56 @@ export function repeatMeal(meal: readonly LogEntry[], time: number, dayOf: (time
     entries.push({ ...rest, batchId: batch.id, storage: slot, time: at, day });
   }
   return { entries, skipped };
+}
+
+/** The unit an item's amount is changed in when it is logged again: as it was logged (pieces stay pieces). */
+export type RepeatUnit = 'g' | 'pieces' | 'portions' | 'servings';
+
+/** How much of an item was logged, in its own unit; undefined for things without an amount (tea, a manual entry). */
+export function repeatAmount(e: LogEntry): { value: number; unit: RepeatUnit } | undefined {
+  switch (e.kind) {
+    case 'food':
+      return e.pieces ? { value: e.pieces, unit: 'pieces' } : { value: e.grams, unit: 'g' };
+    case 'portion':
+      return e.grams !== undefined ? { value: e.grams, unit: 'g' } : { value: e.portions, unit: 'portions' };
+    case 'custom':
+      return { value: e.servings, unit: 'servings' };
+    default:
+      return undefined;
+  }
+}
+
+/**
+ * An item with another amount in the unit of `repeatAmount`; what hangs on it follows: the grams of
+ * pieces, and the portions a serving by weight takes from its pot's stock (none when it took none).
+ */
+export function withAmount(e: LogEntry, value: number, batches: ReadonlyMap<string, Batch>): LogEntry {
+  if (!(value > 0)) return e;
+  switch (e.kind) {
+    case 'food':
+      return e.pieces ? { ...e, pieces: value, grams: Math.round(((e.grams / e.pieces) * value) * 10) / 10 } : { ...e, grams: value };
+    case 'portion': {
+      if (e.grams === undefined) return { ...e, portions: value };
+      const batch = batches.get(e.batchId);
+      return { ...e, grams: value, portions: e.portions === 0 || !batch ? e.portions : stockPortionsFor(value, batch) };
+    }
+    case 'custom':
+      return { ...e, servings: value };
+    default:
+      return e;
+  }
+}
+
+/**
+ * The items of a meal picked to log again (owner's ask, 2026-11-11: just the soup of Sunday's big
+ * meal, as leftovers), each with its new amount where one was given. Unpicked items are left out;
+ * the meal's order is kept so `repeatMeal` keeps their spacing.
+ */
+export function pickFromMeal(meal: readonly LogEntry[], picks: ReadonlyMap<string, number | undefined>, batches: ReadonlyMap<string, Batch>): LogEntry[] {
+  return meal.filter((e) => picks.has(e.id)).map((e) => {
+    const value = picks.get(e.id);
+    return value === undefined ? e : withAmount(e, value, batches);
+  });
 }
 
 /** What makes two meals "the same" (Recent list, favourites): the same items in the same amounts. */

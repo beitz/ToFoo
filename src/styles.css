@@ -5953,19 +5953,43 @@ a.contributor-link > span:first-child {
 }
 .meal-sheet-item {
   display: grid;
-  grid-template-columns: auto 1fr;
-  grid-template-rows: auto auto;
-  column-gap: 12px;
+  grid-template-columns: 1fr auto;
+  column-gap: 8px;
   align-items: center;
-  padding: 6px 0;
+  padding: 4px 0;
   border-bottom: 1px solid var(--border);
 }
-.meal-sheet-item .food-icon {
-  grid-row: span 2;
+/* The whole row ticks: box, icon and name are one touch target. */
+.meal-sheet-pick {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  min-width: 0;
+  cursor: pointer;
+}
+.meal-sheet-pick input {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  accent-color: var(--accent);
+}
+.meal-sheet-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }
 .meal-sheet-name {
   font-weight: 600;
   overflow-wrap: anywhere;
+}
+/* Unticked: the box says so; the row only steps back. */
+.meal-sheet-item.off .food-icon,
+.meal-sheet-item.off .meal-sheet-text {
+  opacity: 0.5;
+}
+.meal-sheet-amount {
+  width: 104px;
 }
 
 /* ── Nutrient page (design 2026-10-22) ── */
