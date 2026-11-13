@@ -75,4 +75,12 @@ describe('nights', () => {
     expect(lastMealBefore([at(20, 12), at(20, 19, 30), at(21, 8)], at(20, 23))).toBe(at(20, 19, 30));
     expect(lastMealBefore([at(19, 19)], at(20, 23))).toBeUndefined();
   });
+
+  // Owner's report 2026-11-13: slept 21:08–23:32 and was up after; the diary had it on the next day but the page showed no row for it.
+  it('ends with today once a short night from the evening before is logged', () => {
+    const nights = nightsWindow([sleep(19, 23, 0, 20, 6, 30), sleep(20, 21, 8, 20, 23, 32)], '2026-10-21', 2, NEED);
+    expect(nights.map((x) => x.day)).toEqual(['2026-10-20', '2026-10-21']);
+    expect(nights[1]!.asleep).toBe(144);
+    expect(nights[1]!.diff).toBe(144 - NEED);
+  });
 });

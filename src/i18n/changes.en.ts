@@ -8,6 +8,7 @@
  * scenes and small fixes. A pull request that changes what users see adds its line here in the same PR.
  */
 export const changesEn = {
+  'change.193': 'A short sleep in the evening or night (from 18:00 to 06:00) counts as that day\'s night, not a nap, so a night with only two hours of sleep shows on the sleep page like in the diary.',
   'change.192': 'New tracker: blood pressure (turn it on in Settings → What you track). Log the two readings of a sitting from Home, the diary, the round button or the assistant (it reads a photo of the cuff too). Home shows your 7-day average as Not raised, Raised or High, from the European home lines; its page has a chart, what the numbers mean, how to measure, and what moves it. Patterns can set it against salt, sleep or activity.',
   'change.192.major': 'Blood pressure tracker',
   'change.191': 'A sleep that ends after 18:00 now counts to the next day, as the start of that night, so falling asleep at 21:00 no longer shows up as a nap on the day before.',
