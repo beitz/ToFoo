@@ -42,6 +42,12 @@ describe('catch up', () => {
     expect(missingOn({ ...base, skipped: new Set(['sleep', 'water'] as const) })).toEqual(['activity']);
   });
 
+  it('asks about blood pressure when it is on, after water, and never offers a usual reading', () => {
+    expect(missingOn({ ...base, on: { ...base.on, bloodPressure: true } })).toEqual(['sleep', 'activity', 'water', 'bloodPressure']);
+    expect(missingOn({ ...base, on: { ...base.on, bloodPressure: true }, bloodPressure: [{ day: key(22) }] })).toEqual(['sleep', 'activity', 'water']);
+    expect(missingOn({ ...base, on: { ...base.on, bloodPressure: true }, bloodPressure: [{ day: key(20) }], askDays: { bloodPressure: [] } })).toEqual(['sleep', 'activity', 'water']);
+  });
+
   it('asks about each thing only on the weekdays set for it', () => {
     // 2026-10-22 is a Thursday (4).
     expect(asksOn(undefined, 'activity', key(22))).toBe(true);

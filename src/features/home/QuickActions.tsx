@@ -11,6 +11,7 @@ import { DateInput } from '../../ui/DateInputs';
 import { Icon } from '../../ui/Icon';
 import { ActivitySheet } from '../activity/ActivitySheet';
 import { JournalSheet } from '../journal/JournalSheet';
+import { BloodPressureSheet } from '../bloodPressure/BloodPressureSheet';
 import { SleepButton } from '../sleep/SleepButton';
 import { DialItem } from './DialItem';
 import { endFast } from '../fast/fastActions';
@@ -30,6 +31,7 @@ export function QuickActions() {
   const [open, setOpen] = useState(false);
   const [activity, setActivity] = useState(false);
   const [journal, setJournal] = useState(false);
+  const [bp, setBp] = useState(false);
   const [fastSheet, setFastSheet] = useState(false);
   const [fastStart, setFastStart] = useState(today);
   const close = () => setOpen(false);
@@ -97,6 +99,17 @@ export function QuickActions() {
               }}
             />
           )}
+          {on('bloodPressure') && (
+            <DialItem
+              icon="heart"
+              label={t('bp.addTitle')}
+              tour="fan.bloodPressure"
+              onClick={() => {
+                close();
+                setBp(true);
+              }}
+            />
+          )}
           {on('sleep') && <SleepButton onDone={close} />}
           {(on('fasting') || d.activeFast) && (
             <DialItem
@@ -141,6 +154,7 @@ export function QuickActions() {
       </div>
       {activity && <ActivitySheet defaultTime={Date.now()} onClose={() => setActivity(false)} />}
       {journal && <JournalSheet onClose={() => setJournal(false)} />}
+      {bp && <BloodPressureSheet defaultTime={Date.now()} onClose={() => setBp(false)} />}
       {fastSheet && (
         <Sheet title={t('home.fasting')} onClose={() => setFastSheet(false)}>
           <Field label={t('home.fastSince')} hint={t('home.fastHint')}>

@@ -29,6 +29,7 @@ import {
   type ShoppingItem,
   type PantryItem,
   type KetoneReading,
+  type BloodPressureReading,
   type Habit,
   type HabitDay,
   type LogEntry,
@@ -64,6 +65,7 @@ export interface Snapshot {
   ketones: KetoneReading[];
   habits: Habit[];
   habitDays: HabitDay[];
+  bloodPressure: BloodPressureReading[];
   /** Missing in backups from before portion sizes were included; restoring one keeps the sizes on the phone. */
   portionSizes?: FoodPortionSizes[];
 }
@@ -526,6 +528,28 @@ export function createRepo(db: ToFooDB) {
       await db.ketones.put(k);
     },
 
+    // ── Blood pressure ──
+    /** Save readings taken at one sitting; returns them so the UI can offer undo. */
+    async addBloodPressure(readings: Array<Omit<BloodPressureReading, 'id' | 'schemaVersion'>>): Promise<BloodPressureReading[]> {
+      const recs = readings.map((r): BloodPressureReading => ({ ...r, id: newId(), schemaVersion: v }));
+      await db.bloodPressure.bulkPut(recs);
+      return recs;
+    },
+    async updateBloodPressure(r: BloodPressureReading): Promise<void> {
+      await db.bloodPressure.put({ ...r, schemaVersion: v });
+    },
+    /** Delete readings; returns them so the UI can offer undo via restoreBloodPressure. */
+    async deleteBloodPressure(ids: string[]): Promise<BloodPressureReading[]> {
+      return db.transaction('rw', db.bloodPressure, async () => {
+        const old = (await db.bloodPressure.bulkGet(ids)).filter((r): r is BloodPressureReading => !!r);
+        await db.bloodPressure.bulkDelete(ids);
+        return old;
+      });
+    },
+    async restoreBloodPressure(rs: BloodPressureReading[]): Promise<void> {
+      await db.bloodPressure.bulkPut(rs);
+    },
+
     // ── Habits ──
     /** Add a habit at the end of the list. */
     async addHabit(h: Omit<Habit, 'id' | 'schemaVersion' | 'order' | 'createdAt'>, now = Date.now()): Promise<Habit> {
@@ -693,7 +717,7 @@ export function createRepo(db: ToFooDB) {
      * `backupFirst`, an automatic backup of the data it replaces is saved in the same transaction.
      */
     async restore(s: Snapshot, { backupFirst = false } = {}): Promise<void> {
-      const tables = [db.profile, db.settings, db.recipes, db.batches, db.log, db.customFoods, db.dayStatus, db.fasts, db.sunEntries, db.products, db.journal, db.sleep, db.activities, db.water, db.shopping, db.pantry, db.ketones, db.habits, db.habitDays];
+      const tables = [db.profile, db.settings, db.recipes, db.batches, db.log, db.customFoods, db.dayStatus, db.fasts, db.sunEntries, db.products, db.journal, db.sleep, db.activities, db.water, db.shopping, db.pantry, db.ketones, db.habits, db.habitDays, db.bloodPressure];
       await db.transaction('rw', [...SNAPSHOT_TABLES, 'autoBackups'], async () => {
         if (backupFirst) await writeAutoBackup((name) => db.table(name), 'restore', new Date());
         await Promise.all(tables.map((t) => t.clear()));
@@ -717,6 +741,7 @@ export function createRepo(db: ToFooDB) {
         await db.ketones.bulkPut(s.ketones);
         await db.habits.bulkPut(s.habits);
         await db.habitDays.bulkPut(s.habitDays);
+        await db.bloodPressure.bulkPut(s.bloodPressure);
         if (s.portionSizes) {
           await db.meta.where('key').startsWith(PORTIONS_PREFIX).delete();
           await db.meta.bulkPut(s.portionSizes.map((p) => ({ key: PORTIONS_PREFIX + p.food, value: p.sizes })));

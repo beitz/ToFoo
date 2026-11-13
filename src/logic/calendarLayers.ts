@@ -1,5 +1,5 @@
 import type { DayStatus } from '../model/types';
-import type { ActivityRecord, AskDays, Habit, JournalEntry, SleepRecord, WaterRecord } from '../storage/types';
+import type { ActivityRecord, AskDays, BloodPressureReading, Habit, JournalEntry, SleepRecord, WaterRecord } from '../storage/types';
 import { asksOn, type CatchUpKind } from './catchUp';
 import { habitsDaySummary, type HabitData, type HabitsDaySummary } from './habits';
 
@@ -8,7 +8,7 @@ import { habitsDaySummary, type HabitData, type HabitsDaySummary } from './habit
  * logged but activities forgotten, and the calendar could not show which days). Pure.
  */
 
-export const LAYERS = ['meals', 'sleep', 'activity', 'water', 'journal', 'habits'] as const;
+export const LAYERS = ['meals', 'sleep', 'activity', 'water', 'bloodPressure', 'journal', 'habits'] as const;
 export type Layer = (typeof LAYERS)[number];
 
 /**
@@ -27,6 +27,8 @@ export interface DayLayers {
   journal: number;
   /** Habits kept, missed and (daily ones) still open that day. */
   habits: HabitsDaySummary;
+  /** The day's average blood pressure, when measured. */
+  bloodPressure?: { systolic: number; diastolic: number };
 }
 
 export interface LayersInput {
@@ -38,6 +40,8 @@ export interface LayersInput {
   activities: readonly Pick<ActivityRecord, 'day' | 'minutes'>[];
   water: readonly Pick<WaterRecord, 'day' | 'ml'>[];
   journal: readonly Pick<JournalEntry, 'day'>[];
+  /** Blood pressure readings; absent counts as none. */
+  bloodPressure?: readonly Pick<BloodPressureReading, 'day' | 'systolic' | 'diastolic'>[];
   /** Kinds skipped on the fill-in page, by day. */
   skipped: Readonly<Record<string, readonly CatchUpKind[]>>;
   /** The habits and what they need, when habits are on. */
@@ -56,15 +60,17 @@ function firstDay(rs: readonly { day: string }[]): string | undefined {
 export function dayLayers(input: LayersInput): Map<string, DayLayers> {
   const finished = input.sleep.filter((r): r is typeof r & { end: number } => r.end !== undefined);
   // A tracker counts as in use from the first day anything was logged with it; before that, nothing is missing.
-  const since = { sleep: firstDay(finished), activity: firstDay(input.activities), water: firstDay(input.water) };
+  const bp = input.bloodPressure ?? [];
+  const since = { sleep: firstDay(finished), activity: firstDay(input.activities), water: firstDay(input.water), bloodPressure: firstDay(bp) };
   const sum = <T extends { day: string }>(rs: readonly T[], day: string, f: (r: T) => number) => rs.reduce((a, r) => (r.day === day ? a + f(r) : a), 0);
   const out = new Map<string, DayLayers>();
   for (const day of input.days) {
     const over = day < input.today;
     const skipped = new Set(input.skipped[day] ?? []);
     const sleepMinutes = Math.round(sum(finished, day, (r) => (r.end - r.start) / 60_000));
-    const has = { sleep: finished.some((r) => r.day === day), activity: input.activities.some((r) => r.day === day), water: input.water.some((r) => r.day === day) };
-    const tracker = (layer: 'sleep' | 'activity' | 'water'): Mark => {
+    const dayBp = bp.filter((r) => r.day === day);
+    const has = { sleep: finished.some((r) => r.day === day), activity: input.activities.some((r) => r.day === day), water: input.water.some((r) => r.day === day), bloodPressure: dayBp.length > 0 };
+    const tracker = (layer: 'sleep' | 'activity' | 'water' | 'bloodPressure'): Mark => {
       if (has[layer]) return 'logged';
       if (skipped.has(layer)) return 'skipped';
       const from = since[layer];
@@ -77,12 +83,13 @@ export function dayLayers(input: LayersInput): Map<string, DayLayers> {
     // A day with any habit answered counts as logged; one with only open daily habits is missing them, once over.
     const habitMark: Mark = habits.kept + habits.missed > 0 ? 'logged' : skipped.has('habits') ? 'skipped' : over && habits.open > 0 && asksOn(input.askDays, 'habits', day) ? 'missing' : 'none';
     out.set(day, {
-      marks: { meals, sleep: tracker('sleep'), activity: tracker('activity'), water: tracker('water'), journal: journal ? 'logged' : 'none', habits: habitMark },
+      marks: { meals, sleep: tracker('sleep'), activity: tracker('activity'), water: tracker('water'), bloodPressure: tracker('bloodPressure'), journal: journal ? 'logged' : 'none', habits: habitMark },
       sleepMinutes,
       activityMinutes: sum(input.activities, day, (r) => r.minutes),
       waterMl: sum(input.water, day, (r) => r.ml),
       journal,
       habits,
+      ...(dayBp.length ? { bloodPressure: { systolic: Math.round(dayBp.reduce((a, r) => a + r.systolic, 0) / dayBp.length), diastolic: Math.round(dayBp.reduce((a, r) => a + r.diastolic, 0) / dayBp.length) } } : {}),
     });
   }
   return out;

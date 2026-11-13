@@ -153,6 +153,24 @@ describe('insight day facts', () => {
     expect(all.days.get(key(7))).toEqual(data.days.get(key(7)));
   });
 
+  it('gives blood pressure per day only where measured, and shares it only when ticked', () => {
+    const bloodPressure = [
+      { id: 'b1', schemaVersion: 1, time: at(3, 7), day: key(3), systolic: 132, diastolic: 86, pulse: 70 },
+      { id: 'b2', schemaVersion: 1, time: at(3, 7, 1), day: key(3), systolic: 128, diastolic: 82 },
+    ];
+    const withBp = buildInsightData({ ...input, bloodPressure });
+    expect(withBp.days.get(key(3))!.values).toMatchObject({ bp_systolic: 130, bp_diastolic: 84, bp_pulse: 70 });
+    // Not measured is unknown, never zero.
+    expect(withBp.days.get(key(4))!.values).toMatchObject({ bp_systolic: null, bp_diastolic: null, bp_pulse: null });
+    expect(overview(withBp, key(1), key(10)).bloodPressureDays).toBe(1);
+    expect(holds({ kind: 'measure', measure: 'bp_systolic', op: '>=', value: 130 }, key(3), withBp)).toBe(true);
+    const without = shareInsightData(withBp, key(1), new Set(['food']));
+    expect(without.days.get(key(3))!.values.bp_systolic).toBeNull();
+    expect(without.days.get(key(3))!.bloodPressure).toEqual([]);
+    const shared = shareInsightData(withBp, key(1), new Set(['bloodPressure']));
+    expect(shared.days.get(key(3))!.bloodPressure).toHaveLength(2);
+  });
+
   it('keeps private journal entries out unless the user includes them', () => {
     const secret: JournalEntry[] = [
       ...journal,

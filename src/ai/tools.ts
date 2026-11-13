@@ -21,6 +21,7 @@ import { refKey } from '../lib/refs';
 import { MAX_SLEEP_MS } from '../logic/sleep';
 import { MAX_ACTIVITY_MINUTES } from '../logic/activity';
 import { MAX_WATER_ML } from '../logic/water';
+import { BP_INPUT, bpProblem } from '../logic/bloodPressure';
 import { MAX_WEIGHT_KG, MIN_WEIGHT_KG } from '../logic/weight';
 import { dayKey } from '../lib/dates';
 import { MAX_POT_GRAMS, MAX_POT_PORTIONS } from '../logic/batch';
@@ -220,6 +221,21 @@ export const waterProposalInput = z.object({
 /** Plain water the assistant proposes, for the user to check. */
 export interface WaterProposal {
   ml: number;
+  time?: number;
+  replaces?: string;
+}
+
+export const bloodPressureProposalInput = z.object({
+  readings: z.array(z.object({ systolic: z.number(), diastolic: z.number(), pulse: z.number().optional() })),
+  /** Local "YYYY-MM-DD HH:MM" it was measured; empty for now. */
+  time: z.string().optional(),
+  /** Id of the open blood pressure card this replaces (e.g. "D1"); empty for a new one. */
+  replaces: z.string().optional(),
+});
+
+/** The readings of one sitting the assistant proposes, for the user to check. */
+export interface BloodPressureProposal {
+  readings: Array<{ systolic: number; diastolic: number; pulse?: number }>;
   time?: number;
   replaces?: string;
 }
@@ -453,6 +469,8 @@ export interface ToolContext {
   ketones?: boolean;
   /** Weight is on: the assistant may propose weigh-ins. */
   weight?: boolean;
+  /** Blood pressure is on: the assistant may propose readings. */
+  bloodPressure?: boolean;
   /** Habits are on: the user's habits, which the assistant may answer per day (absent when there are none). */
   habits?: readonly HabitInfo[];
   /** The shopping list is on: the assistant may propose things to put on it. */
@@ -497,7 +515,7 @@ export interface IdeaTools {
 }
 
 /** Which online sources the assistant is offered (decides the prompt and tool variant). */
-export function sourcesOf(ctx: Pick<ToolContext, 'products' | 'journal' | 'sleep' | 'activity' | 'water' | 'ketones' | 'weight' | 'habits' | 'shopping' | 'pantry' | 'recipe' | 'recipes' | 'forgotten' | 'insights' | 'foodCheck'>): {
+export function sourcesOf(ctx: Pick<ToolContext, 'products' | 'journal' | 'sleep' | 'activity' | 'water' | 'ketones' | 'weight' | 'bloodPressure' | 'habits' | 'shopping' | 'pantry' | 'recipe' | 'recipes' | 'forgotten' | 'insights' | 'foodCheck'>): {
   off: boolean;
   usda: boolean;
   webSearch: boolean;
@@ -507,6 +525,7 @@ export function sourcesOf(ctx: Pick<ToolContext, 'products' | 'journal' | 'sleep
   water: boolean;
   ketones: boolean;
   weight: boolean;
+  bloodPressure: boolean;
   habits: boolean;
   shopping: boolean;
   pantry: boolean;
@@ -519,7 +538,7 @@ export function sourcesOf(ctx: Pick<ToolContext, 'products' | 'journal' | 'sleep
 } {
   const { products } = ctx;
   const online = { off: !!products?.find, usda: !!products?.searchUsda, webSearch: !!products?.find && !!products.webSearch };
-  if (ctx.recipe) return { ...online, journal: false, sleep: false, activity: false, water: false, ketones: false, weight: false, habits: false, shopping: false, pantry: false, recipe: true, recipes: false, ideas: false, forgotten: false, insights: false, check: false };
+  if (ctx.recipe) return { ...online, journal: false, sleep: false, activity: false, water: false, ketones: false, weight: false, bloodPressure: false, habits: false, shopping: false, pantry: false, recipe: true, recipes: false, ideas: false, forgotten: false, insights: false, check: false };
   return {
     ...online,
     journal: !!ctx.journal,
@@ -528,6 +547,7 @@ export function sourcesOf(ctx: Pick<ToolContext, 'products' | 'journal' | 'sleep
     water: !!ctx.water,
     ketones: !!ctx.ketones,
     weight: !!ctx.weight,
+    bloodPressure: !!ctx.bloodPressure,
     habits: !!ctx.habits?.length,
     shopping: !!ctx.shopping,
     pantry: !!ctx.pantry,
@@ -795,6 +815,32 @@ export function validateWaterProposal(input: unknown, now?: number): { ok: true;
   if (problems.length) return { ok: false, error: `${problems.join('\n')}\nFix these and call propose_water again.` };
   const replaces = parsed.data.replaces?.trim();
   return { ok: true, proposal: { ml: Math.round(ml), ...(time !== undefined ? { time } : {}), ...(replaces ? { replaces } : {}) } };
+}
+
+/** At most this many readings in one sitting's card (the protocol's two, and a third when they differ). */
+const MAX_BP_READINGS = 3;
+
+/** Check a `propose_blood_pressure` call: one to three plausible readings, at a plausible time. */
+export function validateBloodPressureProposal(input: unknown, now?: number): { ok: true; proposal: BloodPressureProposal } | { ok: false; error: string } {
+  const parsed = bloodPressureProposalInput.safeParse(input);
+  if (!parsed.success) return { ok: false, error: `Invalid input: ${parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}` };
+  const problems: string[] = [];
+  const readings = parsed.data.readings.map((r) => ({ systolic: Math.round(r.systolic), diastolic: Math.round(r.diastolic), ...(r.pulse ? { pulse: Math.round(r.pulse) } : {}) }));
+  if (!readings.length) problems.push('readings is empty: give at least one reading.');
+  if (readings.length > MAX_BP_READINGS) problems.push(`${readings.length} readings in one card; at most ${MAX_BP_READINGS} per sitting (one card per sitting).`);
+  readings.forEach((r, i) => {
+    const p = bpProblem(r);
+    const what = `reading ${i + 1} (${r.systolic}/${r.diastolic}${r.pulse ? `, pulse ${r.pulse}` : ''})`;
+    if (p === 'systolic') problems.push(`${what}: systolic must be ${BP_INPUT.systolic[0]}–${BP_INPUT.systolic[1]} mmHg.`);
+    else if (p === 'diastolic') problems.push(`${what}: diastolic must be ${BP_INPUT.diastolic[0]}–${BP_INPUT.diastolic[1]} mmHg.`);
+    else if (p === 'pulse') problems.push(`${what}: pulse must be ${BP_INPUT.pulse[0]}–${BP_INPUT.pulse[1]} per minute, or 0 when not shown.`);
+    else if (p === 'order') problems.push(`${what}: systolic (the upper number) must be higher than diastolic; check whether they are swapped.`);
+  });
+  const { time, problem } = checkTime(parsed.data.time, now);
+  if (problem) problems.push(problem);
+  if (problems.length) return { ok: false, error: `${problems.join('\n')}\nFix these and call propose_blood_pressure again.` };
+  const replaces = parsed.data.replaces?.trim();
+  return { ok: true, proposal: { readings, ...(time !== undefined ? { time } : {}), ...(replaces ? { replaces } : {}) } };
 }
 
 /** Input check against unit mix-ups (e.g. mg/dL for mmol/L), not physiology: values above these are sent back to the assistant to check. */

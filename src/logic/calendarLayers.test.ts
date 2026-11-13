@@ -36,6 +36,17 @@ describe('calendar layers', () => {
     expect(base.days.map((d) => l.get(d)!.marks.water)).toEqual(['none', 'none', 'none', 'none', 'none']);
   });
 
+  it('marks blood pressure from its first reading on, with the day\'s average', () => {
+    const l = dayLayers({ ...base, bloodPressure: [{ day: key(19), systolic: 130, diastolic: 84 }, { day: key(19), systolic: 125, diastolic: 81 }] });
+    expect(base.days.map((d) => l.get(d)!.marks.bloodPressure)).toEqual(['none', 'logged', 'missing', 'missing', 'none']);
+    expect(l.get(key(19))!.bloodPressure).toEqual({ systolic: 128, diastolic: 83 });
+    expect(l.get(key(20))!.bloodPressure).toBeUndefined();
+    // Not asked about on Tuesdays: not missing then.
+    const some = dayLayers({ ...base, bloodPressure: [{ day: key(19), systolic: 130, diastolic: 84 }], askDays: { bloodPressure: [1, 3] } });
+    expect(base.days.map((d) => some.get(d)!.marks.bloodPressure)).toEqual(['none', 'logged', 'none', 'missing', 'none']);
+    expect(base.days.map((d) => dayLayers(base).get(d)!.marks.bloodPressure)).toEqual(['none', 'none', 'none', 'none', 'none']);
+  });
+
   it('never marks missing on a weekday the user said not to ask about', () => {
     // 2026-10-19 is a Monday, 2026-10-20 a Tuesday, 2026-10-21 a Wednesday.
     const l = dayLayers({ ...base, askDays: { food: [2, 3, 4, 5, 6, 7], sleep: [1], activity: [] } });

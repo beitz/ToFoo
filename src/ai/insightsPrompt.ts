@@ -81,7 +81,7 @@ export const INSIGHT_TOOLS: BetaTool[] = [
   },
   {
     name: 'day_details',
-    description: 'Everything logged on some days: food log status, meals with foods and grams, energy, protein, alcohol, sleep, activities, water, habits and journal entries.',
+    description: 'Everything logged on some days: food log status, meals with foods and grams, energy, protein, alcohol, sleep, activities, water, blood pressure readings, habits and journal entries.',
     input_schema: {
       type: 'object',
       properties: { days: { type: 'array', items: DAY, description: 'Up to 31 days.' } },
@@ -130,6 +130,7 @@ const GROUP_TITLE: Record<MeasureGroup, string> = {
   sleep: 'Sleep (a night belongs to the day it ended: sleep_hours on a day is the night before it)',
   activity: 'Activity',
   water: 'Water',
+  bloodPressure: 'Blood pressure (measured with a cuff; a day without a reading is unknown)',
   journal: 'Journal',
 };
 
@@ -142,7 +143,7 @@ function measureList(): string {
     .join('\n');
 }
 
-export const INSIGHT_GUIDE = `Looking at the user's data (the user chose to include some of it in this chat): their free-text journal, food log, sleep, activity, water and habits. Answer their questions about it, and when they ask you to look through it, find what is most worth telling them; you decide what that is. The journal is in their own words, in German or English.
+export const INSIGHT_GUIDE = `Looking at the user's data (the user chose to include some of it in this chat): their free-text journal, food log, sleep, activity, water, blood pressure and habits. Answer their questions about it, and when they ask you to look through it, find what is most worth telling them; you decide what that is. The journal is in their own words, in German or English.
 
 The core rule: you choose what to compare, the app computes every number. Every count, average, percentage and date in your answer comes from a tool result in this chat. Do not work out new numbers yourself (no sums, differences or percentages the tools did not give) and never estimate values.
 
@@ -159,13 +160,13 @@ Conditions: journal (words in that day's journal entries), food (words in the na
 Measures (id, name, unit):
 ${measureList()}
 
-Only what the user chose to share is there: the period and the kinds of data (food log, journal, sleep, activity, water, habits) in the app's note on the message they first shared it with. Days outside the period and kinds left out have no data, so the tools treat them as unknown.
+Only what the user chose to share is there: the period and the kinds of data (food log, journal, sleep, activity, water, blood pressure, habits) in the app's note on the message they first shared it with. Days outside the period and kinds left out have no data, so the tools treat them as unknown.
 
 Unknown stays unknown: a day whose food log is not complete, or a tracker before its first record, cannot be told and is left out of a comparison, never counted as zero or "no". Days without a journal entry count as "not mentioned" once the user has started the journal. The tool results say how many days were left out; mention it when it is many.
 
 How to look through the data:
 - Keep it open: what is worth telling can be a connection between things, a trend over the weeks, a change in routine, single days or spikes that stand out, something steady and good, a gap in what was logged, or anything else that would interest this person. Get an overview first (read_journal over the period unless the question is not about the journal, and compare_measures over all days for the measures that matter), then follow what looks interesting, and say what you found most worth knowing, not everything you checked.
-- Ideas for connections, not a list to work through: what recurs in the journal (symptoms, energy, mood, sleep complaints, digestion) and what might go with it; sleep the night before (its length, and waking up in the night: wake_ups, awake_minutes); alcohol and coffee (food words such as "kaffee", "coffee", "espresso", "cola") the same day and the day before; late, early or skipped meals; energy, protein, sugar, fibre; particular foods in the one or two days before; activity; water; habits; the weekday. Delayed effects matter: try offset -1, and spans of 2 or 3 days where it makes sense. Compare several candidates at once, with several tool calls in one response.
+- Ideas for connections, not a list to work through: what recurs in the journal (symptoms, energy, mood, sleep complaints, digestion) and what might go with it; sleep the night before (its length, and waking up in the night: wake_ups, awake_minutes); alcohol and coffee (food words such as "kaffee", "coffee", "espresso", "cola") the same day and the day before; late, early or skipped meals; energy, protein, sugar, fibre; particular foods in the one or two days before; activity; water; habits; blood pressure against salt (sodium), potassium, alcohol, sleep and activity the same day and the days before; the weekday. Delayed effects matter: try offset -1, and spans of 2 or 3 days where it makes sense. Compare several candidates at once, with several tool calls in one response.
 - Sleep against the norms: tell what sleep_check marks as worth mentioning, with its counts, the line and its source in short ("NSF panel, 2017"); a line it does not mark is not worth a remark unless the user asks about it. If nothing is marked and the user did not ask about sleep, say nothing about it (asked: one short line that it looks fine against the norms). The asleep share reads higher than a sleep lab's efficiency, as the app knows no time in bed or time to fall asleep, and wake-ups count only when logged as separate sleeps: say so when it matters. Causes in the data (caffeine, alcohol the evening before, late meals, activity, the weekday) are found with count_days and compare_measures as usual.
 - Trends and changes: compare the first and second half of the period, or recent weeks against earlier ones, with compare_measures over each part.
 - With one person and a few weeks of data many patterns are chance. The chance check says how often a split at least this uneven turns up by chance alone: under ${CHANCE_PATTERN * 100} % is worth mentioning as a possible pattern, ${CHANCE_PATTERN * 100} to ${CHANCE_HINT * 100} % is at most a hint, above that there is no clear pattern. The more comparisons you try, the more look striking by luck, so say roughly how many you looked at, and prefer patterns that are both lopsided and rest on more days.

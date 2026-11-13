@@ -28,6 +28,8 @@ import { hmText } from '../sleep/format';
 import { useSleep } from '../sleep/useSleep';
 import { waterText } from '../water/format';
 import { fmtKg } from '../weight/format';
+import { BP_CATEGORY_KEY, bpText } from '../bloodPressure/format';
+import { bpCategory, bpWeek } from '../../logic/bloodPressure';
 import { useWeight } from '../weight/useWeight';
 import { InsightsTabs } from './InsightsTabs';
 import { LevelsSummary } from './LevelsSummary';
@@ -71,9 +73,9 @@ export function OverviewPage() {
   const layers = useMemo(
     () =>
       sleep && water && journal && skipped && habits !== undefined
-        ? dayLayers({ days, today: d.today, dayStatus: d.model.dayStatus, sleep, activities: d.activities, water, journal, skipped, habits: habits ?? undefined, askDays: d.settings.askDays })
+        ? dayLayers({ days, today: d.today, dayStatus: d.model.dayStatus, sleep, activities: d.activities, water, bloodPressure: d.bloodPressure, journal, skipped, habits: habits ?? undefined, askDays: d.settings.askDays })
         : undefined,
-    [days, d.today, d.model.dayStatus, sleep, d.activities, water, journal, skipped, habits, d.settings.askDays],
+    [days, d.today, d.model.dayStatus, sleep, d.activities, water, d.bloodPressure, journal, skipped, habits, d.settings.askDays],
   );
 
   const fast = useMemo(() => {
@@ -97,7 +99,7 @@ export function OverviewPage() {
   const notes = journal.filter((j) => j.day >= days[0]!);
   // A private entry's words stay off the overview; it still counts.
   const latest = notes.filter((n) => !n.private).pop();
-  const off = (['sleep', 'activity', 'water', 'weight', 'journal', 'habits'] as const).filter((k) => !isOn(f, k));
+  const off = (['sleep', 'activity', 'water', 'bloodPressure', 'weight', 'journal', 'habits'] as const).filter((k) => !isOn(f, k));
   const offNames = [...(isOn(f, 'fasting') ? [] : [t('overview.fasting')]), ...off.map((k) => t(OFF_NAME[k]))];
 
   return (
@@ -133,7 +135,7 @@ export function OverviewPage() {
         )}
       </div>
 
-      {off.length < 6 && (
+      {off.length < 7 && (
         <div className="card ov-card" data-tour="insights.trackers">
           {isOn(f, 'sleep') && (
             <Row to={href('nights')} icon="bed" title={t('nights.title')} strip={strip('sleep')}>
@@ -154,6 +156,11 @@ export function OverviewPage() {
           {isOn(f, 'water') && (
             <Row to={href('water')} icon="drop" title={t('water.title')} strip={strip('water')}>
               {wat.averageMl === undefined ? t('overview.nothingDays') : t('overview.water', { avg: waterText(wat.averageMl), n: wat.daysAtTarget, target: waterText(target) })}
+            </Row>
+          )}
+          {isOn(f, 'bloodPressure') && (
+            <Row to={href('blood-pressure')} icon="heart" title={t('bp.title')} strip={strip('bloodPressure')}>
+              <BpOverview />
             </Row>
           )}
           {isOn(f, 'habits') && habits && (
@@ -192,7 +199,8 @@ export function OverviewPage() {
   );
 }
 
-const OFF_NAME: Record<'sleep' | 'activity' | 'water' | 'weight' | 'journal' | 'habits', MessageKey> = {
+const OFF_NAME: Record<'sleep' | 'activity' | 'water' | 'bloodPressure' | 'weight' | 'journal' | 'habits', MessageKey> = {
+  bloodPressure: 'bp.title',
   sleep: 'nights.title',
   activity: 'activity.short',
   water: 'water.title',
@@ -200,6 +208,14 @@ const OFF_NAME: Record<'sleep' | 'activity' | 'water' | 'weight' | 'journal' | '
   journal: 'journal.title',
   habits: 'habits.title',
 };
+
+/** Blood pressure: the average of the last 7 days (the protocol's window, as on Home) and its category. */
+function BpOverview() {
+  const d = useData();
+  const { average } = bpWeek(d.bloodPressure, d.today);
+  if (!average) return <>{t('overview.nothingDays')}</>;
+  return <>{t('overview.bp', { value: bpText(average), cat: t(BP_CATEGORY_KEY[bpCategory(average)]), n: average.readings })}</>;
+}
 
 /** Weight: the trend now, and what the log check says once it can say something. */
 function WeightRow() {

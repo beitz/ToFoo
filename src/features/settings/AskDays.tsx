@@ -21,7 +21,7 @@ export function AskDays() {
   const d = useData();
   const f = d.settings.features;
   const ask = d.settings.askDays ?? {};
-  const kinds: CatchUpKind[] = ['food', ...(['sleep', 'activity', 'water', 'habits'] as const).filter((k) => isOn(f, k))];
+  const kinds: CatchUpKind[] = ['food', ...(['sleep', 'activity', 'water', 'bloodPressure', 'habits'] as const).filter((k) => isOn(f, k))];
   const save = (kind: CatchUpKind, days: number[] | undefined) => {
     const next = { ...ask };
     if (days) next[kind] = [...days].sort();

@@ -13,6 +13,7 @@ import { SettingsButton } from '../../ui/SettingsButton';
 import { AskChips } from '../../ui/AskChips';
 import { SleepQuestion } from '../sleep/SleepQuestion';
 import { WaterCard } from '../water/WaterCard';
+import { BloodPressureCard } from '../bloodPressure/BloodPressureCard';
 import { HabitsRow } from '../habits/HabitsRow';
 import { withStores } from '../../logic/stores';
 import { DayStrip } from './DayStrip';
@@ -85,6 +86,7 @@ export function HomePage() {
 
       <HomeCards rest={rest} stores={stores} windowDays={windowDays} startLevel={d.profile.startingLevel} showRange={showRange} defaultBased={perKgOnDefault} />
       {isOn(d.settings.features, 'water') && <WaterCard day={today} compact />}
+      {isOn(d.settings.features, 'bloodPressure') && <BloodPressureCard />}
       <NextToCook />
 
       {gaps.length > 0 && (

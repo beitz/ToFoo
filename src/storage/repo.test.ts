@@ -14,6 +14,25 @@ const fresh = async () => {
 };
 
 describe('repository', () => {
+  it('saves blood pressure readings of one sitting, deletes and restores them, and backs them up', async () => {
+    const repo = await fresh();
+    const added = await repo.addBloodPressure([
+      { time: 1000, day: '2026-10-15', systolic: 131, diastolic: 84, pulse: 66 },
+      { time: 1000, day: '2026-10-15', systolic: 127, diastolic: 82 },
+    ]);
+    expect(added.map((r) => r.schemaVersion)).toEqual([1, 1]);
+    expect((await repo.snapshot()).bloodPressure).toHaveLength(2);
+    const old = await repo.deleteBloodPressure([added[0]!.id]);
+    expect(await repo.db.bloodPressure.count()).toBe(1);
+    await repo.restoreBloodPressure(old);
+    expect((await repo.db.bloodPressure.get(added[0]!.id))!.pulse).toBe(66);
+    const snap = await repo.snapshot();
+    await repo.restore({ ...snap, bloodPressure: [] });
+    expect(await repo.db.bloodPressure.count()).toBe(0);
+    await repo.restore(snap);
+    expect(await repo.db.bloodPressure.count()).toBe(2);
+  });
+
   it('creates profile and settings on first start', async () => {
     const repo = await fresh();
     expect((await repo.getProfile())!.modelStartDay).toBe('2026-10-15');

@@ -50,6 +50,7 @@ function useSampleData(d: AppData, on: boolean): AppData | undefined {
       productList: d.products,
       activities: d.activities,
       ketones: [],
+      bloodPressure: d.bloodPressure,
     });
     // Not on every settings write behind the tour (it writes toursSeen itself); the profile can change on the About you sheet.
     // eslint-disable-next-line react-hooks/exhaustive-deps

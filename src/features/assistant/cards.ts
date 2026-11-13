@@ -1,19 +1,20 @@
 import { useEffect } from 'react';
 import type { useToast } from '../../app/toast';
-import type { RecipeSoFar, ShownActivity, ShownBatch, ShownIngredients, ShownNote, ShownPortion, ShownProposal, ShownHome, ShownRecipe, ShownShopping, ShownSleep, ShownWater, ShownKetone, ShownWeight, ShownHabits, ShownFoodFix, ShownMarkChecked } from '../../ai/assistant';
+import type { RecipeSoFar, ShownActivity, ShownBatch, ShownIngredients, ShownNote, ShownPortion, ShownProposal, ShownHome, ShownRecipe, ShownShopping, ShownSleep, ShownWater, ShownKetone, ShownWeight, ShownBloodPressure, ShownHabits, ShownFoodFix, ShownMarkChecked } from '../../ai/assistant';
 import type { ProposedItem } from '../../ai/tools';
 import type { AudioClip } from '../../ai/chatRecord';
 import type { Check } from '../../ai/insights';
 import { t } from '../../i18n';
 import { formatTime } from '../../lib/dates';
 import { fmtKg } from '../weight/format';
+import { bpText } from '../bloodPressure/format';
 import { activityName } from '../activity/ActivityForm';
 import { spanText } from '../sleep/format';
 import { waterText } from '../water/format';
 import { KETONE_TYPE_KEY, ketoneValueText } from '../fast/ketoneFormat';
 
 /**
- * A proposed meal (M1, …), journal entry (J1, …), sleep (S1, …), activity (A1, …), water (W1, …), ketone measurement (K1, …), weigh-in (G1, …), habit answers (T1, …),
+ * A proposed meal (M1, …), journal entry (J1, …), sleep (S1, …), activity (A1, …), water (W1, …), ketone measurement (K1, …), weigh-in (G1, …), blood pressure readings (D1, …), habit answers (T1, …),
  * things for the shopping list (L1, …), things bought or running low at home (H1, …),
  * recipe ingredients (R1, …, recipe editor), recipe for the book (R1, …, main chat), serving from
  * stock (P1, …), cooked batch (B1, …), fix from a check of the logged foods or the foods it found
@@ -28,6 +29,7 @@ export type Card =
   | { kind: 'water'; water: ShownWater; logged: boolean }
   | { kind: 'ketone'; ketone: ShownKetone; logged: boolean }
   | { kind: 'weight'; weight: ShownWeight; logged: boolean }
+  | { kind: 'bloodPressure'; pressure: ShownBloodPressure; logged: boolean }
   | { kind: 'habits'; habits: ShownHabits; logged: boolean }
   | { kind: 'shopping'; shopping: ShownShopping; logged: boolean }
   | { kind: 'home'; home: ShownHome; logged: boolean }
@@ -54,6 +56,8 @@ export function cardOf(c: Card) {
       return c.ketone;
     case 'weight':
       return c.weight;
+    case 'bloodPressure':
+      return c.pressure;
     case 'habits':
       return c.habits;
     case 'shopping':
@@ -95,6 +99,8 @@ export function cardTitle(c: Card): string {
       return `${t('ketone.cardTitle')} · ${ketoneValueText(c.ketone)} (${t(KETONE_TYPE_KEY[c.ketone.type])})`;
     case 'weight':
       return `${t('weight.title')} · ${t('weight.kg', { kg: fmtKg(c.weight.kg) })}`;
+    case 'bloodPressure':
+      return `${t('bp.title')} · ${c.pressure.readings.map(bpText).join(', ')}`;
     case 'habits':
       return `${t('habits.title')} · ${[...new Set(c.habits.answers.map((a) => a.name))].join(', ')}`;
     case 'shopping':
@@ -171,6 +177,8 @@ export function cardSpan(c: Card, fallback: number): { start: number; end: numbe
       return at(c.water.time ?? fallback);
     case 'ketone':
       return at(c.ketone.time ?? fallback);
+    case 'bloodPressure':
+      return at(c.pressure.time ?? fallback);
     case 'portion':
       return at(c.portion.time ?? fallback);
     case 'sleep':

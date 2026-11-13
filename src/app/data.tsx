@@ -8,7 +8,7 @@ import { refKey } from '../lib/refs';
 import { isOn } from '../settings/features';
 import { repo } from '../storage/repo';
 import { startAutoBackups } from './autoBackup';
-import type { ActivityRecord, Batch, CustomFood, KetoneReading, DayStatusRecord, Fast, LogEntry, Product, Profile, Recipe, Settings, SunEntry } from '../storage/types';
+import type { ActivityRecord, Batch, BloodPressureReading, CustomFood, KetoneReading, DayStatusRecord, Fast, LogEntry, Product, Profile, Recipe, Settings, SunEntry } from '../storage/types';
 import { resolveRequirements, type ResolvedRequirements } from '../model/requirements';
 import { simulate, type SimulationResult } from '../model/simulate';
 import type { ModelEntry } from '../model/types';
@@ -50,6 +50,8 @@ export interface AppData {
   activities: ActivityRecord[];
   /** Measured ketones, oldest first. */
   ketones: KetoneReading[];
+  /** Blood pressure readings, oldest first (also while the module is off). */
+  bloodPressure: BloodPressureReading[];
   /** Food code → recency boost (0–1), for search. */
   recentFoods: Map<string, number>;
   weightKg: number;
@@ -95,10 +97,11 @@ export interface RawData {
   productList: Product[];
   activities: ActivityRecord[];
   ketones: KetoneReading[];
+  bloodPressure: BloodPressureReading[];
 }
 
 /** Everything the screens read, derived from the stored records; also used for the tour's sample week. */
-export function computeAppData({ today, foods, searchIndex, profile, settings, recipes, batches, log, customFoods, dayStatus, fasts, sunEntries, productList, activities, ketones }: RawData): AppData {
+export function computeAppData({ today, foods, searchIndex, profile, settings, recipes, batches, log, customFoods, dayStatus, fasts, sunEntries, productList, activities, ketones, bloodPressure }: RawData): AppData {
   const batchesById = new Map(batches.map((b) => [b.id, b]));
   const customFoodsById = new Map(customFoods.map((c) => [c.id, c]));
   const weight = currentWeight(profile);
@@ -172,6 +175,7 @@ export function computeAppData({ today, foods, searchIndex, profile, settings, r
     activeFast: activeFast(fasts, log, customFoodsById, today),
     activities,
     ketones,
+    bloodPressure,
     recentFoods,
     weightKg: weight ?? 70,
   };
@@ -208,6 +212,7 @@ export function DataProvider({ children, fallback }: { children: ReactNode; fall
   // Only outside activities matter to the model (time in the sun); the rest stays out of it.
   const activities = useLiveQuery(() => repo.db.activities.toArray(), []);
   const ketones = useLiveQuery(() => repo.db.ketones.orderBy('time').toArray(), []);
+  const bloodPressure = useLiveQuery(() => repo.db.bloodPressure.orderBy('time').toArray(), []);
 
   const searchIndex = useMemo(() => (foods ? buildIndex(foods.foods.map((f) => ({ key: f.code, nameEn: f.nameEn, nameDe: f.nameDe }))) : null), [foods]);
 
@@ -238,9 +243,9 @@ export function DataProvider({ children, fallback }: { children: ReactNode; fall
   }, [accent]);
 
   const value = useMemo<AppData | null>(() => {
-    if (!foods || !searchIndex || !profile || !settings || !recipes || !batches || !log || !customFoods || !dayStatus || !fasts || !sunEntries || !productList || !activities || !ketones) return null;
-    return computeAppData({ today, foods, searchIndex, profile, settings, recipes, batches, log, customFoods, dayStatus, fasts, sunEntries, productList, activities, ketones });
-  }, [foods, searchIndex, profile, settings, recipes, batches, log, customFoods, dayStatus, fasts, sunEntries, productList, activities, ketones, today]);
+    if (!foods || !searchIndex || !profile || !settings || !recipes || !batches || !log || !customFoods || !dayStatus || !fasts || !sunEntries || !productList || !activities || !ketones || !bloodPressure) return null;
+    return computeAppData({ today, foods, searchIndex, profile, settings, recipes, batches, log, customFoods, dayStatus, fasts, sunEntries, productList, activities, ketones, bloodPressure });
+  }, [foods, searchIndex, profile, settings, recipes, batches, log, customFoods, dayStatus, fasts, sunEntries, productList, activities, ketones, bloodPressure, today]);
 
   if (error) return <>{fallback({ error })}</>;
   if (!value) return <>{fallback({})}</>;

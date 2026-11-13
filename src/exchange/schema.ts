@@ -122,7 +122,7 @@ export const settingsSchema = z.object({
   toursSeen: z.array(z.string()).optional(),
   backupReminderDays: z.number().int().positive(),
   askDays: z
-    .partialRecord(z.enum(['food', 'sleep', 'activity', 'water', 'habits']), z.array(z.number().int().min(1).max(7)))
+    .partialRecord(z.enum(['food', 'sleep', 'activity', 'water', 'habits', 'bloodPressure']), z.array(z.number().int().min(1).max(7)))
     .optional()
     .describe('Weekdays (1 = Monday … 7 = Sunday) to ask about each thing on when a day lacks it; unset = every day, [] = never'),
   autoBackupKeep: z.number().int().positive().optional(),
@@ -131,7 +131,7 @@ export const settingsSchema = z.object({
   macroView: z.enum(['rings', 'bars']).optional(),
   nutrientView: z.enum(['comets', 'bars']).optional(),
   homeGrouping: z.enum(['status', 'type', 'none']).optional(),
-  calendarLayer: z.enum(['all', 'meals', 'sleep', 'activity', 'water', 'journal', 'habits']).optional(),
+  calendarLayer: z.enum(['all', 'meals', 'sleep', 'activity', 'water', 'journal', 'habits', 'bloodPressure']).optional(),
   homeCollapsed: z.record(z.string(), z.boolean()).optional(),
   favourites: z.array(foodRef).optional(),
   favouriteMeals: z.array(favouriteMeal).optional(),
@@ -316,6 +316,18 @@ export const ketoneSchema = z
   .object({ id: z.string(), ...versioned, time: z.number(), day, type: z.enum(['blood', 'breath', 'urine']), value: z.number().nonnegative() })
   .describe('A ketone measurement: when (epoch ms), how (blood: β-hydroxybutyrate in mmol/L from a finger-prick meter; breath: acetone in ppm, device-specific; urine: acetoacetate in mmol/L as the strip reads) and the value in that unit');
 
+export const bloodPressureSchema = z
+  .object({
+    id: z.string(),
+    ...versioned,
+    time: z.number(),
+    day,
+    systolic: z.number().positive(),
+    diastolic: z.number().positive(),
+    pulse: z.number().positive().optional(),
+  })
+  .describe('One blood pressure reading from a cuff: when (epoch ms), systolic and diastolic in mmHg, and the pulse in beats per minute when noted; two readings a minute apart are two records');
+
 const activityKind = z.enum(['walk', 'run', 'cycling', 'strength', 'other']);
 export const habitSchema = z
   .object({
@@ -398,6 +410,7 @@ export const backupSchema = z.object({
     ketones: z.array(ketoneSchema).default([]),
     habits: z.array(habitSchema).default([]),
     habitDays: z.array(habitDaySchema).default([]),
+    bloodPressure: z.array(bloodPressureSchema).default([]),
     // Optional, not defaulted: restoring a backup from before portion sizes were in backups keeps the
     // sizes on the phone instead of clearing them.
     portionSizes: z.array(portionSizesSchema).optional(),

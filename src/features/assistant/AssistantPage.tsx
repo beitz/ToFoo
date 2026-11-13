@@ -73,6 +73,7 @@ import { ProposalGroup, cardAnchor } from './ProposalGroup';
 import { CardFrame, useCardIntake } from './CardFrame';
 import { ForgottenAsk } from './ForgottenAsk';
 import { WeightProposalCard } from './WeightCard';
+import { BloodPressureProposalCard } from './BloodPressureCard';
 import { FoodFixCard } from './FoodFixCard';
 import { MarkCheckedCard } from './MarkCheckedCard';
 import { kitchenNote, type KitchenThing } from '../../ai/kitchen';
@@ -508,6 +509,7 @@ function Chat({
               water: isOn(d.settings.features, 'water'),
               ketones: isOn(d.settings.features, 'ketosis') && isOn(d.settings.features, 'ketoneReadings'),
               weight: isOn(d.settings.features, 'weight'),
+              bloodPressure: isOn(d.settings.features, 'bloodPressure'),
               ...(habits?.length ? { habits } : {}),
               shopping: isOn(d.settings.features, 'shoppingList'),
               forgotten: isOn(d.settings.features, 'forgottenCheck'),
@@ -578,6 +580,7 @@ function Chat({
         ...outcome.waters.map((w): Card => ({ kind: 'water', water: w, logged: false })),
         ...outcome.ketones.map((k): Card => ({ kind: 'ketone', ketone: k, logged: false })),
         ...outcome.weights.map((w): Card => ({ kind: 'weight', weight: w, logged: false })),
+        ...outcome.pressures.map((p): Card => ({ kind: 'bloodPressure', pressure: p, logged: false })),
         ...outcome.habits.map((h): Card => ({ kind: 'habits', habits: h, logged: false })),
         ...outcome.shopping.map((l): Card => ({ kind: 'shopping', shopping: l, logged: false })),
         ...outcome.homes.map((h): Card => ({ kind: 'home', home: h, logged: false })),
@@ -789,6 +792,7 @@ function Chat({
                     isOn(d.settings.features, 'water') && t('ai.introWater'),
                     isOn(d.settings.features, 'ketosis') && isOn(d.settings.features, 'ketoneReadings') && t('ai.introKetones'),
                     isOn(d.settings.features, 'weight') && t('ai.introWeight'),
+                    isOn(d.settings.features, 'bloodPressure') && t('ai.introBloodPressure'),
                     isOn(d.settings.features, 'habits') && !!habits?.length && t('ai.introHabits'),
                     isOn(d.settings.features, 'shoppingList') && t('ai.introShopping'),
                     isOn(d.settings.features, 'atHome') && t('ai.introPantry'),
@@ -1087,6 +1091,7 @@ function CardView({ card, ...rest }: CardProps<Card>) {
   if (card.kind === 'water') return <WaterProposalCard card={card} {...rest} />;
   if (card.kind === 'ketone') return <KetoneProposalCard card={card} {...rest} />;
   if (card.kind === 'weight') return <WeightProposalCard card={card} {...rest} />;
+  if (card.kind === 'bloodPressure') return <BloodPressureProposalCard card={card} {...rest} />;
   if (card.kind === 'habits') return <HabitsProposalCard card={card} {...rest} />;
   if (card.kind === 'shopping') return <ShoppingCard card={card} {...rest} />;
   if (card.kind === 'home') return <HomeCard card={card} {...rest} />;

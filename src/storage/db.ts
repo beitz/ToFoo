@@ -7,7 +7,7 @@ import { SNAPSHOT_TABLES, writeAutoBackup } from './autoBackup';
 import { sleepDay } from '../logic/sleep';
 import { migrateRecord, needsMigration, TABLES, type TableName } from './migrations';
 import type { ChatAudio, ChatPhoto, ChatRecord } from '../ai/chatRecord';
-import type { ActivityRecord, AutoBackup, Batch, CustomFood, DayStatusRecord, Fast, Habit, HabitDay, JournalEntry, KetoneReading, LogEntry, MetaRecord, Product, Profile, Recipe, Settings, PantryItem, ShoppingItem, SleepRecord, SunEntry, WaterRecord } from './types';
+import type { ActivityRecord, AutoBackup, Batch, BloodPressureReading, CustomFood, DayStatusRecord, Fast, Habit, HabitDay, JournalEntry, KetoneReading, LogEntry, MetaRecord, Product, Profile, Recipe, Settings, PantryItem, ShoppingItem, SleepRecord, SunEntry, WaterRecord } from './types';
 
 export class ToFooDB extends Dexie {
   profile!: Table<Profile, string>;
@@ -29,6 +29,7 @@ export class ToFooDB extends Dexie {
   ketones!: Table<KetoneReading, string>;
   habits!: Table<Habit, string>;
   habitDays!: Table<HabitDay, string>;
+  bloodPressure!: Table<BloodPressureReading, string>;
   meta!: Table<MetaRecord, string>;
   /** Saved assistant chats (not in backups: they are logs for debugging, see src/ai/chatRecord.ts). */
   chats!: Table<ChatRecord, string>;
@@ -105,6 +106,10 @@ export class ToFooDB extends Dexie {
             r.day = sleepDay(r);
           });
       });
+    // v15: blood pressure readings.
+    this.version(15)
+      .stores({ bloodPressure: 'id, time, day' })
+      .upgrade((tx) => this.backupBeforeUpgrade(tx));
   }
 
   /** Save a full backup inside the upgrade transaction, once per opening. */

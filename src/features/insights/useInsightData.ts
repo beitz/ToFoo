@@ -34,6 +34,7 @@ export function useInsightData(enabled: boolean): InsightData | undefined {
       sleep: isOn(f, 'sleep') ? sleep : [],
       activities: isOn(f, 'activity') ? activities : [],
       water: isOn(f, 'water') ? water : [],
+      bloodPressure: isOn(f, 'bloodPressure') ? d.bloodPressure : [],
       mealWindowMinutes: d.settings.mealWindowMinutes,
       today: d.today,
       ...(isOn(f, 'habits') ? { habits: { list: habits.all, data: habits.data } } : {}),
@@ -49,7 +50,7 @@ export function useInsightData(enabled: boolean): InsightData | undefined {
           }
         : {}),
     });
-  }, [enabled, d.modelDays, d.model, d.modelEntries, d.settings.mealWindowMinutes, d.today, f, journal, sleep, activities, water, habits, p.sleepNeedMinutes, p.birthYear]);
+  }, [enabled, d.modelDays, d.model, d.modelEntries, d.settings.mealWindowMinutes, d.today, f, journal, sleep, activities, water, d.bloodPressure, habits, p.sleepNeedMinutes, p.birthYear]);
 }
 
 /** The kinds of data there are to send: the food log, and each tracker that is on. */
