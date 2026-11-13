@@ -2686,7 +2686,7 @@
                   "start",
                   "day"
                 ],
-                "description": "One sleep: fell asleep (start) and woke up (end, missing while asleep), epoch ms; day is the local day it ended"
+                "description": "One sleep: fell asleep (start) and woke up (end, missing while asleep), epoch ms; day is the local day it ended, the next day when it ended from 18:00 on (an import works it out again from the times)"
               }
             },
             "activities": {

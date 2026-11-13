@@ -2,7 +2,7 @@
  * Sleep records (docs/SPEC.md, "Sleep"): pure helpers for the morning question, overlaps and
  * durations. Times are epoch ms; days are local YYYY-MM-DD keys.
  */
-import { dayKey } from '../lib/dates';
+import { addDays, dayKey } from '../lib/dates';
 import type { SleepRecord } from '../storage/types';
 
 const MIN = 60_000;
@@ -23,9 +23,22 @@ export const NEW_SLEEP_MS = 8 * HOUR;
 
 export type SleepSpan = { start: number; end?: number };
 
-/** The day a sleep belongs to: the day it ended (or started, while still asleep). */
+/**
+ * Where a sleep day starts (owner's ask 2026-11-13: an evening sleep from 21:00 counted to the day
+ * before): a sleep ending from 18:00 on belongs to the next day, as the first part of its night. The
+ * sleep page's rows start at the same hour.
+ */
+export const SLEEP_DAY_START_HOUR = 18;
+
+/** The sleep day of a moment: its calendar day, or the next one from SLEEP_DAY_START_HOUR on. */
+export function sleepDayAt(t: number): string {
+  const d = new Date(t);
+  return d.getHours() >= SLEEP_DAY_START_HOUR ? addDays(dayKey(d), 1) : dayKey(d);
+}
+
+/** The day a sleep belongs to: the day it ended (or started, while still asleep), a sleep ending in the evening counting to the next day. */
 export function sleepDay(s: SleepSpan): string {
-  return dayKey(new Date(s.end ?? s.start));
+  return sleepDayAt(s.end ?? s.start);
 }
 
 export function duration(s: { start: number; end: number }): number {
@@ -70,14 +83,14 @@ export const isNight = (b: SleepBlock): boolean => b.asleep >= NIGHT_MIN_MS;
 export type DaySleep = { night?: SleepBlock; naps: SleepBlock[] };
 
 /**
- * Every sleep by the day it ended, as in the diary and the calendar (owner's report 2026-10-24: a
+ * Every sleep by the day it ended (from 18:00 on, the next day: sleepDayAt), as in the diary and the calendar (owner's report 2026-10-24: a
  * midday nap showed in the diary but not here): night blocks ending the same day count as one night,
  * and naps count to their day too. Only a night makes a day logged, so a day with just a nap stays unknown.
  */
 export function sleepByDay(records: readonly SleepRecord[]): Map<string, DaySleep> {
   const out = new Map<string, DaySleep>();
   for (const b of sleepBlocks(records)) {
-    const day = dayKey(new Date(b.end));
+    const day = sleepDayAt(b.end);
     const had = out.get(day) ?? { naps: [] };
     if (!isNight(b)) had.naps.push(b);
     else if (!had.night) had.night = b;
@@ -180,7 +193,7 @@ export function morningGuess(records: SleepRecord[], now: number): { start: numb
     return rest.end - rest.start >= NIGHT_MIN_MS ? rest : undefined;
   }
   const today = dayKey(new Date(now));
-  if (sleepBlocks(records).some((b) => isNight(b) && dayKey(new Date(b.end)) === today)) return undefined;
+  if (sleepBlocks(records).some((b) => isNight(b) && sleepDayAt(b.end) === today)) return undefined;
   return { start, end };
 }
 

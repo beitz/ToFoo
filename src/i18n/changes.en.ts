@@ -8,6 +8,7 @@
  * scenes and small fixes. A pull request that changes what users see adds its line here in the same PR.
  */
 export const changesEn = {
+  'change.191': 'A sleep that ends after 18:00 now counts to the next day, as the start of that night, so falling asleep at 21:00 no longer shows up as a nap on the day before.',
   'change.190': 'The sleep timeline uses the full width: each day\'s bar runs across the card, with the day and the time asleep on a small line above, so more days fit on screen.',
   'change.189': 'The sleep timeline is easier to read: hours as plain numbers every 2 hours, thin lines down every hour (midnight clearest), and the hours the sun is up shaded light, worked out on your phone from the date and your latitude.',
   'change.188': 'Log again on a meal (in the diary, or hold a meal on Log meal) lets you pick which items to log and change their amounts, so you can log just the soup from a big meal as leftovers.',

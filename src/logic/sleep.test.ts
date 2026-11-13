@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { SleepRecord } from '../storage/types';
-import { followOnSleep, hoursMinutes, isNight, morningGuess, overlaps, sleepBlocks, usualTimes } from './sleep';
+import { followOnSleep, hoursMinutes, isNight, morningGuess, overlaps, sleepBlocks, sleepByDay, sleepDay, usualTimes } from './sleep';
 
 const at = (day: number, h: number, m = 0) => new Date(2026, 9, day, h, m).getTime();
 let n = 0;
@@ -68,5 +68,28 @@ describe('sleep', () => {
 
   it('splits a duration into hours and minutes', () => {
     expect(hoursMinutes(7.5 * 3_600_000)).toEqual({ h: 7, m: 30 });
+  });
+});
+
+// Owner's ask 2026-11-13: an evening sleep (21:00–22:15) counted to the day before; the next day now starts at 18:00.
+describe('which day a sleep belongs to', () => {
+  const at = (d: number, h: number, m = 0) => new Date(2026, 10, d, h, m).getTime();
+  it('is the day it ended, or the next day when it ended from 18:00 on', () => {
+    expect(sleepDay({ start: at(12, 23), end: at(13, 6) })).toBe('2026-11-13');
+    expect(sleepDay({ start: at(12, 13), end: at(12, 14) })).toBe('2026-11-12');
+    expect(sleepDay({ start: at(12, 16), end: at(12, 17, 59) })).toBe('2026-11-12');
+    expect(sleepDay({ start: at(12, 21), end: at(12, 22, 15) })).toBe('2026-11-13');
+    // Still asleep: by when it started.
+    expect(sleepDay({ start: at(12, 21) })).toBe('2026-11-13');
+    expect(sleepDay({ start: at(13, 2) })).toBe('2026-11-13');
+  });
+
+  it('puts an evening nap with the next night, not the day before', () => {
+    const rec = (id: string, start: number, end: number): SleepRecord => ({ id, schemaVersion: 1, start, end, day: sleepDay({ start, end }) });
+    const byDay = sleepByDay([rec('a', at(12, 21), at(12, 22, 15)), rec('b', at(13, 3, 30), at(13, 8))]);
+    expect(byDay.get('2026-11-12')).toBeUndefined();
+    const fri = byDay.get('2026-11-13')!;
+    expect(fri.night?.parts.map((p) => p.id)).toEqual(['b']);
+    expect(fri.naps.flatMap((b) => b.parts.map((p) => p.id))).toEqual(['a']);
   });
 });

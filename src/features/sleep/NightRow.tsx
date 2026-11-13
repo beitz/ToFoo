@@ -4,17 +4,18 @@ import { t } from '../../i18n';
 import { addDays, dayKey, formatTime, parseDay, weekdayShort } from '../../lib/dates';
 import { daylight } from '../../logic/daylight';
 import { minuteOfDay, type Night } from '../../logic/nights';
-import type { SleepBlock } from '../../logic/sleep';
+import { SLEEP_DAY_START_HOUR, type SleepBlock } from '../../logic/sleep';
 import { clockText, hmShort, hmText, signedHm } from './format';
 
 /**
  * The "When you slept" rows, shared by the sleep page (#/nights) and its day-by-day page
- * (#/nights/days). The axis runs from 18:00 the evening before to 12:00 (18 hours), and on to the end
- * of the latest sleep shown (up to midnight), so a nap in the afternoon fits on its row.
+ * (#/nights/days). The axis runs from 18:00 the evening before (where a sleep day starts, see
+ * SLEEP_DAY_START_HOUR) to 12:00 (18 hours), and on to the end of the latest sleep shown (up to 18:00,
+ * where the next day takes over), so a nap in the afternoon fits on its row.
  */
-const AXIS_START_MIN = 18 * 60;
+const AXIS_START_MIN = SLEEP_DAY_START_HOUR * 60;
 const AXIS_MIN = 18 * 60;
-const AXIS_MAX_MIN = 30 * 60;
+const AXIS_MAX_MIN = 24 * 60;
 
 /** Hours with a label: every 2 hours from the start, short of the right end (the bar is the card's full width, so they fit at 360 px even on the longest axis). Midnight is always one of them. */
 function axisTicks(len: number): number[] {
@@ -45,7 +46,7 @@ function axisMinute(t: number, day: string): number {
   return base + minuteOfDay(t) - AXIS_START_MIN;
 }
 
-/** The axis length: to 12:00, or on to the end of the latest sleep, a whole hour, up to midnight. */
+/** The axis length: to 12:00, or on to the end of the latest sleep, a whole hour, up to 18:00. */
 export function axisLength(nights: readonly Night[]): number {
   let len = AXIS_MIN;
   for (const n of nights) for (const b of [...(n.block ? [n.block] : []), ...n.naps]) len = Math.max(len, Math.ceil(axisMinute(b.end, n.day) / 60) * 60);
