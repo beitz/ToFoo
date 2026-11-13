@@ -30,6 +30,10 @@ test('When you slept opens a day-by-day page with the times of each sleep', asyn
   expect(ticks).toContain('0');
   await expect(page.locator('.nights-row').first().locator('.nights-daylight').first()).toBeVisible();
   await expect(page.locator('.nights-row').first().locator('.nights-grid.is-midnight')).toHaveCount(1);
+  // Owner's ask 2026-11-13: a normal night to compare with, off until tapped.
+  await expect(page.locator('.nights-normal')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Compare with a normal night' }).click();
+  await expect(page.getByRole('img', { name: /^A normal night: 7 to 9 hours in one stretch/ })).toBeVisible();
   await page.getByRole('link', { name: 'When you slept' }).click();
   await expect(page).toHaveURL(/#\/nights\/days$/);
   await expect(page.getByRole('heading', { name: 'When you slept', level: 1 })).toBeVisible();

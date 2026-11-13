@@ -5,6 +5,7 @@ import { t } from '../../i18n';
 import { formatDate } from '../../lib/dates';
 import { lastMealBefore, nightsWindow, nightTimes, sleepDebt, weeklySleep, type Night, type Spread } from '../../logic/nights';
 import { sleepNeed } from '../../../model/parameters';
+import { sleepAgeGroup, sleepDuration, sleepQuality } from '../../../model/sleep';
 import { isOn } from '../../settings/features';
 import { AskChips } from '../../ui/AskChips';
 import { BackButton } from '../../ui/BackButton';
@@ -12,7 +13,7 @@ import { Segmented } from '../../ui/controls';
 import { Icon } from '../../ui/Icon';
 import { useSleepNeed } from '../settings/SleepNeed';
 import { clockText, hmText } from './format';
-import { axisLength, dayLabel, NightAxis, NightLegend, NightRow } from './NightRow';
+import { axisLength, dayLabel, NightAxis, NightLegend, NightRow, NormalRow } from './NightRow';
 import { useSleep } from './useSleep';
 import { DEFAULT_LATITUDE } from '../../logic/resolve';
 
@@ -42,6 +43,10 @@ export function SleepPage() {
   const usual = times.bed && times.wake ? { bed: times.bed.median, wake: times.wake.median } : undefined;
   const unknown = nights.filter((n) => n.asleep === undefined);
   const axisLen = useMemo(() => axisLength(nights), [nights]);
+  // "Compare with a normal night": off until tapped, for this visit.
+  const [normal, setNormal] = useState(false);
+  const group = d.profile.birthYear ? sleepAgeGroup(Number(d.today.slice(0, 4)) - d.profile.birthYear) : 'adult';
+  const hours = sleepDuration.value.recommended[group];
 
   return (
     <section>
@@ -120,7 +125,22 @@ export function SleepPage() {
               </h2>
               <span className="card-note">{t('nights.vsNeed', { need: hmText(need.minutes) })}</span>
             </div>
+            {usual && (
+              <div className="nights-normal-toggle">
+                <button type="button" className={`chip chip-small${normal ? ' on' : ''}`} aria-pressed={normal} onClick={() => setNormal((v) => !v)}>
+                  {t('nights.normalToggle')}
+                </button>
+              </div>
+            )}
             <NightAxis axisLen={axisLen} />
+            {normal && usual && (
+              <>
+                <NormalRow axisLen={axisLen} bed={usual.bed} hours={hours} />
+                <p className="nights-normal-note small muted">
+                  {t('nights.normalNote', { low: hours[0], high: hours[1], wakeUps: sleepQuality.awakenings.value.goodMax[group], minutes: sleepQuality.awakenings.value.minMinutes, awake: sleepQuality.awakeMinutes.value.goodMax })}
+                </p>
+              </>
+            )}
             <ol className="plain-list nights-rows">
               {[...nights].reverse().map((n) => (
                 <li key={n.day}>

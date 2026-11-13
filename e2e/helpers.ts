@@ -32,3 +32,13 @@ export async function todayKcal(page: Page): Promise<number> {
   const m = /([\d,]+)\s*of [\d,]+ kcal/.exec(text);
   return m ? Number(m[1]!.replace(/,/g, '')) : NaN;
 }
+
+/**
+ * The energy eaten today once something just logged has reached Home: the log is written as the sheet
+ * closes, and Home can read the day a moment before the new entry arrives (CI read 0 once, 2026-11-13).
+ */
+export async function loggedKcal(page: Page): Promise<number> {
+  let kcal = 0;
+  await expect.poll(async () => (kcal = await todayKcal(page))).toBeGreaterThan(0);
+  return kcal;
+}

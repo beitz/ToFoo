@@ -68,6 +68,37 @@ export function NightAxis({ axisLen }: { axisLen: number }) {
   );
 }
 
+/**
+ * A normal night to hold the rows against (owner's ask 2026-11-13: "a normal sleep pattern to compare
+ * to"): one stretch from the usual bedtime, solid for the low end of the NSF recommended hours and
+ * pale on to the high end. No sun shading: it is no particular day.
+ */
+export function NormalRow({ axisLen, bed, hours }: { axisLen: number; bed: number; hours: readonly [number, number] }) {
+  const lines = useMemo(() => hourLines(axisLen), [axisLen]);
+  const from = bed >= AXIS_START_MIN ? bed - AXIS_START_MIN : bed + 1440 - AXIS_START_MIN;
+  const pct = (m: number) => (Math.max(0, Math.min(axisLen, m)) / axisLen) * 100;
+  const [low, high] = hours;
+  return (
+    <div className="nights-row nights-normal" role="img" aria-label={t('nights.normalSpoken', { from: clockText(bed), low, high })}>
+      <span className="nights-day small" aria-hidden>
+        {t('nights.normalLabel')}
+      </span>
+      <span className="nights-track" aria-hidden>
+        <span className="nights-shade">
+          {lines.map(({ m, kind }) => (
+            <span key={m} className={`nights-grid is-${kind}`} style={{ left: `${(m / axisLen) * 100}%` }} />
+          ))}
+        </span>
+        <span className="nights-normal-more" style={{ left: `${pct(from)}%`, width: `${pct(from + high * 60) - pct(from)}%` }} />
+        <span className="nights-sleep" style={{ left: `${pct(from)}%`, width: `${pct(from + low * 60) - pct(from)}%` }} />
+      </span>
+      <span className="nights-total" aria-hidden>
+        <strong>{t('nights.normalHours', { low, high })}</strong>
+      </span>
+    </div>
+  );
+}
+
 /** What the marks on the rows mean. */
 export function NightLegend({ usual }: { usual?: { bed: number; wake: number } }) {
   return (
