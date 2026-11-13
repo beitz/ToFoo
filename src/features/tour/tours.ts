@@ -8,7 +8,7 @@ import type { FeatureKey, Settings } from '../../storage/types';
  * marker isn't on screen (feature off, card hidden) is skipped. Lines say what a part is, never how
  * it looks (owner's ask), so a restyle doesn't make them wrong.
  */
-export type TourId = 'home' | 'insights' | 'kitchen' | 'fan' | 'settings' | 'assistant' | 'nutrient' | 'weight' | 'habits';
+export type TourId = 'home' | 'insights' | 'kitchen' | 'fan' | 'settings' | 'assistant' | 'nutrient' | 'weight' | 'habits' | 'bloodPressure';
 
 export interface TourStep {
   /** The `data-tour` marker to outline; none = a bubble in the middle of the screen. */
@@ -38,6 +38,7 @@ export const TOURS: Record<TourId, Tour> = {
       { target: 'home.week', text: 'tour.home.week' },
       { target: 'home.stores', text: 'tour.home.stores' },
       { target: 'home.info', text: 'tour.home.info' },
+      { target: 'home.bp', text: 'tour.home.bp' },
       { target: 'home.next', text: 'tour.home.next' },
       { target: 'home.check', text: 'tour.home.check' },
       { target: 'home.chips', text: 'tour.home.chips' },
@@ -69,6 +70,7 @@ export const TOURS: Record<TourId, Tour> = {
     steps: [
       { target: 'fan.journal', text: 'tour.fan.journal' },
       { target: 'fan.activity', text: 'tour.fan.activity' },
+      { target: 'fan.bloodPressure', text: 'tour.fan.bloodPressure' },
       { target: 'fan.sleep', text: 'tour.fan.sleep' },
       { target: 'fan.fast', text: 'tour.fan.fast' },
       { target: 'fan.assistant', text: 'tour.fan.assistant' },
@@ -112,6 +114,15 @@ export const TOURS: Record<TourId, Tour> = {
       { target: 'weight.measured', text: 'tour.weight.measured' },
     ],
   },
+  bloodPressure: {
+    requires: 'bloodPressure',
+    steps: [
+      { target: 'bp.average', text: 'tour.bp.average' },
+      { target: 'bp.lines', text: 'tour.bp.lines' },
+      { target: 'bp.how', text: 'tour.bp.how' },
+      { target: 'bp.readings', text: 'tour.bp.readings' },
+    ],
+  },
   habits: {
     requires: 'habits',
     steps: [
@@ -137,6 +148,7 @@ export function tourForRoute(route: readonly string[]): TourId | undefined {
   // The nutrient page itself, not its food list, Why page or a split over a recipe or meal.
   if (a === 'nutrient' && b && !c) return 'nutrient';
   if (a === 'weight') return 'weight';
+  if (a === 'blood-pressure') return 'bloodPressure';
   if (a === 'habits' && !b) return 'habits';
   return undefined;
 }

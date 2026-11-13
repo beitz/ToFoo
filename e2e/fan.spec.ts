@@ -20,12 +20,12 @@ test('the round button lists every tracker that is on, at any hour', async ({ pa
   await page.clock.setFixedTime(new Date('2026-10-23T14:40:00+02:00'));
   const errors = watchErrors(page);
   await firstLaunch(page);
-  await turnOn(page, ['Journal', 'Sleep', 'Activity', 'Fasting']);
+  await turnOn(page, ['Journal', 'Sleep', 'Activity', 'Blood pressure', 'Fasting']);
 
   await page.goto('./#/');
   await page.locator('[data-tour="round-button"]').click();
   const fan = page.getByRole('group', { name: 'Quick actions' });
-  for (const label of ['Write in journal', 'Going to sleep', 'Log activity', 'Start fast', /^Assistant/]) {
+  for (const label of ['Write in journal', 'Going to sleep', 'Log activity', 'Log blood pressure', 'Start fast', /^Assistant/]) {
     await expect(fan.getByRole('button', { name: label })).toBeVisible();
   }
 
@@ -41,7 +41,7 @@ test('trackers that are off stay out of the round button', async ({ page }) => {
   await page.locator('[data-tour="round-button"]').click();
   const fan = page.getByRole('group', { name: 'Quick actions' });
   await expect(fan.getByRole('button', { name: /^Assistant/ })).toBeVisible();
-  for (const label of ['Going to sleep', 'Log activity', 'Start fast']) {
+  for (const label of ['Going to sleep', 'Log activity', 'Log blood pressure', 'Start fast']) {
     await expect(fan.getByRole('button', { name: label })).toHaveCount(0);
   }
 });

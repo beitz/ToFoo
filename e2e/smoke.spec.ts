@@ -24,6 +24,7 @@ const ROUTES = [
   'nights',
   'nights/days',
   'weight',
+  'blood-pressure',
   'habits',
   'habits/new',
   'settings',

@@ -31,6 +31,7 @@
   --t-water: #1d6fd6;
   --t-journal: #8a6d1a;
   --t-habits: #0f766e;
+  --t-bp: #b91c1c;
   /* Habit colours tell habits apart, never status. */
   --habit-teal: #0f766e;
   --habit-violet: #7c3aed;
@@ -89,6 +90,7 @@
   --t-water: #60a5fa;
   --t-journal: #d6b45a;
   --t-habits: #2dd4bf;
+  --t-bp: #f87171;
   --habit-teal: #2dd4bf;
   --habit-violet: #a78bfa;
   --habit-orange: #fb923c;
@@ -101,6 +103,7 @@
     --t-water: #60a5fa;
     --t-journal: #d6b45a;
     --t-habits: #2dd4bf;
+    --t-bp: #f87171;
     --habit-teal: #2dd4bf;
     --habit-violet: #a78bfa;
     --habit-orange: #fb923c;
@@ -7672,6 +7675,7 @@ a.contributor-link > span:first-child {
 .cal-water { --c: var(--t-water); }
 .cal-journal { --c: var(--t-journal); }
 .cal-habits { --c: var(--t-habits); }
+.cal-bloodPressure { --c: var(--t-bp); }
 .cal-dots {
   display: flex;
   gap: 1.5px;
@@ -9301,4 +9305,192 @@ button.link-row {
   .log-time svg {
     display: none;
   }
+}
+
+/* ── Blood pressure ──────────────────────────────────────────── */
+/* Category chips: the word says it; the colour only repeats it. */
+.bp-chip {
+  display: inline-block;
+  padding: 1px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.5;
+  white-space: nowrap;
+  vertical-align: middle;
+  color: var(--text-muted);
+}
+.bp-cat-raised {
+  border-color: var(--warn);
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+.bp-cat-high {
+  border-color: var(--high);
+  background: var(--high-soft);
+  color: var(--high);
+}
+.bp-cat-veryHigh {
+  border-color: var(--high);
+  background: var(--high);
+  color: var(--accent-text);
+}
+.bp-cat-low {
+  border-color: var(--unknown);
+}
+.bp-card .water-main {
+  text-decoration: none;
+}
+.bp-amount {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+.bp-alert p {
+  margin: 0 0 4px;
+}
+.bp-alert p:last-child {
+  margin-bottom: 0;
+}
+.bp-alert svg {
+  vertical-align: -3px;
+  color: var(--high);
+}
+.bp-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.bp-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.bp-field .number-input input {
+  width: 100%;
+  padding-right: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.bp-slash {
+  padding-bottom: 12px;
+  color: var(--text-muted);
+  font-size: 1.2rem;
+}
+.bp-row .icon-btn {
+  flex: none;
+}
+.bp-big {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.bp-big .bp-chip {
+  align-self: center;
+}
+.bp-unit {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+.bp-line {
+  stroke: var(--high);
+  stroke-width: 1;
+  stroke-dasharray: 4 3;
+}
+.bp-bar line {
+  stroke: var(--t-bp);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+}
+.bp-bar circle {
+  fill: var(--t-bp);
+}
+.bp-bar circle.bp-dia {
+  fill: var(--surface, var(--bg));
+  stroke: var(--t-bp);
+  stroke-width: 2;
+}
+.bp-key {
+  white-space: nowrap;
+  margin-right: 8px;
+}
+.bp-key-sys,
+.bp-key-dia {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--t-bp);
+}
+.bp-key-dia {
+  margin-left: 6px;
+  background: none;
+  border: 2px solid var(--t-bp);
+  box-sizing: border-box;
+}
+.bp-key-line {
+  width: 16px;
+  margin-left: 6px;
+  border-top: 1.5px dashed var(--high);
+}
+.bp-chart .weight-key {
+  flex-wrap: wrap;
+}
+.bp-lines-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+  padding: 2px 6px;
+  border-radius: 8px;
+}
+.bp-lines-row .bp-chip {
+  min-width: 84px;
+  text-align: center;
+}
+.bp-lines-row.is-mine {
+  background: var(--accent-soft);
+  font-weight: 600;
+}
+.bp-you {
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-weight: 600;
+}
+.bp-how ol {
+  margin: 0 0 8px;
+  padding-left: 1.2rem;
+}
+.bp-how ol li {
+  margin-bottom: 4px;
+}
+.bp-how summary h2 {
+  margin: 0;
+}
+.bp-moves .entry-label {
+  white-space: normal;
+}
+.bp-moves-text {
+  margin: 0;
+  padding: 10px 0;
+}
+.bp-day + .bp-day {
+  margin-top: 6px;
+}
+.bp-day-head {
+  margin: 4px 0 0;
+}
+.bp-head-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: inherit;
+  text-decoration: none;
 }

@@ -3,7 +3,7 @@ import type * as Beta from '@anthropic-ai/sdk/resources/beta/messages/messages';
 import type { Food } from '../foods/foodDb';
 import { buildIndex } from '../foods/search';
 import { appNote, emptyConversation, requestParams, retirePhotos, sendMessage, textOf, type CreateMessage } from './assistant';
-import { describeFood, validateBatchProposal, validatePortionProposal, MAX_INGREDIENT_GRAMS, MAX_ITEM_GRAMS, runCheckRecipe, runListRecipes, validateRecipeProposal, validateIngredientsProposal, runLookupBarcode, runSearchFoods, runSearchProducts, runSearchActivities, runSearchUsda, validateJournalProposal, validateProposal, validateSleepProposal, validateActivityProposal, validateWaterProposal, validateKetoneProposal, validateWeightProposal, validateHabitsProposal, validateShoppingProposal, validateHomeProposal, type ProductTools, type ToolContext } from './tools';
+import { describeFood, validateBatchProposal, validatePortionProposal, MAX_INGREDIENT_GRAMS, MAX_ITEM_GRAMS, runCheckRecipe, runListRecipes, validateRecipeProposal, validateIngredientsProposal, runLookupBarcode, runSearchFoods, runSearchProducts, runSearchActivities, runSearchUsda, validateJournalProposal, validateProposal, validateSleepProposal, validateActivityProposal, validateWaterProposal, validateKetoneProposal, validateWeightProposal, validateBloodPressureProposal, validateHabitsProposal, validateShoppingProposal, validateHomeProposal, type ProductTools, type ToolContext } from './tools';
 import type { Product } from '../storage/types';
 import type { FindResult } from '../foods/findProduct';
 
@@ -696,6 +696,49 @@ describe('ketones', () => {
     expect(validateKetoneProposal({ type: 'blood', value: 20, time: '', replaces: '' }, now)).toMatchObject({ ok: false });
     expect(validateKetoneProposal({ type: 'urine', value: 4, time: '2026-10-22 09:00', replaces: '' }, now)).toMatchObject({ ok: false });
     expect(validateKetoneProposal({ type: 'breath', value: 30, time: '', replaces: 'K1' }, now)).toEqual({ ok: true, proposal: { type: 'breath', value: 30, replaces: 'K1' } });
+  });
+});
+
+describe('blood pressure', () => {
+  const now = new Date(2026, 10, 13, 9, 0).getTime();
+
+  it('offers propose_blood_pressure only with Blood pressure on, not strict, never in the recipe editor', () => {
+    const tool = (sources: Parameters<typeof requestParams>[2]) => (requestParams('claude-opus-5-5', [], sources).tools ?? []).find((t) => 'name' in t && t.name === 'propose_blood_pressure') as { strict?: boolean } | undefined;
+    expect(tool({})).toBeUndefined();
+    expect(tool({ bloodPressure: true, recipe: true })).toBeUndefined();
+    expect(tool({ bloodPressure: true })!.strict).toBeUndefined();
+    const system = String(requestParams('claude-opus-5-5', [], { bloodPressure: true }).system);
+    expect(system).toContain('Do not diagnose');
+    expect(system).toContain('180/110');
+    expect(system).toContain('2024 ESC Guidelines');
+  });
+
+  it('shows one card per sitting with its readings', async () => {
+    const api = scripted(
+      reply(
+        [
+          toolUse('d', 'propose_blood_pressure', { readings: [{ systolic: 131.4, diastolic: 84, pulse: 66 }, { systolic: 128, diastolic: 82, pulse: 0 }], time: '2026-11-13 07:10', replaces: '' }),
+          toolUse('e', 'propose_blood_pressure', { readings: [{ systolic: 126, diastolic: 80, pulse: 0 }], time: '', replaces: '' }),
+        ],
+        'tool_use',
+      ),
+    );
+    const { conversation, outcome } = await sendMessage(api.create, 'claude-opus-5-5', emptyConversation(), { text: '131/84 and 128/82 at 7:10, 126/80 now', images: [] }, { ...ctx, now, bloodPressure: true });
+    expect(outcome.kind === 'proposal' && outcome.pressures).toEqual([
+      { id: 'D1', readings: [{ systolic: 131, diastolic: 84, pulse: 66 }, { systolic: 128, diastolic: 82 }], time: new Date(2026, 10, 13, 7, 10).getTime() },
+      { id: 'D2', readings: [{ systolic: 126, diastolic: 80 }] },
+    ]);
+    expect(conversation.pressures).toBe(2);
+  });
+
+  it('sends swapped, implausible or too many readings back to the assistant', () => {
+    expect(validateBloodPressureProposal({ readings: [], time: '', replaces: '' }, now)).toMatchObject({ ok: false });
+    expect(validateBloodPressureProposal({ readings: [{ systolic: 82, diastolic: 128, pulse: 0 }], time: '', replaces: '' }, now)).toMatchObject({ ok: false, error: expect.stringContaining('swapped') });
+    expect(validateBloodPressureProposal({ readings: [{ systolic: 1280, diastolic: 82, pulse: 0 }], time: '', replaces: '' }, now)).toMatchObject({ ok: false });
+    const four = Array.from({ length: 4 }, () => ({ systolic: 120, diastolic: 80, pulse: 0 }));
+    expect(validateBloodPressureProposal({ readings: four, time: '', replaces: '' }, now)).toMatchObject({ ok: false });
+    expect(validateBloodPressureProposal({ readings: [{ systolic: 120, diastolic: 80, pulse: 0 }], time: '2026-11-14 09:00', replaces: '' }, now)).toMatchObject({ ok: false });
+    expect(validateBloodPressureProposal({ readings: [{ systolic: 120, diastolic: 80, pulse: 70 }], time: '', replaces: 'D1' }, now)).toEqual({ ok: true, proposal: { readings: [{ systolic: 120, diastolic: 80, pulse: 70 }], replaces: 'D1' } });
   });
 });
 

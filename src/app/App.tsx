@@ -53,6 +53,7 @@ import { CatchUpPage } from '../features/catchup/CatchUpPage';
 import { ActivityPage } from '../features/trackers/ActivityPage';
 import { WaterPage } from '../features/trackers/WaterPage';
 import { WeightPage } from '../features/weight/WeightPage';
+import { BloodPressurePage } from '../features/bloodPressure/BloodPressurePage';
 import { HabitsPage } from '../features/habits/HabitsPage';
 import { HabitPage } from '../features/habits/HabitPage';
 import { HabitEditor } from '../features/habits/HabitEditor';
@@ -154,6 +155,8 @@ function Page({ route }: { route: string[] }) {
       return <WaterPage />;
     case 'weight':
       return <WeightPage />;
+    case 'blood-pressure':
+      return <BloodPressurePage />;
     case 'catchup':
       return <CatchUpPage key={b} day={b ?? d.today} />;
     case 'habits':
@@ -198,6 +201,7 @@ const TAB_OF: Record<string, (typeof NAV)[number]['key'] | null> = {
   activity: 'insights',
   water: 'insights',
   weight: 'insights',
+  'blood-pressure': 'insights',
   fasting: 'insights',
   catchup: 'insights',
   kitchen: 'kitchen',

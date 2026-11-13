@@ -38,12 +38,13 @@ export function useCatchUp(day: string): CatchUpKind[] | undefined {
   const f = d.settings.features;
   return missingOn({
     day,
-    on: { sleep: isOn(f, 'sleep'), activity: isOn(f, 'activity'), water: isOn(f, 'water') },
+    on: { sleep: isOn(f, 'sleep'), activity: isOn(f, 'activity'), water: isOn(f, 'water'), bloodPressure: isOn(f, 'bloodPressure') },
     foodUnknown: d.model.dayStatus[day] === 'unknown',
     beforeStart: day < d.profile.modelStartDay,
     sleep,
     activities: d.activities,
     water,
+    bloodPressure: d.bloodPressure,
     skipped,
     habitsOpen: isOn(f, 'habits') && openHabitsOn(habits.active, day, habits.data).length > 0,
     askDays: d.settings.askDays,

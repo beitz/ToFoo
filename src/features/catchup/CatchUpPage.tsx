@@ -16,12 +16,13 @@ import { spanText } from '../sleep/format';
 import { useSleep } from '../sleep/useSleep';
 import { addWaterWithUndo, WaterSheet } from '../water/WaterSheet';
 import { waterText } from '../water/format';
+import { BloodPressureSheet } from '../bloodPressure/BloodPressureSheet';
 import { skip, useCatchUp } from './useCatchUp';
 import { openHabitsOn } from '../../logic/habits';
 import { useHabits } from '../habits/useHabits';
 import { answerLabels, habitStyle, useAnswer } from '../habits/HabitParts';
 
-const ICON: Record<CatchUpKind, string> = { food: 'diary', sleep: 'bed', activity: 'activity', water: 'drop', habits: 'repeat' };
+const ICON: Record<CatchUpKind, string> = { food: 'diary', sleep: 'bed', activity: 'activity', water: 'drop', bloodPressure: 'heart', habits: 'repeat' };
 const NOON = 12 * 60;
 
 /**
@@ -54,6 +55,7 @@ export function CatchUpPage({ day }: { day: string }) {
           {k === 'sleep' && <SleepChoices day={day} />}
           {k === 'activity' && <ActivityChoices day={day} />}
           {k === 'water' && <WaterChoices day={day} />}
+          {k === 'bloodPressure' && <BloodPressureChoices day={day} />}
           {k === 'habits' && <HabitChoices day={day} />}
         </CatchUpCard>
       ))}
@@ -247,6 +249,23 @@ function HabitChoices({ day }: { day: string }) {
       <div className="prompt-actions">
         <SkipButton day={day} kind="habits" />
       </div>
+    </>
+  );
+}
+
+/** No "usual" here: a reading is only ever what the cuff showed (from its memory, for a past day). */
+function BloodPressureChoices({ day }: { day: string }) {
+  const [sheet, setSheet] = useState(false);
+  return (
+    <>
+      <p className="muted small">{t('catchUp.bloodPressure')}</p>
+      <div className="prompt-actions">
+        <button className="btn btn-small btn-primary" onClick={() => setSheet(true)}>
+          {t('catchUp.addReadings')}
+        </button>
+        <SkipButton day={day} kind="bloodPressure" label="catchUp.notMeasured" />
+      </div>
+      {sheet && <BloodPressureSheet defaultTime={atDayMinute(day, NOON)} onClose={() => setSheet(false)} />}
     </>
   );
 }

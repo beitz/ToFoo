@@ -23,7 +23,7 @@ import { fmtNumber } from '../../lib/format';
 type View = NonNullable<Settings['calendarLayer']>;
 
 /** Each tracker's own page, linked under the month when that tracker is shown. */
-const PAGE: Partial<Record<View, string>> = { sleep: 'nights', activity: 'activity', water: 'water', journal: 'journal', habits: 'habits' };
+const PAGE: Partial<Record<View, string>> = { sleep: 'nights', activity: 'activity', water: 'water', bloodPressure: 'blood-pressure', journal: 'journal', habits: 'habits' };
 
 /** The trackers switched on, in the calendar's fixed order (meals always). */
 function layersOn(features: Settings['features']): Layer[] {
@@ -54,9 +54,9 @@ export function CalendarPage({ month: monthParam }: { month?: string }) {
   const layers = useMemo(
     () =>
       sleep && water && journal && skipped && habits !== undefined
-        ? dayLayers({ days, today: d.today, dayStatus: d.model.dayStatus, sleep, activities: d.activities, water, journal, skipped, habits: habits ?? undefined, askDays: d.settings.askDays })
+        ? dayLayers({ days, today: d.today, dayStatus: d.model.dayStatus, sleep, activities: d.activities, water, bloodPressure: d.bloodPressure, journal, skipped, habits: habits ?? undefined, askDays: d.settings.askDays })
         : undefined,
-    [days, d.today, d.model.dayStatus, sleep, d.activities, water, journal, skipped, habits, d.settings.askDays],
+    [days, d.today, d.model.dayStatus, sleep, d.activities, water, d.bloodPressure, journal, skipped, habits, d.settings.askDays],
   );
   const counts: Record<string, number> = {};
   for (const day of weeks.flat()) {
@@ -217,6 +217,8 @@ function LayerValue({ layer, l }: { layer: Exclude<Layer, 'meals'>; l: DayLayers
         ? `${l.activityMinutes}′`
         : layer === 'water'
           ? `${fmtNumber(l.waterMl / 1000, 1)} l`
+          : layer === 'bloodPressure'
+            ? `${l.bloodPressure?.systolic ?? ''}/${l.bloodPressure?.diastolic ?? ''}`
           : layer === 'habits'
             ? `${h.kept}/${h.kept + h.missed + h.open}`
             : String(l.journal);

@@ -114,9 +114,10 @@ export function DataPanel({
         sleep: t('insights.ovNights', { n: ov.nights }),
         activity: t('insights.ovActivity', { n: ov.activityDays }),
         water: t('insights.ovWater', { n: ov.waterDays }),
+        bloodPressure: t('insights.ovBloodPressure', { n: ov.bloodPressureDays }),
         habits: t('insights.ovHabits', { n: ov.habitDays }),
       }
-    : { food: '', journal: '', sleep: '', activity: '', water: '', habits: '' };
+    : { food: '', journal: '', sleep: '', activity: '', water: '', bloodPressure: '', habits: '' };
 
   return (
     <div className="composer-note data-panel">

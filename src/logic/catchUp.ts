@@ -1,5 +1,5 @@
 import { parseDay } from '../lib/dates';
-import type { ActivityRecord, AskDays, Intensity, SleepRecord, WaterRecord } from '../storage/types';
+import type { ActivityRecord, AskDays, BloodPressureReading, Intensity, SleepRecord, WaterRecord } from '../storage/types';
 import { activityKey } from './activity';
 import { isoWeekday } from './habits';
 import { minuteOfDay } from './nights';
@@ -11,7 +11,7 @@ import { usualTimes } from './sleep';
  * passes the records and which trackers are on.
  */
 
-export const CATCH_UP_KINDS = ['food', 'sleep', 'activity', 'water', 'habits'] as const;
+export const CATCH_UP_KINDS = ['food', 'sleep', 'activity', 'water', 'bloodPressure', 'habits'] as const;
 export type CatchUpKind = (typeof CATCH_UP_KINDS)[number];
 
 /**
@@ -26,7 +26,7 @@ export function asksOn(askDays: AskDays | undefined, kind: CatchUpKind, day: str
 export interface CatchUpInput {
   day: string;
   /** Trackers switched on in Settings (food is always tracked). */
-  on: { sleep: boolean; activity: boolean; water: boolean };
+  on: { sleep: boolean; activity: boolean; water: boolean; bloodPressure?: boolean };
   /** The day has no meals and no status (fasted, left out, …): the model's 'unknown'. */
   foodUnknown: boolean;
   /** The day is before the model starts: nothing to ask about food. */
@@ -34,6 +34,7 @@ export interface CatchUpInput {
   sleep: readonly Pick<SleepRecord, 'day' | 'end'>[];
   activities: readonly Pick<ActivityRecord, 'day'>[];
   water: readonly Pick<WaterRecord, 'day'>[];
+  bloodPressure?: readonly Pick<BloodPressureReading, 'day'>[];
   /** What the user already answered with "Skip" for this day. */
   skipped: ReadonlySet<CatchUpKind>;
   /** Habits are on and some due that day are still open (see openHabitsOn in ./habits). */
@@ -56,6 +57,7 @@ export function missingOn(input: CatchUpInput): CatchUpKind[] {
   if (input.on.sleep && lacks(input.sleep.filter((r) => r.end !== undefined))) out.push('sleep');
   if (input.on.activity && lacks(input.activities)) out.push('activity');
   if (input.on.water && lacks(input.water)) out.push('water');
+  if (input.on.bloodPressure && lacks(input.bloodPressure ?? [])) out.push('bloodPressure');
   if (input.habitsOpen) out.push('habits');
   return out.filter((k) => !input.skipped.has(k) && asksOn(input.askDays, k, day));
 }

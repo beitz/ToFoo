@@ -33,6 +33,7 @@ import { CountsFor, useCountsFor } from '../habits/CountsFor';
 import { activityName } from '../activity/ActivityForm';
 import { useActivities } from '../activity/useActivities';
 import { WaterCard } from '../water/WaterCard';
+import { DayBloodPressure } from '../bloodPressure/BloodPressureCard';
 import { WaterSheet } from '../water/WaterSheet';
 import { useWater } from '../water/useWater';
 import { waterText } from '../water/format';
@@ -281,6 +282,8 @@ export function DiaryPage({ day: dayParam }: { day?: string }) {
           <p className="muted small">{t('water.guide', { target: waterText(waterTarget(d.requirements.ageGroup)) })}</p>
         </>
       )}
+
+      {isOn(d.settings.features, 'bloodPressure') && <DayBloodPressure day={day} />}
 
       {sunOn && (
         <>

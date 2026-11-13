@@ -5,6 +5,7 @@
  */
 import type { BetaTool, BetaToolUnion, BetaWebSearchTool20250305 } from '@anthropic-ai/sdk/resources/beta/messages/messages';
 import { SLEEP_FACTS } from '../../model/sleep';
+import { BP_FACTS, homeProtocol, veryHigh } from '../../model/blood-pressure';
 import { ACTIVITY_KINDS, INTENSITIES } from '../storage/types';
 import { INSIGHT_GUIDE, INSIGHT_TOOLS } from './insightsPrompt';
 import { FORGOTTEN as FORGOTTEN_KINDS, PREPARATIONS } from './tools';
@@ -39,6 +40,11 @@ const KETONES = `- Ketones: when the user says they measured ketones ("ketones 1
 // Weight (docs/SPEC.md, "Weight"): only what the user weighed; the app draws the trend and the log check.
 const WEIGHT = `- Weight: when the user says what they weighed ("82.4 kg this morning", "weighed 81 yesterday", a photo of the scale), propose it with propose_weight: kg (convert pounds or stone), day as local "YYYY-MM-DD", empty for today. One card per weigh-in. Only weights they read off a scale; never estimate one, and do not comment on the weight itself (no goals, no praise or worry): the app uses it for the trend and to check whether the food log looks complete. Saving replaces a weigh-in already saved for that day. To change an open weight card, call propose_weight again with replaces set to its id (G1, G2, …).`;
 
+// Blood pressure (docs/SPEC.md, "Blood pressure"): only what the cuff showed; the lines come from model/blood-pressure.ts.
+const BLOOD_PRESSURE = `- Blood pressure: when the user tells you readings from their cuff ("128 to 82, pulse 64", "135/88 and 131/85 this morning", a photo of the cuff's screen), propose them with propose_blood_pressure: one card per sitting, each reading with systolic (the upper number), diastolic (the lower) and pulse when shown, and the time they measured as local "YYYY-MM-DD HH:MM" (empty for now). Only values they read off the device; never estimate, round or average one. Do not diagnose: the app shows the average against the European home lines. If a reading is ${veryHigh.value.systolic}/${veryHigh.value.diastolic} or more, say once, calmly, to rest ${homeProtocol.value.restMinutes} minutes and measure again, to get medical advice the same day if it stays that high, and to call 112 with chest pain, breathlessness, weakness or trouble speaking or seeing. To change an open blood pressure card, call propose_blood_pressure again with all readings and replaces set to its id (D1, D2, …).
+Blood pressure background (checked for this app; name the source in short when you use it, beyond it say you answer from general knowledge):
+${BP_FACTS.map((f) => `  - ${f}`).join('\n')}`;
+
 // Habits (docs/SPEC.md, "Habits"): answered only from what the user says; not answered is not "no".
 const HABITS = `- Habits: the user keeps habits, listed by name in the app's note on their message: do habits (did true = done, false = not done), avoid habits (did true = had some or did it, false = none) and minutes habits, which the app counts from logged activities. When the user says whether they kept a do or avoid habit ("flossed", "no alcohol yesterday", "didn't stretch"), propose the answers with propose_habits: the habit's name exactly as listed, the day as local "YYYY-MM-DD" (empty for today) and did; all answers of a message in one card. Only what the user says about it (their words "had two beers" answer a habit about alcohol); never answer one from photos, the food log or a guess, and leave habits they did not mention unanswered: not answered is not "no". For a minutes habit, propose the activity with propose_activity; it counts by itself. Habits are created and changed in the app (Habits page), not here. To change an open habit card, call propose_habits again with the complete answers and replaces set to its id (T1, T2, …).`;
 
@@ -69,6 +75,8 @@ export interface PromptSources {
   weight?: boolean;
   /** Habits are on and the user has some: the assistant may answer them per day. */
   habits?: boolean;
+  /** Blood pressure is on: the assistant may propose readings. */
+  bloodPressure?: boolean;
   /** The shopping list is on: the assistant may put things on it. */
   shopping?: boolean;
   /** At home is on: the assistant may save what was bought or runs low. */
@@ -92,7 +100,7 @@ export interface PromptSources {
 const SLEEP_BACKGROUND = `Sleep background: what research says, checked for this app. Use it to tell what is normal and what is worth acting on, and name the source in short when you use a fact ("NSF panel, 2017"). Beyond it, say that you answer from general knowledge. These lines are for healthy people and describe groups, not a diagnosis of one person.
 ${SLEEP_FACTS.map((f) => `- ${f.topic}: ${f.text} (${f.source})`).join('\n')}`;
 
-const NO_DATA = `- Their data: you cannot see the user's journal, sleep, activity, water or past days. If they ask about those or about patterns in their days, say they can tap "Include my data" above the message box (it needs Patterns on in Settings → AI assistant), tick what to share and ask again.`;
+const NO_DATA = `- Their data: you cannot see the user's journal, sleep, activity, water, blood pressure or past days. If they ask about those or about patterns in their days, say they can tap "Include my data" above the message box (it needs Patterns on in Settings → AI assistant), tick what to share and ask again.`;
 
 // Forgotten foods (docs/SPEC.md, "Forgotten foods"): logs come out short mostly from what is
 // easy to leave out; the app asks on the card with tap answers instead of a question in text.
@@ -157,7 +165,7 @@ Style: brief, friendly, plain text (no headings or tables). Answer in the langua
 
 function systemPrompt(sources: PromptSources): string {
   if (sources.recipe) return recipeSystemPrompt(sources);
-  const { off = false, usda = false, webSearch = false, journal = false, sleep = false, activity = false, water = false, ketones = false, weight = false, habits = false, shopping = false, pantry = false, recipes = false, ideas = false, forgotten = false, insights = false, check = false } = sources;
+  const { off = false, usda = false, webSearch = false, journal = false, sleep = false, activity = false, water = false, ketones = false, weight = false, habits = false, bloodPressure = false, shopping = false, pantry = false, recipes = false, ideas = false, forgotten = false, insights = false, check = false } = sources;
   const extra = [
     off && ' Packaged products can also be looked up by barcode in Open Food Facts.',
     usda && ' Foods the BLS lacks can be searched in USDA FoodData Central.',
@@ -168,6 +176,7 @@ function systemPrompt(sources: PromptSources): string {
     ketones && ' The user can also tell you ketone values they measured.',
     weight && ' The user can also tell you what they weighed.',
     habits && ' The user can also tell you whether they kept their habits.',
+    bloodPressure && ' The user can also tell you blood pressure readings they took.',
     shopping && ' The user can also have you put things on their shopping list.',
     pantry && ' The user can also tell you what they bought or what runs low at home.',
     recipes && ' The user can also save recipes they cooked and change recipes in their recipe book.',
@@ -183,11 +192,11 @@ Your job: work out which foods the user ate and how many grams of each, then cal
 How to work:
 - Find foods with search_foods. Search short, generic terms, in English and German (e.g. ["milk roll", "Milchbrötchen"]); send several queries in one call. Only use codes that search_foods returned.
 ${off ? BRANDED_WITH_PRODUCTS('propose_meal') : BRANDED_BLS_ONLY}
-${off && webSearch ? `${WEB_SEARCH}\n` : ''}${usda ? `${USDA('propose_meal')}\n` : ''}${journal ? `${JOURNAL(activity)}\n` : ''}${sleep ? `${SLEEP(journal)}\n` : ''}${activity ? `${ACTIVITY}\n` : ''}${water ? `${WATER}\n` : ''}${ketones ? `${KETONES}\n` : ''}${weight ? `${WEIGHT}\n` : ''}${habits ? `${HABITS}\n` : ''}${shopping ? `${SHOPPING(recipes)}\n` : ''}${pantry ? `${PANTRY(off)}\n` : ''}${recipes ? `${RECIPES(ideas)}\n${PAGES}\n` : ''}${check ? `${CHECK}\n` : ''}- Mixed dishes (restaurant meals, a hotpot, a bowl): use a matching BLS dish if there is one, otherwise split it into ingredients with estimated grams. Include what changes the result most: cooking oil, sauces, broth that was actually eaten.
+${off && webSearch ? `${WEB_SEARCH}\n` : ''}${usda ? `${USDA('propose_meal')}\n` : ''}${journal ? `${JOURNAL(activity)}\n` : ''}${sleep ? `${SLEEP(journal)}\n` : ''}${activity ? `${ACTIVITY}\n` : ''}${water ? `${WATER}\n` : ''}${ketones ? `${KETONES}\n` : ''}${weight ? `${WEIGHT}\n` : ''}${bloodPressure ? `${BLOOD_PRESSURE}\n` : ''}${habits ? `${HABITS}\n` : ''}${shopping ? `${SHOPPING(recipes)}\n` : ''}${pantry ? `${PANTRY(off)}\n` : ''}${recipes ? `${RECIPES(ideas)}\n${PAGES}\n` : ''}${check ? `${CHECK}\n` : ''}- Mixed dishes (restaurant meals, a hotpot, a bowl): use a matching BLS dish if there is one, otherwise split it into ingredients with estimated grams. Include what changes the result most: cooking oil, sauces, broth that was actually eaten.
 ${forgotten ? `${FORGOTTEN}\n` : ''}- Amounts: use what the user said, label weights, counts of standard items, and visual cues (plate size, cutlery, hands, packaging). Think about the portion one person ate, not the whole shared dish.
 - Pieces: when the user counts pieces of a food ("one piece of chewing gum", "2 bars", "a handful of 5 sweets"), set pieces to the count. Foods list "1 piece = … g" when the weight of one is known (the user's own, or the label's): then grams is pieces × that weight and the app uses that weight. "weight of one piece unknown": estimate grams for all the pieces from the pack (its weight ÷ the number of pieces printed on it, from a photo or the label data) or what such a piece usually weighs, and say the estimate in assumptions (e.g. "1 piece ≈ 1.4 g: 14 g pack of 10"); the user can save the real weight in the app.
 - Ask when the answer would noticeably change the result (an unknown main food, a portion that could easily be double or half, whether shared food was all eaten). Ask one short question at a time and offer a default the user can just accept, e.g. "About one bowl, roughly 400 ml?". Do not ask about details that barely matter. Do not ask for more photos (barcode, label, packaging) when you can work with what you have: the user often cannot take them. If one would clearly change the result, mention it once alongside your proposal, not instead of it. If the user cannot know, estimate and record the assumption.
-- Everything at once: the user often logs a day or two in one go, in one long message (often spoken for many minutes, with filler words and corrections) and many photos (meals, packaging, barcodes, labels, screenshots). Go through all of it and propose every meal${journal ? ', journal entry' : ''}${sleep ? ', sleep' : ''}${activity ? ', activity' : ''}${water ? ', water' : ''}${habits ? ', habit answer' : ''}${recipes ? ', recipe' : ''} it contains: leave nothing out and propose nothing twice. Later words override earlier ones ("no, it was two eggs"). The app puts a line before each photo with its number and capture time. Group the photos into meals by time and content: photos minutes apart of the same table are one meal; the same food at different times (yogurt in the morning and in the evening) is two; a photo of a package or barcode belongs to the meal that food was eaten in. Also include meals the user only describes in words. Before proposing, ask everything that matters in one message, as a short numbered list with a default for each, and say how you grouped the photos (e.g. "Photos 2–5: Korean BBQ, Thu 19:40"); keep it to what really changes the result. Then propose everything in one response, one call per meal${journal ? ', journal entry' : ''}${sleep ? ', sleep' : ''}${activity ? ', activity' : ''}${water ? ', water' : ''}${recipes ? ', recipe' : ''}${habits ? ' (and one propose_habits call for all habit answers)' : ''}.
+- Everything at once: the user often logs a day or two in one go, in one long message (often spoken for many minutes, with filler words and corrections) and many photos (meals, packaging, barcodes, labels, screenshots). Go through all of it and propose every meal${journal ? ', journal entry' : ''}${sleep ? ', sleep' : ''}${activity ? ', activity' : ''}${water ? ', water' : ''}${bloodPressure ? ', blood pressure reading' : ''}${habits ? ', habit answer' : ''}${recipes ? ', recipe' : ''} it contains: leave nothing out and propose nothing twice. Later words override earlier ones ("no, it was two eggs"). The app puts a line before each photo with its number and capture time. Group the photos into meals by time and content: photos minutes apart of the same table are one meal; the same food at different times (yogurt in the morning and in the evening) is two; a photo of a package or barcode belongs to the meal that food was eaten in. Also include meals the user only describes in words. Before proposing, ask everything that matters in one message, as a short numbered list with a default for each, and say how you grouped the photos (e.g. "Photos 2–5: Korean BBQ, Thu 19:40"); keep it to what really changes the result. Then propose everything in one response, one call per meal${journal ? ', journal entry' : ''}${sleep ? ', sleep' : ''}${activity ? ', activity' : ''}${water ? ', water' : ''}${bloodPressure ? ', blood pressure sitting' : ''}${recipes ? ', recipe' : ''}${habits ? ' (and one propose_habits call for all habit answers)' : ''}.
 - Times: set each meal's time to when it was eaten, as local "YYYY-MM-DD HH:MM". Use what the user said first ("at 8", "yesterday lunch" means a plausible lunch time that day, "after the run" means after the run's time), then the capture time of the meal's first photo. Words like "this morning" or "yesterday" count from the current time the app gives you, not from the photos. A "file date" may be when the photo was saved rather than taken; ask if it looks off. When the user gives no time and there is no photo, pick a plausible time and say so in assumptions. Leave time empty only for a single meal eaten just now or on the day the chat was opened for; when a message covers several meals, set every time.
 - Cards: each proposal is shown as a card with an id (M1, M2, …${recipes ? '; recipes R1, R2, …' : ''}). The user can log each card, edit it, or keep chatting. To change an open card, call propose_meal${recipes ? ' (or the tool that made it)' : ''} with the whole corrected meal and replaces set to its id; the app swaps the card. The app tells you which cards were logged; never propose those again.
 - preparation: "asListed" when the BLS food already matches how it was eaten (cooked entries, bread, dishes, sweets); otherwise raw, boiled, steamed, baked or fried.
@@ -200,10 +209,10 @@ ${insights ? '' : `${NO_DATA}\n`}${sleep ? `\n${SLEEP_BACKGROUND}\n` : ''}
 ${insights ? `\n${INSIGHT_GUIDE}\n\n` : ''}Style: brief, friendly, plain text (no headings or tables). Answer in the language the user writes in.`;
 }
 
-const key = ({ off = false, usda = false, webSearch = false, journal = false, sleep = false, activity = false, water = false, ketones = false, weight = false, habits = false, shopping = false, pantry = false, recipe = false, recipes = false, ideas = false, forgotten = false, insights = false, check = false }: PromptSources) =>
+const key = ({ off = false, usda = false, webSearch = false, journal = false, sleep = false, activity = false, water = false, ketones = false, weight = false, habits = false, bloodPressure = false, shopping = false, pantry = false, recipe = false, recipes = false, ideas = false, forgotten = false, insights = false, check = false }: PromptSources) =>
   recipe
     ? `r${off ? 1 : 0}${usda ? 1 : 0}${off && webSearch ? 1 : 0}`
-    : `${off ? 1 : 0}${usda ? 1 : 0}${off && webSearch ? 1 : 0}${journal ? 1 : 0}${sleep ? 1 : 0}${activity ? 1 : 0}${water ? 1 : 0}${ketones ? 1 : 0}${shopping ? 1 : 0}${pantry ? 1 : 0}${recipes ? 1 : 0}${recipes && ideas ? 1 : 0}${forgotten ? 1 : 0}${weight ? 1 : 0}${habits ? 1 : 0}${insights ? 1 : 0}${check ? 1 : 0}`;
+    : `${off ? 1 : 0}${usda ? 1 : 0}${off && webSearch ? 1 : 0}${journal ? 1 : 0}${sleep ? 1 : 0}${activity ? 1 : 0}${water ? 1 : 0}${ketones ? 1 : 0}${shopping ? 1 : 0}${pantry ? 1 : 0}${recipes ? 1 : 0}${recipes && ideas ? 1 : 0}${forgotten ? 1 : 0}${weight ? 1 : 0}${habits ? 1 : 0}${insights ? 1 : 0}${check ? 1 : 0}${bloodPressure ? 1 : 0}`;
 const prompts = new Map<string, string>();
 const toolSets = new Map<string, BetaToolUnion[]>();
 
@@ -291,7 +300,7 @@ export const WEB_SEARCH_TOOL: BetaWebSearchTool20250305 = {
   user_location: { type: 'approximate', country: 'DE' },
 };
 
-function tools({ off = false, usda = false, webSearch = false, journal = false, sleep = false, activity = false, water = false, ketones = false, weight = false, habits = false, shopping = false, pantry = false, recipe = false, recipes = false, ideas = false, forgotten = false, insights = false, check = false }: PromptSources): BetaToolUnion[] {
+function tools({ off = false, usda = false, webSearch = false, journal = false, sleep = false, activity = false, water = false, ketones = false, weight = false, habits = false, bloodPressure = false, shopping = false, pantry = false, recipe = false, recipes = false, ideas = false, forgotten = false, insights = false, check = false }: PromptSources): BetaToolUnion[] {
   const withProducts = off || usda;
   const codeHelp = off && usda ? 'BLS code from search_foods, or an OFF: or USDA: code from lookup_barcode, search_usda or search_foods.' : off ? 'BLS code from search_foods, or OFF: product code from lookup_barcode or search_foods.' : usda ? 'BLS code from search_foods, or USDA: code from search_usda or search_foods.' : 'BLS code from search_foods.';
   const items = {
@@ -390,6 +399,7 @@ function tools({ off = false, usda = false, webSearch = false, journal = false, 
     ...(water ? [PROPOSE_WATER] : []),
     ...(ketones ? [PROPOSE_KETONE] : []),
     ...(weight ? [PROPOSE_WEIGHT] : []),
+    ...(bloodPressure ? [PROPOSE_BLOOD_PRESSURE] : []),
     ...(habits ? [PROPOSE_HABITS] : []),
     ...(shopping ? [proposeShopping(recipes)] : []),
     ...(pantry ? [proposeHome(codeHelp)] : []),
@@ -638,6 +648,36 @@ const PROPOSE_WEIGHT: BetaTool = {
       replaces: { type: 'string', description: 'Id of the open weight card this corrects (e.g. "G1"); empty for a new weigh-in.' },
     },
     required: ['kg', 'day', 'replaces'],
+    additionalProperties: false,
+  },
+};
+
+const PROPOSE_BLOOD_PRESSURE: BetaTool = {
+  name: 'propose_blood_pressure',
+  description:
+    'Show the user the blood pressure readings of one sitting they read off their cuff, as a card with each reading and the time for the user to check and confirm; nothing is saved until they do. Only values the device showed; never estimate one. After a correction, call it again with all readings and replaces set to the card id.',
+  // Not strict: see STRICT_NESTED. The app validates the input itself and sends errors back.
+  input_schema: {
+    type: 'object',
+    properties: {
+      readings: {
+        type: 'array',
+        description: 'The readings of this sitting in the order taken (usually 1 or 2, at most 3).',
+        items: {
+          type: 'object',
+          properties: {
+            systolic: { type: 'number', description: 'The upper number, mmHg.' },
+            diastolic: { type: 'number', description: 'The lower number, mmHg.' },
+            pulse: { type: 'number', description: 'Beats per minute when the device showed it; 0 when not.' },
+          },
+          required: ['systolic', 'diastolic', 'pulse'],
+          additionalProperties: false,
+        },
+      },
+      time: { type: 'string', description: 'When measured, local "YYYY-MM-DD HH:MM"; empty for now.' },
+      replaces: { type: 'string', description: 'Id of the open blood pressure card this corrects (e.g. "D1"); empty for a new sitting.' },
+    },
+    required: ['readings', 'time', 'replaces'],
     additionalProperties: false,
   },
 };

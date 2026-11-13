@@ -114,7 +114,8 @@ export type FeatureKey =
   | 'fasting'
   | 'forgottenCheck'
   | 'weight'
-  | 'habits';
+  | 'habits'
+  | 'bloodPressure';
 
 export interface Settings extends Versioned {
   id: 'settings';
@@ -145,7 +146,7 @@ export interface Settings extends Versioned {
   /** Home nutrient list grouping; unset = by status. */
   homeGrouping?: 'status' | 'type' | 'none';
   /** What the calendar shows: every tracker as dots, or one of them; unset = all. */
-  calendarLayer?: 'all' | 'meals' | 'sleep' | 'activity' | 'water' | 'journal' | 'habits';
+  calendarLayer?: 'all' | 'meals' | 'sleep' | 'activity' | 'water' | 'journal' | 'habits' | 'bloodPressure';
   /** Home groups the user opened (false) or closed (true), by group key; unset keys use the default. */
   homeCollapsed?: Record<string, boolean>;
   /** Foods pinned to the top of the log screen, in the order they were added. */
@@ -171,7 +172,7 @@ export interface Settings extends Versioned {
 }
 
 /** Per thing the fill-in page asks about: the weekdays to ask on (Settings → Reminders). */
-export type AskDays = Partial<Record<'food' | 'sleep' | 'activity' | 'water' | 'habits', number[]>>;
+export type AskDays = Partial<Record<'food' | 'sleep' | 'activity' | 'water' | 'habits' | 'bloodPressure', number[]>>;
 
 /** An empty pot, weighed once and remembered by name. */
 export interface Pot {
@@ -468,6 +469,23 @@ export interface HabitDay extends Versioned {
   /** Local calendar day (YYYY-MM-DD). */
   day: string;
   did: boolean;
+}
+
+/**
+ * One blood pressure reading the user took with a cuff (docs/SPEC.md, "Blood pressure"): systolic
+ * and diastolic in mmHg, and the pulse when the device shows it. The protocol's two readings a minute
+ * apart are two records with their own times.
+ */
+export interface BloodPressureReading extends Versioned {
+  id: string;
+  /** Epoch ms it was measured. */
+  time: number;
+  /** Local calendar day of `time` (YYYY-MM-DD). */
+  day: string;
+  systolic: number;
+  diastolic: number;
+  /** Beats per minute; missing when not noted. */
+  pulse?: number;
 }
 
 export const KETONE_TYPES = ['blood', 'breath', 'urine'] as const;

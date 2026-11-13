@@ -352,13 +352,14 @@ function dayText(day: string, data: InsightData): string {
   } else if (v.nap_minutes !== null) lines.push(`sleep: no night logged${naps}`);
   if (f.activities.length) lines.push(`activity: ${f.activities.map((a) => `${clock(a.time)} ${a.name || a.kind} ${a.minutes} min${a.intensity ? `, ${a.intensity}` : ''}${a.outside ? ', outside' : ''}`).join('; ')}`);
   if (v.plain_water) lines.push(`plain water: ${fmtMeasure('plain_water', v.plain_water)}${v.total_water !== null ? `; with water in food ${fmtMeasure('total_water', v.total_water ?? 0)}` : ''}`);
+  if (f.bloodPressure.length) lines.push(`blood pressure: ${f.bloodPressure.map((r) => `${clock(r.time)} ${r.systolic}/${r.diastolic} mmHg${r.pulse !== undefined ? `, pulse ${r.pulse}` : ''}`).join('; ')}`);
   const habits = Object.entries(f.habits);
   if (habits.length) lines.push(`habits: ${habits.map(([name, kept]) => `${name} ${kept ? 'kept' : 'not kept'}`).join(', ')}`);
   if (f.journal.length) lines.push(`journal: ${f.journal.map((j) => `${clock(j.time)} ${j.text.replace(/\s+/g, ' ').trim()}`).join(' / ')}`);
   return lines.join('\n');
 }
 
-const KIND_NAME: Record<ShareKind, string> = { food: 'food log', journal: 'journal', sleep: 'sleep', activity: 'activity', water: 'water', habits: 'habits' };
+const KIND_NAME: Record<ShareKind, string> = { food: 'food log', journal: 'journal', sleep: 'sleep', activity: 'activity', water: 'water', bloodPressure: 'blood pressure', habits: 'habits' };
 
 const HABIT_KIND_TEXT: Record<InsightData['habits'][number]['kind'], string> = { do: 'to do', avoid: 'to avoid', minutes: 'minutes of activity, from the activity log' };
 
@@ -377,7 +378,7 @@ export function shareNote(o: Overview, notShared: readonly ShareKind[] = [], pri
     ...(privateLeftOut
       ? ['The user keeps some journal entries private and did not share them: a day with only private entries reads as not mentioned, so say "not in the shared entries" rather than "never mentioned" where it matters.']
       : []),
-    `In this period: food log complete on ${o.foodComplete} days (logged ${s.logged}, fasted ${s.fasted}), partly logged ${s.partial}, not logged ${s.unknown + s.filled}, left out by the user ${s.excluded}; ${o.journalEntries} journal entries on ${o.journalDays} days; sleep logged for ${o.nights} nights; activities on ${o.activityDays} days; plain water on ${o.waterDays} days${habits.length ? `; habits answered on ${o.habitDays} days` : ''}.`,
+    `In this period: food log complete on ${o.foodComplete} days (logged ${s.logged}, fasted ${s.fasted}), partly logged ${s.partial}, not logged ${s.unknown + s.filled}, left out by the user ${s.excluded}; ${o.journalEntries} journal entries on ${o.journalDays} days; sleep logged for ${o.nights} nights; activities on ${o.activityDays} days; plain water on ${o.waterDays} days${o.bloodPressureDays ? `; blood pressure measured on ${o.bloodPressureDays} days` : ''}${habits.length ? `; habits answered on ${o.habitDays} days` : ''}.`,
     ...(habits.length
       ? [
           `The user's habits (habit conditions use these names): ${habits.map((h) => `"${h.name}" (${HABIT_KIND_TEXT[h.kind]})`).join(', ')}. A habit condition holds on days it was kept (a habit to do done, a habit to avoid avoided, the minutes reached) and fails on days it was not; days not answered cannot be told.`,

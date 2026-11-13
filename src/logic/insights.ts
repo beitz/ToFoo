@@ -8,7 +8,7 @@ import { addDays, dayRange, parseDay } from '../lib/dates';
 import { NUTRIENTS } from '../model/nutrients';
 import { groupMeals, type DailyTotals } from '../model/simulate';
 import type { DayStatus, ModelEntry } from '../model/types';
-import type { ActivityRecord, Habit, HabitKind, JournalEntry, SleepRecord, WaterRecord } from '../storage/types';
+import type { ActivityRecord, BloodPressureReading, Habit, HabitKind, JournalEntry, SleepRecord, WaterRecord } from '../storage/types';
 import { habitDay, habitStart, type HabitData } from './habits';
 import type { SleepAgeGroup } from '../../model/sleep';
 import { sleepByDay, wakeUps } from './sleep';
@@ -23,6 +23,8 @@ export interface InsightInput {
   sleep: readonly SleepRecord[];
   activities: readonly ActivityRecord[];
   water: readonly WaterRecord[];
+  /** Blood pressure readings; absent while Blood pressure is off. */
+  bloodPressure?: readonly BloodPressureReading[];
   mealWindowMinutes: number;
   today: string;
   /** Habits with their answers (docs/SPEC.md, "Habits"); absent while Habits is off. */
@@ -31,7 +33,7 @@ export interface InsightInput {
   sleepProfile?: SleepProfile;
 }
 
-export type MeasureGroup = 'food' | 'sleep' | 'activity' | 'water' | 'journal';
+export type MeasureGroup = 'food' | 'sleep' | 'activity' | 'water' | 'bloodPressure' | 'journal';
 
 export interface MeasureDef {
   id: string;
@@ -59,6 +61,9 @@ const OWN_MEASURES: MeasureDef[] = [
   { id: 'outside_minutes', group: 'activity', name: 'Activity outside', unit: 'min', decimals: 0 },
   { id: 'plain_water', group: 'water', name: 'Plain water', unit: 'ml', decimals: 0 },
   { id: 'total_water', group: 'water', name: 'Water from drinks and food', unit: 'ml', decimals: 0, about: 'plain water plus the water in logged foods and drinks' },
+  { id: 'bp_systolic', group: 'bloodPressure', name: 'Blood pressure, systolic', unit: 'mmHg', decimals: 0, about: 'average systolic (upper) number of the readings taken that day; unknown on days without a reading' },
+  { id: 'bp_diastolic', group: 'bloodPressure', name: 'Blood pressure, diastolic', unit: 'mmHg', decimals: 0, about: 'average diastolic (lower) number of the readings taken that day; unknown on days without a reading' },
+  { id: 'bp_pulse', group: 'bloodPressure', name: 'Pulse', unit: '/min', decimals: 0, about: 'average pulse the cuff showed with that day’s readings; unknown when none was noted' },
   { id: 'journal_entries', group: 'journal', name: 'Journal entries', unit: '', decimals: 0 },
 ];
 
@@ -97,6 +102,8 @@ export interface DayFacts {
   /** Sleeps that ended on this day and are not part of a night. */
   naps: Array<{ start: number; end: number }>;
   activities: ActivityRecord[];
+  /** Blood pressure readings taken that day, in the order taken. */
+  bloodPressure: Array<{ time: number; systolic: number; diastolic: number; pulse?: number }>;
   /** Value per measure id; null = not known that day (not logged, not tracked yet). */
   values: Record<string, number | null>;
   /** Measures some item on this day had no data for: that day's value is a minimum. */
@@ -159,12 +166,14 @@ export function buildInsightData(input: InsightInput): InsightData {
   const sleep = sleepByDay(input.sleep);
   const activities = byDay(input.activities);
   const water = byDay(input.water);
+  const bp = byDay(input.bloodPressure ?? []);
   // A tracker counts as in use from its first record on: before that its days are unknown, after it an empty day is a real zero.
   const since = {
     journal: earliest(input.journal.map((x) => x.day)),
     sleep: earliest(input.sleep.filter((s) => s.end !== undefined).map((s) => s.day)),
     activity: earliest(input.activities.map((x) => x.day)),
     water: earliest(input.water.map((x) => x.day)),
+    bloodPressure: earliest((input.bloodPressure ?? []).map((x) => x.day)),
   };
   const tracked = (k: keyof typeof since, day: string) => since[k] !== undefined && day >= since[k];
   const habitList = input.habits?.list ?? [];
@@ -222,6 +231,13 @@ export function buildInsightData(input: InsightInput): InsightData {
     values.plain_water = plain;
     values.total_water = plain !== null && foodComplete ? plain + foodWater : null;
 
+    // A day without a reading is not measured: unknown, never a zero.
+    const readings = [...(bp.get(day) ?? [])].sort((a, b) => a.time - b.time);
+    const mean = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
+    values.bp_systolic = mean(readings.map((r) => r.systolic));
+    values.bp_diastolic = mean(readings.map((r) => r.diastolic));
+    values.bp_pulse = mean(readings.flatMap((r) => (r.pulse !== undefined ? [r.pulse] : [])));
+
     const notes = [...(journal.get(day) ?? [])].sort((a, b) => a.time - b.time);
     values.journal_entries = tracked('journal', day) ? notes.length : null;
 
@@ -250,6 +266,7 @@ export function buildInsightData(input: InsightInput): InsightData {
       ...(night ? { night } : {}),
       naps: naps.map((b) => ({ start: b.start, end: b.end })),
       activities: acts,
+      bloodPressure: readings.map((r) => ({ time: r.time, systolic: r.systolic, diastolic: r.diastolic, ...(r.pulse !== undefined ? { pulse: r.pulse } : {}) })),
       values,
       missing,
       foodText: ` ${names.map(normalize).join(' | ')} `,
@@ -509,12 +526,14 @@ export interface Overview {
   nights: number;
   activityDays: number;
   waterDays: number;
+  /** Days with at least one blood pressure reading. */
+  bloodPressureDays: number;
   /** Days with at least one habit answered (or a minutes habit settled). */
   habitDays: number;
 }
 
 /** What the user can choose to share in Insights, each a whole tracker (docs/SPEC.md, "Insights"). */
-export const SHARE_KINDS = ['food', 'journal', 'sleep', 'activity', 'water', 'habits'] as const satisfies readonly (MeasureGroup | 'habits')[];
+export const SHARE_KINDS = ['food', 'journal', 'sleep', 'activity', 'water', 'bloodPressure', 'habits'] as const satisfies readonly (MeasureGroup | 'habits')[];
 export type ShareKind = (typeof SHARE_KINDS)[number];
 
 /**
@@ -547,6 +566,7 @@ export function shareInsightData(data: InsightData, from: string, kinds: Readonl
       journal: notes,
       journalText: notes.length === f.journal.length ? f.journalText : ` ${notes.map((n) => normalize(n.text)).join(' | ')} `,
       activities: kinds.has('activity') ? f.activities : [],
+      bloodPressure: kinds.has('bloodPressure') ? f.bloodPressure : [],
       habits: kinds.has('habits') ? f.habits : {},
       values,
       missing: new Set([...f.missing].filter((id) => !hidden.has(id))),
@@ -578,6 +598,7 @@ export function overview(data: InsightData, from: string, to: string): Overview 
     nights: days.filter((f) => f.night).length,
     activityDays: days.filter((f) => f.activities.length > 0).length,
     waterDays: days.filter((f) => (f.values.plain_water ?? 0) > 0).length,
+    bloodPressureDays: days.filter((f) => f.bloodPressure.length > 0).length,
     habitDays: days.filter((f) => Object.keys(f.habits).length > 0).length,
   };
 }

@@ -129,6 +129,10 @@ const snapshot: Snapshot = {
     { id: 'hb3', schemaVersion: 1, name: 'Exercise', colour: 'green', kind: 'minutes', goal: { type: 'weekdays', days: [1, 3, 5] }, minutes: 30, activities: [{ kind: 'run' }, { kind: 'other', name: 'Yoga' }], order: 2, createdAt: 19 },
   ],
   habitDays: [{ id: 'hb1|2026-10-21', schemaVersion: 1, habitId: 'hb1', day: '2026-10-21', did: true }],
+  bloodPressure: [
+    { id: 'bp1', schemaVersion: 1, time: 1_760_000_000_000, day: '2026-10-09', systolic: 128, diastolic: 82, pulse: 64 },
+    { id: 'bp2', schemaVersion: 1, time: 1_760_000_060_000, day: '2026-10-09', systolic: 125, diastolic: 80 },
+  ],
   portionSizes: [
     { food: 'C133000', sizes: [{ label: 'My bowl', grams: 60 }] },
     { food: 'OFF:8000500319475', sizes: [{ label: 'piece', grams: 4.3, piece: true }] },
@@ -146,8 +150,8 @@ describe('exchange format', () => {
     }
   });
 
-  it('reads backups made before products, the journal, sleep, activities, water, the shopping list, the At home list, ketone measurements and habits existed', () => {
-    const { products: _products, journal: _journal, sleep: _sleep, activities: _activities, water: _water, shopping: _shopping, pantry: _pantry, ketones: _ketones, habits: _habits, habitDays: _habitDays, portionSizes: _sizes, ...older } = snapshot;
+  it('reads backups made before products, the journal, sleep, activities, water, the shopping list, the At home list, ketone measurements, habits and blood pressure existed', () => {
+    const { bloodPressure: _bp, products: _products, journal: _journal, sleep: _sleep, activities: _activities, water: _water, shopping: _shopping, pantry: _pantry, ketones: _ketones, habits: _habits, habitDays: _habitDays, portionSizes: _sizes, ...older } = snapshot;
     const parsed = parseExchange(JSON.stringify(buildBackup({ ...older, log: snapshot.log.slice(0, 2) } as Snapshot, '0.1.0', new Date())));
     expect(parsed.ok && parsed.value.type === 'backup' && parsed.value.data.products).toEqual([]);
     expect(parsed.ok && parsed.value.type === 'backup' && parsed.value.data.journal).toEqual([]);
@@ -159,6 +163,7 @@ describe('exchange format', () => {
     expect(parsed.ok && parsed.value.type === 'backup' && parsed.value.data.ketones).toEqual([]);
     expect(parsed.ok && parsed.value.type === 'backup' && parsed.value.data.habits).toEqual([]);
     expect(parsed.ok && parsed.value.type === 'backup' && parsed.value.data.habitDays).toEqual([]);
+    expect(parsed.ok && parsed.value.type === 'backup' && parsed.value.data.bloodPressure).toEqual([]);
     // Left missing, so restoring an older backup keeps the portion sizes on the phone.
     expect(parsed.ok && parsed.value.type === 'backup' && parsed.value.data.portionSizes).toBeUndefined();
   });
