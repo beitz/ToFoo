@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { firstLaunch, todayKcal, watchErrors } from './helpers';
+import { firstLaunch, loggedKcal, watchErrors } from './helpers';
 
 test('a recipe is saved, cooked as a batch, eaten and stored', async ({ page }) => {
   const errors = watchErrors(page);
@@ -21,7 +21,7 @@ test('a recipe is saved, cooked as a batch, eaten and stored', async ({ page }) 
   await page.getByRole('button', { name: /^Done · eat 1 now, store 3/ }).click();
   await expect(page.getByRole('button', { name: /3 of 4 left/ })).toBeVisible();
 
-  const kcal = await todayKcal(page);
+  const kcal = await loggedKcal(page);
   expect(kcal).toBeGreaterThan(150);
   expect(kcal).toBeLessThan(250);
 

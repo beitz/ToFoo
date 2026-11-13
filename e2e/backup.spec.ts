@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
-import { firstLaunch, logFood, todayKcal, watchErrors } from './helpers';
+import { firstLaunch, logFood, loggedKcal, todayKcal, watchErrors } from './helpers';
 
 test('a backup file restores the log on a fresh install', async ({ browser }, testInfo) => {
   // Phone one: log a meal and export everything.
@@ -9,7 +9,7 @@ test('a backup file restores the log on a fresh install', async ({ browser }, te
   const errors = watchErrors(page);
   await firstLaunch(page);
   await logFood(page, 'oat flakes', /^Oat flakes/, '100 g');
-  const kcal = await todayKcal(page);
+  const kcal = await loggedKcal(page);
   expect(kcal).toBeGreaterThan(0);
   await page.goto('./#/settings/backup');
   const download = page.waitForEvent('download');
