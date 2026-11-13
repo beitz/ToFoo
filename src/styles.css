@@ -7175,6 +7175,37 @@ a.contributor-link > span:first-child {
   border-radius: 4px;
   background: var(--tank);
 }
+/* The normal night: pale from the low to the high end of the recommended hours. */
+.nights-normal-more {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  border-radius: 4px;
+  background: var(--tank-soft);
+}
+.nights-normal {
+  border-bottom: 1px dashed var(--border);
+  margin-bottom: 4px;
+  padding-bottom: 6px;
+}
+.nights-normal .nights-day {
+  font-weight: 600;
+  color: var(--text);
+}
+.nights-normal-toggle {
+  display: flex;
+  justify-content: flex-end;
+  margin: -4px 0 6px;
+}
+.nights-normal-toggle .chip {
+  font-size: 0.8rem;
+  padding: 0 12px;
+}
+.nights-normal-note {
+  margin: 0 0 6px;
+  font-size: 0.75rem;
+  line-height: 1.3;
+}
 .nights-unknown {
   position: absolute;
   top: 2px;
