@@ -84,12 +84,21 @@ describe('which day a sleep belongs to', () => {
     expect(sleepDay({ start: at(13, 2) })).toBe('2026-11-13');
   });
 
-  it('puts an evening nap with the next night, not the day before', () => {
-    const rec = (id: string, start: number, end: number): SleepRecord => ({ id, schemaVersion: 1, start, end, day: sleepDay({ start, end }) });
+  const rec = (id: string, start: number, end: number): SleepRecord => ({ id, schemaVersion: 1, start, end, day: sleepDay({ start, end }) });
+
+  it('puts an evening sleep with the next night, not the day before', () => {
     const byDay = sleepByDay([rec('a', at(12, 21), at(12, 22, 15)), rec('b', at(13, 3, 30), at(13, 8))]);
     expect(byDay.get('2026-11-12')).toBeUndefined();
     const fri = byDay.get('2026-11-13')!;
-    expect(fri.night?.parts.map((p) => p.id)).toEqual(['b']);
-    expect(fri.naps.flatMap((b) => b.parts.map((p) => p.id))).toEqual(['a']);
+    expect(fri.night?.parts.map((p) => p.id)).toEqual(['a', 'b']);
+    expect(fri.naps).toEqual([]);
+  });
+
+  // Owner's report 2026-11-13: 21:08–23:32 and then up showed in the diary on Friday but no Friday row on the sleep page.
+  it('counts a short sleep fallen asleep in the night hours as the night, and a short day sleep as a nap', () => {
+    const byDay = sleepByDay([rec('short', at(12, 21, 8), at(12, 23, 32)), rec('nap', at(13, 14), at(13, 16)), rec('early', at(14, 4), at(14, 6))]);
+    expect(byDay.get('2026-11-13')).toMatchObject({ night: { start: at(12, 21, 8), end: at(12, 23, 32) } });
+    expect(byDay.get('2026-11-13')!.naps.flatMap((b) => b.parts.map((p) => p.id))).toEqual(['nap']);
+    expect(byDay.get('2026-11-14')!.night?.parts.map((p) => p.id)).toEqual(['early']);
   });
 });

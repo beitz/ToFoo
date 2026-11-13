@@ -61,8 +61,8 @@ export type SleepBlock = { start: number; end: number; asleep: number; parts: Fi
 
 /**
  * Finished sleeps joined into blocks, oldest first: sleeps less than NIGHT_GAP_MS apart are one block,
- * so a night with waking up in between counts as one night. A block with NIGHT_MIN_MS or more of sleep
- * is a night (it belongs to the day it ended); the parts of a shorter one are naps.
+ * so a night with waking up in between counts as one night. A block with NIGHT_MIN_MS or more of sleep,
+ * or one fallen asleep in the night hours, is a night (see isNight); the parts of the others are naps.
  */
 export function sleepBlocks(records: readonly SleepRecord[]): SleepBlock[] {
   const blocks: SleepBlock[] = [];
@@ -77,7 +77,23 @@ export function sleepBlocks(records: readonly SleepRecord[]): SleepBlock[] {
   return blocks;
 }
 
-export const isNight = (b: SleepBlock): boolean => b.asleep >= NIGHT_MIN_MS;
+/** Night hours end here: a sleep falling asleep from SLEEP_DAY_START_HOUR until this hour is the night, however short. */
+export const NIGHT_HOURS_END = 6;
+
+/** Fell asleep in the night hours (18:00 to 06:00). */
+const startsInNightHours = (b: SleepBlock): boolean => {
+  const h = new Date(b.start).getHours();
+  return h >= SLEEP_DAY_START_HOUR || h < NIGHT_HOURS_END;
+};
+
+/**
+ * A night, not a nap: 3 hours of sleep or more, or fallen asleep in the night hours however short
+ * (owner's report 2026-11-13: a 2 h 24 sleep from 21:08 counted as a nap, so the day showed no night).
+ */
+export const isNight = (b: SleepBlock): boolean => b.asleep >= NIGHT_MIN_MS || startsInNightHours(b);
+
+/** Long enough to set the usual bed and wake times; a short night stays out so it doesn't move them. */
+const isLongSleep = (b: SleepBlock): boolean => b.asleep >= NIGHT_MIN_MS;
 
 /** A day's sleep: the night that ended on it (if any) and its naps, oldest first. */
 export type DaySleep = { night?: SleepBlock; naps: SleepBlock[] };
@@ -155,7 +171,7 @@ function median(xs: number[]): number {
  */
 export function usualTimes(records: SleepRecord[]): { bed: number; wake: number } | undefined {
   const nights = sleepBlocks(records)
-    .filter(isNight)
+    .filter(isLongSleep)
     .sort((a, b) => b.end - a.end)
     .slice(0, USUAL_NIGHTS);
   if (nights.length === 0) return undefined;
