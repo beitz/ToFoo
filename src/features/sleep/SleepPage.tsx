@@ -14,6 +14,7 @@ import { useSleepNeed } from '../settings/SleepNeed';
 import { clockText, hmText } from './format';
 import { axisLength, dayLabel, NightAxis, NightLegend, NightRow } from './NightRow';
 import { useSleep } from './useSleep';
+import { DEFAULT_LATITUDE } from '../../logic/resolve';
 
 const WINDOWS = ['7', '14', '28'] as const;
 type Window = (typeof WINDOWS)[number];
@@ -123,7 +124,7 @@ export function SleepPage() {
             <ol className="plain-list nights-rows">
               {[...nights].reverse().map((n) => (
                 <li key={n.day}>
-                  <NightRow night={n} axisLen={axisLen} usual={usual} lastMeal={n.block ? lastMealBefore(mealStarts, n.block.start) : undefined} />
+                  <NightRow night={n} axisLen={axisLen} latitude={d.profile.latitude ?? DEFAULT_LATITUDE} usual={usual} lastMeal={n.block ? lastMealBefore(mealStarts, n.block.start) : undefined} />
                 </li>
               ))}
             </ol>

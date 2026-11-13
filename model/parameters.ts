@@ -980,6 +980,12 @@ export const sun = {
     source: 'Central Germany; only used to place solar noon (≈ 12:20 CET)',
     confidence: 'high',
   } satisfies Valued<number>,
+  sunriseElevationDeg: {
+    value: -0.833,
+    source: 'NOAA Global Monitoring Laboratory, Solar Calculation Details (gml.noaa.gov/grad/solcalc/solareqns.PDF): sunrise and sunset are when the sun centre is 0.833° below the horizon (refraction plus the size of the solar disk)',
+    url: 'https://gml.noaa.gov/grad/solcalc/solareqns.PDF',
+    confidence: 'high',
+  } satisfies Valued<number>,
   defaultRoutine: {
     value: { minutesPerDay: 15, startHour: 12, skin: 'faceHands' as const },
     source: 'Default for "little time outdoors" (docs/SPEC.md)',

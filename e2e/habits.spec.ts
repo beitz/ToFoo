@@ -60,6 +60,11 @@ test('habits: add them, tick today on Home, answer a day on the habit page', asy
 
 test('habits: one tap logs the preset activity, again and again, and long press changes it first', async ({ page }) => {
   const errors = watchErrors(page);
+  // A tap logs a walk ending now on the day it started, so within half an hour after midnight it would
+  // count to yesterday: run at midday so the card's "today" is the walk's day.
+  const noon = new Date();
+  noon.setHours(12, 0, 0, 0);
+  await page.clock.install({ time: noon });
   await firstLaunch(page);
   await turnOnHabits(page);
   await page.goto('./#/habits/new');

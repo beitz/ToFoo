@@ -1197,6 +1197,7 @@ export const en = {
   'nights.keyUsual': 'your usual {from}–{to}',
   'nights.keyMeal': 'last meal',
   'nights.keyUnknown': 'not logged',
+  'nights.keyDaylight': 'sun up',
   'nights.regular': 'How regular',
   'nights.regularNote': 'whole range pale, middle half dark',
   'nights.asleep': 'Asleep',
