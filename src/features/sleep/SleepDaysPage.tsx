@@ -10,6 +10,7 @@ import { useSleepNeed } from '../settings/SleepNeed';
 import { hmText } from './format';
 import { axisLength, NightAxis, NightLegend, NightRow } from './NightRow';
 import { useSleep } from './useSleep';
+import { DEFAULT_LATITUDE } from '../../logic/resolve';
 
 /** Days added each time the list reaches its end. */
 const STEP = 21;
@@ -77,7 +78,7 @@ export function SleepDaysPage() {
                       </li>
                     )}
                     <li>
-                      <NightRow night={n} axisLen={axisLen} usual={usual} lastMeal={n.block ? lastMealBefore(mealStarts, n.block.start) : undefined} times />
+                      <NightRow night={n} axisLen={axisLen} latitude={d.profile.latitude ?? DEFAULT_LATITUDE} usual={usual} lastMeal={n.block ? lastMealBefore(mealStarts, n.block.start) : undefined} times />
                     </li>
                   </Fragment>
                 );

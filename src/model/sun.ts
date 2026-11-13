@@ -92,3 +92,41 @@ export function sunVitaminD(input: SunDayInput): Range {
   }
   return result;
 }
+
+export interface SunTimes {
+  /** Local clock hours (e.g. 7.75 = 07:45); missing when the sun does not rise or set that day. */
+  rise?: number;
+  set?: number;
+  /** Where neither happens: up all day (summer far north) or down all day (winter far north). */
+  allDay?: 'up' | 'down';
+}
+
+/**
+ * Sunrise and sunset for a local date: where the sun centre crosses the NOAA sunrise elevation, found
+ * by scanning the day in 10-minute steps and narrowing each crossing to under a second.
+ */
+export function sunTimes(year: number, month: number, day: number, utcOffsetHours: number, latitude: number, longitude: number = sun.defaultLongitudeDeg.value): SunTimes {
+  const h0 = sun.sunriseElevationDeg.value;
+  const above = (h: number) => solarElevation(year, month, day, h, utcOffsetHours, latitude, longitude) - h0;
+  const crossing = (a: number, b: number) => {
+    let [lo, hi, fLo] = [a, b, above(a)];
+    for (let i = 0; i < 20; i++) {
+      const mid = (lo + hi) / 2;
+      const f = above(mid);
+      if (f === 0 || f > 0 === fLo > 0) [lo, fLo] = [mid, f];
+      else hi = mid;
+    }
+    return (lo + hi) / 2;
+  };
+  const out: SunTimes = {};
+  const step = 1 / 6;
+  let prev = above(0);
+  for (let h = step; h <= 24 + 1e-9; h += step) {
+    const f = above(h);
+    if (prev <= 0 && f > 0 && out.rise === undefined) out.rise = crossing(h - step, h);
+    else if (prev > 0 && f <= 0 && out.set === undefined) out.set = crossing(h - step, h);
+    prev = f;
+  }
+  if (out.rise === undefined && out.set === undefined) out.allDay = above(12) > 0 ? 'up' : 'down';
+  return out;
+}

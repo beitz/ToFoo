@@ -19,6 +19,13 @@ test('When you slept opens a day-by-day page with the times of each sleep', asyn
   await expect(sheet).toHaveCount(0);
 
   await page.goto('./#/nights');
+  // Owner's ask 2026-11-13: the hours read as plain numbers ("22", "0", "6") over guide lines, with the hours the sun is up shaded.
+  const ticks = await page.locator('.nights-axis-ticks > span').allInnerTexts();
+  expect(ticks.length).toBeGreaterThanOrEqual(6);
+  for (const tick of ticks) expect(tick).toMatch(/^\d{1,2}$/);
+  expect(ticks).toContain('0');
+  await expect(page.locator('.nights-row').first().locator('.nights-daylight').first()).toBeVisible();
+  await expect(page.locator('.nights-row').first().locator('.nights-grid.is-midnight')).toHaveCount(1);
   await page.getByRole('link', { name: 'When you slept' }).click();
   await expect(page).toHaveURL(/#\/nights\/days$/);
   await expect(page.getByRole('heading', { name: 'When you slept', level: 1 })).toBeVisible();

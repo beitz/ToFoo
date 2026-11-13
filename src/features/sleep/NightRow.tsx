@@ -1,6 +1,8 @@
+import { useMemo } from 'react';
 import { href } from '../../app/router';
 import { t } from '../../i18n';
 import { addDays, dayKey, formatTime, parseDay, weekdayShort } from '../../lib/dates';
+import { daylight } from '../../logic/daylight';
 import { minuteOfDay, type Night } from '../../logic/nights';
 import type { SleepBlock } from '../../logic/sleep';
 import { clockText, hmShort, hmText, signedHm } from './format';
@@ -14,13 +16,27 @@ const AXIS_START_MIN = 18 * 60;
 const AXIS_MIN = 18 * 60;
 const AXIS_MAX_MIN = 30 * 60;
 
-/** Ticks every 4 hours from 22:00 on the usual axis; every 6 hours from midnight on a longer one, so they fit at 360 px. */
+/** Up to this axis length the labels fit every 2 hours at 360 px; a longer axis labels every 3 hours. */
+const TWO_HOUR_LABELS_MAX = 20 * 60;
+
+/** Hours with a label: every 2 (or 3) hours from the start, short of the right end. Midnight is always one of them. */
 function axisTicks(len: number): number[] {
-  const [first, step] = len > AXIS_MIN ? [6 * 60, 6 * 60] : [4 * 60, 4 * 60];
+  const step = len > TWO_HOUR_LABELS_MAX ? 3 * 60 : 2 * 60;
   const out: number[] = [];
-  for (let m = first; m <= len - 60; m += step) out.push(m);
+  for (let m = step; m <= len - 60; m += step) out.push(m);
   return out;
 }
+
+/** Every whole hour inside the axis gets a faint guide line; labelled hours a clearer one. */
+function hourLines(len: number): Array<{ m: number; kind: 'hour' | 'label' | 'midnight' }> {
+  const labels = new Set(axisTicks(len));
+  const out: Array<{ m: number; kind: 'hour' | 'label' | 'midnight' }> = [];
+  for (let m = 60; m < len; m += 60) out.push({ m, kind: (m + AXIS_START_MIN) % 1440 === 0 ? 'midnight' : labels.has(m) ? 'label' : 'hour' });
+  return out;
+}
+
+/** "22", "0", "6": just the hour, the grid says the rest. */
+const hourText = (m: number) => String(Math.floor(((m + AXIS_START_MIN) % 1440) / 60));
 
 /** "Wed 21": the month is in the window's dates already, and the rows are narrow. */
 export const dayLabel = (day: string) => `${weekdayShort(day)} ${parseDay(day).getDate()}`;
@@ -47,7 +63,7 @@ export function NightAxis({ axisLen }: { axisLen: number }) {
       <span className="nights-axis-ticks">
         {axisTicks(axisLen).map((m) => (
           <span key={m} style={{ left: `${(m / axisLen) * 100}%` }}>
-            {clockText((m + AXIS_START_MIN) % 1440)}
+            {hourText(m)}
           </span>
         ))}
       </span>
@@ -73,6 +89,9 @@ export function NightLegend({ usual }: { usual?: { bed: number; wake: number } }
       </span>
       <span>
         <span className="nights-key nights-key-unknown" /> {t('nights.keyUnknown')}
+      </span>
+      <span>
+        <span className="nights-key nights-key-day" /> {t('nights.keyDaylight')}
       </span>
     </p>
   );
@@ -115,8 +134,11 @@ function SleepTimes({ night: n }: { night: Night }) {
  * One day on the 18:00 → 12:00 (or later) axis: the usual window, each sleep and nap, the last meal
  * before the night, the total on the right. With `times`, the clock times of each sleep under the bar.
  */
-export function NightRow({ night: n, axisLen, usual, lastMeal, times, label = dayLabel(n.day) }: { night: Night; axisLen: number; usual?: { bed: number; wake: number }; lastMeal?: number; times?: boolean; label?: string }) {
+export function NightRow({ night: n, axisLen, latitude, usual, lastMeal, times, label = dayLabel(n.day) }: { night: Night; axisLen: number; latitude: number; usual?: { bed: number; wake: number }; lastMeal?: number; times?: boolean; label?: string }) {
   const pos = (t: number) => (Math.max(0, Math.min(axisLen, axisMinute(t, n.day))) / axisLen) * 100;
+  // When the sun was up, the evening before and on the day itself, behind the sleep.
+  const sunUp = useMemo(() => [...daylight(addDays(n.day, -1), latitude), ...daylight(n.day, latitude)], [n.day, latitude]);
+  const lines = useMemo(() => hourLines(axisLen), [axisLen]);
   // A clock time on the row: evening times on the day before, the rest on the day itself.
   const minutePos = (m: number) => ((m >= AXIS_START_MIN ? m - AXIS_START_MIN : m + 1440 - AXIS_START_MIN) / axisLen) * 100;
   const night = n.block ? stretches(n.block) : [];
@@ -142,6 +164,16 @@ export function NightRow({ night: n, axisLen, usual, lastMeal, times, label = da
         {label}
       </span>
       <span className="nights-track" aria-hidden>
+        <span className="nights-shade">
+          {sunUp.map((s) => {
+            const a = pos(s.start);
+            const b = pos(s.end);
+            return b > a ? <span key={s.start} className="nights-daylight" style={{ left: `${a}%`, width: `${b - a}%` }} /> : null;
+          })}
+          {lines.map(({ m, kind }) => (
+            <span key={m} className={`nights-grid is-${kind}`} style={{ left: `${(m / axisLen) * 100}%` }} />
+          ))}
+        </span>
         {usual && <span className="nights-usual" style={{ left: `${minutePos(usual.bed)}%`, width: `${Math.max(0, minutePos(usual.wake) - minutePos(usual.bed))}%` }} />}
         {!n.block && usual && <span className="nights-unknown" style={{ left: `${minutePos(usual.bed)}%`, width: `${Math.max(0, minutePos(usual.wake) - minutePos(usual.bed))}%` }} />}
         {parts.map((p) => {

@@ -44,6 +44,10 @@
   --shop: #2f5fb3;
   --shop-soft: color-mix(in srgb, var(--shop) 10%, transparent);
   --range: rgba(21, 24, 27, 0.16);
+  /* Sleep timeline: night darker and a little blue, the hours the sun is up warm and light. */
+  --night: #d6dae3;
+  --daylight: #faf1d4;
+  --grid-line: rgba(21, 24, 27, 0.2);
   --shadow: none;
   --radius: 18px;
   --radius-sm: 12px;
@@ -108,6 +112,9 @@
     --shop: #8fb4f7;
     --shop-soft: color-mix(in srgb, var(--shop) 12%, transparent);
     --range: rgba(238, 241, 243, 0.2);
+    --night: #0f1418;
+    --daylight: #3f3d31;
+    --grid-line: rgba(238, 241, 243, 0.18);
     --shadow: none;
   }
 }
@@ -139,6 +146,9 @@
   --shop: #8fb4f7;
   --shop-soft: color-mix(in srgb, var(--shop) 12%, transparent);
   --range: rgba(238, 241, 243, 0.2);
+  --night: #0f1418;
+  --daylight: #3f3d31;
+  --grid-line: rgba(238, 241, 243, 0.18);
   --shadow: none;
 }
 
@@ -7103,13 +7113,43 @@ a.contributor-link > span:first-child {
   position: relative;
   height: 26px;
   border-radius: 6px;
-  background: var(--surface-2);
+  background: var(--night);
 }
+/* Daylight and guide lines, cut to the track's rounded ends; the meal mark may still stick out. */
+.nights-shade {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  overflow: hidden;
+}
+.nights-daylight {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: var(--daylight);
+}
+/* Thin guide lines: faint every hour, clearer under each label, midnight strongest. */
+.nights-grid {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  transform: translateX(-50%);
+  background: var(--grid-line);
+}
+.nights-grid.is-hour {
+  opacity: 0.4;
+}
+.nights-grid.is-midnight {
+  background: var(--edge);
+  opacity: 0.7;
+}
+/* The usual window as a line along the top and bottom of the track, so the day and night shading shows through. */
 .nights-usual {
   position: absolute;
   top: 0;
   bottom: 0;
-  background: var(--surface-3);
+  border-block: 2px solid var(--edge);
 }
 .nights-sleep {
   position: absolute;
@@ -7221,7 +7261,11 @@ a.contributor-link > span:first-child {
   background: var(--tank);
 }
 .nights-key-usual {
-  background: var(--surface-3);
+  border-block: 2px solid var(--edge);
+}
+.nights-key-day {
+  background: var(--daylight);
+  box-shadow: inset 0 0 0 1px var(--border);
 }
 .nights-key-unknown {
   border: 1.5px dashed var(--text-muted);
