@@ -16,12 +16,9 @@ const AXIS_START_MIN = 18 * 60;
 const AXIS_MIN = 18 * 60;
 const AXIS_MAX_MIN = 30 * 60;
 
-/** Up to this axis length the labels fit every 2 hours at 360 px; a longer axis labels every 3 hours. */
-const TWO_HOUR_LABELS_MAX = 20 * 60;
-
-/** Hours with a label: every 2 (or 3) hours from the start, short of the right end. Midnight is always one of them. */
+/** Hours with a label: every 2 hours from the start, short of the right end (the bar is the card's full width, so they fit at 360 px even on the longest axis). Midnight is always one of them. */
 function axisTicks(len: number): number[] {
-  const step = len > TWO_HOUR_LABELS_MAX ? 3 * 60 : 2 * 60;
+  const step = 2 * 60;
   const out: number[] = [];
   for (let m = step; m <= len - 60; m += step) out.push(m);
   return out;
@@ -59,7 +56,6 @@ export function axisLength(nights: readonly Night[]): number {
 export function NightAxis({ axisLen }: { axisLen: number }) {
   return (
     <div className="nights-axis" aria-hidden>
-      <span />
       <span className="nights-axis-ticks">
         {axisTicks(axisLen).map((m) => (
           <span key={m} style={{ left: `${(m / axisLen) * 100}%` }}>
@@ -67,7 +63,6 @@ export function NightAxis({ axisLen }: { axisLen: number }) {
           </span>
         ))}
       </span>
-      <span />
     </div>
   );
 }

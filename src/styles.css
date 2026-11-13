@@ -7076,14 +7076,26 @@ a.contributor-link > span:first-child {
   font-size: 1.5rem;
   line-height: 1.2;
 }
-.nights-axis,
+/*
+ * Each day is two lines (owner's ask 2026-11-13: full-width bars, more days on screen): the day, the
+ * clock times (day-by-day page) and the total on a small first line, the bar the whole width under it.
+ * Rows are about 36 px, under the usual 44 px, on purpose: a mis-tap only opens the next day's diary.
+ */
 .nights-row {
   display: grid;
-  grid-template-columns: 52px minmax(0, 1fr) 62px;
-  align-items: center;
-  gap: 8px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    'day times total'
+    'track track track';
+  align-items: baseline;
+  column-gap: 8px;
+  row-gap: 1px;
+  padding: 1px 0 3px;
+  font-size: 0.75rem;
+  line-height: 1.25;
 }
 .nights-axis-ticks {
+  display: block;
   position: relative;
   height: 18px;
   font-size: 0.7rem;
@@ -7101,17 +7113,19 @@ a.contributor-link > span:first-child {
   border: 0;
 }
 .nights-row {
-  min-height: 44px;
   color: var(--text);
   text-decoration: none;
 }
 .nights-day {
+  grid-area: day;
+  font-size: inherit;
   color: var(--text-muted);
   white-space: nowrap;
 }
 .nights-track {
+  grid-area: track;
   position: relative;
-  height: 26px;
+  height: 16px;
   border-radius: 6px;
   background: var(--night);
 }
@@ -7153,31 +7167,35 @@ a.contributor-link > span:first-child {
 }
 .nights-sleep {
   position: absolute;
-  top: 3px;
-  bottom: 3px;
-  border-radius: 5px;
+  top: 2px;
+  bottom: 2px;
+  border-radius: 4px;
   background: var(--tank);
 }
 .nights-unknown {
   position: absolute;
-  top: 3px;
-  bottom: 3px;
+  top: 2px;
+  bottom: 2px;
   border: 1.5px dashed var(--text-muted);
-  border-radius: 5px;
+  border-radius: 4px;
 }
 .nights-meal {
   position: absolute;
   top: 50%;
   transform: translate(-50%, -50%);
-  font-size: 0.75rem;
+  font-size: 0.65rem;
   color: var(--text);
 }
 .nights-total {
+  grid-area: total;
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  line-height: 1.2;
+  align-items: baseline;
+  gap: 6px;
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.nights-row .small {
+  font-size: inherit;
 }
 .nights-diff.is-short {
   color: var(--low);
@@ -7185,14 +7203,9 @@ a.contributor-link > span:first-child {
 .nights-diff.is-over {
   color: var(--ok);
 }
-.nights-row.has-times {
-  grid-template-rows: auto auto;
-  row-gap: 2px;
-  padding: 4px 0;
-}
-/* The times sit under the bar and run on under the total, so a night woken from twice still fits on one line at 360 px. */
+/* The times sit between the day and the total, and wrap there when a broken night and a nap don't fit. */
 .nights-times-cell {
-  grid-column: 2 / -1;
+  grid-area: times;
   min-width: 0;
 }
 .nights-times {
