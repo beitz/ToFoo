@@ -254,7 +254,7 @@ export const sunEntrySchema = z.object({ id: z.string(), ...versioned, day, star
 export const journalEntrySchema = z.object({ id: z.string(), ...versioned, time: z.number(), day, text: z.string(), private: z.boolean().optional().describe('Kept from the AI unless the user includes private entries') }).describe('A free-text journal entry');
 export const sleepRecordSchema = z
   .object({ id: z.string(), ...versioned, start: z.number(), end: z.number().optional(), day })
-  .describe('One sleep: fell asleep (start) and woke up (end, missing while asleep), epoch ms; day is the local day it ended');
+  .describe('One sleep: fell asleep (start) and woke up (end, missing while asleep), epoch ms; day is the local day it ended, the next day when it ended from 18:00 on (an import works it out again from the times)');
 
 export const activitySchema = z
   .object({

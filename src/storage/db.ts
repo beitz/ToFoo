@@ -4,6 +4,7 @@
  */
 import Dexie, { type Table, type Transaction } from 'dexie';
 import { SNAPSHOT_TABLES, writeAutoBackup } from './autoBackup';
+import { sleepDay } from '../logic/sleep';
 import { migrateRecord, needsMigration, TABLES, type TableName } from './migrations';
 import type { ChatAudio, ChatPhoto, ChatRecord } from '../ai/chatRecord';
 import type { ActivityRecord, AutoBackup, Batch, CustomFood, DayStatusRecord, Fast, Habit, HabitDay, JournalEntry, KetoneReading, LogEntry, MetaRecord, Product, Profile, Recipe, Settings, PantryItem, ShoppingItem, SleepRecord, SunEntry, WaterRecord } from './types';
@@ -91,6 +92,19 @@ export class ToFooDB extends Dexie {
     this.version(13)
       .stores({ habits: 'id, order', habitDays: 'id, habitId, day' })
       .upgrade((tx) => this.backupBeforeUpgrade(tx));
+    // v14: a sleep ending from 18:00 on belongs to the next day (logic/sleep.ts, sleepDay): the stored
+    // day of every sleep is worked out again from its times.
+    this.version(14)
+      .stores({})
+      .upgrade(async (tx) => {
+        await this.backupBeforeUpgrade(tx);
+        await tx
+          .table<SleepRecord, string>('sleep')
+          .toCollection()
+          .modify((r) => {
+            r.day = sleepDay(r);
+          });
+      });
   }
 
   /** Save a full backup inside the upgrade transaction, once per opening. */

@@ -154,7 +154,8 @@ describe('repository', () => {
     const H = 3_600_000;
     const night = new Date(2026, 9, 15, 23, 30).getTime();
     const started = await repo.startSleep(night);
-    expect(started!.day).toBe('2026-10-15');
+    // Fallen asleep after 18:00: already the next day's night.
+    expect(started!.day).toBe('2026-10-16');
     expect(await repo.startSleep(night + H)).toBeUndefined(); // already asleep
     const before = await repo.endSleep(night + 7.5 * H);
     expect(before).toEqual(started);

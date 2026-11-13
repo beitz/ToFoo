@@ -61,4 +61,30 @@ describe('opening data from an older app version', () => {
     await again.init('2026-10-19');
     expect(await again.snapshot()).toEqual(before);
   });
+
+  // DB v14 (owner's ask 2026-11-13): a sleep ending from 18:00 on belongs to the next day.
+  it('moves a stored evening sleep to the next day, and keeps the rest', async () => {
+    const name = 'upgrade-sleep-day';
+    const v13 = new Dexie(name);
+    v13.version(13).stores({
+      profile: 'id', settings: 'id', recipes: 'id, name, updatedAt', batches: 'id, recipeId, cookedDay', log: 'id, time, day, kind', customFoods: 'id, name', dayStatus: 'day', fasts: 'id, startDay', sunEntries: 'id, day', meta: 'key',
+      products: 'id, name', journal: 'id, time, day', sleep: 'id, start, day', activities: 'id, time, day', water: 'id, time, day', chats: 'id, updatedAt', chatPhotos: 'id, chatId',
+      autoBackups: 'id, at', shopping: 'id, addedAt', pantry: 'id, addedAt', ketones: 'id, time, day', chatAudio: 'id, chatId', habits: 'id, order', habitDays: 'id, habitId, day',
+    });
+    await v13.open();
+    const t = (d: number, h: number, m = 0) => new Date(2026, 10, d, h, m).getTime();
+    await v13.table('sleep').bulkPut([
+      { id: 'evening', schemaVersion: 1, start: t(12, 21), end: t(12, 22, 15), day: '2026-11-12' },
+      { id: 'night', schemaVersion: 1, start: t(12, 23), end: t(13, 6), day: '2026-11-13' },
+      { id: 'nap', schemaVersion: 1, start: t(13, 14), end: t(13, 15), day: '2026-11-13' },
+    ]);
+    v13.close();
+
+    const repo = createRepo(new ToFooDB(name));
+    await repo.init('2026-11-13');
+    const days = Object.fromEntries((await repo.db.sleep.toArray()).map((r) => [r.id, r.day]));
+    expect(days).toEqual({ evening: '2026-11-13', night: '2026-11-13', nap: '2026-11-13' });
+    // A copy of the data as it was is saved first.
+    expect(await repo.db.autoBackups.count()).toBe(1);
+  });
 });

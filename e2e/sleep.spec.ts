@@ -4,6 +4,10 @@ import { firstLaunch, watchErrors } from './helpers';
 // Owner's ask 2026-11-03: "When you slept" opens every day with the times of each sleep and the total.
 test('When you slept opens a day-by-day page with the times of each sleep', async ({ page }) => {
   const errors = watchErrors(page);
+  // In the morning: a sleep ending from 18:00 on belongs to the next day, which the page doesn't show yet.
+  const morning = new Date();
+  morning.setHours(9, 0, 0, 0);
+  await page.clock.install({ time: morning });
   await firstLaunch(page);
   await page.goto('./#/settings');
   await page.getByText('What you track').click();

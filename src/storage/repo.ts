@@ -708,7 +708,8 @@ export function createRepo(db: ToFooDB) {
         await db.sunEntries.bulkPut(s.sunEntries);
         await db.products.bulkPut(s.products);
         await db.journal.bulkPut(s.journal);
-        await db.sleep.bulkPut(s.sleep);
+        // A backup from before the 18:00 day start (DB v14) carries the old day; the times decide.
+        await db.sleep.bulkPut(s.sleep.map((r) => ({ ...r, day: sleepDay(r) })));
         await db.activities.bulkPut(s.activities);
         await db.water.bulkPut(s.water);
         await db.shopping.bulkPut(s.shopping);
