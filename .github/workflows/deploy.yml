@@ -9,7 +9,8 @@ permissions:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    # Pinned: ubuntu-latest moved to 26.04 in Nov 2026 and Playwright cannot install Chromium there yet.
+    runs-on: ubuntu-24.04
     # A hung step would otherwise hold the deploy back for hours (default limit 6 h).
     timeout-minutes: 20
     steps:
@@ -48,7 +49,7 @@ jobs:
   deploy:
     if: github.ref == 'refs/heads/main'
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # Two merges close together used to fail the second deploy ("in progress deployment", PR #132
     # never went live). Deploys now wait their turn; a newer waiting one replaces an older waiting one.
     concurrency:
