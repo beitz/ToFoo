@@ -238,14 +238,15 @@ function VoiceSettings() {
               <button className="btn btn-primary" disabled={!draft.trim()} onClick={() => void save(draft)}>
                 {t('common.save')}
               </button>
-              <p className="muted small">
-                {t('voice.getKey')}{' '}
-                <a href="https://platform.openai.com/api-keys" target="_blank" rel="noreferrer noopener">
-                  platform.openai.com
-                </a>
-              </p>
             </>
           ))}
+        {/* Shown whether or not a key is saved, like the Anthropic link, so the key page stays one tap away. */}
+        <p className="muted small">
+          {t('voice.getKey')}{' '}
+          <a href="https://platform.openai.com/api-keys" target="_blank" rel="noreferrer noopener">
+            platform.openai.com
+          </a>
+        </p>
       </div>
     </>
   );
