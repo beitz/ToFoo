@@ -1187,14 +1187,29 @@ export const sleepNeed = {
 // ── Weight and the log check (docs/SPEC.md, "Weight") ────────────────────────────────
 
 export const weightCheck = {
-  /** Share of each day's difference the trend line moves toward a new weight (an exponentially smoothed average). */
+  /**
+   * The trend line's smoothing per day: each day older, a weigh-in keeps (1 − this) of its weight in
+   * the time-weighted average, so with daily weigh-ins each new one moves the trend this share of the way.
+   */
   trendSmoothing: {
     value: 0.1,
     source: 'Walker J, The Hacker’s Diet (1991, online edition 2005), ch. "Signal and Noise": a 10 % exponentially smoothed moving average of daily weights',
     url: 'https://www.fourmilab.ch/hackdiet/e4/signalnoise.html',
     confidence: 'medium',
-    note: 'A display choice with a well-known precedent: water and gut content move the scale by a kilogram or more from day to day, the trend shows the direction under that. Gaps between weigh-ins count as that many days.',
+    note: 'A display choice with a well-known precedent: water and gut content move the scale by a kilogram or more from day to day, the trend shows the direction under that. Weighting by days rather than by weigh-ins (and dividing by the weights so far) carries it over to weekly or irregular weighing: daily weigh-ins give Walker’s average, a weekly one moves the trend about half of the way (1 − 0.9⁷), and the first weigh-ins count about equally instead of the first one holding the line for weeks. Half of a weigh-in’s weight is gone after about 6.6 days.',
   } satisfies Valued<number>,
+  /**
+   * How much the scale moves from one day to the next when weighed the same way each morning (on
+   * rising, bladder emptied, before eating or drinking): the "how to weigh" tip and why the trend matters.
+   */
+  dayToDay: {
+    value: { over05kgShare: { low: 0.13, high: 0.3 }, over1kgShare: { low: 0.02, high: 0.06 }, maxShareOfWeight: 0.015 },
+    source:
+      'Robinson MF, Watson PE (1965): Day-to-day variations in body-weight of young women. Br J Nutr 19:225–235 (28 women, 68 days, weighed on rising after emptying the bladder, before food or drink: changes over 0.5 kg on 13.4 % of days, over 1 kg on 1.8 %); in its discussion Adam, Best & Edholm (1961, 64 soldiers, 1,700 weighings: over 0.5 kg on 30 %, over 1 kg on 6 %) and Khosla & Billewicz (1964: rarely over 1.5 % of body weight)',
+    url: 'https://doi.org/10.1079/BJN19650022',
+    confidence: 'medium',
+    note: 'Low = the women in Robinson & Watson, high = the soldiers in Adam et al.; both weighed under strict morning conditions, so weighing at other times of day, in different clothes or after a salty or high-carbohydrate day swings more. The swings are mostly body water (Robinson & Watson).',
+  } satisfies Valued<{ over05kgShare: { low: number; high: number }; over1kgShare: { low: number; high: number }; maxShareOfWeight: number }>,
   /** Energy stored or lost per kg of body weight change (kcal/kg), for the intake a weight change implies. */
   energyPerKg: {
     value: { low: 8390, central: 8840, high: 9290 },
@@ -1226,6 +1241,6 @@ export const weightCheck = {
     value: { days: 28, minLoggedDays: 14, minWeighIns: 3, minSpanDays: 21 },
     source: 'Modelling choice',
     confidence: 'assumption',
-    note: 'Four weeks is about the shortest period over which weekly weigh-ins show a direction; Sanghvi et al. validated 6 months. The slope’s own uncertainty (from the scatter of the weigh-ins) widens the range, so few or noisy weigh-ins give a wide range rather than a false verdict. See docs/OPEN_QUESTIONS.md.',
+    note: 'Four weeks is about the shortest period over which weekly weigh-ins show a direction (more frequent weigh-ins narrow the range); Sanghvi et al. validated 6 months. The slope’s own uncertainty (from the scatter of the weigh-ins) widens the range, so few or noisy weigh-ins give a wide range rather than a false verdict. See docs/OPEN_QUESTIONS.md.',
   } satisfies Valued<{ days: number; minLoggedDays: number; minWeighIns: number; minSpanDays: number }>,
 };

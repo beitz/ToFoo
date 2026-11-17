@@ -109,6 +109,7 @@ export const TOURS: Record<TourId, Tour> = {
   weight: {
     requires: 'weight',
     steps: [
+      { target: 'weight.tip', text: 'tour.weight.tip' },
       { target: 'weight.trend', text: 'tour.weight.trend' },
       { target: 'weight.check', text: 'tour.weight.check' },
       { target: 'weight.measured', text: 'tour.weight.measured' },

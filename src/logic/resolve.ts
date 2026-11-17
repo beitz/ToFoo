@@ -6,6 +6,7 @@ import { ALL_SALT_CODES, saltCode } from '../foods/foodDb';
 import { productFood } from '../foods/products';
 import { refKey } from '../lib/refs';
 import { potShare, servingIngredients } from './batch';
+import { trendWeight } from './weight';
 import { addDays, dayRange, parseDay, utcOffsetHours } from '../lib/dates';
 import { sun as sunParams } from '../../model/parameters';
 import type { Range } from '../model/paramTypes';
@@ -169,7 +170,12 @@ export function sunByDay(days: readonly string[], profile: Profile, extra: reado
   return out;
 }
 
+/**
+ * The body weight the model uses (energy estimate, protein per kg, store sizes, activity energy): the
+ * weight trend now, not the last weigh-in, so a day's swing of water or salt doesn't move targets
+ * (docs/SPEC.md, "Weight"). With one weigh-in it is that weigh-in. Rounded to 0.1 kg like a scale.
+ */
 export function currentWeight(profile: Profile): number | undefined {
-  const h = [...profile.weightHistory].sort((a, b) => a.day.localeCompare(b.day));
-  return h[h.length - 1]?.kg;
+  const kg = trendWeight(profile.weightHistory);
+  return kg === undefined ? undefined : Math.round(kg * 10) / 10;
 }
