@@ -5,6 +5,7 @@ import { href } from '../../app/router';
 import { t } from '../../i18n';
 import { formatDay } from '../../lib/dates';
 import { currentWeight } from '../../logic/resolve';
+import { fmtKg } from '../weight/format';
 import { repo } from '../../storage/repo';
 import type { Profile } from '../../storage/types';
 import { Field, NumberInput, Segmented } from '../../ui/controls';
@@ -115,7 +116,7 @@ export function ProfilePage() {
 
       <h2 className="section-title">{t('profile.weight')}</h2>
       <div className="card">
-        <p>{weight ? t('profile.currentWeight', { kg: weight }) : t('profile.noWeight')}</p>
+        <p>{weight ? t(p.weightHistory.length > 1 ? 'profile.currentTrend' : 'profile.currentWeight', { kg: fmtKg(weight) }) : t('profile.noWeight')}</p>
         <p className="muted small">{t('profile.weightWhy')}</p>
         {isOn(d.settings.features, 'weight') && (
           <p className="small">

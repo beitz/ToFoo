@@ -7839,6 +7839,17 @@ a.contributor-link > span:first-child {
 .weight-add-row .btn {
   flex: 1 1 100%;
 }
+/* The how-to-weigh tip: a quiet line with its ⓘ at the end, under the entry. */
+.weight-tip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 10px;
+}
+.weight-tip p {
+  flex: 1;
+  margin: 0;
+}
 .weight-chart {
   margin: 12px 0 0;
 }

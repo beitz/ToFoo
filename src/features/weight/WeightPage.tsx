@@ -49,7 +49,9 @@ export function WeightPage() {
         <div className="card-head">
           <h2>{t('weight.trend')}</h2>
           <InfoButton title={t('weight.trend')}>
-            <p>{t('weight.trendInfo')}</p>
+            <p>{t('weight.trendInfo', { keep: Math.round((1 - weightCheck.trendSmoothing.value) * 100) })}</p>
+            {last && <p>{t('weight.trendNow', { n: Math.max(1, Math.round(last.weighIns)) })}</p>}
+            <p>{t('weight.trendUsed')}</p>
             <p className="small muted">{t('weight.trendSource')}</p>
           </InfoButton>
         </div>
@@ -112,6 +114,27 @@ function AddWeighIn() {
           {t('weight.save')}
         </button>
       </div>
+      <WeighTip />
+    </div>
+  );
+}
+
+const pctRange = (r: { low: number; high: number }) => `${Math.round(r.low * 100)}–${Math.round(r.high * 100)} %`;
+
+/**
+ * How to weigh (owner's ask, 2026-11-17): one small suggestion under the entry, with why and the
+ * sources behind ⓘ. Weighing the same way is the user's call; the trend copes with any frequency.
+ */
+function WeighTip() {
+  const s = weightCheck.dayToDay.value;
+  return (
+    <div className="weight-tip" data-tour="weight.tip">
+      <p className="small muted">{t('weight.tip')}</p>
+      <InfoButton title={t('weight.tipTitle')}>
+        <p>{t('weight.tipInfo', { p05: pctRange(s.over05kgShare), p1: pctRange(s.over1kgShare) })}</p>
+        <p>{t('weight.tipOften')}</p>
+        <p className="small muted">{t('weight.tipSources')}</p>
+      </InfoButton>
     </div>
   );
 }

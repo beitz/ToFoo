@@ -8,6 +8,7 @@
  * scenes and small fixes. A pull request that changes what users see adds its line here in the same PR.
  */
 export const changesEn = {
+  'change.196': 'Weight: weigh in as often as you like, daily, weekly or now and then; the trend works it out from whatever is there, and the first weigh-ins no longer hold it for weeks. A short tip under the entry says how to weigh so readings compare (ⓘ for why and sources). Your energy estimate, protein per kg and body stores now use the trend instead of the last weigh-in.',
   'change.195': 'Settings → AI assistant: the link to get an OpenAI key for voice input now shows even after a key is saved.',
   'change.194': 'Sleep page: tap "Compare with a normal night" above the timeline to see a normal night (7–9 hours in one stretch from your usual bedtime) next to yours.',
   'change.193': 'A short sleep in the evening or night (from 18:00 to 06:00) counts as that day\'s night, not a nap, so a night with only two hours of sleep shows on the sleep page like in the diary.',

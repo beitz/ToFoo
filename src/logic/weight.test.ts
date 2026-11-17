@@ -4,7 +4,7 @@ import { addDays, dayRange } from '../lib/dates';
 import { estimateEnergyNeed } from '../model/requirements';
 import type { DailyTotals } from '../model/simulate';
 import type { ActivityRecord } from '../storage/types';
-import { logCheck, sortedWeighIns, weightSlope, weightTrend, type LogCheckInput } from './weight';
+import { logCheck, sortedWeighIns, trendWeight, weightSlope, weightTrend, type LogCheckInput } from './weight';
 
 const today = '2026-10-29';
 const day = (n: number) => addDays(today, -n);
@@ -34,17 +34,45 @@ const burn = () => {
 };
 
 describe('weightTrend', () => {
-  it('starts at the first weigh-in and moves a share of the way toward each next one, more after a gap', () => {
+  it('averages weigh-ins by how many days old they are, whatever the frequency', () => {
+    const keep = 1 - weightCheck.trendSmoothing.value;
     const t = weightTrend([
       { day: '2026-10-01', kg: 80 },
       { day: '2026-10-02', kg: 81 },
       { day: '2026-10-09', kg: 81 },
     ]);
-    const a = weightCheck.trendSmoothing.value;
     expect(t[0]!.trend).toBe(80);
-    expect(t[1]!.trend).toBeCloseTo(80 + a);
-    // Seven days without weighing move it as seven days at 81 would.
-    expect(t[2]!.trend).toBeCloseTo(81 - (1 - a) ** 8);
+    expect(t[0]!.weighIns).toBe(1);
+    // The first two count about equally, so the first weigh-in doesn't hold the line for weeks.
+    expect(t[1]!.trend).toBeCloseTo((80 * keep + 81) / (keep + 1));
+    // A week later the older two have faded by seven days.
+    const w = keep ** 7;
+    expect(t[2]!.trend).toBeCloseTo(((80 * keep + 81) * w + 81) / ((keep + 1) * w + 1));
+    expect(t[2]!.weighIns).toBeCloseTo((keep + 1) * w + 1);
+  });
+
+  it('settles to the Hacker’s Diet average with daily weigh-ins and about half the way with weekly ones', () => {
+    const a = weightCheck.trendSmoothing.value;
+    const daily = weightTrend(Array.from({ length: 200 }, (_, i) => ({ day: addDays('2026-01-01', i), kg: i < 199 ? 80 : 81 })));
+    expect(daily[199]!.trend - 80).toBeCloseTo(a, 4);
+    const weekly = weightTrend(Array.from({ length: 60 }, (_, i) => ({ day: addDays('2026-01-01', i * 7), kg: i < 59 ? 80 : 81 })));
+    expect(weekly[59]!.trend - 80).toBeCloseTo(1 - (1 - a) ** 7, 4);
+  });
+
+  it('lands on a steady weight the same way from daily, weekly or irregular weigh-ins', () => {
+    const days = (gaps: number[]) => gaps.reduce<string[]>((acc, g) => [...acc, addDays(acc[acc.length - 1] ?? '2026-09-01', g)], []);
+    for (const gaps of [Array(60).fill(1), Array(9).fill(7), [0, 1, 1, 9, 2, 14, 3, 3, 20]]) {
+      const t = weightTrend(days(gaps).map((day) => ({ day, kg: 75 })));
+      expect(t[t.length - 1]!.trend).toBeCloseTo(75);
+    }
+  });
+
+  it('gives the model the trend, not the last weigh-in', () => {
+    expect(trendWeight([])).toBeUndefined();
+    expect(trendWeight([{ day: '2026-10-01', kg: 80 }])).toBe(80);
+    const daily = Array.from({ length: 30 }, (_, i) => ({ day: addDays('2026-10-01', i), kg: 80 }));
+    // One heavy morning after a salty dinner moves the trend a tenth of the way, not all of it.
+    expect(trendWeight([...daily, { day: '2026-10-31', kg: 81.5 }])).toBeCloseTo(80 + 1.5 * weightCheck.trendSmoothing.value, 1);
   });
 
   it('keeps one weigh-in per day and drops empty ones', () => {

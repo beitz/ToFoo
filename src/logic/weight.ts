@@ -23,6 +23,8 @@ export interface WeighIn {
 export interface TrendPoint extends WeighIn {
   /** The smoothed weight on that day. */
   trend: number;
+  /** How many weigh-ins the trend rests on, counted by their weight in it (1 = this one alone). */
+  weighIns: number;
 }
 
 /** Weigh-ins oldest first, one per day (the last one of a day wins, as when saving). */
@@ -32,21 +34,34 @@ export function sortedWeighIns(history: readonly WeighIn[]): WeighIn[] {
 }
 
 /**
- * The trend line: an exponentially smoothed average that moves a share of the way toward each new
- * weigh-in, more after a gap (a week without weighing moves it as seven days would).
+ * The trend line: a time-weighted average of all weigh-ins so far, where a weigh-in counts less the
+ * older it is (each day older keeps 1 − smoothing of its weight; `weightCheck.trendSmoothing`). Days
+ * count, not weigh-ins, so it works the same for daily, weekly or irregular weighing: with daily
+ * weigh-ins it settles to the Hacker's Diet average (each new one moves it 10 % of the way), with
+ * weekly ones each moves it about half of the way. Dividing by the weights so far keeps the first
+ * weigh-in from pulling the line for weeks (the first ones count about equally), and a weigh-in after
+ * a long gap counts for almost all of it, since the old ones say little about now.
  */
 export function weightTrend(history: readonly WeighIn[], smoothing = weightCheck.trendSmoothing.value): TrendPoint[] {
+  const keep = 1 - smoothing;
   const out: TrendPoint[] = [];
+  let sum = 0;
+  let weights = 0;
+  let prevDay: string | undefined;
   for (const w of sortedWeighIns(history)) {
-    const prev = out[out.length - 1];
-    if (!prev) {
-      out.push({ ...w, trend: w.kg });
-      continue;
-    }
-    const share = 1 - (1 - smoothing) ** Math.max(1, daysBetween(prev.day, w.day));
-    out.push({ ...w, trend: prev.trend + share * (w.kg - prev.trend) });
+    const fade = prevDay ? keep ** daysBetween(prevDay, w.day) : 0;
+    sum = sum * fade + w.kg;
+    weights = weights * fade + 1;
+    prevDay = w.day;
+    out.push({ ...w, trend: sum / weights, weighIns: weights });
   }
   return out;
+}
+
+/** The trend now: the trend at the latest weigh-in (undefined without one). */
+export function trendWeight(history: readonly WeighIn[]): number | undefined {
+  const t = weightTrend(history);
+  return t[t.length - 1]?.trend;
 }
 
 /** Least-squares slope in kg per day, with its standard error (undefined with fewer than three points). */
