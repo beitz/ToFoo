@@ -23,6 +23,8 @@ export type PortionHelper = PortionSize;
 
 type Target = { food: Food; product?: undefined } | { product: Product; food?: undefined };
 
+const chipLabel = (c: PortionHelper) => (c.label === `${c.grams} g` || c.label.includes(`${c.grams} g`) ? c.label : `${c.label} (${fmtNumber(c.grams, 1)} g)`);
+
 /** Pick an amount of a BLS food or a product (Open Food Facts or USDA) and log it. */
 export function AmountSheet({ day, time: initialTime, onClose, onAdded, ...target }: Target & { day: string; time: number; onClose: () => void; onAdded: (e: LogEntry) => void }) {
   const d = useData();
@@ -46,7 +48,8 @@ export function AmountSheet({ day, time: initialTime, onClose, onAdded, ...targe
   // The pack size as printed ("400 g"), for a ready meal or a bar eaten whole.
   const packGrams = draft?.quantity && !draft.perMl ? parseAmount(draft.quantity).grams : undefined;
   const pack = packGrams && packGrams !== draft?.serving?.grams ? [{ label: t('log.wholePack'), grams: packGrams }] : [];
-  const chips: PortionHelper[] = [...helpers.filter((h) => !h.piece), ...serving, ...pack, ...(last ? [{ label: t('log.lastTime'), grams: last }] : []), { label: '50 g', grams: 50 }, { label: '100 g', grams: 100 }, { label: '200 g', grams: 200 }];
+  const own = helpers.filter((h) => !h.piece);
+  const chips: PortionHelper[] = [...serving, ...pack, ...(last ? [{ label: t('log.lastTime'), grams: last }] : []), { label: '50 g', grams: 50 }, { label: '100 g', grams: 100 }, { label: '200 g', grams: 200 }];
   // A product with no label values and no matched food would log nothing but a name.
   const hasValues = !draft || Object.keys(draft.per100).length > 0 || !!choice.food;
 
@@ -85,11 +88,31 @@ export function AmountSheet({ day, time: initialTime, onClose, onAdded, ...targe
           {food.nameDe} · <a href={`#/food/${food.code}`}>{t('log.details')}</a>
         </p>
       )}
-      <AmountField code={food.code} product={draft} value={amount} onChange={setAmount} autoFocus>
+      <AmountField
+        code={food.code}
+        product={draft}
+        value={amount}
+        onChange={setAmount}
+        autoFocus
+        // A usual size is an estimate of what was eaten, not a weighing.
+        onCommonSize={() => setConfidence((c) => (c === 'A' ? 'B' : c))}
+        first={
+          // The user's own sizes come before the common ones from USDA.
+          own.length ? (
+            <div className="chips">
+              {own.map((c) => (
+                <button key={`${c.label}-${c.grams}`} className={`chip${grams === c.grams ? ' on' : ''}`} onClick={() => setGrams(c.grams)}>
+                  {chipLabel(c)}
+                </button>
+              ))}
+            </div>
+          ) : undefined
+        }
+      >
         <div className="chips">
           {chips.map((c) => (
             <button key={`${c.label}-${c.grams}`} className={`chip${grams === c.grams ? ' on' : ''}`} onClick={() => setGrams(c.grams)}>
-              {c.label === `${c.grams} g` || c.label.includes(`${c.grams} g`) ? c.label : `${c.label} (${fmtNumber(c.grams, 1)} g)`}
+              {chipLabel(c)}
             </button>
           ))}
         </div>

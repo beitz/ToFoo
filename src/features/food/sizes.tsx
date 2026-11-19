@@ -4,6 +4,7 @@ import { t, type MessageKey } from '../../i18n';
 import { fmtNumber } from '../../lib/format';
 import { refKey } from '../../lib/refs';
 import type { Product } from '../../storage/types';
+import { commonSizes } from '../../foods/portions';
 import { usePieceWeight } from '../log/AmountField';
 
 /** "420 g", "2.8 g", "500 ml". */
@@ -28,7 +29,8 @@ export function useFoodSizes(code: string | undefined, product: Product | undefi
   const d = useData();
   const { sizes } = usePieceWeight(code ?? '', product);
   if (!code) return [];
-  return foodSizes({ product, sizes, logged: opts.logged ? lastLogged(d.log, code) : undefined, taken: opts.taken });
+  const common = product ? undefined : commonSizes(code)?.sizes;
+  return foodSizes({ product, sizes, logged: opts.logged ? lastLogged(d.log, code) : undefined, taken: opts.taken, common });
 }
 
 const BUTTON: Record<SizeKind, MessageKey> = {
@@ -37,6 +39,7 @@ const BUTTON: Record<SizeKind, MessageKey> = {
   logged: 'size.logged',
   saved: 'size.saved',
   piece: 'size.piece',
+  common: 'size.common',
 };
 
 const HEADING: Record<SizeKind, MessageKey> = {
@@ -45,6 +48,7 @@ const HEADING: Record<SizeKind, MessageKey> = {
   logged: 'size.loggedHeading',
   saved: 'size.savedHeading',
   piece: 'size.pieceHeading',
+  common: 'size.commonHeading',
 };
 
 /** The switch's label: "Pack 420 g". */

@@ -9612,3 +9612,29 @@ button.link-row {
   text-decoration: line-through;
   color: var(--text-muted);
 }
+
+/* Common sizes from USDA in the amount sheet: chips, then the folded source line. */
+.common-sizes .chips {
+  margin-bottom: 0;
+}
+.sizes-source > summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+.sizes-source > summary svg {
+  flex: none;
+}
+.sizes-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 6px;
+}
+.sizes-list li {
+  padding: 2px 0;
+}
+.sizes-source p {
+  margin: 4px 0;
+}

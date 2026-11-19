@@ -17,6 +17,21 @@ describe('foodSizes', () => {
     ]);
   });
 
+  it('offers a BLS food’s common sizes from USDA after the user’s own, medium, small, large first', () => {
+    const common = [
+      { label: '1 small', grams: 149 },
+      { label: '1 medium', grams: 182 },
+      { label: '1 large', grams: 223 },
+    ];
+    expect(foodSizes({ common })).toEqual([
+      { kind: 'common', grams: 182, label: '1 medium' },
+      { kind: 'common', grams: 149, label: '1 small' },
+      { kind: 'common', grams: 223, label: '1 large' },
+    ]);
+    expect(foodSizes({ common: [{ label: '1 extra small', grams: 101 }, ...common] }).map((s) => s.label)).toEqual(['1 medium', '1 small', '1 large']);
+    expect(foodSizes({ common, logged: 150 })[0]).toEqual({ kind: 'logged', grams: 150 });
+  });
+
   it('keeps to three by default', () => {
     expect(foodSizes({ product: { quantity: '200 g (8 Riegel x 25 g)', serving: { label: '2 Riegel (50 g)', grams: 50 } }, sizes: foodFoo(), logged: 75 })).toHaveLength(3);
   });

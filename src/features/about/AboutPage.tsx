@@ -1,4 +1,5 @@
 import { href } from '../../app/router';
+import { commonSizeCount } from '../../foods/portions';
 import { t } from '../../i18n';
 import { useData } from '../../app/data';
 import { applyUpdate, checkForUpdate, useAppUpdate } from '../../app/update';
@@ -38,6 +39,14 @@ export function AboutPage() {
         {' · '}
         <a href="https://www.gov.uk/government/publications/composition-of-foods-integrated-dataset-cofid" target="_blank" rel="noreferrer">
           gov.uk
+        </a>
+      </p>
+
+      <h2>{t('about.sizesHeading')}</h2>
+      <p>
+        {t('about.sizes', { n: commonSizeCount() })}{' '}
+        <a href="https://fdc.nal.usda.gov/" target="_blank" rel="noreferrer">
+          FoodData Central
         </a>
       </p>
 
