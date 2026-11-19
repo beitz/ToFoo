@@ -66,10 +66,18 @@ describe('photo capture time', () => {
     expect(choosePhotoTime(undefined, 0, now)).toEqual({ source: 'unknown' });
   });
 
+  it('dates a photo just taken with the in-app camera to now, unless it carries its own time', () => {
+    const now = Date.parse('2026-11-19T08:00:00Z');
+    expect(choosePhotoTime(undefined, now - 1_000, now, true)).toEqual({ time: now, source: 'camera' });
+    expect(choosePhotoTime(undefined, 0, now, true)).toEqual({ time: now, source: 'camera' });
+    expect(choosePhotoTime(now - 3_000, now, now, true)).toEqual({ time: now - 3_000, source: 'photo' });
+  });
+
   it('labels photos for the assistant, saying where the time came from', () => {
     const t = new Date(2026, 9, 15, 19, 42).getTime();
     expect(photoLabel(3, { time: t, source: 'photo' })).toBe("Photo 3: taken Thu 2026-10-15 19:42 (from the photo's data).");
     expect(photoLabel(4, { time: t, source: 'file' })).toContain('file date Thu 2026-10-15 19:42 (no capture time');
     expect(photoLabel(5, { source: 'unknown' })).toBe('Photo 5: capture time unknown.');
+    expect(photoLabel(6, { time: t, source: 'camera' })).toBe('Photo 6: taken Thu 2026-10-15 19:42 (just taken with the camera in the app).');
   });
 });

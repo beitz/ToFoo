@@ -4,7 +4,8 @@
  * travels with the time and the user sees which one it is.
  */
 
-export type PhotoTimeSource = 'photo' | 'file' | 'unknown';
+/** `camera`: taken with the camera from inside the app, so "now" when the photo has no EXIF time. */
+export type PhotoTimeSource = 'photo' | 'camera' | 'file' | 'unknown';
 
 export interface PhotoTime {
   /** Epoch ms; absent when unknown. */
@@ -111,22 +112,26 @@ export function exifCaptureTime(buf: ArrayBuffer): number | undefined {
   return typeof changed === 'string' ? parseExifDate(changed) : undefined;
 }
 
-/** Capture time from EXIF if present, else the file date unless it is just the time of picking. */
-export function choosePhotoTime(exifTime: number | undefined, lastModified: number | undefined, now: number): PhotoTime {
+/**
+ * Capture time from EXIF if present, else the file date unless it is just the time of picking. A photo
+ * just taken with the camera from inside the app was taken now, whatever the file says.
+ */
+export function choosePhotoTime(exifTime: number | undefined, lastModified: number | undefined, now: number, justTaken = false): PhotoTime {
   if (exifTime !== undefined) return { time: exifTime, source: 'photo' };
+  if (justTaken) return { time: now, source: 'camera' };
   if (lastModified && lastModified > 0 && Math.abs(now - lastModified) > FRESH_COPY_MS) return { time: lastModified, source: 'file' };
   return { source: 'unknown' };
 }
 
 /** Browser glue: read the start of the file and decide. */
-export async function readPhotoTime(file: File, now = Date.now()): Promise<PhotoTime> {
+export async function readPhotoTime(file: File, now = Date.now(), justTaken = false): Promise<PhotoTime> {
   let exif: number | undefined;
   try {
     exif = exifCaptureTime(await file.slice(0, EXIF_SCAN_BYTES).arrayBuffer());
   } catch {
     exif = undefined;
   }
-  return choosePhotoTime(exif, file.lastModified, now);
+  return choosePhotoTime(exif, file.lastModified, now, justTaken);
 }
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -152,6 +157,7 @@ export function parseLocalDateTime(s: string): number | undefined {
 /** The line the assistant sees before a photo. */
 export function photoLabel(n: number, pt: PhotoTime): string {
   if (pt.time === undefined) return `Photo ${n}: capture time unknown.`;
+  if (pt.source === 'camera') return `Photo ${n}: taken ${fmtLocalDateTime(pt.time)} (just taken with the camera in the app).`;
   return pt.source === 'photo'
     ? `Photo ${n}: taken ${fmtLocalDateTime(pt.time)} (from the photo's data).`
     : `Photo ${n}: file date ${fmtLocalDateTime(pt.time)} (no capture time in the photo; this may be when it was saved, not taken).`;
