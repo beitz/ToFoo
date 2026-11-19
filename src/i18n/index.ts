@@ -18,6 +18,16 @@ export function setLanguage(lang: string): void {
   current = languages[currentLang];
   applyNames(currentLang);
   setLocale(currentLang === 'de' ? 'de-DE' : 'en-GB', { today: t('day.today'), yesterday: t('day.yesterday') });
+  // Told after the current render: the switch happens while the data provider renders.
+  if (listeners.size) queueMicrotask(() => listeners.forEach((fn) => fn()));
+}
+
+const listeners = new Set<() => void>();
+
+/** Calls `fn` after each language switch (for parts drawn outside the data provider, like the tab bar). */
+export function subscribeLanguage(fn: () => void): () => void {
+  listeners.add(fn);
+  return () => listeners.delete(fn);
 }
 
 /** The UI language now in use. */
@@ -41,4 +51,17 @@ export function t(key: MessageKey, vars?: Record<string, string | number>): stri
   let s: string = current[key] ?? en[key] ?? key;
   if (vars) for (const [k, v] of Object.entries(vars)) s = s.replaceAll(`{${k}}`, String(v));
   return s;
+}
+
+/**
+ * A status word inside a sentence ("Iron: low"): English all lower case; German only the first letter,
+ * since words after the first keep their case ("noch keine Daten").
+ */
+export function lowerWord(s: string): string {
+  return currentLang === 'de' ? s.charAt(0).toLowerCase() + s.slice(1) : s.toLowerCase();
+}
+
+/** A name inside a sentence ("a ferritin test"): lower case in English; German nouns keep their capital. */
+export function lowerName(s: string): string {
+  return currentLang === 'de' ? s : s.toLowerCase();
 }

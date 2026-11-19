@@ -1,7 +1,7 @@
 import { useMemo, type ReactNode } from 'react';
 import { useData } from '../../app/data';
 import { href } from '../../app/router';
-import { t, type MessageKey } from '../../i18n';
+import { lowerName, lowerWord, t, type MessageKey } from '../../i18n';
 import { fmtAmount, fmtFill, fmtNumber, fmtPercent, nameInSentence } from '../../lib/format';
 import { NUTRIENT_BY_ID } from '../../model/nutrients';
 import { earlyReading, isUnsure, tankTrend, type GaugeStatus, type HistoryPoint, type NutrientResult, type StoreResult } from '../../model/simulate';
@@ -118,7 +118,7 @@ export function NutrientPage({ id, context }: { id: string; context?: SplitConte
               ? {
                   marker: {
                     day: lab.day,
-                    label: t(`lab.${lab.marker}` as MessageKey).toLowerCase(),
+                    label: lowerName(t(`lab.${lab.marker}` as MessageKey)),
                   },
                 }
               : {})}
@@ -265,7 +265,7 @@ function Hero({ r, noData, showRange, whyLabel }: { r: NutrientResult; noData: b
           {range && showRange && <p className="muted small">{t('nutrient.likely', { range })}</p>}
           {r.kind !== 'info' && (
             <p className="status-line">
-              <StatusMark status={status} size={14} unsure={isUnsure(span)} /> {statusText(status, span).toLowerCase()}
+              <StatusMark status={status} size={14} unsure={isUnsure(span)} /> {lowerWord(statusText(status, span))}
             </p>
           )}
           {trend && (
@@ -610,7 +610,7 @@ function storeLastsText(days: Range, name: string): string {
   const low = fmtDuration(days.low);
   const high = fmtDuration(days.high);
   const central = fmtDuration(days.central);
-  const vars = { central, low, high, name: name.toLowerCase() };
+  const vars = { central, low, high, name: lowerName(name) };
   return low === high ? t('nutrient.storeLastsNone', vars) : t('nutrient.storeLastsNoneRange', vars);
 }
 

@@ -1,6 +1,6 @@
-import { useEffect, useLayoutEffect, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useSyncExternalStore, type ReactNode } from 'react';
 import { useRoute, href } from './router';
-import { t } from '../i18n';
+import { language, subscribeLanguage, t } from '../i18n';
 import { DataProvider, useData } from './data';
 import { ToastProvider } from './toast';
 import { ErrorBoundary } from './ErrorBoundary';
@@ -230,6 +230,9 @@ export function App() {
     diag('commit', { route: path, ...layoutSnapshot() });
   }, [path]);
 
+  // The tab bar sits outside the data provider, which switches the language: redraw it on a switch.
+  useSyncExternalStore(subscribeLanguage, language);
+
   return (
     <ErrorBoundary>
       <ToastProvider>
@@ -257,7 +260,7 @@ export function App() {
               <FirstLaunchGate />
             </DataProvider>
           </main>
-          <nav className="bottom-nav" aria-label="Main" data-tour="tabs">
+          <nav className="bottom-nav" aria-label={t('nav.main')} data-tour="tabs">
             {NAV.map((n) => (
               <a key={n.key} href={href(...n.to)} aria-current={active === n.key ? 'page' : undefined}>
                 <Icon name={n.icon} size={24} />

@@ -739,9 +739,13 @@ const HABIT_KIND_NOTE: Record<HabitInfo['kind'], string> = { do: 'do', avoid: 'a
  * photo times can be placed), cards already logged or still open, barcodes read from photos, and
  * whether the text was dictated. In the recipe editor: what the recipe already has instead of the day.
  * `share`: on the message the user first includes their data with, what it holds (shareNote).
+ * `language`: the app's language by its English name, when it is not English.
  */
-export function appNote(o: { now: number; day: string; today: string; logged: string[]; open: string[]; barcodes: string[]; dictated?: boolean; recipe?: RecipeSoFar; habits?: readonly HabitInfo[]; containers?: readonly ContainerInfo[]; share?: string }): string {
+export function appNote(o: { now: number; day: string; today: string; logged: string[]; open: string[]; barcodes: string[]; dictated?: boolean; recipe?: RecipeSoFar; habits?: readonly HabitInfo[]; containers?: readonly ContainerInfo[]; share?: string; language?: string }): string {
   const parts = [`Now: ${fmtLocalDateTime(o.now)}.`];
+  // The app's language when it is not English (docs/SPEC.md, "Languages"): the prompt stays English, the
+  // user reads the answer and the cards in theirs. Only a few words a message, and none in English.
+  if (o.language) parts.push(`The app is shown in ${o.language}: write your text and everything on the cards (names, assumptions, reasons, questions) in ${o.language}, unless the user writes in another language.`);
   if (o.dictated) parts.push('The text was spoken and turned into text by a speech model: expect misheard words, especially food and brand names, and corrections the user made while talking.');
   if (o.recipe) {
     const r = o.recipe;

@@ -1,11 +1,11 @@
 import { href } from '../../app/router';
 import { useData } from '../../app/data';
 import { t } from '../../i18n';
-import { fmtChance, fmtMeasure, type Check } from '../../ai/insights';
+import type { Check } from '../../ai/insights';
 import { formatDay } from '../../lib/dates';
 import { fmtNumber } from '../../lib/format';
-import { MEASURE_BY_ID, type Stats } from '../../logic/insights';
-import { describeConditions, verdict } from './describe';
+import type { Stats } from '../../logic/insights';
+import { describeConditions, fmtChance, fmtMeasure, measureName, verdict } from './describe';
 
 const pctText = (yes: number, known: number) => (known ? ` (${Math.round((100 * yes) / known)} %)` : '');
 
@@ -83,7 +83,7 @@ function CompareCheck({ check }: { check: Extract<Check, { kind: 'compare' }> })
       <p className="insights-check-title">{describeConditions(check.group)}</p>
       <ul className="plain-list small">
         {check.result.measures.map((m) => {
-          const name = MEASURE_BY_ID.get(m.measure)?.name ?? m.measure;
+          const name = measureName(m.measure);
           const minimum = (m.group?.minimumDays ?? 0) + (m.others?.minimumDays ?? 0);
           return (
             <li key={m.measure}>

@@ -232,6 +232,12 @@ describe('several meals at once', () => {
     expect(note).toContain('"Teekanne" 1200 ml Black tea (infusion) (BLS N630000); "Flasche" 750 ml plain water.');
   });
 
+  it('asks for German text and cards only when the app is in German', () => {
+    const base = { now, day: '2026-10-17', today: '2026-10-17', logged: [], open: [], barcodes: [] };
+    expect(appNote({ ...base, language: 'German' })).toContain('The app is shown in German: write your text and everything on the cards');
+    expect(appNote(base)).not.toContain('shown in');
+  });
+
   it('warns that dictated text may have misheard words', () => {
     expect(appNote({ now, day: '2026-10-17', today: '2026-10-17', logged: [], open: [], barcodes: [], dictated: true })).toContain('spoken and turned into text');
   });

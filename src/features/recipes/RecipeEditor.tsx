@@ -3,7 +3,7 @@ import { useData } from '../../app/data';
 import { useBackCloses } from '../../app/history';
 import { goBack, replaceRoute } from '../../app/router';
 import { BackButton } from '../../ui/BackButton';
-import { t } from '../../i18n';
+import { lowerWord, t } from '../../i18n';
 import { productFood, productLabel } from '../../foods/products';
 import { fmtGrams } from '../../lib/format';
 import { refKey } from '../../lib/refs';
@@ -191,7 +191,7 @@ export function RecipeEditor({ id }: { id?: string }) {
     if (!c.was) return now.grams > 0 ? { text: t('swap.adding', { amount: amountOf(now), name }) } : { text: t('swap.addingNoAmount', { name }), pending: true };
     const was = c.was;
     const prep = was.preparation !== now.preparation;
-    const side = (ing: Ingredient) => `${amountOf(ing)}${prep ? `, ${prepLabel(ing.preparation).toLowerCase()}` : ''}`;
+    const side = (ing: Ingredient) => `${amountOf(ing)}${prep ? `, ${lowerWord(prepLabel(ing.preparation))}` : ''}`;
     if (refKey(was.ref) !== refKey(now.ref)) return { text: t('swap.swapped', { was: `${side(was)} ${describe(was).name}`, now: `${side(now)} ${name}` }) };
     if (was.grams === now.grams && !prep) return { text: t('swap.unchanged', { name }) };
     if (now.grams === 0) return { text: t('swap.noAmount', { name }), pending: true };

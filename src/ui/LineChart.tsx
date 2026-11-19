@@ -1,5 +1,6 @@
 import type { HistoryPoint } from '../model/simulate';
 import { formatDate } from '../lib/dates';
+import { t } from '../i18n';
 
 interface Props {
   points: HistoryPoint[];
@@ -41,7 +42,7 @@ export function LineChart({ points, guides = [], maxY, showRange, format, ahead 
   const aheadLine = ahead.length ? `M${x(now).toFixed(1)},${y(points[now]!.central).toFixed(1)}` + ahead.map((p, i) => `L${x(now + 1 + i).toFixed(1)},${y(p.central).toFixed(1)}`).join('') : '';
   const markAt = marker ? points.findIndex((p) => p.day === marker.day) : -1;
   return (
-    <svg className={tone ? `chart chart-${tone}` : 'chart'} viewBox={`0 0 ${W} ${H}`} role="img" aria-label="History">
+    <svg className={tone ? `chart chart-${tone}` : 'chart'} viewBox={`0 0 ${W} ${H}`} role="img" aria-label={t('nutrient.history')}>
       {guides.map((g) => (
         <g key={g.label}>
           <line x1={pad.l} x2={W - pad.r} y1={y(g.value)} y2={y(g.value)} className="chart-guide" />

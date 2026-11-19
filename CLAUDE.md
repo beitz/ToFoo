@@ -38,7 +38,7 @@ CI (`.github/workflows/deploy.yml`) runs data → typecheck → test → build �
 | `src/exchange/` | ToFoo exchange format (backup, recipe, logEntry): zod schema, parser, validator. |
 | `src/features/<name>/` | UI per feature (home, log, recipes, settings, about…). |
 | `src/ui/` | Shared UI components. |
-| `src/i18n/` | UI strings. **All user-visible text goes through `t()`**; English is the default, keys in `en.ts`. |
+| `src/i18n/` | UI strings. **All user-visible text goes through `t()`**; English is the default, keys in `en.ts` (+ `*.en.ts`), German in `de.ts` (+ `*.de.ts`); nutrient, group and feature names in `names.de.ts`. |
 | `docs/` | SPEC, OPEN_QUESTIONS, exchange format docs and JSON Schema. |
 | `e2e/` | Playwright tests of the main flows in a real browser (first launch, logging, recipe + batch, backup + restore, every screen opens). A change to one of these flows updates its test in the same PR. |
 
@@ -57,7 +57,8 @@ CI (`.github/workflows/deploy.yml`) runs data → typecheck → test → build �
 11. Food names: English is the primary display and search language, German second (both from BLS).
 12. Keep `docs/SPEC.md`, `docs/OPEN_QUESTIONS.md` and the exchange-format docs current when decisions change.
 13. **Guided tours** (`src/features/tour/tours.ts`): a new screen, card or menu entry gets a look at its tour in the same PR. Steps point at `data-tour` markers (a test fails on a marker that no longer exists); tour lines say what a part is, never how it looks, and stay one short line.
-14. **Version history:** a PR that changes what users see adds a line to `src/i18n/changes.en.ts` (`change.<pr>`, and `change.<pr>.major` for a bigger change) once it has its PR number. Leave out small fixes, CI, tests, specs and work behind the scenes. Never write version numbers or dates there; the build reads them from git.
+14. **Version history:** a PR that changes what users see adds a line to `src/i18n/changes.en.ts` and its German to `changes.de.ts` (`change.<pr>`, and `change.<pr>.major` for a bigger change) once it has its PR number. Leave out small fixes, CI, tests, specs and work behind the scenes. Never write version numbers or dates there; the build reads them from git.
+15. **Two languages:** every string added or changed in an English file gets its German line in the matching German file in the same PR (`de.ts` is a full record, so `npm run typecheck` fails on a missing key; a test checks `{placeholders}`). Informal "du", and the glossary at the top of `de.ts`. Dates and numbers shown to the user go through `locale()` (`src/lib/locale.ts`), never a fixed `'en-GB'`; text for the assistant stays English (`fmtNumberEn`).
 
 ## Workflow
 

@@ -1,5 +1,6 @@
 import { useEffect, useId, useState, type ReactNode } from 'react';
 import { useBackCloses } from '../app/history';
+import { t } from '../i18n';
 
 export function Field({ label, hint, children }: { label: string; hint?: ReactNode; children: (id: string) => ReactNode }) {
   const id = useId();
@@ -97,7 +98,7 @@ export function Sheet({ title, onClose, children }: { title: string; onClose: ()
       <div className="sheet" role="dialog" aria-modal="true" aria-label={title} onClick={(e) => e.stopPropagation()}>
         <div className="sheet-head">
           <h2>{title}</h2>
-          <button className="icon-btn" onClick={onClose} aria-label="Close">
+          <button className="icon-btn" onClick={onClose} aria-label={t('common.close')}>
             ×
           </button>
         </div>

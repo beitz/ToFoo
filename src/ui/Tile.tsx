@@ -2,7 +2,7 @@ import type { GaugeStatus, NutrientResult } from '../model/simulate';
 import { NUTRIENT_BY_ID } from '../model/nutrients';
 import { trendOf } from '../model/trend';
 import { fmtPercent } from '../lib/format';
-import { t } from '../i18n';
+import { lowerWord, t } from '../i18n';
 import { hasNoData, trendArrows, trendLabel } from './Gauge';
 import { statusLabel } from './status';
 
@@ -109,7 +109,7 @@ export function NutrientTile({ result: r, showRange, onClick }: { result: Nutrie
   const pct = fmtPercent(r.value.central);
   const spoken = noData
     ? t('tile.unknownSpoken', { name: def?.name ?? r.id })
-    : t(r.kind === 'limit' ? 'tile.limitSpoken' : 'tile.needSpoken', { name: def?.name ?? r.id, pct, status: statusLabel(status).toLowerCase() }) + (tr ? `, ${trendLabel(tr)}` : '');
+    : t(r.kind === 'limit' ? 'tile.limitSpoken' : 'tile.needSpoken', { name: def?.name ?? r.id, pct, status: lowerWord(statusLabel(status)) }) + (tr ? `, ${trendLabel(tr)}` : '');
   return (
     <button type="button" className={`ntile ntile-${r.kind} ntile-${status}`} onClick={onClick} aria-label={spoken}>
       {!noData && (

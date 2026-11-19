@@ -240,15 +240,18 @@ const clock = (t: number) => {
 
 const CLOCK_MEASURES = new Set(['bedtime', 'wake_time', 'first_meal', 'last_meal']);
 
+/** Formats a number with so many decimals: English for the assistant by default, the UI passes its own. */
+export type NumberFormat = (v: number, decimals: number) => string;
+
 /** A measure's value with its unit; clock measures as HH:MM. */
-export function fmtMeasure(id: string, v: number): string {
+export function fmtMeasure(id: string, v: number, num: NumberFormat = fmtNumber): string {
   if (CLOCK_MEASURES.has(id)) {
     const minutes = Math.round(v * 60) % (24 * 60);
     return `${pad(Math.floor(minutes / 60))}:${pad(minutes % 60)}`;
   }
   const m = MEASURE_BY_ID.get(id);
   const decimals = id === 'sleep_hours' ? 1 : Math.max(m?.decimals ?? 0, Math.abs(v) < 10 && v !== 0 ? 1 : 0);
-  return `${fmtNumber(v, decimals)}${m?.unit ? ` ${m.unit}` : ''}`;
+  return `${num(v, decimals)}${m?.unit ? ` ${m.unit}` : ''}`;
 }
 
 /** A value for the daily table: no units or thousands separators, clock measures as HH:MM. */
@@ -281,9 +284,9 @@ function tableText(data: InsightData, days: readonly string[], measures: readonl
 }
 
 /** A chance (0–1) as a percentage that does not pretend to more precision than it has. */
-export function fmtChance(p: number): string {
-  if (p < 0.001) return 'under 0.1 %';
-  return `${fmtNumber(p * 100, p < 0.1 ? 1 : 0)} %`;
+export function fmtChance(p: number, num: NumberFormat = fmtNumber, under = (v: string) => `under ${v}`): string {
+  if (p < 0.001) return under(`${num(0.1, 1)} %`);
+  return `${num(p * 100, p < 0.1 ? 1 : 0)} %`;
 }
 
 const pct = (yes: number, n: number) => (n ? ` (${Math.round((100 * yes) / n)} %)` : '');

@@ -1,9 +1,24 @@
 /** Plain words for the comparisons the app ran, so each number under an answer says what it counts. */
 import { t, type MessageKey } from '../../i18n';
-import { fmtMeasure } from '../../ai/insights';
+import { fmtChance as fmtChanceEn, fmtMeasure as fmtMeasureEn } from '../../ai/insights';
 import { CHANCE_HINT, CHANCE_PATTERN, MEASURE_BY_ID, type Condition } from '../../logic/insights';
+import { NUTRIENT_BY_ID } from '../../model/nutrients';
+import { fmtNumber } from '../../lib/format';
 import { parseDay } from '../../lib/dates';
 import { locale } from '../../lib/locale';
+
+/** A measure's value in the UI language (the assistant gets the English form from ai/insights). */
+export const fmtMeasure = (id: string, v: number) => fmtMeasureEn(id, v, fmtNumber);
+export const fmtChance = (p: number) => fmtChanceEn(p, fmtNumber, (v) => t('insights.chanceUnder', { v }));
+
+/** A measure's name in the UI language: nutrients by their (translated) name, the rest from `measure.<id>`. */
+export function measureName(id: string): string {
+  const nutrient = NUTRIENT_BY_ID.get(id);
+  if (nutrient) return nutrient.name;
+  const key = `measure.${id}` as MessageKey;
+  const name = t(key);
+  return name === key ? (MEASURE_BY_ID.get(id)?.name ?? id) : name;
+}
 
 const OP_TEXT = { '<': '<', '<=': '≤', '>': '>', '>=': '≥' } as const;
 
@@ -29,7 +44,7 @@ export function describeCondition(c: Condition): string {
       s = t('insights.c.food', { words: quoted(c.words) });
       break;
     case 'measure': {
-      const name = MEASURE_BY_ID.get(c.measure)?.name ?? c.measure;
+      const name = measureName(c.measure);
       s = t('insights.c.measure', { name, op: OP_TEXT[c.op], value: fmtMeasure(c.measure, c.value) });
       if ((c.span ?? 1) > 1) s = t('insights.c.average', { c: s });
       break;
