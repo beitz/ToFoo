@@ -13,6 +13,10 @@ const snapshot: Snapshot = {
   settings: {
     ...defaultSettings(),
     favourites: [{ source: 'BLS', version: '4.0', code: 'C133000' }, { source: 'OFF', code: '8000500319475' }],
+    drinkContainers: [
+      { id: 'dc1', name: 'Teekanne', ml: 1200, drink: { source: 'BLS', version: '4.0', code: 'N630000' } },
+      { id: 'dc2', name: 'Bottle', ml: 750 },
+    ],
     favouriteMeals: [
       {
         id: 'm1',

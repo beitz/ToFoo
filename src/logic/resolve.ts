@@ -5,6 +5,7 @@ import type { Food, FoodDb } from '../foods/foodDb';
 import { ALL_SALT_CODES, saltCode } from '../foods/foodDb';
 import { productFood } from '../foods/products';
 import { refKey } from '../lib/refs';
+import { isPlainDrink } from './drinks';
 import { potShare, servingIngredients } from './batch';
 import { trendWeight } from './weight';
 import { addDays, dayRange, parseDay, utcOffsetHours } from '../lib/dates';
@@ -98,9 +99,10 @@ export function resolveEntry(e: LogEntry, ctx: ResolveContext): ModelEntry | nul
   }
 }
 
-/** True if the entry ends a fast (food, not a drink or supplement). */
+/** True if the entry ends a fast (food, not a drink or supplement; plain tea and coffee without milk or sugar are drinks). */
 export function breaksFast(e: LogEntry, customFoods: ReadonlyMap<string, CustomFood>): boolean {
   if (e.kind === 'drink') return false;
+  if (e.kind === 'food' && isPlainDrink(e.ref)) return false;
   if (e.kind === 'manual') return !e.isSupplement;
   if (e.kind === 'custom') return !(customFoods.get(e.customFoodId)?.isSupplement ?? false);
   return true;

@@ -11,6 +11,7 @@ import { dayKey, formatDateTime, formatDay, formatTime } from '../../lib/dates';
 import { fmtNumber } from '../../lib/format';
 import {
   appNote,
+  type ContainerInfo,
   chatSetup,
   emptyConversation,
   retirePhotos,
@@ -264,6 +265,10 @@ function Chat({
   const habitRows = useLiveQuery(() => repo.db.habits.orderBy('order').toArray(), []);
   const habits: HabitInfo[] | undefined = !recipe && isOn(d.settings.features, 'habits') ? habitRows?.filter((h) => !h.archived).map(({ id, name, kind }) => ({ id, name, kind })) : undefined;
   const habitsSent = useRef<string | undefined>(undefined);
+  const containers: ContainerInfo[] | undefined = !recipe && isOn(d.settings.features, 'water')
+    ? (d.settings.drinkContainers ?? []).map((c) => ({ name: c.name, ml: c.ml, ...(c.drink ? { drink: { code: c.drink.code, name: d.foods.byCode.get(c.drink.code)?.nameEn ?? c.drink.code } } : {}) }))
+    : undefined;
+  const containersSent = useRef<string | undefined>(undefined);
   /** The undo of each card saved in this visit, for its folded row. */
   const [undos, setUndos] = useState<ReadonlyMap<string, Undo>>(new Map());
   const keepUndo = useCallback((id: string, undo: Undo | undefined) => setUndos((all) => {
@@ -455,6 +460,7 @@ function Chat({
       dictated: dictated_ && !!text_.trim(),
       ...(recipe ? { recipe: recipe.soFar() } : {}),
       ...(habits?.length && JSON.stringify(habits) !== habitsSent.current ? { habits } : {}),
+      ...(containers?.length && JSON.stringify(containers) !== containersSent.current ? { containers } : {}),
       ...(share ? { share } : {}),
     });
     const labelled = images_.map((img, i) => ({ ...img, label: photoLabel(photoCount + i + 1, img.time) }));
@@ -532,6 +538,7 @@ function Chat({
       const lighter = retirePhotos(sharing ? { ...conversation, shared: sharing } : conversation, (id) => !cardsRef.current.get(id) || !!cardsRef.current.get(id)?.logged);
       const r = await sendMessage(create, model, lighter, msg, ctx, onUsage);
       if (habits?.length) habitsSent.current = JSON.stringify(habits);
+      if (containers?.length) containersSent.current = JSON.stringify(containers);
       setConversation(r.conversation);
       const { messages, ...state } = r.conversation;
       // Meal chats keep what reopening them needs (the recipe editor's chat belongs to its recipe).
