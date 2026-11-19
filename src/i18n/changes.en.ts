@@ -8,6 +8,7 @@
  * scenes and small fixes. A pull request that changes what users see adds its line here in the same PR.
  */
 export const changesEn = {
+  'change.201': 'With Water on, the round button has Add a drink, right above the assistant: a glass, or one of your own cups and bottles.',
   'change.200': 'Logging: common sizes ready to tap (1 medium apple · 182 g, 1 egg, 1 roll, 1 tbsp oil) for 288 foods, from USDA; tap again for one more, with where the weight comes from.',
   'change.200.major': 'Common sizes when logging',
   'change.199': 'Assistant: turn on Recent days (Settings → AI assistant) and a tick box in the chat sends what you logged today and the days before (1 to 7), so it skips what is already logged and knows your usual meals. It can also offer to change or delete a saved entry; nothing changes until you tap the card, and Undo puts it back.',

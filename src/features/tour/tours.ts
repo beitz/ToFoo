@@ -73,6 +73,7 @@ export const TOURS: Record<TourId, Tour> = {
       { target: 'fan.bloodPressure', text: 'tour.fan.bloodPressure' },
       { target: 'fan.sleep', text: 'tour.fan.sleep' },
       { target: 'fan.fast', text: 'tour.fan.fast' },
+      { target: 'fan.water', text: 'tour.fan.water' },
       { target: 'fan.assistant', text: 'tour.fan.assistant' },
       { target: 'round-button', text: 'tour.fan.log' },
     ],
