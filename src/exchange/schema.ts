@@ -147,6 +147,7 @@ export const settingsSchema = z.object({
   logCollapsed: z.record(z.string(), z.boolean()).optional(),
   kitchenView: z.enum(['grid', 'list']).optional().describe('The Kitchen tab as icons (default) or as a list'),
   cookingPreferences: z.string().optional(),
+  recentDays: z.number().int().min(1).max(7).optional().describe('Recent days (assistant): days before today sent with a chat'),
   potGrams: z.number().positive().optional(),
   pots: z.array(z.object({ id: z.string(), name: z.string().min(1), grams: z.number().positive() })).optional().describe('Empty pots remembered by name'),
 });

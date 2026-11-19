@@ -1,7 +1,8 @@
 import { useEffect } from 'react';
 import type { useToast } from '../../app/toast';
-import type { RecipeSoFar, ShownActivity, ShownBatch, ShownIngredients, ShownNote, ShownPortion, ShownProposal, ShownHome, ShownRecipe, ShownShopping, ShownSleep, ShownWater, ShownKetone, ShownWeight, ShownBloodPressure, ShownHabits, ShownFoodFix, ShownMarkChecked } from '../../ai/assistant';
+import type { RecipeSoFar, ShownActivity, ShownBatch, ShownIngredients, ShownNote, ShownPortion, ShownProposal, ShownHome, ShownRecipe, ShownShopping, ShownSleep, ShownWater, ShownKetone, ShownWeight, ShownBloodPressure, ShownHabits, ShownFoodFix, ShownMarkChecked, ShownChange, ShownDelete } from '../../ai/assistant';
 import type { ProposedItem } from '../../ai/tools';
+import type { EditTarget } from '../../ai/edits';
 import type { AudioClip } from '../../ai/chatRecord';
 import type { Check } from '../../ai/insights';
 import { t } from '../../i18n';
@@ -18,7 +19,7 @@ import { KETONE_TYPE_KEY, ketoneValueText } from '../fast/ketoneFormat';
  * things for the shopping list (L1, …), things bought or running low at home (H1, …),
  * recipe ingredients (R1, …, recipe editor), recipe for the book (R1, …, main chat), serving from
  * stock (P1, …), cooked batch (B1, …), fix from a check of the logged foods or the foods it found
- * right (F1, …), and whether
+ * right (F1, …), change to saved entries (C1, …), saved entries to delete (X1, …), and whether
  * the user logged, saved, added or applied it.
  */
 export type Card =
@@ -38,7 +39,9 @@ export type Card =
   | { kind: 'portion'; portion: ShownPortion; logged: boolean }
   | { kind: 'batch'; batch: ShownBatch; logged: boolean }
   | { kind: 'fix'; fix: ShownFoodFix; logged: boolean }
-  | { kind: 'checked'; checked: ShownMarkChecked; logged: boolean };
+  | { kind: 'checked'; checked: ShownMarkChecked; logged: boolean }
+  | { kind: 'change'; change: ShownChange; logged: boolean }
+  | { kind: 'delete'; remove: ShownDelete; logged: boolean };
 
 export function cardOf(c: Card) {
   switch (c.kind) {
@@ -76,6 +79,10 @@ export function cardOf(c: Card) {
       return c.fix;
     case 'checked':
       return c.checked;
+    case 'change':
+      return c.change;
+    case 'delete':
+      return c.remove;
   }
 }
 export const cardId = (c: Card) => cardOf(c).id;
@@ -119,8 +126,30 @@ export function cardTitle(c: Card): string {
       return `${t('fix.title')} · ${c.fix.name}`;
     case 'checked':
       return `${t('markChecked.title')} · ${c.checked.foods.map((f) => f.name).join(', ')}`;
+    case 'change':
+      return `${t('edit.changeTitle')} · ${targetNames(c.change.edits)}`;
+    case 'delete':
+      return `${t('edit.deleteTitle')} · ${targetNames(c.remove.targets)}`;
   }
 }
+
+/** The entries a change or delete card is about, by name ("Scrambled eggs, Sleep"), each once. */
+export function targetNames(targets: ReadonlyArray<Pick<EditTarget, 'kind' | 'name'>>): string {
+  return [...new Set(targets.map((x) => (x.kind === 'log' || x.kind === 'habit' ? x.name : t(TARGET_KIND[x.kind]))))].join(', ');
+}
+
+/** What an entry of each kind is called on a change or delete card. */
+export const TARGET_KIND = {
+  log: 'edit.kind.log',
+  journal: 'edit.kind.journal',
+  sleep: 'edit.kind.sleep',
+  activity: 'edit.kind.activity',
+  water: 'edit.kind.water',
+  weight: 'edit.kind.weight',
+  bloodPressure: 'edit.kind.bloodPressure',
+  ketone: 'edit.kind.ketone',
+  habit: 'edit.kind.habit',
+} as const satisfies Record<EditTarget['kind'], string>;
 
 /**
  * A chat bubble; an answer with several cards is one 'pages' bubble, its cards shown as pages.

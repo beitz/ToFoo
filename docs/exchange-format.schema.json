@@ -1119,6 +1119,12 @@
                     "cookingPreferences": {
                       "type": "string"
                     },
+                    "recentDays": {
+                      "description": "Recent days (assistant): days before today sent with a chat",
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 7
+                    },
                     "potGrams": {
                       "type": "number",
                       "exclusiveMinimum": 0

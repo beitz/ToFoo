@@ -93,6 +93,8 @@ export interface PromptSources {
   insights?: boolean;
   /** The main chat: the assistant may check the foods the user logged and propose fixes. */
   check?: boolean;
+  /** The user sent their recent days with this chat: the assistant sees them and may propose changing or deleting saved entries. */
+  edits?: boolean;
 }
 
 // Without Include my data the chat sees none of the user's days, and should say how to share them.
@@ -101,6 +103,13 @@ const SLEEP_BACKGROUND = `Sleep background: what research says, checked for this
 ${SLEEP_FACTS.map((f) => `- ${f.topic}: ${f.text} (${f.source})`).join('\n')}`;
 
 const NO_DATA = `- Their data: you cannot see the user's journal, sleep, activity, water, blood pressure or past days. If they ask about those or about patterns in their days, say they can tap "Include my data" above the message box (it needs Patterns on in Settings → AI assistant), tick what to share and ask again.`;
+const NO_DATA_BEYOND_RECENT = `- Their data: beyond the recent days list you cannot see the user's past days. If they ask about patterns over a longer time, say they can tap "Include my data" above the message box (it needs Patterns on in Settings → AI assistant), tick what to share and ask again.`;
+
+// Recent days and change/delete cards (docs/SPEC.md, "Recent days and changing saved entries"): the
+// list stops double logging and lets "the usual" mean something; changes only on the user's word
+// and tap (owner's ask, 2026-11-19: never change or delete data without specific consent).
+const RECENT = `- Recent days: the user chose to send what is saved for today and the last few days. The app's note on the first message lists it by day, each entry with a ref (e1 food, s1 sleep, a1 activity, w1 water, g1 weight, d1 blood pressure, k1 ketones, h1 habit answer, j1 journal); later notes list only what is new, changed or deleted since, with the same refs. Before proposing, look at what is already there and never propose again something already saved (the same food around the same time, a night or activity already listed); say briefly which things you left out because they are already logged. "The usual", "same as yesterday" or "my normal breakfast" means what the list shows: take its foods, grams and codes, and say so in assumptions. A day with nothing listed may simply not be logged yet.
+- Changing saved entries: when the user says something already saved is wrong ("yesterday's lunch was 2 eggs, not 3", "I went to bed at 1, not at 23:00", "take out the second coffee"), call propose_change with each entry's ref and only the fields that change: time ("YYYY-MM-DD HH:MM"), grams, pieces, portions or servings for food; start and end for sleep; time, minutes and intensity for an activity; time and ml for water; kg for a weigh-in; time, systolic, diastolic and pulse for blood pressure; time and value for ketones; did for a habit answer; time and text for a journal entry. To remove entries, call propose_delete with their refs. The entries of one correction (a meal moved to another time) go on one card. To swap a food for a different one ("it was oat milk, not cow's milk"), propose_delete the old entry and propose_meal the right food in the same response. Only change or delete what the user asked for or clearly confirmed; never tidy up, merge or fix entries on your own: if something looks doubled or wrong, ask first. Each card waits for the user's tap; give it a one-line reason in their words. Entries saved from cards in this chat appear in the next note with refs of their own. To change an open change or delete card, call the same tool again with replaces set to its id (C1, X1, …).`;
 
 // Forgotten foods (docs/SPEC.md, "Forgotten foods"): logs come out short mostly from what is
 // easy to leave out; the app asks on the card with tap answers instead of a question in text.
@@ -165,7 +174,7 @@ Style: brief, friendly, plain text (no headings or tables). Answer in the langua
 
 function systemPrompt(sources: PromptSources): string {
   if (sources.recipe) return recipeSystemPrompt(sources);
-  const { off = false, usda = false, webSearch = false, journal = false, sleep = false, activity = false, water = false, ketones = false, weight = false, habits = false, bloodPressure = false, shopping = false, pantry = false, recipes = false, ideas = false, forgotten = false, insights = false, check = false } = sources;
+  const { off = false, usda = false, webSearch = false, journal = false, sleep = false, activity = false, water = false, ketones = false, weight = false, habits = false, bloodPressure = false, shopping = false, pantry = false, recipes = false, ideas = false, forgotten = false, insights = false, check = false, edits = false } = sources;
   const extra = [
     off && ' Packaged products can also be looked up by barcode in Open Food Facts.',
     usda && ' Foods the BLS lacks can be searched in USDA FoodData Central.',
@@ -182,6 +191,7 @@ function systemPrompt(sources: PromptSources): string {
     recipes && ' The user can also save recipes they cooked and change recipes in their recipe book.',
     ideas && ' You can also suggest recipes that fit their nutrient gaps, and improvements to their recipes.',
     insights && ' The user also shared some of their own data with you, to look for patterns in it.',
+    edits && ' You can see what the user saved in the last few days, and propose changing or deleting saved entries.',
   ]
     .filter(Boolean)
     .join('');
@@ -192,7 +202,7 @@ Your job: work out which foods the user ate and how many grams of each, then cal
 How to work:
 - Find foods with search_foods. Search short, generic terms, in English and German (e.g. ["milk roll", "Milchbrötchen"]); send several queries in one call. Only use codes that search_foods returned.
 ${off ? BRANDED_WITH_PRODUCTS('propose_meal') : BRANDED_BLS_ONLY}
-${off && webSearch ? `${WEB_SEARCH}\n` : ''}${usda ? `${USDA('propose_meal')}\n` : ''}${journal ? `${JOURNAL(activity)}\n` : ''}${sleep ? `${SLEEP(journal)}\n` : ''}${activity ? `${ACTIVITY}\n` : ''}${water ? `${WATER}\n` : ''}${ketones ? `${KETONES}\n` : ''}${weight ? `${WEIGHT}\n` : ''}${bloodPressure ? `${BLOOD_PRESSURE}\n` : ''}${habits ? `${HABITS}\n` : ''}${shopping ? `${SHOPPING(recipes)}\n` : ''}${pantry ? `${PANTRY(off)}\n` : ''}${recipes ? `${RECIPES(ideas)}\n${PAGES}\n` : ''}${check ? `${CHECK}\n` : ''}- Mixed dishes (restaurant meals, a hotpot, a bowl): use a matching BLS dish if there is one, otherwise split it into ingredients with estimated grams. Include what changes the result most: cooking oil, sauces, broth that was actually eaten.
+${off && webSearch ? `${WEB_SEARCH}\n` : ''}${usda ? `${USDA('propose_meal')}\n` : ''}${journal ? `${JOURNAL(activity)}\n` : ''}${sleep ? `${SLEEP(journal)}\n` : ''}${activity ? `${ACTIVITY}\n` : ''}${water ? `${WATER}\n` : ''}${ketones ? `${KETONES}\n` : ''}${weight ? `${WEIGHT}\n` : ''}${bloodPressure ? `${BLOOD_PRESSURE}\n` : ''}${habits ? `${HABITS}\n` : ''}${shopping ? `${SHOPPING(recipes)}\n` : ''}${pantry ? `${PANTRY(off)}\n` : ''}${recipes ? `${RECIPES(ideas)}\n${PAGES}\n` : ''}${check ? `${CHECK}\n` : ''}${edits ? `${RECENT}\n` : ''}- Mixed dishes (restaurant meals, a hotpot, a bowl): use a matching BLS dish if there is one, otherwise split it into ingredients with estimated grams. Include what changes the result most: cooking oil, sauces, broth that was actually eaten.
 ${forgotten ? `${FORGOTTEN}\n` : ''}- Amounts: use what the user said, label weights, counts of standard items, and visual cues (plate size, cutlery, hands, packaging). Think about the portion one person ate, not the whole shared dish.
 - Pieces: when the user counts pieces of a food ("one piece of chewing gum", "2 bars", "a handful of 5 sweets"), set pieces to the count. Foods list "1 piece = … g" when the weight of one is known (the user's own, or the label's): then grams is pieces × that weight and the app uses that weight. "weight of one piece unknown": estimate grams for all the pieces from the pack (its weight ÷ the number of pieces printed on it, from a photo or the label data) or what such a piece usually weighs, and say the estimate in assumptions (e.g. "1 piece ≈ 1.4 g: 14 g pack of 10"); the user can save the real weight in the app.
 - Ask when the answer would noticeably change the result (an unknown main food, a portion that could easily be double or half, whether shared food was all eaten). Ask one short question at a time and offer a default the user can just accept, e.g. "About one bowl, roughly 400 ml?". Do not ask about details that barely matter. Do not ask for more photos (barcode, label, packaging) when you can work with what you have: the user often cannot take them. If one would clearly change the result, mention it once alongside your proposal, not instead of it. If the user cannot know, estimate and record the assumption.
@@ -204,15 +214,15 @@ ${forgotten ? `${FORGOTTEN}\n` : ''}- Amounts: use what the user said, label wei
 - assumptions: short phrases the user should see, e.g. "ate about a quarter of the shared pot".
 
 ${recipes ? '- Questions: when the user just asks something (about their food, the app, nutrition), answer briefly in text. Numbers about their nutrients come only from tools.\n' : ''}- General knowledge: when you answer from general knowledge rather than from the app's tools (what a nutrient does, what research says), say so, and name where it comes from (the DGE, EFSA, the WHO, a well-known review) only when you are sure; never make up a study, a link or a number. Values for foods and their nutrients come from the app, never from you.
-${insights ? '' : `${NO_DATA}\n`}${sleep ? `\n${SLEEP_BACKGROUND}\n` : ''}
+${insights ? '' : `${edits ? NO_DATA_BEYOND_RECENT : NO_DATA}\n`}${sleep ? `\n${SLEEP_BACKGROUND}\n` : ''}
 
 ${insights ? `\n${INSIGHT_GUIDE}\n\n` : ''}Style: brief, friendly, plain text (no headings or tables). Answer in the language the user writes in.`;
 }
 
-const key = ({ off = false, usda = false, webSearch = false, journal = false, sleep = false, activity = false, water = false, ketones = false, weight = false, habits = false, bloodPressure = false, shopping = false, pantry = false, recipe = false, recipes = false, ideas = false, forgotten = false, insights = false, check = false }: PromptSources) =>
+const key = ({ off = false, usda = false, webSearch = false, journal = false, sleep = false, activity = false, water = false, ketones = false, weight = false, habits = false, bloodPressure = false, shopping = false, pantry = false, recipe = false, recipes = false, ideas = false, forgotten = false, insights = false, check = false, edits = false }: PromptSources) =>
   recipe
     ? `r${off ? 1 : 0}${usda ? 1 : 0}${off && webSearch ? 1 : 0}`
-    : `${off ? 1 : 0}${usda ? 1 : 0}${off && webSearch ? 1 : 0}${journal ? 1 : 0}${sleep ? 1 : 0}${activity ? 1 : 0}${water ? 1 : 0}${ketones ? 1 : 0}${shopping ? 1 : 0}${pantry ? 1 : 0}${recipes ? 1 : 0}${recipes && ideas ? 1 : 0}${forgotten ? 1 : 0}${weight ? 1 : 0}${habits ? 1 : 0}${insights ? 1 : 0}${check ? 1 : 0}${bloodPressure ? 1 : 0}`;
+    : `${off ? 1 : 0}${usda ? 1 : 0}${off && webSearch ? 1 : 0}${journal ? 1 : 0}${sleep ? 1 : 0}${activity ? 1 : 0}${water ? 1 : 0}${ketones ? 1 : 0}${shopping ? 1 : 0}${pantry ? 1 : 0}${recipes ? 1 : 0}${recipes && ideas ? 1 : 0}${forgotten ? 1 : 0}${weight ? 1 : 0}${habits ? 1 : 0}${insights ? 1 : 0}${check ? 1 : 0}${bloodPressure ? 1 : 0}${edits ? 1 : 0}`;
 const prompts = new Map<string, string>();
 const toolSets = new Map<string, BetaToolUnion[]>();
 
@@ -300,7 +310,7 @@ export const WEB_SEARCH_TOOL: BetaWebSearchTool20250305 = {
   user_location: { type: 'approximate', country: 'DE' },
 };
 
-function tools({ off = false, usda = false, webSearch = false, journal = false, sleep = false, activity = false, water = false, ketones = false, weight = false, habits = false, bloodPressure = false, shopping = false, pantry = false, recipe = false, recipes = false, ideas = false, forgotten = false, insights = false, check = false }: PromptSources): BetaToolUnion[] {
+function tools({ off = false, usda = false, webSearch = false, journal = false, sleep = false, activity = false, water = false, ketones = false, weight = false, habits = false, bloodPressure = false, shopping = false, pantry = false, recipe = false, recipes = false, ideas = false, forgotten = false, insights = false, check = false, edits = false }: PromptSources): BetaToolUnion[] {
   const withProducts = off || usda;
   const codeHelp = off && usda ? 'BLS code from search_foods, or an OFF: or USDA: code from lookup_barcode, search_usda or search_foods.' : off ? 'BLS code from search_foods, or OFF: product code from lookup_barcode or search_foods.' : usda ? 'BLS code from search_foods, or USDA: code from search_usda or search_foods.' : 'BLS code from search_foods.';
   const items = {
@@ -407,8 +417,71 @@ function tools({ off = false, usda = false, webSearch = false, journal = false, 
     ...(recipes && ideas ? [NUTRIENT_GAPS, checkRecipe(items)] : []),
     ...(insights ? INSIGHT_TOOLS : []),
     ...(check ? [CHECK_LOGGED_FOODS, PROPOSE_FOOD_FIX, PROPOSE_MARK_CHECKED] : []),
+    ...(edits ? [PROPOSE_CHANGE, PROPOSE_DELETE] : []),
   ];
 }
+
+const PROPOSE_CHANGE: BetaTool = {
+  name: 'propose_change',
+  description:
+    'Show the user a change to entries already saved, by their refs from the recent days list, as a card with each entry before and after for the user to check and confirm; nothing changes until they do, and they can undo it. Each edit gives a ref and only the fields that change. Only for what the user asked to change. After a correction, call it again with replaces set to the card id.',
+  // Not strict: see STRICT_NESTED. The app validates the input itself and sends errors back.
+  input_schema: {
+    type: 'object',
+    properties: {
+      edits: {
+        type: 'array',
+        description: 'One per entry; leave out every field that stays as it is.',
+        items: {
+          type: 'object',
+          properties: {
+            ref: { type: 'string', description: 'The entry\'s ref from the recent days list, e.g. "e3".' },
+            time: { type: 'string', description: 'New time, local "YYYY-MM-DD HH:MM" (food, activity start, water, blood pressure, ketones, journal).' },
+            start: { type: 'string', description: 'Sleep: new time they fell asleep, local "YYYY-MM-DD HH:MM".' },
+            end: { type: 'string', description: 'Sleep: new time they woke up, local "YYYY-MM-DD HH:MM".' },
+            grams: { type: 'number', description: 'Food: new grams eaten.' },
+            pieces: { type: 'number', description: 'Food logged as pieces: new count (grams follow from the weight of one).' },
+            portions: { type: 'number', description: 'A portion from a batch: new number of portions.' },
+            servings: { type: 'number', description: 'An own food: new number of servings.' },
+            minutes: { type: 'number', description: 'Activity: new length in minutes.' },
+            intensity: { type: 'string', enum: [...INTENSITIES], description: 'Activity: new effort.' },
+            ml: { type: 'number', description: 'Water: new millilitres.' },
+            kg: { type: 'number', description: 'Weigh-in: new kg.' },
+            systolic: { type: 'number' },
+            diastolic: { type: 'number' },
+            pulse: { type: 'number', description: 'Blood pressure: new pulse; 0 to take it off.' },
+            value: { type: 'number', description: 'Ketones: new value in the reading\'s unit.' },
+            text: { type: 'string', description: 'Journal: the corrected entry, in the user\'s words.' },
+            did: { type: 'boolean', description: 'Habit answer: the corrected answer.' },
+          },
+          required: ['ref'],
+          additionalProperties: false,
+        },
+      },
+      reason: { type: 'string', description: 'One short line why, in the user\'s language, e.g. "You said 2 eggs, not 3".' },
+      replaces: { type: 'string', description: 'Id of the open change card this corrects (e.g. "C1"); empty for a new one.' },
+    },
+    required: ['edits', 'reason'],
+    additionalProperties: false,
+  },
+};
+
+const PROPOSE_DELETE: BetaTool = {
+  name: 'propose_delete',
+  description:
+    'Show the user entries already saved to delete, by their refs from the recent days list, as a card listing them for the user to check and confirm; nothing is deleted until they do, and they can undo it. Only for what the user asked to remove. After a correction, call it again with replaces set to the card id.',
+  // Not strict: see STRICT_NESTED. The app validates the input itself and sends errors back.
+  input_schema: {
+    type: 'object',
+    properties: {
+      refs: { type: 'array', items: { type: 'string' }, description: 'Refs from the recent days list, e.g. ["e4", "e5"].' },
+      reason: { type: 'string', description: 'One short line why, in the user\'s language, e.g. "Logged twice".' },
+      replaces: { type: 'string', description: 'Id of the open delete card this corrects (e.g. "X1"); empty for a new one.' },
+    },
+    required: ['refs', 'reason'],
+    additionalProperties: false,
+  },
+};
 
 const LIST_RECIPES: BetaTool = {
   name: 'list_recipes',

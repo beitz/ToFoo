@@ -160,6 +160,10 @@ export function restoreCard(summary: Summary, logged: boolean, ctx: RestoreConte
       return { kind: 'batch', batch: c, logged };
     case 'F':
       return (o.use === 'looks_right' ? { kind: 'checked', checked: c, logged } : { kind: 'fix', fix: c, logged });
+    case 'C':
+      return { kind: 'change', change: c, logged };
+    case 'X':
+      return { kind: 'delete', remove: c, logged };
     default:
       return undefined;
   }
@@ -202,6 +206,8 @@ export function rebuildConversation(messages: Beta.BetaMessageParam[], events: r
     portions: highest('P'),
     batches: highest('B'),
     fixes: highest('F'),
+    changes: highest('C'),
+    deletes: highest('X'),
   };
 }
 

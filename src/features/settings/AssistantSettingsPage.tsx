@@ -11,7 +11,8 @@ import { addDays } from '../../lib/dates';
 import { fmtNumber, fmtTokens, fmtUsd } from '../../lib/format';
 import { isOn } from '../../settings/features';
 import { repo } from '../../storage/repo';
-import { Field, Toggle } from '../../ui/controls';
+import { Field, Segmented, Toggle } from '../../ui/controls';
+import { DEFAULT_RECENT_DAYS, RECENT_DAY_CHOICES } from '../../ai/recent';
 import { Icon } from '../../ui/Icon';
 
 const MODEL_LABEL: Record<AiModel, { name: string; detail: 'ai.model.opus' | 'ai.model.sonnet' | 'ai.model.haiku' }> = {
@@ -79,6 +80,24 @@ export function AssistantSettingsPage({ focusKey = false }: { focusKey?: boolean
       <div className="card">
         <Toggle checked={isOn(d.settings.features, 'insights')} onChange={(v) => repo.updateSettings({ features: { ...d.settings.features, insights: v } })} label={t('insights.enable')} />
         <p className="muted small">{t('insights.privacy')}</p>
+      </div>
+
+      <h2 className="section-title">{t('recent.settingsTitle')}</h2>
+      <div className="card" data-tour="settings.recent">
+        <Toggle checked={isOn(d.settings.features, 'recentDays')} onChange={(v) => repo.updateSettings({ features: { ...d.settings.features, recentDays: v } })} label={t('recent.enable')} />
+        <p className="muted small">{t('recent.privacy')}</p>
+        {isOn(d.settings.features, 'recentDays') && (
+          <>
+            <p className="small">{t('recent.daysLabel')}</p>
+            <Segmented<string>
+              label={t('recent.daysLabel')}
+              value={String(d.settings.recentDays ?? DEFAULT_RECENT_DAYS)}
+              onChange={(v) => repo.updateSettings({ recentDays: Number(v) })}
+              options={RECENT_DAY_CHOICES.map((n) => ({ value: String(n), label: String(n) }))}
+            />
+            <p className="muted small">{t('recent.daysHint')}</p>
+          </>
+        )}
       </div>
 
       <h2 className="section-title">{t('ideas.settingsTitle')}</h2>
