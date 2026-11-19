@@ -2920,6 +2920,7 @@ export const en = {
   'tour.fan.sleep': 'Going to sleep, or just woke up: one tap.',
   'tour.fan.bloodPressure': 'Type in the readings from your cuff.',
   'tour.fan.fast': 'Start or end a fast.',
+  'tour.fan.water': 'Water, tea or coffee: a glass, or a pot or bottle of your own.',
   'tour.fan.assistant': 'The assistant: log by talking, typing or photos.',
   'tour.fan.log': 'Tap the round button again to log a meal.',
   'tour.settings.profile': 'Your profile makes the targets yours: age, sex, weight, activity.',

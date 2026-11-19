@@ -20,12 +20,12 @@ test('the round button lists every tracker that is on, at any hour', async ({ pa
   await page.clock.setFixedTime(new Date('2026-10-23T14:40:00+02:00'));
   const errors = watchErrors(page);
   await firstLaunch(page);
-  await turnOn(page, ['Journal', 'Sleep', 'Activity', 'Blood pressure', 'Fasting']);
+  await turnOn(page, ['Journal', 'Sleep', 'Activity', 'Blood pressure', 'Fasting', 'Water']);
 
   await page.goto('./#/');
   await page.locator('[data-tour="round-button"]').click();
   const fan = page.getByRole('group', { name: 'Quick actions' });
-  for (const label of ['Write in journal', 'Going to sleep', 'Log activity', 'Log blood pressure', 'Start fast', /^Assistant/]) {
+  for (const label of ['Write in journal', 'Going to sleep', 'Log activity', 'Log blood pressure', 'Start fast', 'Add a drink', /^Assistant/]) {
     await expect(fan.getByRole('button', { name: label })).toBeVisible();
   }
 
@@ -41,7 +41,7 @@ test('trackers that are off stay out of the round button', async ({ page }) => {
   await page.locator('[data-tour="round-button"]').click();
   const fan = page.getByRole('group', { name: 'Quick actions' });
   await expect(fan.getByRole('button', { name: /^Assistant/ })).toBeVisible();
-  for (const label of ['Going to sleep', 'Log activity', 'Log blood pressure', 'Start fast']) {
+  for (const label of ['Going to sleep', 'Log activity', 'Log blood pressure', 'Start fast', 'Add a drink']) {
     await expect(fan.getByRole('button', { name: label })).toHaveCount(0);
   }
 });
@@ -62,5 +62,22 @@ test('Write in journal opens the writing sheet right where you are', async ({ pa
   await expect(sheet).toBeHidden();
   await expect(page.getByText('Saved to your journal.')).toBeVisible();
   expect(new URL(page.url()).hash).toBe('#/');
+  expect(errors).toEqual([]);
+});
+
+// Owner's report 2026-11-19: he turned on Water and looked for it next to the assistant.
+test('Add a drink in the round button opens the water sheet right where you are', async ({ page }) => {
+  const errors = watchErrors(page);
+  await firstLaunch(page);
+  await turnOn(page, ['Water']);
+
+  await page.goto('./#/');
+  await page.locator('[data-tour="round-button"]').click();
+  await page.getByRole('group', { name: 'Quick actions' }).getByRole('button', { name: 'Add a drink' }).click();
+  const sheet = page.getByRole('dialog', { name: 'Add a drink' });
+  await sheet.getByRole('button', { name: '500 ml' }).click();
+  await sheet.getByRole('button', { name: 'Save' }).click();
+  await expect(page.getByText('500 ml of water added.')).toBeVisible();
+  await expect(page.locator('.water-card')).toContainText('500 ml of');
   expect(errors).toEqual([]);
 });

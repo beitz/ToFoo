@@ -13,6 +13,7 @@ import { ActivitySheet } from '../activity/ActivitySheet';
 import { JournalSheet } from '../journal/JournalSheet';
 import { BloodPressureSheet } from '../bloodPressure/BloodPressureSheet';
 import { SleepButton } from '../sleep/SleepButton';
+import { WaterSheet } from '../water/WaterSheet';
 import { DialItem } from './DialItem';
 import { endFast } from '../fast/fastActions';
 import { useTourControl } from '../tour/TourHost';
@@ -32,6 +33,7 @@ export function QuickActions() {
   const [activity, setActivity] = useState(false);
   const [journal, setJournal] = useState(false);
   const [bp, setBp] = useState(false);
+  const [water, setWater] = useState(false);
   const [fastSheet, setFastSheet] = useState(false);
   const [fastStart, setFastStart] = useState(today);
   const close = () => setOpen(false);
@@ -123,6 +125,18 @@ export function QuickActions() {
               }}
             />
           )}
+          {/* Next to the assistant, where the owner looked for it first (2026-11-19); the sheet has his cups and bottles. */}
+          {on('water') && (
+            <DialItem
+              icon="drop"
+              label={t('drinks.addTitle')}
+              tour="fan.water"
+              onClick={() => {
+                close();
+                setWater(true);
+              }}
+            />
+          )}
           {/* Off, it stays in the menu and leads to setting it up (owner's ask, 2026-10-23). */}
           {on('aiAssistant') ? (
             <DialItem icon="chat" label={t('ai.pageTitle')} tour="fan.assistant" onClick={() => go('assistant')} />
@@ -154,6 +168,7 @@ export function QuickActions() {
       </div>
       {activity && <ActivitySheet defaultTime={Date.now()} onClose={() => setActivity(false)} />}
       {journal && <JournalSheet onClose={() => setJournal(false)} />}
+      {water && <WaterSheet defaultTime={Date.now()} onClose={() => setWater(false)} />}
       {bp && <BloodPressureSheet defaultTime={Date.now()} onClose={() => setBp(false)} />}
       {fastSheet && (
         <Sheet title={t('home.fasting')} onClose={() => setFastSheet(false)}>
