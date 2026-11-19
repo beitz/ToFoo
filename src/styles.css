@@ -2821,9 +2821,34 @@ body:has(.fab-stack) .toast-area {
 /* ── Water ───────────────────────────────────────────────────── */
 .water-card {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 10px;
   padding: 10px 12px;
+}
+/* Own containers: a row of one-tap buttons under the bar (a full teapot, a full bottle). */
+.water-containers {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.water-containers .water-glass {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.water-containers .water-glass svg {
+  flex: none;
+}
+.water-container-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.drink-amount {
+  margin: 4px 0 8px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 .water-main {
   flex: 1;

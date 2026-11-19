@@ -150,6 +150,10 @@ export const settingsSchema = z.object({
   recentDays: z.number().int().min(1).max(7).optional().describe('Recent days (assistant): days before today sent with a chat'),
   potGrams: z.number().positive().optional(),
   pots: z.array(z.object({ id: z.string(), name: z.string().min(1), grams: z.number().positive() })).optional().describe('Empty pots remembered by name'),
+  drinkContainers: z
+    .array(z.object({ id: z.string(), name: z.string().min(1), ml: z.number().positive(), drink: blsRef.optional() }))
+    .optional()
+    .describe('Cups, bottles and teapots the user drinks from: name, size when full (ml), and the plain BLS drink it holds (none = plain water)'),
 });
 
 export const recipeRecordSchema = z.object({

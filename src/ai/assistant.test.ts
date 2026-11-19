@@ -227,6 +227,11 @@ describe('several meals at once', () => {
     expect(appNote({ now, day: '2026-10-17', today: '2026-10-17', logged: [], open: [], barcodes: [] })).toBe('(Now: Sat 2026-10-17 09:30.)');
   });
 
+  it('lists the user\'s cups and bottles with their size and drink', () => {
+    const note = appNote({ now, day: '2026-10-17', today: '2026-10-17', logged: [], open: [], barcodes: [], containers: [{ name: 'Teekanne', ml: 1200, drink: { code: 'N630000', name: 'Black tea (infusion)' } }, { name: 'Flasche', ml: 750 }] });
+    expect(note).toContain('"Teekanne" 1200 ml Black tea (infusion) (BLS N630000); "Flasche" 750 ml plain water.');
+  });
+
   it('warns that dictated text may have misheard words', () => {
     expect(appNote({ now, day: '2026-10-17', today: '2026-10-17', logged: [], open: [], barcodes: [], dictated: true })).toContain('spoken and turned into text');
   });

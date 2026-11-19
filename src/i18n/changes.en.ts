@@ -10,6 +10,8 @@
 export const changesEn = {
   'change.199': 'Assistant: turn on Recent days (Settings → AI assistant) and a tick box in the chat sends what you logged today and the days before (1 to 7), so it skips what is already logged and knows your usual meals. It can also offer to change or delete a saved entry; nothing changes until you tap the card, and Undo puts it back.',
   'change.199.major': 'Assistant sees your recent days and can fix saved entries',
+  'change.198': 'Water: add your own cups, bottles and teapots once (name, size, and whether it holds water, tea or coffee). The water card then has one button per container, so a full teapot is one tap; the sheet takes half a pot or two bottles. The assistant understands "two pots of tea" with your sizes. Plain tea and coffee without milk or sugar no longer end a fast.',
+  'change.198.major': 'Your own cups and bottles for water',
   'change.197': 'Take photo in the assistant chat opens the camera; the shot lands in the chat with the time it was taken.',
   'change.196': 'Weight: weigh in as often as you like, daily, weekly or now and then; the trend works it out from whatever is there, and the first weigh-ins no longer hold it for weeks. A short tip under the entry says how to weigh so readings compare (ⓘ for why and sources). Your energy estimate, protein per kg and body stores now use the trend instead of the last weigh-in.',
   'change.195': 'Settings → AI assistant: the link to get an OpenAI key for voice input now shows even after a key is saved.',

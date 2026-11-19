@@ -172,10 +172,25 @@ export interface Settings extends Versioned {
   potGrams?: number;
   /** Empty pots remembered by name ("Big red pot"), so weighing a batch is one number. */
   pots?: Pot[];
+  /** Cups, bottles and teapots the user drinks from, measured once, so a refill is one tap (Water). */
+  drinkContainers?: DrinkContainer[];
 }
 
 /** Per thing the fill-in page asks about: the weekdays to ask on (Settings → Reminders). */
 export type AskDays = Partial<Record<'food' | 'sleep' | 'activity' | 'water' | 'habits' | 'bloodPressure', number[]>>;
+
+/**
+ * A cup, bottle or teapot the user drinks from, measured once and remembered by name (owner's ask
+ * 2026-11-19: "I drink only from my Teekanne or a water bottle"). Without `drink` it holds plain
+ * water (a water record); with it, a plain drink from the BLS (src/logic/drinks.ts), logged as that food.
+ */
+export interface DrinkContainer {
+  id: string;
+  name: string;
+  /** How much it holds when full (ml). */
+  ml: number;
+  drink?: { source: 'BLS'; version: string; code: string };
+}
 
 /** An empty pot, weighed once and remembered by name. */
 export interface Pot {

@@ -724,6 +724,14 @@ export interface RecipeSoFar {
   instructions?: string;
 }
 
+/** One of the user's own cups, bottles or teapots, for the app's note: what it holds when full. */
+export interface ContainerInfo {
+  name: string;
+  ml: number;
+  /** The plain drink it holds; none = plain water. */
+  drink?: { code: string; name: string };
+}
+
 const HABIT_KIND_NOTE: Record<HabitInfo['kind'], string> = { do: 'do', avoid: 'avoid', minutes: 'minutes of activity, from the activity log' };
 
 /**
@@ -732,7 +740,7 @@ const HABIT_KIND_NOTE: Record<HabitInfo['kind'], string> = { do: 'do', avoid: 'a
  * whether the text was dictated. In the recipe editor: what the recipe already has instead of the day.
  * `share`: on the message the user first includes their data with, what it holds (shareNote).
  */
-export function appNote(o: { now: number; day: string; today: string; logged: string[]; open: string[]; barcodes: string[]; dictated?: boolean; recipe?: RecipeSoFar; habits?: readonly HabitInfo[]; share?: string }): string {
+export function appNote(o: { now: number; day: string; today: string; logged: string[]; open: string[]; barcodes: string[]; dictated?: boolean; recipe?: RecipeSoFar; habits?: readonly HabitInfo[]; containers?: readonly ContainerInfo[]; share?: string }): string {
   const parts = [`Now: ${fmtLocalDateTime(o.now)}.`];
   if (o.dictated) parts.push('The text was spoken and turned into text by a speech model: expect misheard words, especially food and brand names, and corrections the user made while talking.');
   if (o.recipe) {
@@ -744,6 +752,7 @@ export function appNote(o: { now: number; day: string; today: string; logged: st
   if (o.open.length) parts.push(`Cards still open: ${o.open.join(', ')}.`);
   if (o.barcodes.length) parts.push(`Barcodes the app read from the photos: ${o.barcodes.join(', ')}.`);
   if (o.habits?.length) parts.push(`The user's habits: ${o.habits.map((h) => `"${h.name}" (${HABIT_KIND_NOTE[h.kind]})`).join(', ')}.`);
+  if (o.containers?.length) parts.push(`The user's cups and bottles (full): ${o.containers.map((c) => `"${c.name}" ${c.ml} ml ${c.drink ? `${c.drink.name} (BLS ${c.drink.code})` : 'plain water'}`).join('; ')}.`);
   if (o.share) parts.push(o.share);
   return `(${parts.join(' ')})`;
 }
