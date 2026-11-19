@@ -1,5 +1,6 @@
 /** Date ranges for reviewing the past: presets and labels. Day keys as in ./dates. */
 import { addDays, daysBetween, formatDate, formatDay, parseDay } from './dates';
+import { locale } from './locale';
 
 export type PeriodPreset = 'day' | 'week' | 'month' | 'range';
 
@@ -38,7 +39,7 @@ export function presetOf(from: string, to: string, today: string): PeriodPreset 
 }
 
 export function formatMonth(month: string): string {
-  return parseDay(`${month}-01`).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+  return parseDay(`${month}-01`).toLocaleDateString(locale(), { month: 'long', year: 'numeric' });
 }
 
 /** "Yesterday", "October 2026", "10.10. – 16.10." */

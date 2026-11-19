@@ -16,6 +16,7 @@ import { useOffSearch } from '../log/OffResults';
 import { findProduct } from '../../foods/findProduct';
 import type { OffListing } from '../../foods/offIndex';
 import { usePantry, usePantryFoods, usePantryLeft } from '../pantry/usePantry';
+import { foodName, foodAltName } from '../../i18n/names';
 
 /** Foods and products from the database offered while typing, after things already at home. */
 const FOOD_SUGGESTIONS = 3;
@@ -150,9 +151,9 @@ export function PantryAdd({ place, autoFocus, placeholder }: { place?: HomePlace
           ))}
           {foods.map((f) => (
             <li key={f.code}>
-              <button className="result" onClick={() => void add({ name: f.nameEn, ref: { source: 'BLS', version: d.foods.version, code: f.code } })}>
-                <span className="result-name">{f.nameEn}</span>
-                <span className="muted small">{f.nameDe}</span>
+              <button className="result" onClick={() => void add({ name: foodName(f), ref: { source: 'BLS', version: d.foods.version, code: f.code } })}>
+                <span className="result-name">{foodName(f)}</span>
+                <span className="muted small">{foodAltName(f)}</span>
               </button>
             </li>
           ))}

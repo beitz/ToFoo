@@ -14,6 +14,7 @@ import { repo } from '../../storage/repo';
 import type { MixPart, Product } from '../../storage/types';
 import { isOn } from '../../settings/features';
 import { Icon } from '../../ui/Icon';
+import { foodName, foodAltName, groupName } from '../../i18n/names';
 
 /** Label nutrients shown first, in label order; the rest are counted. */
 const LABEL_ORDER = ['ENERCC', 'FAT', 'FASAT', 'CHO', 'SUGAR', 'FIBT', 'PROT625'];
@@ -86,9 +87,9 @@ export function MatchPicker({ product, choice, onChange, linked }: { product: Pr
             choice.parts ? (
               t('match.mixName', { n: choice.parts.length })
             ) : linked ? (
-              <a href={href('food', match.code)}>{match.nameEn}</a>
+              <a href={href('food', match.code)}>{foodName(match)}</a>
             ) : (
-              match.nameEn
+              foodName(match)
             )
           ) : (
             <span className="muted">{t(!choice.auto ? 'match.labelOnly' : own ? 'usda.matchNone' : 'match.noneFound')}</span>
@@ -129,16 +130,16 @@ export function MatchPicker({ product, choice, onChange, linked }: { product: Pr
                   }}
                 >
                   <span className="result-name">{t('match.mixOption', { n: mix.length })}</span>
-                  <span className="muted small">{mix.slice(0, 3).map((p) => d.foods.byCode.get(p.code)?.nameEn).join(', ')}…</span>
+                  <span className="muted small">{mix.slice(0, 3).map((p) => foodName(d.foods.byCode.get(p.code))).join(', ')}…</span>
                 </button>
               </li>
             )}
             {options.map((f) => (
               <li key={f.code}>
                 <button className={`result${match?.code === f.code && !choice.parts ? ' on' : ''}`} onClick={() => pick({ food: f, auto: false })}>
-                  <span className="result-name">{f.nameEn}</span>
+                  <span className="result-name">{foodName(f)}</span>
                   <span className="muted small">
-                    {f.nameDe} · {d.foods.groups[f.group]?.en}
+                    {foodAltName(f)} · {groupName(d.foods.groups[f.group])}
                   </span>
                 </button>
               </li>
@@ -173,7 +174,7 @@ function MixList({ product, parts, linked }: { product: Product; parts: MixPart[
       <p className="small muted">{t('match.mixTitle')}</p>
       <ul className="small">
         {shown.map((r) => {
-          const name = d.foods.byCode.get(r.code)?.nameEn ?? r.code;
+          const name = foodName(d.foods.byCode.get(r.code)) ?? r.code;
           return (
             <li key={r.code}>
               <span className="mix-share">{fmtNumber(r.share, r.share < 10 ? 1 : 0)} %</span>
@@ -267,7 +268,7 @@ export function SavedMatchPicker({ product }: { product: Product }) {
     const before: Pick<Product, 'match' | 'labelOnly'> = { ...(product.match ? { match: product.match } : {}), ...(product.labelOnly ? { labelOnly: true as const } : {}) };
     await repo.setProductMatch(product.id, withChoice(product, c, d.foods.version));
     const name = productLabel(product);
-    const what = c.parts ? t('match.mixName', { n: c.parts.length }) : c.food?.nameEn;
+    const what = c.parts ? t('match.mixName', { n: c.parts.length }) : foodName(c.food);
     toast(what ? t('match.saved', { name, food: what }) : t('match.savedNone', { name }), () => repo.setProductMatch(product.id, before));
   }
   return <MatchPicker key={product.id} product={product} choice={choice} onChange={(c) => void change(c)} linked />;

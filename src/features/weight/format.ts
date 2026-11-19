@@ -1,7 +1,8 @@
 import { fmtNumber } from '../../lib/format';
+import { locale } from '../../lib/locale';
 
 /** A weight to one decimal, as a scale shows it ("81.4"); the unit comes from the text around it. */
-export const fmtKg = (kg: number) => kg.toLocaleString('en-GB', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+export const fmtKg = (kg: number) => kg.toLocaleString(locale(), { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
 /** A change in kg with its sign, never coloured or judged ("+0.4", "−0.3", "±0.0"). */
 export const fmtKgChange = (kg: number) => {

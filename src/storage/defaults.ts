@@ -27,6 +27,8 @@ export function defaultSettings(): Settings {
     shortWindowDays: 7,
     longWindowDays: 14,
     theme: 'system',
+    // A new install follows the phone's language (German or English).
+    language: 'auto',
     // A new install has seen no tours yet (older installs have no list and count as all seen).
     toursSeen: [],
     backupReminderDays: 14,

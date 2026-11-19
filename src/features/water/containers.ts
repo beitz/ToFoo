@@ -6,12 +6,13 @@ import { containerDrinkKey, containerMl } from '../../logic/drinks';
 import { repo } from '../../storage/repo';
 import type { DrinkContainer } from '../../storage/types';
 import { waterText } from './format';
+import { foodName } from '../../i18n/names';
 
 /** What a container holds, in words: "water", "black tea", … */
 export function drinkName(c: Pick<DrinkContainer, 'drink'>, foods: FoodDb): string {
   const key = containerDrinkKey(c);
   if (key !== 'other') return t(`drinks.${key}`);
-  return foods.byCode.get(c.drink!.code)?.nameEn ?? c.drink!.code;
+  return foodName(foods.byCode.get(c.drink!.code)) ?? c.drink!.code;
 }
 
 /** "1 l black tea", "375 ml water". */
@@ -33,6 +34,6 @@ export async function logContainer(c: DrinkContainer, amount: number, time: numb
     return;
   }
   const food = foods.byCode.get(c.drink.code);
-  const entry = await repo.addLog({ kind: 'food', ref: c.drink, grams: ml, preparation: 'asListed', time, day, confidence: 'B', label: food?.nameEn ?? drinkName(c, foods) });
+  const entry = await repo.addLog({ kind: 'food', ref: c.drink, grams: ml, preparation: 'asListed', time, day, confidence: 'B', label: foodName(food) ?? drinkName(c, foods) });
   toast(text, () => void repo.deleteLog(entry.id));
 }

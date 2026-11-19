@@ -10,6 +10,7 @@ import { Sheet } from '../../ui/controls';
 import { atDayMinute } from '../../logic/catchUp';
 import { ActivitySheet } from '../activity/ActivitySheet';
 import { activityName, DEFAULT_ACTIVITY_SKIN } from '../activity/ActivityForm';
+import { locale } from '../../lib/locale';
 
 /** The habit's colour for its name and marks (it tells habits apart, never status). */
 export const habitStyle = (h: Pick<Habit, 'colour'>) => ({ '--hc': `var(--habit-${h.colour})` }) as CSSProperties;
@@ -52,7 +53,7 @@ const WEEKDAY_ANCHOR = '2026-10-12'; // a Monday
 export function weekdayName(n: number, style: 'short' | 'narrow' = 'short'): string {
   const d = parseDay(WEEKDAY_ANCHOR);
   d.setDate(d.getDate() + n - 1);
-  return d.toLocaleDateString('en-GB', { weekday: style });
+  return d.toLocaleDateString(locale(), { weekday: style });
 }
 
 /** "Every day", "Mon, Wed, Fri", "2× a week"; for avoid habits "Never", "Not on Mon, Fri", "At most 2 days a week". */

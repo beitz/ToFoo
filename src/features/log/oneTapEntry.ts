@@ -6,6 +6,7 @@ import type { PieceUnits } from '../../logic/pantry';
 import { repo } from '../../storage/repo';
 import type { LogEntry } from '../../storage/types';
 import type { HomePick } from './useHomeTiles';
+import { foodName } from '../../i18n/names';
 
 /** What one tap logs: the entry and the amount as the toast says it. */
 export type OneTap = () => Promise<{ entry: LogEntry; amount: string }>;
@@ -33,7 +34,7 @@ export function oneTapFor(
   if (!amount) return undefined;
   // Products' last amount goes by the product's id, BLS foods' by their code (as in the amount sheet).
   const lastKey = product ? product.id : food!.code;
-  const label = product ? productLabel(product) : food!.nameEn;
+  const label = product ? productLabel(product) : foodName(food!);
   return async () => {
     const entry = await repo.addLog({
       kind: 'food',

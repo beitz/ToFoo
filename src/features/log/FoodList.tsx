@@ -1,6 +1,7 @@
 import { useData } from '../../app/data';
 import type { Food } from '../../foods/foodDb';
 import { FavouriteStar } from './FavouriteButton';
+import { foodName, foodAltName, groupName } from '../../i18n/names';
 
 export function FoodList({ foods, onPick }: { foods: Food[]; onPick: (f: Food) => void }) {
   const d = useData();
@@ -9,12 +10,12 @@ export function FoodList({ foods, onPick }: { foods: Food[]; onPick: (f: Food) =
       {foods.map((f) => (
         <li key={f.code} className="fav-row">
           <button className="result" onClick={() => onPick(f)}>
-            <span className="result-name">{f.nameEn}</span>
+            <span className="result-name">{foodName(f)}</span>
             <span className="muted small">
-              {f.nameDe} · {d.foods.groups[f.group]?.en}
+              {foodAltName(f)} · {groupName(d.foods.groups[f.group])}
             </span>
           </button>
-          <FavouriteStar foodRef={{ source: 'BLS', version: d.foods.version, code: f.code }} name={f.nameEn} />
+          <FavouriteStar foodRef={{ source: 'BLS', version: d.foods.version, code: f.code }} name={foodName(f)} />
         </li>
       ))}
     </ul>

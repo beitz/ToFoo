@@ -118,6 +118,7 @@ export const settingsSchema = z.object({
   shortWindowDays: z.number().int().positive(),
   longWindowDays: z.number().int().positive(),
   theme: z.enum(['system', 'light', 'dark']),
+  language: z.enum(['auto', 'en', 'de']).optional().describe('UI language; auto = the phone\'s; unset = English'),
   accent: z.enum(['green', 'teal', 'blue', 'rose', 'ink']).optional(),
   toursSeen: z.array(z.string()).optional(),
   backupReminderDays: z.number().int().positive(),

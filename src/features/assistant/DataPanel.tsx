@@ -9,6 +9,7 @@ import { HOME_PLACES, type HomePlace } from '../../storage/types';
 import { Segmented } from '../../ui/controls';
 import { Icon } from '../../ui/Icon';
 import { placeName } from '../pantry/usePantry';
+import { locale } from '../../lib/locale';
 
 export type Period = '2w' | '4w' | '3m' | 'all';
 const PERIOD_DAYS: Record<Exclude<Period, 'all'>, number> = { '2w': 14, '4w': 28, '3m': 91 };
@@ -41,7 +42,7 @@ export function periodStart(data: InsightData | undefined, period: Period, today
 export function kindNames(kinds: readonly ShareKind[], privateJournal: boolean, kitchen: readonly HomePlace[] = []): string {
   const names = kinds.map((k) => (k === 'journal' && privateJournal ? t('insights.kind.journalPrivate') : t(`insights.kind.${k}`)));
   if (kitchen.length === HOME_PLACES.length) names.push(t('data.kitchenName'));
-  else if (kitchen.length) names.push(t('data.kitchenSome', { places: kitchen.map((p) => placeName(p).toLocaleLowerCase('en-GB')).join(', ') }));
+  else if (kitchen.length) names.push(t('data.kitchenSome', { places: kitchen.map((p) => placeName(p).toLocaleLowerCase(locale())).join(', ') }));
   return names.join(', ');
 }
 

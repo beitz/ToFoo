@@ -19,6 +19,7 @@ import { useHabitLayers } from '../habits/useHabits';
 import { useJournal } from '../journal/useJournal';
 import { hmShort } from '../sleep/format';
 import { fmtNumber } from '../../lib/format';
+import { locale } from '../../lib/locale';
 
 type View = NonNullable<Settings['calendarLayer']>;
 
@@ -64,7 +65,7 @@ export function CalendarPage({ month: monthParam }: { month?: string }) {
     if (st) counts[st] = (counts[st] ?? 0) + 1;
   }
   const range = presetRange('month', `${month}-01`, d.today);
-  const weekdays = [...Array(7)].map((_, i) => parseDay(`2026-10-${String(12 + i).padStart(2, '0')}`).toLocaleDateString('en-GB', { weekday: 'narrow' }));
+  const weekdays = [...Array(7)].map((_, i) => parseDay(`2026-10-${String(12 + i).padStart(2, '0')}`).toLocaleDateString(locale(), { weekday: 'narrow' }));
 
   return (
     <section>
@@ -114,7 +115,7 @@ export function CalendarPage({ month: monthParam }: { month?: string }) {
                       <span className="calendar-num">{num}</span>
                     </span>
                   );
-                const date = parseDay(day).toLocaleDateString('en-GB', { day: 'numeric', month: 'long' });
+                const date = parseDay(day).toLocaleDateString(locale(), { day: 'numeric', month: 'long' });
                 const l = layers?.get(day);
                 if (view === 'meals' || !l)
                   return (

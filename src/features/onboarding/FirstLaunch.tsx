@@ -5,6 +5,7 @@ import type { ActivityLevel, Sex } from '../../model/paramTypes';
 import { repo } from '../../storage/repo';
 import { Field, NumberInput, Segmented } from '../../ui/controls';
 import { AccentPicker } from '../settings/AccentPicker';
+import { LanguagePicker } from '../settings/LanguagePicker';
 import { isAppleBrowserTab } from '../../lib/platform';
 import { Icon } from '../../ui/Icon';
 
@@ -33,6 +34,7 @@ function LookStep({ onDone }: { onDone: () => void }) {
           <Icon name="warning" size={16} /> {t('install.ios.onboarding')}
         </p>
       )}
+      <LanguagePicker />
       <p className="muted small settings-label" id="accent-label">
         {t('settings.accent')}
       </p>

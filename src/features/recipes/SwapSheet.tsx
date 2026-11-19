@@ -18,6 +18,7 @@ import { Icon } from '../../ui/Icon';
 import { symbolOf } from '../../ui/Tile';
 import { SwapPreview } from './SwapPreview';
 import { useSwapGaps } from './useGaps';
+import { foodName } from '../../i18n/names';
 
 /**
  * Swap one ingredient (owner's decision, 2026-10-22): foods from the same BLS group ranked by how
@@ -44,7 +45,7 @@ export function SwapSheet({ recipe, index, onSwap, onSearch, onClose }: { recipe
     const code = ing.ref.source === 'BLS' ? ing.ref.code : ing.ref.source === 'custom' ? undefined : d.productsById.get(refKey(ing.ref))?.match?.code;
     return code ? d.foods.byCode.get(code) : undefined;
   }, [ing, d.foods, d.productsById]);
-  const name = current?.nameEn ?? ing.name;
+  const name = foodName(current) ?? ing.name;
 
   const options = useMemo(() => {
     if (!current) return [];
@@ -86,7 +87,7 @@ export function SwapSheet({ recipe, index, onSwap, onSearch, onClose }: { recipe
                   aria-pressed={o.food.code === picked}
                   onClick={() => setPicked(o.food.code === picked ? null : o.food.code)}
                 >
-                  <span className="swap-option-name">{o.food.nameEn}</span>
+                  <span className="swap-option-name">{foodName(o.food)}</span>
                   <span className="swap-option-moves">
                     {top.map((m) => (
                       <span
@@ -109,9 +110,9 @@ export function SwapSheet({ recipe, index, onSwap, onSearch, onClose }: { recipe
       )}
       {chosen && (
         <>
-          <SwapPreview title={t('swap.swapped', { was: name, now: chosen.food.nameEn })} move={chosen.move} />
+          <SwapPreview title={t('swap.swapped', { was: name, now: foodName(chosen.food) })} move={chosen.move} />
           <button type="button" className="btn btn-primary btn-block" onClick={() => onSwap(chosen.next, name)}>
-            {t('swapSheet.use', { name: chosen.food.nameEn })}
+            {t('swapSheet.use', { name: foodName(chosen.food) })}
           </button>
         </>
       )}

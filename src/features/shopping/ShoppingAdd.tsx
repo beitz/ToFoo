@@ -10,6 +10,7 @@ import { repo } from '../../storage/repo';
 import { CURRENT_SCHEMA_VERSION } from '../../storage/types';
 import { Icon } from '../../ui/Icon';
 import { useShopFoods, useShopping } from './useShopping';
+import { foodName, foodAltName } from '../../i18n/names';
 
 /** Foods from the database offered while typing, after things bought before. */
 const FOOD_SUGGESTIONS = 3;
@@ -57,9 +58,9 @@ export function ShoppingAdd({ docked, autoFocus }: { docked?: boolean; autoFocus
       ))}
       {foods.map((f) => (
         <li key={f.code}>
-          <button className="result" onClick={() => void add({ name: f.nameEn, ref: { source: 'BLS', version: d.foods.version, code: f.code }, section: sectionOfCode(f.code) })}>
-            <span className="result-name">{f.nameEn}</span>
-            <span className="muted small">{f.nameDe}</span>
+          <button className="result" onClick={() => void add({ name: foodName(f), ref: { source: 'BLS', version: d.foods.version, code: f.code }, section: sectionOfCode(f.code) })}>
+            <span className="result-name">{foodName(f)}</span>
+            <span className="muted small">{foodAltName(f)}</span>
           </button>
         </li>
       ))}

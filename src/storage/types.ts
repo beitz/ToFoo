@@ -127,6 +127,8 @@ export interface Settings extends Versioned {
   shortWindowDays: number;
   longWindowDays: number;
   theme: 'system' | 'light' | 'dark';
+  /** UI language: "auto" follows the phone; unset = an install from before the setting, which stays English. */
+  language?: 'auto' | 'en' | 'de';
   /** Accent (action) colour; unset = green. */
   accent?: 'green' | 'teal' | 'blue' | 'rose' | 'ink';
   /** Guided tours already shown (or skipped), by tour id; unset = an install from before the tours, which counts as all seen. */

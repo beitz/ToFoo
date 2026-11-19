@@ -20,6 +20,7 @@ import { PortionFields, portionDraftValid, type PortionDraft } from '../log/Port
 import { MatchPicker, ProductInfo, saveProductChoice, useMatchChoice } from '../log/ProductParts';
 import { AmountField } from '../log/AmountField';
 import { TimeField } from '../log/TimeField';
+import { foodName } from '../../i18n/names';
 
 /** A portion entry with changed fields; a field set to undefined is left out (not stored as undefined). */
 function withPortion<E extends PortionDraft>(e: E, patch: Partial<PortionDraft>): E {
@@ -66,7 +67,7 @@ export function EditEntrySheet({ entry, onClose, nutrientsLink = true }: { entry
     } else {
       setProduct(undefined);
       resetChoice(undefined);
-      setDraft(replaceFood(draft, { source: 'BLS', version: d.foods.version, code: p.food.code }, p.food.nameEn, d.customFoodsById));
+      setDraft(replaceFood(draft, { source: 'BLS', version: d.foods.version, code: p.food.code }, foodName(p.food), d.customFoodsById));
     }
     setMode('edit');
   }

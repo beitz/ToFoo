@@ -4,6 +4,7 @@ import { href } from '../../app/router';
 import { t, type MessageKey } from '../../i18n';
 import { addDays, parseDay } from '../../lib/dates';
 import { Icon } from '../../ui/Icon';
+import { locale } from '../../lib/locale';
 
 /** The marks, each with what it means, for the ⓘ legend (owner's ask, 2026-10-22). */
 const LEGEND = [
@@ -30,9 +31,9 @@ export function DayStrip({ days: shown }: { days: number }) {
           const date = parseDay(day);
           const label = status === 'today' ? t('home.dayToday') : t(`day.${status}` as MessageKey);
           return (
-            <a key={day} href={href('diary', day)} className={`day-cell day-${status}`} aria-label={`${date.toLocaleDateString('en-GB', { weekday: 'long' })} ${date.getDate()}: ${label}`}>
+            <a key={day} href={href('diary', day)} className={`day-cell day-${status}`} aria-label={`${date.toLocaleDateString(locale(), { weekday: 'long' })} ${date.getDate()}: ${label}`}>
               <span className="day-wd" aria-hidden>
-                {date.toLocaleDateString('en-GB', { weekday: 'narrow' })}
+                {date.toLocaleDateString(locale(), { weekday: 'narrow' })}
               </span>
               <span className="day-num" aria-hidden>
                 {date.getDate()}

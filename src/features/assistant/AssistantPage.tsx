@@ -78,6 +78,8 @@ import { BloodPressureProposalCard } from './BloodPressureCard';
 import { FoodFixCard } from './FoodFixCard';
 import { MarkCheckedCard } from './MarkCheckedCard';
 import { kitchenNote, type KitchenThing } from '../../ai/kitchen';
+import { foodName } from '../../i18n/names';
+import { locale } from '../../lib/locale';
 import type { FoodCheckData } from '../../ai/foodCheck';
 import { usePantryLeft } from '../pantry/usePantry';
 import { HabitsProposalCard } from './HabitsCard';
@@ -1114,7 +1116,7 @@ function touchKeyboard(): boolean {
 /** Capture time under a photo thumbnail: "Thu 19:42", "≈ Thu 19:42" from the file date, or "–". */
 function photoTimeShort(pt: PhotoTime): string {
   if (pt.time === undefined) return '–';
-  const s = `${new Date(pt.time).toLocaleDateString('en-GB', { weekday: 'short' })} ${formatTime(pt.time)}`;
+  const s = `${new Date(pt.time).toLocaleDateString(locale(), { weekday: 'short' })} ${formatTime(pt.time)}`;
   return pt.source === 'photo' || pt.source === 'camera' ? s : `≈ ${s}`;
 }
 
@@ -1555,7 +1557,7 @@ function ProposalCard({ card, day, toast, onLogged, register }: CardProps<Extrac
           time,
           day: dayKey(new Date(time)),
           confidence,
-          label: it.product ? productLabel(it.product) : it.food.nameEn,
+          label: it.product ? productLabel(it.product) : foodName(it.food),
         });
         ids.push(entry.id);
       }
@@ -1604,7 +1606,7 @@ function ProposalCard({ card, day, toast, onLogged, register }: CardProps<Extrac
                   {productLabel(it.product)}
                 </a>
               ) : (
-                <a href={href('food', it.food.code)}>{it.food.nameEn}</a>
+                <a href={href('food', it.food.code)}>{foodName(it.food)}</a>
               )}
               <span className="muted small block">
                 {/* Where the numbers come from, as on recipe cards: BLS, a scanned product, USDA. */}
@@ -1625,7 +1627,7 @@ function ProposalCard({ card, day, toast, onLogged, register }: CardProps<Extrac
             ) : (
               <NumberInput value={it.grams} onChange={(g) => setItems((all) => all.map((x, j) => (j === i ? { ...x, grams: g } : x)))} suffix="g" min={0} />
             )}
-            <button className="icon-btn" aria-label={t('ai.removeItem', { name: it.food.nameEn })} onClick={() => setItems((all) => all.filter((_, j) => j !== i))}>
+            <button className="icon-btn" aria-label={t('ai.removeItem', { name: foodName(it.food) })} onClick={() => setItems((all) => all.filter((_, j) => j !== i))}>
               <Icon name="trash" size={18} />
             </button>
           </li>
@@ -1724,9 +1726,9 @@ function IngredientsCard({ card, toast, onLogged, register, recipe }: CardProps<
         {items.map((it, i) => (
           <li key={`${it.food.code}-${i}`} className="proposal-item">
             {/* Tap to change the food (another BLS food, a product, USDA, a barcode), amount or preparation. */}
-            <button className="proposal-name ingredient-name" onClick={() => setEditing(i)} aria-label={t('recipes.changeIngredient', { name: it.product ? productLabel(it.product) : it.food.nameEn })}>
+            <button className="proposal-name ingredient-name" onClick={() => setEditing(i)} aria-label={t('recipes.changeIngredient', { name: it.product ? productLabel(it.product) : foodName(it.food) })}>
               <span className="link-like">
-                {it.product ? productLabel(it.product) : it.food.nameEn} <Icon name="edit" size={14} />
+                {it.product ? productLabel(it.product) : foodName(it.food)} <Icon name="edit" size={14} />
               </span>
               <span className="muted small block">
                 <SourceTag source={it.product?.source ?? 'BLS'} product={it.product} /> {it.note || it.food.nameDe}
@@ -1737,7 +1739,7 @@ function IngredientsCard({ card, toast, onLogged, register, recipe }: CardProps<
               )}
             </button>
             <NumberInput value={it.grams} onChange={(g) => setItems((all) => all.map((x, j) => (j === i ? { ...x, grams: g } : x)))} suffix="g" min={0} />
-            <button className="icon-btn" aria-label={t('ai.removeItem', { name: it.food.nameEn })} onClick={() => setItems((all) => all.filter((_, j) => j !== i))}>
+            <button className="icon-btn" aria-label={t('ai.removeItem', { name: foodName(it.food) })} onClick={() => setItems((all) => all.filter((_, j) => j !== i))}>
               <Icon name="trash" size={18} />
             </button>
           </li>

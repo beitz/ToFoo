@@ -16,6 +16,7 @@ import { InfoButton } from '../../ui/InfoButton';
 import { omega3Index, omega3IndexLevels } from '../../../model/nutrientFacts';
 import { statusThresholds } from '../../../model/parameters';
 import { contributorHref } from './CameFromCard';
+import { foodName } from '../../i18n/names';
 
 /** Rows of the store card: portions a week of the example food. A choice of examples, not physiology. */
 const PER_WEEK = [1, 3, 7];
@@ -68,7 +69,7 @@ function StoreFilling({ r }: { r: NutrientResult }) {
         <p className="small muted">
           {t('fill.portionOf')}{' '}
           <a href={href('food', example.food.code)}>
-            {example.food.nameEn}, {fmtGrams(example.grams)}
+            {foodName(example.food)}, {fmtGrams(example.grams)}
           </a>
         </p>
       )}
@@ -188,5 +189,5 @@ function omega3Example(d: AppData, r: NutrientResult): { label: string; href?: s
   const recommended = d.requirements.byNutrient.get(r.id)?.recommended ?? 0;
   const fish = coverExamples(r.id, d.foods.byCode, recommended)[0];
   if (!fish) return undefined;
-  return { label: t('fill.hundredOf', { name: fish.food.nameEn }), href: href('food', fish.food.code), perPortion: fish.days * recommended };
+  return { label: t('fill.hundredOf', { name: foodName(fish.food) }), href: href('food', fish.food.code), perPortion: fish.days * recommended };
 }

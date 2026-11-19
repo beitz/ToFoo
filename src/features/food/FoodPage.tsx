@@ -19,6 +19,7 @@ import { FoodActions } from './FoodActions';
 import { Segmented } from '../../ui/controls';
 import type { FoodSize } from '../../foods/sizes';
 import { chosenSize, rememberedKind, rememberKind, sizeButton, sizeHeading, sizeValue, switchClass, useFoodSizes, type SizeChoice } from './sizes';
+import { foodName, foodAltName, groupName } from '../../i18n/names';
 
 /**
  * A food's nutrient profile per 100 g: a BLS food, or a scanned or USDA product (`OFF:<barcode>`,
@@ -42,7 +43,7 @@ export function FoodPage({ code }: { code: string }) {
     <section>
       <header className="page-head row">
         <BackButton />
-        <h1 className="grow">{food.nameEn}</h1>
+        <h1 className="grow">{foodName(food)}</h1>
       </header>
       {product ? (
         <>
@@ -51,10 +52,10 @@ export function FoodPage({ code }: { code: string }) {
         </>
       ) : (
         <p className="muted">
-          {food.nameDe} · {group?.en} · BLS {food.code}
+          {foodAltName(food)} · {groupName(group)} · BLS {food.code}
         </p>
       )}
-      <FoodActions foodRef={product ? productRef(product) : { source: 'BLS', version: d.foods.version, code: food.code }} name={product ? productLabel(product) : food.nameEn} />
+      <FoodActions foodRef={product ? productRef(product) : { source: 'BLS', version: d.foods.version, code: food.code }} name={product ? productLabel(product) : foodName(food)} />
       <PieceWeightLine code={food.code} product={product} />
       {sizes.length > 0 && (
         <Segmented<SizeChoice>

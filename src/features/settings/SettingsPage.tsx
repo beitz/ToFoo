@@ -8,6 +8,7 @@ import { FEATURE_GROUPS, FEATURES, isOn } from '../../settings/features';
 import { repo } from '../../storage/repo';
 import { Field, NumberInput, Segmented, Toggle } from '../../ui/controls';
 import { AccentPicker } from './AccentPicker';
+import { LanguagePicker } from './LanguagePicker';
 import { AskDays } from './AskDays';
 import { viewsOf } from '../../settings/views';
 import { Icon } from '../../ui/Icon';
@@ -99,7 +100,8 @@ export function SettingsPage() {
       </Fold>
 
       <Fold title={t('settings.appearance')}>
-        <p className="muted small settings-label settings-label-first">{t('settings.theme')}</p>
+        <LanguagePicker first />
+        <p className="muted small settings-label">{t('settings.theme')}</p>
         <Segmented
           label={t('settings.theme')}
           value={s.theme}

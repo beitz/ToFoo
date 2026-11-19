@@ -13,6 +13,7 @@ import { BackButton } from '../../ui/BackButton';
 import { Icon } from '../../ui/Icon';
 import { activitiesText, DaySheet, goalText, HabitActivitySheet, habitStyle, markText, MarkGlyph, quickText, shownMark, useQuickLog, weekdayName } from './HabitParts';
 import { runText, tallyUnit, useHabit } from './HabitsPage';
+import { locale } from '../../lib/locale';
 
 /**
  * #/habits/<id>: one habit's month, every past day answerable or clearable; for a weekly goal its last
@@ -121,7 +122,7 @@ export function HabitPage({ id }: { id: string }) {
                   );
                 const s = habitDay(h, day, data, start);
                 const value = h.kind === 'minutes' && s.minutes ? `${s.minutes}′` : null;
-                const date = parseDay(day).toLocaleDateString('en-GB', { day: 'numeric', month: 'long' });
+                const date = parseDay(day).toLocaleDateString(locale(), { day: 'numeric', month: 'long' });
                 return (
                   <button
                     key={day}
@@ -151,7 +152,7 @@ export function HabitPage({ id }: { id: string }) {
               const w = habitWeek(h, monday, data, start);
               return (
                 <li key={monday} className="row-between tracker-row">
-                  <span>{t('habits.weekOf', { day: parseDay(monday).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) })}</span>
+                  <span>{t('habits.weekOf', { day: parseDay(monday).toLocaleDateString(locale(), { day: 'numeric', month: 'short' }) })}</span>
                   <span className="small">
                     {t(h.kind === 'avoid' ? 'habits.card.max' : 'habits.card.week', { n: w.count, of: w.of, max: w.of })} · {t(`habits.outcome.${w.outcome}`)}
                   </span>

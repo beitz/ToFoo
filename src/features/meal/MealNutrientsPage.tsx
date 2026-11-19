@@ -38,6 +38,7 @@ import { BackButton } from '../../ui/BackButton';
 import { pairingName } from '../food/pairingName';
 import { chosenSize, fmtSize, sizeButton, sizeValue, switchClass, useFoodSizes, type SizeChoice } from '../food/sizes';
 import type { Product } from '../../storage/types';
+import { foodName } from '../../i18n/names';
 
 const MACROS = ['PROT625', 'FAT', 'CHO', 'FIBT'];
 
@@ -514,7 +515,7 @@ function ItemSource({ code, entry }: { code?: string; entry: LogEntry }) {
                 <a href={href('food', product.id)}>{pairingName(product.match, d.foods)}</a>
               ) : (
                 <>
-                  <a href={href('food', match.code)}>{match.nameEn}</a> <span className="muted">(BLS {match.code})</span>
+                  <a href={href('food', match.code)}>{foodName(match)}</a> <span className="muted">(BLS {match.code})</span>
                 </>
               )}
               {product.match?.auto && <span className="muted"> · {t('match.autoShort')}</span>} · <a href={href('food', product.id)}>{t('off.matchChange')}</a>

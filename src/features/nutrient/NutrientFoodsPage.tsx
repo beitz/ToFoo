@@ -10,6 +10,7 @@ import { diverseTop } from '../../foods/variety';
 import { Segmented, Toggle } from '../../ui/controls';
 import { Icon } from '../../ui/Icon';
 import { BackButton } from '../../ui/BackButton';
+import { foodName, groupName } from '../../i18n/names';
 
 const PAGE = 50;
 
@@ -25,7 +26,7 @@ export function NutrientFoodsPage({ id }: { id: string }) {
   const [dishes, setDishes] = useState(false);
   const [shown, setShown] = useState(PAGE);
 
-  const groups = useMemo(() => Object.entries(d.foods.groups).sort((a, b) => a[1].en.localeCompare(b[1].en)), [d.foods.groups]);
+  const groups = useMemo(() => Object.entries(d.foods.groups).sort((a, b) => groupName(a[1]).localeCompare(groupName(b[1]))), [d.foods.groups]);
 
   const ranked = useMemo(() => {
     const excludedGroups = new Set(d.profile.exclusions.groups);
@@ -95,7 +96,7 @@ export function NutrientFoodsPage({ id }: { id: string }) {
         <option value="">{t('foods.allGroups')}</option>
         {groups.map(([code, g]) => (
           <option key={code} value={code}>
-            {g.en}
+            {groupName(g)}
           </option>
         ))}
       </select>
@@ -110,7 +111,7 @@ export function NutrientFoodsPage({ id }: { id: string }) {
           <li key={f.code}>
             <a className="food-rank-row" href={href('food', f.code)}>
               <span className="grow">
-                <span className="food-rank-name">{f.nameEn}</span>
+                <span className="food-rank-name">{foodName(f)}</span>
                 <span className="muted small block">{f.nameDe}</span>
               </span>
               <span className="food-rank-amount">

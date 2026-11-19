@@ -7,13 +7,14 @@ import { PROFILE_DEFAULTS, type OwnTarget, type Requirement } from '../../model/
 import { proteinForTraining } from '../../../model/parameters';
 import { repo } from '../../storage/repo';
 import { Field, NumberInput, Segmented } from '../../ui/controls';
+import { locale } from '../../lib/locale';
 
 const ID = 'PROT625';
 type Mode = 'reference' | OwnTarget['per'];
 
 const perKg = (v: number) => fmtNumber(v, 1);
 /** Research values keep their published precision ("2.0", not "2"). */
-const cited = (v: number) => v.toLocaleString('en-GB', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+const cited = (v: number) => v.toLocaleString(locale(), { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
 /** One sentence: which protein target is in use and where it comes from. */
 export function proteinBasisText(req: Requirement, weightKg: number): string {

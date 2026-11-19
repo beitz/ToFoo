@@ -24,6 +24,7 @@ import { PortionNutrients } from './PortionNutrients';
 import { PlanEditor } from './PlanEditor';
 import { IngredientSheet, draftOf, type IngredientDraft, type SavedIngredient } from './IngredientSheet';
 import { IngredientSwapLine, SwapLine, SwapPreview, usePortionMove } from './SwapPreview';
+import { foodName } from '../../i18n/names';
 
 /** Create or edit a recipe. Route: #/recipes/new or #/recipes/<id>/edit. */
 export function RecipeEditor({ id }: { id?: string }) {
@@ -103,7 +104,7 @@ export function RecipeEditor({ id }: { id?: string }) {
     if (ing.ref.source === 'BLS') {
       const food = d.foods.byCode.get(ing.ref.code);
       return {
-        name: food?.nameEn ?? ing.name,
+        name: foodName(food) ?? ing.name,
         detail: food?.nameDe ?? t('recipes.missingFood'),
       };
     }
@@ -112,7 +113,7 @@ export function RecipeEditor({ id }: { id?: string }) {
     const match = product.match ? d.foods.byCode.get(product.match.code) : undefined;
     return {
       name: productLabel(product),
-      detail: match ? t('recipes.microsFromLine', { name: match.nameEn }) : '',
+      detail: match ? t('recipes.microsFromLine', { name: foodName(match) }) : '',
     };
   }
 

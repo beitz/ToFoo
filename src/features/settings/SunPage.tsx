@@ -15,6 +15,7 @@ import { Icon } from '../../ui/Icon';
 import { SubPage } from './ProfilePage';
 import { SkinSelect } from './SkinSelect';
 import { TimeInput } from '../../ui/DateInputs';
+import { locale } from '../../lib/locale';
 
 const WEEKDAYS = [1, 2, 3, 4, 5, 6, 0];
 const toTime = (h: number) => `${String(Math.floor(h)).padStart(2, '0')}:${String(Math.round((h % 1) * 60)).padStart(2, '0')}`;
@@ -72,7 +73,7 @@ export function SunPage() {
                 aria-pressed={s.weekdays.includes(w)}
                 onClick={() => update(i, { weekdays: s.weekdays.includes(w) ? s.weekdays.filter((x) => x !== w) : [...s.weekdays, w] })}
               >
-                {new Date(2026, 0, 4 + w).toLocaleDateString('en-GB', { weekday: 'short' })}
+                {new Date(2026, 0, 4 + w).toLocaleDateString(locale(), { weekday: 'short' })}
               </button>
             ))}
           </div>
