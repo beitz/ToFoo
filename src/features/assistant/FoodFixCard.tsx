@@ -12,6 +12,7 @@ import { makeUp } from '../food/makeUp';
 import { pairingName } from '../food/pairingName';
 import { ChangeButton, DoneRow } from './CardFrame';
 import { useRegister, type Card, type CardProps, type Undo } from './cards';
+import { foodName } from '../../i18n/names';
 
 /**
  * A fix from the assistant's check of the logged foods (F1, …): a product's new similar BLS food
@@ -27,7 +28,7 @@ export function FoodFixCard({ card, toast, onLogged, register }: CardProps<Extra
   const newName = newMatch ? pairingName(newMatch, d.foods) : t('fix.labelOnly');
   const newFood = newMatch ? (newMatch.parts ? mixedFood(newMatch.parts, d.foods) : d.foods.byCode.get(newMatch.code)) : undefined;
   const entries = (fix.entryIds ?? []).map((id) => d.log.find((e) => e.id === id)).filter((e): e is Extract<LogEntry, { kind: 'food' }> => e?.kind === 'food');
-  const now = product ? (product.match ? pairingName(product.match, d.foods) : product.labelOnly ? t('fix.labelOnly') : t('fix.noFood')) : (d.foods.byCode.get(fix.food.slice(4))?.nameEn ?? fix.name);
+  const now = product ? (product.match ? pairingName(product.match, d.foods) : product.labelOnly ? t('fix.labelOnly') : t('fix.noFood')) : (foodName(d.foods.byCode.get(fix.food.slice(4))) ?? fix.name);
   const valid = product ? true : entries.length > 0 && !!newMatch;
 
   async function save(): Promise<Undo | undefined> {
@@ -51,7 +52,7 @@ export function FoodFixCard({ card, toast, onLogged, register }: CardProps<Extra
       }
       const food = d.foods.byCode.get(fix.code!)!;
       const key = `BLS:${food.code}`;
-      for (const e of entries) await repo.updateLog({ ...e, ref: { source: 'BLS', version: d.foods.version, code: food.code }, label: food.nameEn });
+      for (const e of entries) await repo.updateLog({ ...e, ref: { source: 'BLS', version: d.foods.version, code: food.code }, label: foodName(food) });
       // The old food's "Not right" is done with too; a "Looks right" it had stays.
       const { doubted: _d, ...old } = before[fix.food] ?? {};
       await repo.setFoodMarks({ [key]: { checked: 'BLS' }, [fix.food]: old });

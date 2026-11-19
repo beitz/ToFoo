@@ -41,9 +41,10 @@ import { InsightsTabs } from '../review/InsightsTabs';
 import { waterTarget } from '../../logic/water';
 import { AskChips } from '../../ui/AskChips';
 import { DAY_ICON } from '../review/dayStatus';
+import { locale } from '../../lib/locale';
 
 /** "Wednesday 21.10.2026". */
-const longDay = (day: string) => `${parseDay(day).toLocaleDateString('en-GB', { weekday: 'long' })} ${formatDate(day)}`;
+const longDay = (day: string) => `${parseDay(day).toLocaleDateString(locale(), { weekday: 'long' })} ${formatDate(day)}`;
 
 type StatusChoice = 'auto' | 'logged' | 'partial' | 'fasted' | 'filled' | 'excluded';
 

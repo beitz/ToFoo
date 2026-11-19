@@ -14,7 +14,7 @@ import { rankFoods } from '../model/ranking';
 import type { ResolvedRequirements } from '../model/requirements';
 import type { NutrientResult } from '../model/simulate';
 import { addDays } from '../lib/dates';
-import { fmtNumber } from '../lib/format';
+import { fmtNumberEn as fmtNumber } from '../lib/format';
 import type { Batch, Ingredient, LogEntry, Profile, Recipe } from '../storage/types';
 import { batchParts, type ResolveContext } from './resolve';
 import { totalLeft } from './stock';

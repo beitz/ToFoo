@@ -9,6 +9,7 @@ import { normalize, type SearchItem } from '../foods/search';
 import { refKey } from '../lib/refs';
 import { HOME_PLACES, type Batch, type FoodRef, type HomePlace, type LogEntry, type PantryItem, type Product, type ShopSection, type ShoppingItem } from '../storage/types';
 import { commonSection, fmtShopGrams, isOpen, namedFoods, parseAmount, parseEntry, sameThing } from './shopping';
+import { locale } from '../lib/locale';
 
 /** What is added: something bought, before it is on the list. */
 export interface NewPantryItem {
@@ -138,7 +139,7 @@ export function leftOf(item: PantryItem, usage: Usage): Left {
 
 /** Grams left as shown: small amounts to a tenth of a gram ("8.5 g"), else like the shopping list ("350 g", "1.2 kg"). */
 export function fmtLeftGrams(g: number): string {
-  if (g < 100) return `${(Math.round(g * 10) / 10).toLocaleString('en-GB')} g`;
+  if (g < 100) return `${(Math.round(g * 10) / 10).toLocaleString(locale())} g`;
   return fmtShopGrams(g);
 }
 

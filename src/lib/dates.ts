@@ -1,3 +1,4 @@
+import { dayWord, locale } from './locale';
 /** Local calendar helpers. Day keys are local dates as YYYY-MM-DD. */
 
 export function dayKey(d: Date): string {
@@ -47,7 +48,7 @@ const toDate = (d: Date | string) => (typeof d === 'string' ? parseDay(d) : d);
 
 /** "Wed" */
 export function weekdayShort(d: Date | string): string {
-  return toDate(d).toLocaleDateString('en-GB', { weekday: 'short' });
+  return toDate(d).toLocaleDateString(locale(), { weekday: 'short' });
 }
 
 /** "22.10.2026", or "22.10." without the year. */
@@ -58,8 +59,8 @@ export function formatDate(d: Date | string, withYear = true): string {
 
 /** "Today", "Yesterday", "Wed 22.10." (with the year when it is not this year's). */
 export function formatDay(key: string, today = todayKey()): string {
-  if (key === today) return 'Today';
-  if (key === addDays(today, -1)) return 'Yesterday';
+  if (key === today) return dayWord('today');
+  if (key === addDays(today, -1)) return dayWord('yesterday');
   return `${weekdayShort(key)} ${formatDate(key, key.slice(0, 4) !== today.slice(0, 4))}`;
 }
 

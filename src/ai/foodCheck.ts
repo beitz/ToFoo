@@ -14,7 +14,7 @@ import type { FoodDb } from '../foods/foodDb';
 import { ingredientMix } from '../foods/productMatch';
 import { productLabel } from '../foods/products';
 import { addDays } from '../lib/dates';
-import { fmtNumber } from '../lib/format';
+import { fmtNumberEn as fmtNumber } from '../lib/format';
 import { refKey } from '../lib/refs';
 import { foodCheck, type CheckRow, type FoodMarks, type HomeRef } from '../logic/foodCheck';
 import type { Batch, HomePlace, LogEntry, MixPart, Product } from '../storage/types';

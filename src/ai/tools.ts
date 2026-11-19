@@ -17,7 +17,7 @@ import { sizesNote } from '../foods/portions';
 import { hasOwnMicros, isProductCode, productFood, productId, productLabel, productRef } from '../foods/products';
 import { normalize, search, type SearchIndex } from '../foods/search';
 import { parseLocalDateTime } from './photoTime';
-import { fmtNumber } from '../lib/format';
+import { fmtNumberEn as fmtNumber } from '../lib/format';
 import { refKey } from '../lib/refs';
 import { MAX_SLEEP_MS } from '../logic/sleep';
 import { MAX_ACTIVITY_MINUTES } from '../logic/activity';

@@ -22,6 +22,7 @@ import type { StartingLevelChoice } from '../../model/simulate';
 import { Field, NumberInput, Sheet, Toggle } from '../../ui/controls';
 import { Icon } from '../../ui/Icon';
 import { SubPage } from './ProfilePage';
+import { foodName, groupName, groupAltName } from '../../i18n/names';
 
 // ── Starting levels ──
 
@@ -98,8 +99,8 @@ export function ExclusionsPage() {
             key={letter}
             checked={ex.groups.includes(letter)}
             onChange={(v) => save({ groups: v ? [...ex.groups, letter] : ex.groups.filter((x) => x !== letter) })}
-            label={g.en}
-            description={g.de}
+            label={groupName(g)}
+            description={groupAltName(g)}
           />
         ))}
       </div>
@@ -108,7 +109,7 @@ export function ExclusionsPage() {
         {ex.foods.length === 0 && <li className="muted">{t('exclusions.none')}</li>}
         {ex.foods.map((code) => (
           <li key={code} className="row-between">
-            <span>{d.foods.byCode.get(code)?.nameEn ?? code}</span>
+            <span>{foodName(d.foods.byCode.get(code)) ?? code}</span>
             <button className="icon-btn" aria-label={t('common.delete')} onClick={() => save({ foods: ex.foods.filter((x) => x !== code) })}>
               <Icon name="close" size={16} />
             </button>
@@ -129,7 +130,7 @@ export function ExclusionsPage() {
                 setQuery('');
               }}
             >
-              <span className="result-name">{r.nameEn}</span>
+              <span className="result-name">{foodName(r)}</span>
               <span className="muted small">{r.nameDe}</span>
             </button>
           </li>

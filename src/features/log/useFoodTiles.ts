@@ -15,6 +15,7 @@ import type { HomeTile } from './HomeTiles';
 import { oneTapFor } from './oneTapEntry';
 import { productTag } from './ProductList';
 import type { HomePick } from './useHomeTiles';
+import { foodName, foodAltName } from '../../i18n/names';
 
 /** Recent foods shown: two rows of five at 360 px. */
 const RECENT_FOODS = 10;
@@ -67,7 +68,7 @@ export function useFoodTiles({
       if (ref.source === 'BLS') {
         const food = d.foods.byCode.get(ref.code);
         if (!food) return undefined;
-        return { key, name: food.nameEn, detail: food.nameDe, pick: { kind: 'food', food }, icon: iconFor(food.nameEn, food.code) ?? iconFor(food.nameDe), kind: homeKindOf({ food }) };
+        return { key, name: foodName(food), detail: foodAltName(food), pick: { kind: 'food', food }, icon: iconFor(food.nameEn, food.code) ?? iconFor(food.nameDe), kind: homeKindOf({ food }) };
       }
       if (ref.source === 'custom') {
         const food = d.customFoodsById.get(ref.id);

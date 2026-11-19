@@ -19,6 +19,7 @@ import { Sheet } from '../../ui/controls';
 import { Icon } from '../../ui/Icon';
 import { nutrientType } from '../home/grouping';
 import { fmtDuration } from '../../ui/duration';
+import { foodName } from '../../i18n/names';
 
 export const INFO_GROUPS = ['protein', 'fat', 'carbs', 'vitamins', 'minerals'] as const;
 export type InfoGroup = (typeof INFO_GROUPS)[number];
@@ -255,7 +256,7 @@ function FatInfo({ onNavigate }: { onNavigate: () => void }) {
                 <tr key={f.code}>
                   <th scope="row">
                     <a href={href('food', f.code)} onClick={onNavigate}>
-                      {f.nameEn}
+                      {foodName(f)}
                     </a>
                   </th>
                   <td className="num">{pct(p.saturated)}</td>

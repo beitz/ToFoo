@@ -6,6 +6,7 @@
 import { normalize, type SearchItem } from '../foods/search';
 import { refKey } from '../lib/refs';
 import { SHOP_SECTIONS, type FoodRef, type Ingredient, type Recipe, type ShopSection, type ShoppingItem } from '../storage/types';
+import { locale } from '../lib/locale';
 
 /** What is added: an item before it is on the list. */
 export interface NewShoppingItem {
@@ -191,7 +192,7 @@ function toGrams(num: string, unit: string | undefined): number | undefined {
 /** Grams as they read on a list: "350 g", "1.2 kg". */
 export function fmtShopGrams(g: number): string {
   if (g < 1000) return `${Math.round(g)} g`;
-  return `${(Math.round(g / 100) / 10).toLocaleString('en-GB')} kg`;
+  return `${(Math.round(g / 100) / 10).toLocaleString(locale())} kg`;
 }
 
 /** The amount of a line, or '' when none was given: "500 g", "2 l", "500 g + 1 pack". */

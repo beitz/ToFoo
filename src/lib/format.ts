@@ -1,6 +1,13 @@
 import { NUTRIENT_BY_ID } from '../model/nutrients';
+import { locale } from './locale';
 
 export function fmtNumber(v: number, decimals = 0): string {
+  if (!Number.isFinite(v)) return '–';
+  return v.toLocaleString(locale(), { maximumFractionDigits: decimals, minimumFractionDigits: 0 });
+}
+
+/** Always English digits ("1,500.5"), for text sent to the assistant: its instructions and data are in English. */
+export function fmtNumberEn(v: number, decimals = 0): string {
   if (!Number.isFinite(v)) return '–';
   return v.toLocaleString('en-GB', { maximumFractionDigits: decimals, minimumFractionDigits: 0 });
 }

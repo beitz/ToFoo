@@ -3,11 +3,12 @@ import { t, type MessageKey } from '../../i18n';
 import { fmtMeasure } from '../../ai/insights';
 import { CHANCE_HINT, CHANCE_PATTERN, MEASURE_BY_ID, type Condition } from '../../logic/insights';
 import { parseDay } from '../../lib/dates';
+import { locale } from '../../lib/locale';
 
 const OP_TEXT = { '<': '<', '<=': '≤', '>': '>', '>=': '≥' } as const;
 
 const quoted = (words: readonly string[]) => words.map((w) => `“${w}”`).join(t('insights.or'));
-const weekdayName = (n: number) => parseDay(`2026-10-${String(4 + n).padStart(2, '0')}`).toLocaleDateString('en-GB', { weekday: 'long' }); // 4 Oct 2026 is a Sunday
+const weekdayName = (n: number) => parseDay(`2026-10-${String(4 + n).padStart(2, '0')}`).toLocaleDateString(locale(), { weekday: 'long' }); // 4 Oct 2026 is a Sunday
 
 /** When a condition looks, relative to the day counted; empty for the same day. */
 function whenText(offset: number, span: number): string {

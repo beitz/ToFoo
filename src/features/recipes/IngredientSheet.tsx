@@ -13,6 +13,7 @@ import { CommonSizeChips } from '../log/CommonSizes';
 import { FoodPicker, type PickedFood } from '../log/FoodPicker';
 import { PreparationSelect } from '../log/PreparationSelect';
 import { MatchPicker, ProductInfo, saveProductChoice, useMatchChoice } from '../log/ProductParts';
+import { foodName, foodAltName } from '../../i18n/names';
 
 /** An ingredient being added or changed: a BLS food, or a product (Open Food Facts or USDA) as a food. */
 export interface IngredientDraft {
@@ -74,7 +75,7 @@ export function IngredientSheet({
   const [preparation, setPreparation] = useState<Preparation>(initial.preparation);
   const { choice, setChoice, draft: productDraft, reset: resetChoice } = useMatchChoice(product);
   const current = productDraft ? productFood(productDraft, d.foods) : food;
-  const name = productDraft ? productLabel(productDraft) : (current?.nameEn ?? label ?? '');
+  const name = productDraft ? productLabel(productDraft) : (foodName(current) ?? label ?? '');
   // A product with no label values and no matched food would count nothing but a name.
   const hasValues = !productDraft || Object.keys(productDraft.per100).length > 0 || !!choice.food;
   const valid = !!current && !!grams && grams > 0 && hasValues;
@@ -121,7 +122,7 @@ export function IngredientSheet({
       ) : (
         <>
           {productDraft && <ProductInfo product={productDraft} />}
-          {!productDraft && current && <p className="muted small">{current.nameDe}</p>}
+          {!productDraft && current && <p className="muted small">{foodAltName(current)}</p>}
           {!current && (
             <p className="notice small" role="alert">
               <Icon name="alert" size={16} /> {t('recipes.missingFood')}

@@ -17,6 +17,7 @@ import { IngredientSheet } from '../recipes/IngredientSheet';
 import { SourceTag } from '../recipes/SourceTag';
 import { useRegister, type Card, type CardProps, type Undo } from './cards';
 import { ChangeButton, DoneRow } from './CardFrame';
+import { foodName } from '../../i18n/names';
 
 type Item = Omit<ProposedItem, 'grams'> & { grams: number | undefined };
 
@@ -136,9 +137,9 @@ export function RecipeCard({ card, toast, onLogged, register }: CardProps<Extrac
           const tag = !existing ? undefined : !before ? t('ai.recipeItemNew') : before.grams !== it.grams ? t('ai.recipeItemWas', { grams: fmtNumber(before.grams, 1) }) : undefined;
           return (
             <li key={`${itemKey(it)}-${i}`} className="proposal-item">
-              <button className="proposal-name ingredient-name" onClick={() => setEditing(i)} aria-label={t('recipes.changeIngredient', { name: it.product ? productLabel(it.product) : it.food.nameEn })}>
+              <button className="proposal-name ingredient-name" onClick={() => setEditing(i)} aria-label={t('recipes.changeIngredient', { name: it.product ? productLabel(it.product) : foodName(it.food) })}>
                 <span className="link-like">
-                  {it.product ? productLabel(it.product) : it.food.nameEn} <Icon name="edit" size={14} />
+                  {it.product ? productLabel(it.product) : foodName(it.food)} <Icon name="edit" size={14} />
                 </span>
                 <span className="muted small block">
                   <SourceTag source={it.product?.source ?? 'BLS'} product={it.product} /> {it.note || it.food.nameDe}
@@ -147,7 +148,7 @@ export function RecipeCard({ card, toast, onLogged, register }: CardProps<Extrac
                 {tag && <span className="change-tag small">{tag}</span>}
               </button>
               <NumberInput value={it.grams} onChange={(g) => setItems((all) => all.map((x, j) => (j === i ? { ...x, grams: g } : x)))} suffix="g" min={0} />
-              <button className="icon-btn" aria-label={t('ai.removeItem', { name: it.food.nameEn })} onClick={() => setItems((all) => all.filter((_, j) => j !== i))}>
+              <button className="icon-btn" aria-label={t('ai.removeItem', { name: foodName(it.food) })} onClick={() => setItems((all) => all.filter((_, j) => j !== i))}>
                 <Icon name="trash" size={18} />
               </button>
             </li>

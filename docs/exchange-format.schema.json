@@ -366,6 +366,15 @@
                         "dark"
                       ]
                     },
+                    "language": {
+                      "description": "UI language; auto = the phone's; unset = English",
+                      "type": "string",
+                      "enum": [
+                        "auto",
+                        "en",
+                        "de"
+                      ]
+                    },
                     "accent": {
                       "type": "string",
                       "enum": [

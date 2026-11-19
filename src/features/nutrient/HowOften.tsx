@@ -9,6 +9,7 @@ import { howOften } from '../../../model/howOften';
 import { slowWindow, storage } from '../../../model/parameters';
 import { Sheet } from '../../ui/controls';
 import { Icon } from '../../ui/Icon';
+import { foodName } from '../../i18n/names';
 
 /**
  * "How often" chip in the nutrient page's hero (owner's ask, 2026-10-26): the DGE food rule in a few words;
@@ -58,8 +59,8 @@ function HowOftenNotes({ id, recommended }: { id: string; recommended: number })
           <ul className="plain-list often-list">
             {examples.map((e) => (
               <li key={e.food.code}>
-                <a className="often-line" href={href('food', e.food.code)} aria-label={t('often.exampleSpoken', { food: e.food.nameEn, n: Math.round(e.days) })}>
-                  <span className="grow">{e.food.nameEn}</span>
+                <a className="often-line" href={href('food', e.food.code)} aria-label={t('often.exampleSpoken', { food: foodName(e.food), n: Math.round(e.days) })}>
+                  <span className="grow">{foodName(e.food)}</span>
                   <strong>{t('often.example', { n: Math.round(e.days) })}</strong>
                   <Icon name="chevron" size={12} />
                 </a>

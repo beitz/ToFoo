@@ -5,7 +5,7 @@
  */
 import { z } from 'zod';
 import { parseDay } from '../lib/dates';
-import { fmtNumber } from '../lib/format';
+import { fmtNumberEn as fmtNumber } from '../lib/format';
 import {
   compareMeasures,
   conditionProblem,

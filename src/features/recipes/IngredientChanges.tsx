@@ -16,11 +16,12 @@ import { prepLabel } from '../log/PreparationSelect';
 import { IngredientSearch } from './IngredientSearch';
 import { IngredientSheet, type IngredientDraft, type SavedIngredient } from './IngredientSheet';
 import { SourceTag } from './SourceTag';
+import { foodName } from '../../i18n/names';
 
 /** An ingredient's display name: its food's or product's current name, or the name it was saved with. */
 export function ingredientName(ing: Ingredient, d: Pick<AppData, 'foods' | 'productsById'>): string {
   if (ing.isSalt) return t('recipes.salt');
-  if (ing.ref.source === 'BLS') return d.foods.byCode.get(ing.ref.code)?.nameEn ?? ing.name;
+  if (ing.ref.source === 'BLS') return foodName(d.foods.byCode.get(ing.ref.code)) ?? ing.name;
   const product = d.productsById.get(refKey(ing.ref));
   return product ? productLabel(product) : ing.name;
 }

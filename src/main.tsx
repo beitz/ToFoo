@@ -6,7 +6,9 @@ import { watchStaleBuild } from './app/staleBuild';
 import { startUpdates } from './app/update';
 import { registerSW } from 'virtual:pwa-register';
 import './styles.css';
+import { startLanguage } from './app/language';
 
+startLanguage();
 installDiagnostics();
 watchStaleBuild();
 startUpdates(registerSW);

@@ -6,6 +6,7 @@ import { refKey } from '../../lib/refs';
 import { commonSection, sameThing, sectionFromFoods, sectionOfRef, type NewShoppingItem } from '../../logic/shopping';
 import { repo } from '../../storage/repo';
 import type { FoodRef, Ingredient, ShoppingItem, ShopSection } from '../../storage/types';
+import { foodName } from '../../i18n/names';
 
 /** Every shopping list line (cleared ones too, for suggestions); undefined while loading. */
 export function useShopping(): ShoppingItem[] | undefined {
@@ -17,7 +18,7 @@ export function useShopFoods() {
   const d = useData();
   const sectionOf = (ref: FoodRef): ShopSection => sectionOfRef(ref, (r) => d.productsById.get(refKey(r))?.match?.code);
   const nameOf = (ing: Ingredient): string => {
-    if (ing.ref.source === 'BLS') return d.foods.byCode.get(ing.ref.code)?.nameEn ?? ing.name;
+    if (ing.ref.source === 'BLS') return foodName(d.foods.byCode.get(ing.ref.code)) ?? ing.name;
     const product = d.productsById.get(refKey(ing.ref));
     return product ? productLabel(product) : ing.name;
   };

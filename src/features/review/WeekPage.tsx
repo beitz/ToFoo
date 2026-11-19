@@ -33,6 +33,7 @@ import { StatusMark, symbolOf } from '../../ui/Tile';
 import type { DayStatus } from '../../model/types';
 import { InsightsTabs } from './InsightsTabs';
 import { DAY_ICON } from './dayStatus';
+import { locale } from '../../lib/locale';
 
 const DAY_KEY = /^\d{4}-\d{2}-\d{2}$/;
 const RECAP_NAMES = 4;
@@ -244,7 +245,7 @@ function DaysCard({ monday }: { monday: string }) {
                 </span>
               )}
               <span className="week-energy-wd" aria-hidden>
-                {date.toLocaleDateString('en-GB', { weekday: 'narrow' })}
+                {date.toLocaleDateString(locale(), { weekday: 'narrow' })}
               </span>
             </>
           );
@@ -510,7 +511,7 @@ function WeekChart({ weeks, values, max, current, onPick }: { weeks: string[]; v
               <span className="week-chart-label">
                 {parseDay(w).getDate()}
                 <br />
-                {i === 0 || w.slice(5, 7) !== weeks[i - 1]!.slice(5, 7) ? parseDay(w).toLocaleDateString('en-GB', { month: 'short' }) : '\u00a0'}
+                {i === 0 || w.slice(5, 7) !== weeks[i - 1]!.slice(5, 7) ? parseDay(w).toLocaleDateString(locale(), { month: 'short' }) : '\u00a0'}
               </span>
             </button>
           </li>

@@ -37,7 +37,7 @@ ToFoo is an installable progressive web app (PWA), hosted on GitHub Pages from t
 | Offline / install | Service worker + web manifest (e.g. vite-plugin-pwa) | Works offline in the kitchen, home-screen icon |
 | Tests | Vitest | The model math must be unit-tested |
 | Deploy | GitHub Actions → GitHub Pages | Push to main = new version live |
-| UI language | English (translation layer ready for German and others) | Food names: English first, German second (BLS 4.0 has both) |
+| UI language | English or German (see "Languages") | Food names in the UI language first, the other second (BLS 4.0 has both) |
 
 **iPhone and iPad** (checked 2026-10-23, owner's question before sharing with family): the app works in Safari on iOS, with these differences. Every iOS browser is Safari underneath and none offers to install a web app, and data kept in a browser tab can be deleted after 7 days without a visit, while the Home Screen app is exempt but keeps its own storage, apart from the tab's. So in an iPhone or iPad browser tab the welcome sheet says to add ToFoo to the Home Screen first, and Home shows one line ("Add ToFoo to your Home Screen to keep your data") that opens the steps and, for data already logged in the tab, the way over (backup file, then restore in the app); it has no dismiss and disappears in the installed app (`src/lib/platform.ts`, `src/features/home/InstallHint.tsx`). Safari has no built-in barcode reader, so the app bundles ZXing as WebAssembly (`zxing-wasm`, about 1 MB, fetched from ToFoo's own site the first time a barcode is looked for and then cached; never from a CDN). Voice records as audio/mp4 where WebM is not offered. Not available on iOS: the app icon's shortcuts; keeping the screen on in the shop needs a recent iOS. Not tested on a real iPhone yet.
 
@@ -861,6 +861,15 @@ A light layer of rewards makes regular use feel good, rewarding logging, cooking
 **Satisfying feedback** beyond achievements (later, small): store cards animate their fill after a log, respecting reduced motion.
 
 **Weekly recap**: which gaps closed, which store improved most. Built on its own as the weekly look-back (see "Reviewing the past").
+
+## Languages
+
+Built 2026-11-19 (owner's ask: sharing the app with a German-speaking colleague). The app speaks **English or German**. Settings → Appearance → Language (also first on the first-launch look picker): **Automatic** (the phone's first language: German for any German locale, English for everything else), English or Deutsch. New installs start on Automatic; installs from before the setting stay English until changed. A change redraws every screen at once.
+
+- **What changes**: every UI string (`src/i18n/en.ts` and its German twin `de.ts`, informal "du", nutrient words as the DGE uses them), weekday and month names and numbers (decimal comma: "82,4 kg"; dates stay 19.11.2026 in both), nutrient, nutrient group and feature names (`src/i18n/names.de.ts`), and BLS food and group names: German first with the English name small under it (the BLS has both; search finds either). Diary entries keep the name they were logged with.
+- **Stays English**: the names of the 1,111 activities from the Compendium of Physical Activities (the assistant searches them in English), and source notes and citations on the "how it's calculated" pages (they cite English papers). Food data, numbers and sources are the same in both languages.
+- **The assistant**: its instructions and the app's notes to it stay in English (one text to keep right, and the same prompt cache); it answers and writes its cards' text (assumptions, names, questions) in the language the user writes in, or in the app's language when unclear. Numbers in its tool results stay English ("1,500.5").
+- **Keeping both in step**: the German file has a key for every English one or the type check fails; a test checks that German strings use the same `{placeholders}`, that every nutrient and feature has its German name, and that no screen fixes dates or numbers to English. A PR that adds or changes a string adds or changes its German line too (CLAUDE.md).
 
 ## Settings and feature toggles
 

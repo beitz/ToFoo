@@ -18,6 +18,7 @@ import { Icon } from '../../ui/Icon';
 import { InfoButton } from '../../ui/InfoButton';
 import { usePantry, usePantryLeft, leftLabel, placeName } from '../pantry/usePantry';
 import { logPortion, nextStorage, totalLeft } from '../home/StockChips';
+import { foodName } from '../../i18n/names';
 
 type Option =
   | {
@@ -142,7 +143,7 @@ export function FillsBest({ id, recommended }: { id: string; recommended: number
         items,
         [
           {
-            name: food.nameEn,
+            name: foodName(food),
             ref: { source: 'BLS', version: d.foods.version, code: food.code },
             section: sectionOfCode(food.code),
           },
@@ -152,7 +153,7 @@ export function FillsBest({ id, recommended }: { id: string; recommended: number
         CURRENT_SCHEMA_VERSION,
       ),
     );
-    toast(t('fills.added', { name: food.nameEn }), () => void repo.undoShopping(u));
+    toast(t('fills.added', { name: foodName(food) }), () => void repo.undoShopping(u));
   }
 
   if (options.length === 0) return null;
@@ -166,7 +167,7 @@ export function FillsBest({ id, recommended }: { id: string; recommended: number
       </div>
       <ul className="plain-list fills-list">
         {options.map((o) => {
-          const name = o.kind === 'batch' ? o.batch.recipe.name : o.kind === 'recipe' ? o.recipe.name : `${o.food.nameEn}, ${Math.round(o.grams)} g`;
+          const name = o.kind === 'batch' ? o.batch.recipe.name : o.kind === 'recipe' ? o.recipe.name : `${foodName(o.food)}, ${Math.round(o.grams)} g`;
           const link = o.kind === 'batch' ? href('recipes', o.batch.recipeId) : o.kind === 'recipe' ? href('recipes', o.recipe.id) : href('food', o.food.code);
           const sub =
             o.kind === 'batch'

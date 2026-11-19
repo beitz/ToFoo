@@ -26,6 +26,8 @@ import { RecentDays } from './RecentDays';
 import { HomeCards } from './HomeCards';
 import { CheckLine } from './CheckLine';
 import { formatDate, parseDay } from '../../lib/dates';
+import { locale } from '../../lib/locale';
+import { foodName } from '../../i18n/names';
 
 /** Energy and the macronutrients: today's rings at the top, not in the 7-day list; fibre too (owner's ask). */
 const MACRO_ROW = ['ENERCC', 'PROT625', 'FAT', 'CHO', 'FIBT'];
@@ -69,7 +71,7 @@ export function HomePage() {
       <header className="page-head row-between home-head">
         <div className="grow home-title">
           <AppVersion />
-          <h1>{`${parseDay(today).toLocaleDateString('en-GB', { weekday: 'long' })} ${formatDate(today, false)}`}</h1>
+          <h1>{`${parseDay(today).toLocaleDateString(locale(), { weekday: 'long' })} ${formatDate(today, false)}`}</h1>
         </div>
         <FastChip />
         <SettingsButton />
@@ -99,7 +101,7 @@ export function HomePage() {
               const food = d.foods.byCode.get(g.key)!;
               return (
                 <a key={g.key} role="listitem" className="food-card" href={href('food', g.key)}>
-                  <strong className="food-card-name">{food.nameEn}</strong>
+                  <strong className="food-card-name">{foodName(food)}</strong>
                   <span className="muted small">{food.nameDe}</span>
                   <span className="food-card-helps small">
                     {g.helps

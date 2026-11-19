@@ -17,6 +17,7 @@ import { ConfidenceField } from './ConfidenceField';
 import { PreparationSelect } from './PreparationSelect';
 import { MatchPicker, ProductInfo, saveProductChoice, useMatchChoice } from './ProductParts';
 import { FoodActions } from '../food/FoodActions';
+import { foodName, foodAltName } from '../../i18n/names';
 
 /** Saved portion sizes are in backups (src/storage/autoBackup.ts `readSnapshot`). */
 export type PortionHelper = PortionSize;
@@ -31,7 +32,7 @@ export function AmountSheet({ day, time: initialTime, onClose, onAdded, ...targe
   const product = target.product;
   const { choice, setChoice, draft } = useMatchChoice(product);
   const food = draft ? productFood(draft, d.foods) : target.food!;
-  const name = draft ? productLabel(draft) : food.nameEn;
+  const name = draft ? productLabel(draft) : foodName(food);
 
   const helpers = useLiveQuery(() => repo.getMeta<PortionHelper[]>(`portions:${food.code}`), [food.code]) ?? [];
   const last = useLiveQuery(() => repo.getMeta<number>(`lastGrams:${food.code}`), [food.code]);
@@ -85,7 +86,7 @@ export function AmountSheet({ day, time: initialTime, onClose, onAdded, ...targe
         </>
       ) : (
         <p className="muted small">
-          {food.nameDe} · <a href={`#/food/${food.code}`}>{t('log.details')}</a>
+          {foodAltName(food)} · <a href={`#/food/${food.code}`}>{t('log.details')}</a>
         </p>
       )}
       <AmountField

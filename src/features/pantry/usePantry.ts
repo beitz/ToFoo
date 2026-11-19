@@ -13,6 +13,7 @@ import { isOn } from '../../settings/features';
 import { repo, type HomeUndo } from '../../storage/repo';
 import { CURRENT_SCHEMA_VERSION, type FoodRef, type HomePlace, type PantryItem, type ShoppingItem } from '../../storage/types';
 import { useShopFoods } from '../shopping/useShopping';
+import { foodName } from '../../i18n/names';
 
 /** Everything at home (used-up things too); undefined while loading. */
 export function usePantry(): PantryItem[] | undefined {
@@ -63,7 +64,7 @@ export function usePantryFoods() {
   };
   /** The current name of a food, for showing which food an item is. */
   const nameOfRef = (ref: FoodRef): string | undefined => {
-    if (ref.source === 'BLS') return d.foods.byCode.get(ref.code)?.nameEn;
+    if (ref.source === 'BLS') return foodName(d.foods.byCode.get(ref.code));
     if (ref.source === 'custom') return d.customFoodsById.get(ref.id)?.name;
     const product = d.productsById.get(refKey(ref));
     return product ? productLabel(product) : undefined;

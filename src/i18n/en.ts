@@ -2641,6 +2641,13 @@ export const en = {
   'settings.themeSystem': 'System',
   'settings.themeLight': 'Light',
   'settings.themeDark': 'Dark',
+  'settings.language': 'Language',
+  'settings.languageAuto': 'Automatic',
+  'settings.languageAutoIs': 'Automatic follows your phone: {lang} now.',
+  'language.en': 'English',
+  'language.de': 'Deutsch',
+  'day.today': 'Today',
+  'day.yesterday': 'Yesterday',
 
   'profile.intro': 'All optional. ToFoo works with defaults and marks values that would get more accurate with your details.',
   'profile.birthYear': 'Birth year',

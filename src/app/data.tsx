@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createContext, Fragment, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { loadFoodDb, groupSearchBoost, type FoodDb } from '../foods/foodDb';
 import { autoMatches, wantsAutoMatch } from '../foods/productMatch';
@@ -8,6 +8,7 @@ import { refKey } from '../lib/refs';
 import { isOn } from '../settings/features';
 import { repo } from '../storage/repo';
 import { startAutoBackups } from './autoBackup';
+import { applyLanguage } from './language';
 import type { ActivityRecord, Batch, BloodPressureReading, CustomFood, KetoneReading, DayStatusRecord, Fast, LogEntry, Product, Profile, Recipe, Settings, SunEntry } from '../storage/types';
 import { resolveRequirements, type ResolvedRequirements } from '../model/requirements';
 import { simulate, type SimulationResult } from '../model/simulate';
@@ -247,7 +248,15 @@ export function DataProvider({ children, fallback }: { children: ReactNode; fall
     return computeAppData({ today, foods, searchIndex, profile, settings, recipes, batches, log, customFoods, dayStatus, fasts, sunEntries, productList, activities, ketones, bloodPressure });
   }, [foods, searchIndex, profile, settings, recipes, batches, log, customFoods, dayStatus, fasts, sunEntries, productList, activities, ketones, bloodPressure, today]);
 
+  // Set before the screens render, since t() reads the language as they do; a change remounts them
+  // (key) so every string, memo included, is drawn again in the new language.
+  const lang = settings ? applyLanguage(settings.language) : undefined;
+
   if (error) return <>{fallback({ error })}</>;
   if (!value) return <>{fallback({})}</>;
-  return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
+  return (
+    <DataContext.Provider value={value}>
+      <Fragment key={lang}>{children}</Fragment>
+    </DataContext.Provider>
+  );
 }

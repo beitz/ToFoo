@@ -16,6 +16,8 @@ export default defineConfig({
     baseURL: 'http://localhost:4173/ToFoo/',
     trace: 'retain-on-failure',
     acceptDownloads: true,
+    // The app follows the phone's language on a new install; the tests read English.
+    locale: 'en-US',
   },
   projects: [{ name: 'phone', use: { browserName: 'chromium' } }],
   webServer: {
