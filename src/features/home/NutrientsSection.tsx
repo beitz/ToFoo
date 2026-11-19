@@ -1,6 +1,6 @@
 import { useData } from '../../app/data';
 import { navigate } from '../../app/router';
-import { t, type MessageKey } from '../../i18n';
+import { lowerWord, t, type MessageKey } from '../../i18n';
 import { fmtAmount, fmtPercent } from '../../lib/format';
 import { trendDisplay } from '../../../model/parameters';
 import { NUTRIENT_BY_ID } from '../../model/nutrients';
@@ -147,7 +147,7 @@ function CometRow({ result: r, showRange, open = (id) => navigate('nutrient', id
   const pct = fmtPercent(now);
   const spoken = noData
     ? t('tile.unknownSpoken', { name: def?.name ?? r.id })
-    : t(r.kind === 'limit' ? 'tile.limitSpoken' : 'tile.needSpoken', { name: def?.name ?? r.id, pct, status: isUnsure(r.statusSpan) ? statusText(status, r.statusSpan).toLowerCase() : t(`statusWord.${status}` as MessageKey) }) +
+    : t(r.kind === 'limit' ? 'tile.limitSpoken' : 'tile.needSpoken', { name: def?.name ?? r.id, pct, status: isUnsure(r.statusSpan) ? lowerWord(statusText(status, r.statusSpan)) : t(`statusWord.${status}` as MessageKey) }) +
       (tr ? `, ${trendLabel(tr)}` : '') +
       (r.ownTarget ? `, ${t('gauge.ownTarget')}` : '') +
       (tag ? `, ${tag.spoken}` : '');

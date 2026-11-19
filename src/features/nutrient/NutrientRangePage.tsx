@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useData } from '../../app/data';
 import { href } from '../../app/router';
-import { t } from '../../i18n';
+import { lowerWord, t } from '../../i18n';
 import { dayRange, formatDate, weekdayShort } from '../../lib/dates';
 import { fmtAmount, fmtPercent } from '../../lib/format';
 import { formatRange } from '../../lib/periods';
@@ -105,7 +105,7 @@ export function NutrientRangePage({ id, from: fromParam, to: toParam, today = fa
             {likely && showRange && <p className="muted small">{t('nutrient.likely', { range: likely })}</p>}
             {r.kind !== 'info' && !open && (
               <p className="status-line">
-                <StatusMark status={noData ? 'unknown' : r.status} size={14} /> {statusLabel(noData ? 'unknown' : r.status).toLowerCase()}
+                <StatusMark status={noData ? 'unknown' : r.status} size={14} /> {lowerWord(statusLabel(noData ? 'unknown' : r.status))}
               </p>
             )}
             <p className="small muted">{today ? t('nrange.soFar') : single ? t('nrange.thatDay') : t('nrange.perDay', { n: counted })}</p>

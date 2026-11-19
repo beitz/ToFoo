@@ -24,7 +24,7 @@ export function RecentDays() {
               <a href={href('diary', day)}>{formatDay(day, d.today)}</a>
               <span className="muted small">
                 {' · '}
-                {meals.length ? t('home.recentMeals', { n: meals.length }) + ` · ${fmtAmount('ENERCC', kcal)}` : day === d.today ? t('home.nothingYet') : t(`day.${d.model.dayStatus[day] ?? 'unknown'}` as never)}
+                {meals.length ? (meals.length === 1 ? t('home.recentMeal') : t('home.recentMeals', { n: meals.length })) + ` · ${fmtAmount('ENERCC', kcal)}` : day === d.today ? t('home.nothingYet') : t(`day.${d.model.dayStatus[day] ?? 'unknown'}` as never)}
               </span>
             </h2>
             {meals.length > 0 && (

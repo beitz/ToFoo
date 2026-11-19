@@ -8,6 +8,7 @@ import { foodAltName, foodName, groupName } from './names';
 import { FEATURES_DE, NUTRIENT_GROUPS_DE, NUTRIENT_NAMES_DE } from './names.de';
 import { NUTRIENTS, NUTRIENT_BY_ID, NUTRIENT_GROUPS } from '../model/nutrients';
 import { FEATURES } from '../settings/features';
+import { MEASURES } from '../logic/insights';
 import { fmtNumber, fmtNumberEn } from '../lib/format';
 import { formatDay, weekdayShort } from '../lib/dates';
 
@@ -62,6 +63,16 @@ describe('language setting', () => {
 });
 
 describe('German strings', () => {
+  it('cover every English key', () => {
+    expect((Object.keys(en) as MessageKey[]).filter((k) => !de[k])).toEqual([]);
+  });
+
+  it('split the ladder signs into as many parts as English', () => {
+    const parts = (s: string) => s.split(' · ').length;
+    const wrong = (Object.keys(en) as MessageKey[]).filter((k) => k.endsWith('.signs') && parts(de[k]) !== parts(en[k]));
+    expect(wrong).toEqual([]);
+  });
+
   it('use the same {placeholders} as English', () => {
     const wrong = (Object.keys(de) as MessageKey[]).filter((k) => placeholders(de[k]!).join() !== placeholders(en[k]).join());
     expect(wrong).toEqual([]);
@@ -71,6 +82,10 @@ describe('German strings', () => {
     expect(NUTRIENTS.filter((n) => !NUTRIENT_NAMES_DE[n.id]).map((n) => n.id)).toEqual([]);
     expect(Object.keys(NUTRIENT_GROUPS).filter((g) => !NUTRIENT_GROUPS_DE[g])).toEqual([]);
     expect(FEATURES.filter((f) => !FEATURES_DE[f.key]).map((f) => f.key)).toEqual([]);
+  });
+
+  it('name every Patterns measure (nutrients go by their own name)', () => {
+    expect(MEASURES.filter((m) => !NUTRIENT_BY_ID.has(m.id) && !(`measure.${m.id}` in en)).map((m) => m.id)).toEqual([]);
   });
 });
 

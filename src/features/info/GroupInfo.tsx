@@ -7,7 +7,7 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useData } from '../../app/data';
 import { href } from '../../app/router';
-import { t, type MessageKey } from '../../i18n';
+import { lowerName, t, type MessageKey } from '../../i18n';
 import { GROUP_INFO_SOURCES } from '../../i18n/groupInfo.en';
 import { fmtPercent } from '../../lib/format';
 import { NUTRIENT_BY_ID, NUTRIENTS } from '../../model/nutrients';
@@ -38,7 +38,7 @@ export function GroupInfoButton({ group }: { group: InfoGroup }) {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <button type="button" className="icon-btn info-btn" aria-label={t('ginfo.open', { group: groupTitle(group).toLowerCase() })} onClick={() => setOpen(true)}>
+      <button type="button" className="icon-btn info-btn" aria-label={t('ginfo.open', { group: lowerName(groupTitle(group)) })} onClick={() => setOpen(true)}>
         <Icon name="info" size={20} />
       </button>
       {open && createPortal(<GroupInfoSheet group={group} onClose={() => setOpen(false)} />, document.body)}
@@ -52,7 +52,7 @@ export function GroupInfoLink({ group }: { group: InfoGroup }) {
   return (
     <>
       <button type="button" className="btn btn-ghost btn-small" onClick={() => setOpen(true)}>
-        <Icon name="info" size={18} /> {t('ginfo.open', { group: groupTitle(group).toLowerCase() })}
+        <Icon name="info" size={18} /> {t('ginfo.open', { group: lowerName(groupTitle(group)) })}
       </button>
       {open && createPortal(<GroupInfoSheet group={group} onClose={() => setOpen(false)} />, document.body)}
     </>

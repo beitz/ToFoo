@@ -6,7 +6,7 @@ import { useToast } from '../../app/toast';
 import { href, navigate, replaceRoute } from '../../app/router';
 import { useBackCloses } from '../../app/history';
 import { SourceTag } from '../recipes/SourceTag';
-import { t, type MessageKey } from '../../i18n';
+import { language, t, type MessageKey } from '../../i18n';
 import { dayKey, formatDateTime, formatDay, formatTime } from '../../lib/dates';
 import { fmtNumber } from '../../lib/format';
 import {
@@ -480,6 +480,7 @@ function Chat({
       ...(habits?.length && JSON.stringify(habits) !== habitsSent.current ? { habits } : {}),
       ...(containers?.length && JSON.stringify(containers) !== containersSent.current ? { containers } : {}),
       ...(share ? { share } : {}),
+      ...(language() === 'de' ? { language: 'German' } : {}),
     });
     const labelled = images_.map((img, i) => ({ ...img, label: photoLabel(photoCount + i + 1, img.time) }));
     const msg = { text: text_, images: labelled, appNote: note };

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { labMarkers } from '../../../model/parameters';
 import { useData } from '../../app/data';
-import { t, type MessageKey } from '../../i18n';
+import { lowerName, t, type MessageKey } from '../../i18n';
 import { formatDay } from '../../lib/dates';
 import { fmtNumber } from '../../lib/format';
 import { newId } from '../../lib/id';
@@ -37,7 +37,7 @@ export function BloodTests({ id, folded = false }: { id: string; folded?: boolea
   const latest = results[0];
   const content = (
     <>
-      <p className="small muted">{t('lab.intro', { name: name.toLowerCase() })}</p>
+      <p className="small muted">{t('lab.intro', { name: lowerName(name) })}</p>
       {results.length > 0 && (
         <ul className="plain-list">
           {results.map((r) => (

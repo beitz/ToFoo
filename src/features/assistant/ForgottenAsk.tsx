@@ -1,6 +1,6 @@
 import { useContext, useState } from 'react';
 import type { Forgotten } from '../../ai/tools';
-import { t, type MessageKey } from '../../i18n';
+import { lowerName, t, type MessageKey } from '../../i18n';
 import { Icon } from '../../ui/Icon';
 import { CardFrame } from './CardFrame';
 
@@ -33,7 +33,7 @@ export function ForgottenAsk({ asks }: { asks: readonly Forgotten[] }) {
             className="ask-chip"
             aria-pressed={picked.has(f)}
             onClick={() => {
-              onAnswer(t(LABEL[f]).toLowerCase());
+              onAnswer(lowerName(t(LABEL[f])));
               setPicked((p) => new Set(p).add(f));
             }}
           >

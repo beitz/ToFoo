@@ -66,5 +66,7 @@ export function fmtTokens(n: number): string {
 
 /** A nutrient name inside a sentence: "Vitamin B12" → "vitamin B12"; abbreviations ("EPA + DHA") stay. */
 export function nameInSentence(name: string): string {
+  // German nouns keep their capital ("Was Eisen macht").
+  if (locale() === 'de-DE') return name;
   return /^[A-Z][A-Z]/.test(name) ? name : name.charAt(0).toLowerCase() + name.slice(1);
 }
