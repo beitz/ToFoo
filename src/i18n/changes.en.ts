@@ -8,6 +8,8 @@
  * scenes and small fixes. A pull request that changes what users see adds its line here in the same PR.
  */
 export const changesEn = {
+  'change.198': 'Water: add your own cups, bottles and teapots once (name, size, and whether it holds water, tea or coffee). The water card then has one button per container, so a full teapot is one tap; the sheet takes half a pot or two bottles. The assistant understands "two pots of tea" with your sizes. Plain tea and coffee without milk or sugar no longer end a fast.',
+  'change.198.major': 'Your own cups and bottles for water',
   'change.197': 'Take photo in the assistant chat opens the camera; the shot lands in the chat with the time it was taken.',
   'change.196': 'Weight: weigh in as often as you like, daily, weekly or now and then; the trend works it out from whatever is there, and the first weigh-ins no longer hold it for weeks. A short tip under the entry says how to weigh so readings compare (ⓘ for why and sources). Your energy estimate, protein per kg and body stores now use the trend instead of the last weigh-in.',
   'change.195': 'Settings → AI assistant: the link to get an OpenAI key for voice input now shows even after a key is saved.',
