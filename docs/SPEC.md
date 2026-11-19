@@ -868,11 +868,7 @@ Built 2026-11-19 (owner's ask: sharing the app with a German-speaking colleague)
 
 - **What changes**: every UI string (`src/i18n/en.ts` and its German twin `de.ts`, informal "du", nutrient words as the DGE uses them), weekday and month names and numbers (decimal comma: "82,4 kg"; dates stay 19.11.2026 in both), nutrient, nutrient group and feature names (`src/i18n/names.de.ts`), and BLS food and group names: German first with the English name small under it (the BLS has both; search finds either). Diary entries keep the name they were logged with.
 - **Stays English**: the names of the 1,111 activities from the Compendium of Physical Activities (the assistant searches them in English), and source notes and citations on the "how it's calculated" pages (they cite English papers). Food data, numbers and sources are the same in both languages.
-<<<<<<< HEAD
 - **The assistant**: its instructions and the app's notes to it stay in English (one text to keep right, and the same prompt cache). In German, the note on each message adds one line: the app is shown in German, so it writes its answer and its cards' text (names, assumptions, reasons, questions) in German unless the user writes in another language. Numbers and measure names in its tool results stay English ("1,500.5"). Patterns' numbers under an answer are shown in the app's language.
-=======
-- **The assistant**: its instructions and the app's notes to it stay in English (one text to keep right, and the same prompt cache); it answers and writes its cards' text (assumptions, names, questions) in the language the user writes in, or in the app's language when unclear. Numbers in its tool results stay English ("1,500.5").
->>>>>>> origin/claude/project-thread-7x24zt
 - **Keeping both in step**: the German file has a key for every English one or the type check fails; a test checks that German strings use the same `{placeholders}`, that every nutrient and feature has its German name, and that no screen fixes dates or numbers to English. A PR that adds or changes a string adds or changes its German line too (CLAUDE.md).
 
 ## Settings and feature toggles
