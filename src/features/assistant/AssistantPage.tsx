@@ -310,6 +310,8 @@ function Chat({
   const [error, setError] = useState<{ key: MessageKey; detail?: string }>();
   const showError = (key: MessageKey) => setError({ key });
   const fileRef = useRef<HTMLInputElement>(null);
+  /** Opens the phone's camera; the shot comes straight back into the chat (owner's ask, 2026-11-19). */
+  const cameraRef = useRef<HTMLInputElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const [create] = useState(() => makeCreate(apiKey));
   /** Saves the chat on the phone as it goes, for exporting it later (Settings → AI assistant → Saved chats). */
@@ -357,7 +359,7 @@ function Chat({
     endRef.current?.scrollIntoView?.({ block: 'end', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
   }, [bubbles.length, busy]);
 
-  async function addPhotos(files: FileList | null) {
+  async function addPhotos(files: FileList | null, justTaken = false) {
     if (!files) return;
     setError(undefined);
     const picked = [...files].slice(0, Math.max(0, MAX_PHOTOS - images.length));
@@ -366,7 +368,7 @@ function Chat({
       // Capture time and barcodes come from the original file, on the phone (scaling drops EXIF);
       // the assistant gets them as text.
       const all = await Promise.all(
-        picked.map(async (f): Promise<ComposerPhoto> => ({ ...(await prepareImage(f)), barcodes: offOn ? await barcodesInPhoto(f) : [], time: await readPhotoTime(f) })),
+        picked.map(async (f): Promise<ComposerPhoto> => ({ ...(await prepareImage(f)), barcodes: offOn ? await barcodesInPhoto(f) : [], time: await readPhotoTime(f, Date.now(), justTaken) })),
       );
       let room = MAX_PHOTO_BYTES - photoBytes - images.reduce((n, i) => n + i.data.length, 0);
       const prepared = all.filter((img) => (room -= img.data.length) >= 0);
@@ -633,7 +635,7 @@ function Chat({
     }
   }, [cards, recipeDone]);
 
-  const timedOut = images.filter((i) => i.time.source !== 'photo').length;
+  const timedOut = images.filter((i) => i.time.source !== 'photo' && i.time.source !== 'camera').length;
   const openCards = [...cards.values()].filter((c) => !c.logged).map(cardId);
 
   // Leaving with cards still open (the back gesture, a link): the chat is saved, so the toast's
@@ -929,9 +931,13 @@ function Chat({
           />
         )}
         <div className="composer-row">
+          <input ref={cameraRef} type="file" accept="image/*" capture="environment" hidden onChange={(e) => void addPhotos(e.target.files, true).then(() => (e.target.value = ''))} />
           <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={(e) => void addPhotos(e.target.files).then(() => (e.target.value = ''))} />
-          <button className="icon-btn composer-btn" aria-label={t('ai.addPhoto')} onClick={() => fileRef.current?.click()} disabled={busy}>
+          <button className="icon-btn composer-btn" aria-label={t('ai.takePhoto')} title={t('ai.takePhoto')} onClick={() => cameraRef.current?.click()} disabled={busy}>
             <Icon name="camera" />
+          </button>
+          <button className="icon-btn composer-btn" aria-label={t('ai.addPhoto')} title={t('ai.addPhoto')} onClick={() => fileRef.current?.click()} disabled={busy}>
+            <Icon name="image" />
           </button>
           {micButton}
           <textarea
@@ -1081,7 +1087,7 @@ function touchKeyboard(): boolean {
 function photoTimeShort(pt: PhotoTime): string {
   if (pt.time === undefined) return '–';
   const s = `${new Date(pt.time).toLocaleDateString('en-GB', { weekday: 'short' })} ${formatTime(pt.time)}`;
-  return pt.source === 'photo' ? s : `≈ ${s}`;
+  return pt.source === 'photo' || pt.source === 'camera' ? s : `≈ ${s}`;
 }
 
 function CardView({ card, ...rest }: CardProps<Card>) {
