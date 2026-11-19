@@ -8,6 +8,8 @@
  * scenes and small fixes. A pull request that changes what users see adds its line here in the same PR.
  */
 export const changesEn = {
+  'change.203': 'ToFoo speaks German: Settings → Appearance → Language (Automatic follows your phone, English or Deutsch). Every screen, the nutrient explanations and the version history, with German food names first and the decimal comma; the assistant answers and writes its cards in German too.',
+  'change.203.major': 'ToFoo in German',
   'change.201': 'With Water on, the round button has Add a drink, right above the assistant: a glass, or one of your own cups and bottles.',
   'change.200': 'Logging: common sizes ready to tap (1 medium apple · 182 g, 1 egg, 1 roll, 1 tbsp oil) for 288 foods, from USDA; tap again for one more, with where the weight comes from.',
   'change.200.major': 'Common sizes when logging',

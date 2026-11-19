@@ -5,6 +5,8 @@ import type { changesEn } from './changes.en';
  * same PR; the type makes a missing one a type error.
  */
 export const changesDe: Record<keyof typeof changesEn, string> = {
+  'change.203': 'ToFoo spricht Deutsch: Einstellungen → Darstellung → Sprache (Automatisch folgt deinem Handy, English oder Deutsch). Jeder Bildschirm, die Nährstoff-Erklärungen und der Versionsverlauf, mit deutschen Lebensmittelnamen zuerst und Dezimalkomma; der Assistent antwortet und schreibt seine Karten auch auf Deutsch.',
+  'change.203.major': 'ToFoo auf Deutsch',
   'change.201': 'Mit Wasser an hat der runde Knopf „Getränk hinzufügen“, direkt über dem Assistenten: ein Glas, oder eine deiner eigenen Tassen und Flaschen.',
   'change.200': 'Eintragen: übliche Größen zum Antippen (1 mittlerer Apfel · 182 g, 1 Ei, 1 Brötchen, 1 EL Öl) für 288 Lebensmittel, von USDA; noch mal tippen für eins mehr, mit Angabe, woher das Gewicht kommt.',
   'change.200.major': 'Übliche Größen beim Eintragen',
