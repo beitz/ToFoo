@@ -89,6 +89,7 @@ export const TOURS: Record<TourId, Tour> = {
     requires: 'aiAssistant',
     steps: [
       { target: 'assistant.input', text: 'tour.assistant.input' },
+      { target: 'assistant.recent', text: 'tour.assistant.recent' },
       { target: 'assistant.data', text: 'tour.assistant.data' },
       { text: 'tour.assistant.cards' },
       { text: 'tour.assistant.numbers' },

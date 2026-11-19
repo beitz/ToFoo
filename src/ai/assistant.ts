@@ -12,6 +12,8 @@ import { INSIGHT_TOOL_NAMES, runInsightTool, type Check } from './insights';
 import type { ShareKind } from '../logic/insights';
 import type { HomePlace } from '../storage/types';
 import { runCheckLoggedFoods, validateFoodFix, validateMarkChecked, type FoodFixProposal, type MarkCheckedProposal } from './foodCheck';
+import { validateChangeProposal, validateDeleteProposal, type ChangeProposal, type DeleteProposal } from './edits';
+import type { RecentState } from './recent';
 import {
   runLookupBarcode,
   runSearchFoods,
@@ -106,10 +108,16 @@ export interface Conversation {
   batches?: number;
   /** Fixes from a check of the logged foods shown so far; the next one gets id F(fixes + 1). */
   fixes?: number;
+  /** Changes to saved entries shown so far; the next one gets id C(changes + 1). */
+  changes?: number;
+  /** Deletes of saved entries shown so far; the next one gets id X(deletes + 1). */
+  deletes?: number;
   /** User messages with photos, each with the cards proposed after it (see retirePhotos). */
   photoTurns?: PhotoTurn[];
   /** The data the user included in this chat (Include my data); fixed once sent, so the chat can be reopened with it. */
   shared?: SharedData;
+  /** The recent days sent with this chat and their refs (Recent days on, ticked); kept so refs mean the same in every message. */
+  recent?: RecentState;
 }
 
 /**
@@ -130,7 +138,7 @@ export interface PhotoTurn {
   cards: string[];
 }
 
-export const emptyConversation = (): Conversation => ({ messages: [], pendingResults: [], cards: 0, notes: 0, sleeps: 0, activities: 0, waters: 0, ketones: 0, weights: 0, pressures: 0, habits: 0, lists: 0, homes: 0, recipes: 0, portions: 0, batches: 0, fixes: 0, photoTurns: [] });
+export const emptyConversation = (): Conversation => ({ messages: [], pendingResults: [], cards: 0, notes: 0, sleeps: 0, activities: 0, waters: 0, ketones: 0, weights: 0, pressures: 0, habits: 0, lists: 0, homes: 0, recipes: 0, portions: 0, batches: 0, fixes: 0, changes: 0, deletes: 0, photoTurns: [] });
 
 const RETIRED_PHOTO = '[photo removed]';
 const RETIRED_NOTE =
@@ -197,6 +205,10 @@ export type ShownBatch = BatchProposal & { id: string };
 export type ShownFoodFix = FoodFixProposal & { id: string };
 /** Foods the check found right, to mark as checked: an F card too (F1, F2, …). */
 export type ShownMarkChecked = MarkCheckedProposal & { id: string };
+/** A change to saved entries as shown: with its card id (C1, C2, …). */
+export type ShownChange = ChangeProposal & { id: string };
+/** Saved entries to delete as shown: with its card id (X1, X2, …). */
+export type ShownDelete = DeleteProposal & { id: string };
 
 /** `checks`: the comparisons the app computed for the answer (pattern tools), shown under it. */
 export type TurnOutcome =
@@ -221,6 +233,8 @@ export type TurnOutcome =
       portions: ShownPortion[];
       batches: ShownBatch[];
       fixes: Array<ShownFoodFix | ShownMarkChecked>;
+      changes: ShownChange[];
+      deletes: ShownDelete[];
       /** Every card id, in the order the assistant proposed them (meals, recipes and trackers mixed). */
       order: string[];
     }
@@ -314,9 +328,11 @@ export async function sendMessage(
   let portions = conversation.portions ?? 0;
   let batches = conversation.batches ?? 0;
   let fixes = conversation.fixes ?? 0;
+  let changes = conversation.changes ?? 0;
+  let deletes = conversation.deletes ?? 0;
   const checks: Check[] = [];
-  const shared = conversation.shared ? { shared: conversation.shared } : {};
-  const done = (outcome: TurnOutcome, pendingResults: Beta.BetaToolResultBlockParam[] = []) => ({ conversation: { messages, pendingResults, cards, notes, sleeps, activities, waters, ketones, weights, pressures, habits, lists, homes, recipes, portions, batches, fixes, photoTurns, ...shared }, outcome });
+  const kept = { ...(conversation.shared ? { shared: conversation.shared } : {}), ...(conversation.recent ? { recent: conversation.recent } : {}) };
+  const done = (outcome: TurnOutcome, pendingResults: Beta.BetaToolResultBlockParam[] = []) => ({ conversation: { messages, pendingResults, cards, notes, sleeps, activities, waters, ketones, weights, pressures, habits, lists, homes, recipes, portions, batches, fixes, changes, deletes, photoTurns, ...kept }, outcome });
 
   for (let step = 0; step < MAX_STEPS; step++) {
     const res = await create(requestParams(model, messages, sources));
@@ -348,6 +364,8 @@ export async function sendMessage(
     const portionsProposed: Array<{ id: string; proposal: PortionProposal }> = [];
     const batchesProposed: Array<{ id: string; proposal: BatchProposal }> = [];
     const fixesProposed: Array<{ id: string; proposal: FoodFixProposal | MarkCheckedProposal }> = [];
+    const changesProposed: Array<{ id: string; proposal: ChangeProposal }> = [];
+    const deletesProposed: Array<{ id: string; proposal: DeleteProposal }> = [];
     let rejected = false;
     for (const use of uses) {
       if (use.name === 'search_foods') {
@@ -489,6 +507,20 @@ export async function sendMessage(
           rejected = true;
           results.push({ type: 'tool_result', tool_use_id: use.id, content: r.error, is_error: true });
         }
+      } else if (use.name === 'propose_change' && ctx.recent) {
+        const r = validateChangeProposal(use.input, ctx.recent, ctx.now);
+        if (r.ok) changesProposed.push({ id: use.id, proposal: r.proposal });
+        else {
+          rejected = true;
+          results.push({ type: 'tool_result', tool_use_id: use.id, content: r.error, is_error: true });
+        }
+      } else if (use.name === 'propose_delete' && ctx.recent) {
+        const r = validateDeleteProposal(use.input, ctx.recent);
+        if (r.ok) deletesProposed.push({ id: use.id, proposal: r.proposal });
+        else {
+          rejected = true;
+          results.push({ type: 'tool_result', tool_use_id: use.id, content: r.error, is_error: true });
+        }
       } else if (INSIGHT_TOOL_NAMES.has(use.name) && ctx.insights) {
         // Reads only the data the user included (already cut to their period and ticked kinds).
         const r = runInsightTool(use.name, use.input, ctx.insights);
@@ -500,7 +532,7 @@ export async function sendMessage(
     }
 
     // Cards are shown all together or not at all, so the user never sees half a batch.
-    const anyProposed = proposals.length + notesProposed.length + sleepsProposed.length + activitiesProposed.length + watersProposed.length + ketonesProposed.length + weightsProposed.length + pressuresProposed.length + habitsProposed.length + listsProposed.length + homesProposed.length + ingredientsProposed.length + recipesProposed.length + portionsProposed.length + batchesProposed.length + fixesProposed.length > 0;
+    const anyProposed = proposals.length + notesProposed.length + sleepsProposed.length + activitiesProposed.length + watersProposed.length + ketonesProposed.length + weightsProposed.length + pressuresProposed.length + habitsProposed.length + listsProposed.length + homesProposed.length + ingredientsProposed.length + recipesProposed.length + portionsProposed.length + batchesProposed.length + fixesProposed.length + changesProposed.length + deletesProposed.length > 0;
     if (anyProposed && !rejected) {
       const shown = proposals.map(({ proposal }): ShownProposal => ({ ...proposal, id: `M${++cards}` }));
       const shownNotes = notesProposed.map(({ proposal }): ShownNote => ({ ...proposal, id: `J${++notes}` }));
@@ -518,6 +550,8 @@ export async function sendMessage(
       const shownPortions = portionsProposed.map(({ proposal }): ShownPortion => ({ ...proposal, id: `P${++portions}` }));
       const shownBatches = batchesProposed.map(({ proposal }): ShownBatch => ({ ...proposal, id: `B${++batches}` }));
       const shownFixes = fixesProposed.map(({ proposal }): ShownFoodFix | ShownMarkChecked => ({ ...proposal, id: `F${++fixes}` }));
+      const shownChanges = changesProposed.map(({ proposal }): ShownChange => ({ ...proposal, id: `C${++changes}` }));
+      const shownDeletes = deletesProposed.map(({ proposal }): ShownDelete => ({ ...proposal, id: `X${++deletes}` }));
       const cardOfUse = new Map<string, string>([
         ...proposals.map(({ id }, i) => [id, shown[i]!.id] as const),
         ...notesProposed.map(({ id }, i) => [id, shownNotes[i]!.id] as const),
@@ -535,6 +569,8 @@ export async function sendMessage(
         ...portionsProposed.map(({ id }, i) => [id, shownPortions[i]!.id] as const),
         ...batchesProposed.map(({ id }, i) => [id, shownBatches[i]!.id] as const),
         ...fixesProposed.map(({ id }, i) => [id, shownFixes[i]!.id] as const),
+        ...changesProposed.map(({ id }, i) => [id, shownChanges[i]!.id] as const),
+        ...deletesProposed.map(({ id }, i) => [id, shownDeletes[i]!.id] as const),
       ]);
       const order = uses.map((u) => cardOfUse.get(u.id)).filter((id): id is string => !!id);
       const fromPhotos = order.filter((id) => !shownRecipes.some((r) => r.id === id && r.kind === 'idea'));
@@ -558,6 +594,8 @@ export async function sendMessage(
         ...portionsProposed.map(({ id }, i) => shownResult(id, shownPortions[i]!.id, 'logged')),
         ...batchesProposed.map(({ id }, i) => shownResult(id, shownBatches[i]!.id, 'saved')),
         ...fixesProposed.map(({ id }, i) => shownResult(id, shownFixes[i]!.id, 'applied')),
+        ...changesProposed.map(({ id }, i) => shownResult(id, shownChanges[i]!.id, 'changed')),
+        ...deletesProposed.map(({ id }, i) => shownResult(id, shownDeletes[i]!.id, 'deleted')),
       ];
       return done(
         {
@@ -580,6 +618,8 @@ export async function sendMessage(
           portions: shownPortions,
           batches: shownBatches,
           fixes: shownFixes,
+          changes: shownChanges,
+          deletes: shownDeletes,
           order,
         },
         [...results, ...shownResults],
@@ -627,6 +667,12 @@ export async function sendMessage(
     for (const { id, proposal } of fixesProposed) {
       results.push({ type: 'tool_result', tool_use_id: id, content: `Not shown: another proposal in this response had errors. Call ${proposal.use === 'looks_right' ? 'propose_mark_checked' : 'propose_food_fix'} again for this card too.`, is_error: true });
     }
+    for (const { id } of changesProposed) {
+      results.push({ type: 'tool_result', tool_use_id: id, content: 'Not shown: another proposal in this response had errors. Call propose_change again for this change too.', is_error: true });
+    }
+    for (const { id } of deletesProposed) {
+      results.push({ type: 'tool_result', tool_use_id: id, content: 'Not shown: another proposal in this response had errors. Call propose_delete again for these entries too.', is_error: true });
+    }
     for (const { id } of batchesProposed) {
       results.push({ type: 'tool_result', tool_use_id: id, content: 'Not shown: another proposal in this response had errors. Call propose_batch again for this batch too.', is_error: true });
     }
@@ -651,6 +697,10 @@ export function cardVerb(card: string, recipe: boolean): string {
       return 'added to the list';
     case 'F':
       return 'applied';
+    case 'C':
+      return 'changed';
+    case 'X':
+      return 'deleted';
     case 'R':
       return recipe ? 'added to the recipe' : 'saved';
     default:

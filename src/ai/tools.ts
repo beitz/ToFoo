@@ -31,6 +31,7 @@ import type { SkinExposure } from '../model/sun';
 import { excludedFoods, type RecipeInfo } from '../logic/recipeIdeas';
 import type { InsightData } from '../logic/insights';
 import type { FoodCheckData } from './foodCheck';
+import type { RecentContext } from './recent';
 import { stockAmount } from '../logic/pantry';
 import { ACTIVITY_KINDS, HOME_PLACES, INTENSITIES, type ActivityKind, type FoodRef, type HabitKind, type HomePlace, type Ingredient, type Intensity, type KetoneType, type Product, type Profile } from '../storage/types';
 
@@ -54,7 +55,7 @@ export const MAX_ITEM_GRAMS = 3000;
 /** The same for one recipe ingredient: a big pot, not a meal (10 kg of potatoes is still a pot). */
 export const MAX_INGREDIENT_GRAMS = 10000;
 /** Sanity limit for pieces of one food in one meal, not a nutritional number (a bag of sweets is still under it). */
-const MAX_PIECES = 200;
+export const MAX_PIECES = 200;
 /** Sanity limit for a recipe's portions (a party pot), not a physiological number. */
 const MAX_PORTIONS = 100;
 /** Longest proposed preparation steps: a long recipe, not a transcript of the whole chat. */
@@ -373,7 +374,7 @@ export interface RecipeProposal {
 const MAX_REASON_CHARS = 300;
 
 /** Longest proposed journal entry: a few paragraphs, not a transcript of the whole chat. */
-const MAX_JOURNAL_CHARS = 4000;
+export const MAX_JOURNAL_CHARS = 4000;
 
 export interface ProposedItem {
   food: Food;
@@ -493,6 +494,11 @@ export interface ToolContext {
   insights?: InsightData;
   /** The main chat: what was logged, read by check_logged_foods only when the user asks for a check. */
   foodCheck?: FoodCheckData;
+  /**
+   * The recent days the user chose to send with this chat (Settings → AI assistant → Recent days):
+   * the refs of the list and the entries behind them now, for change and delete cards.
+   */
+  recent?: RecentContext;
 }
 
 /** The recipe book as the assistant may read it, and the app's numbers for ideas. */
@@ -515,7 +521,7 @@ export interface IdeaTools {
 }
 
 /** Which online sources the assistant is offered (decides the prompt and tool variant). */
-export function sourcesOf(ctx: Pick<ToolContext, 'products' | 'journal' | 'sleep' | 'activity' | 'water' | 'ketones' | 'weight' | 'bloodPressure' | 'habits' | 'shopping' | 'pantry' | 'recipe' | 'recipes' | 'forgotten' | 'insights' | 'foodCheck'>): {
+export function sourcesOf(ctx: Pick<ToolContext, 'products' | 'journal' | 'sleep' | 'activity' | 'water' | 'ketones' | 'weight' | 'bloodPressure' | 'habits' | 'shopping' | 'pantry' | 'recipe' | 'recipes' | 'forgotten' | 'insights' | 'foodCheck' | 'recent'>): {
   off: boolean;
   usda: boolean;
   webSearch: boolean;
@@ -535,10 +541,11 @@ export function sourcesOf(ctx: Pick<ToolContext, 'products' | 'journal' | 'sleep
   forgotten: boolean;
   insights: boolean;
   check: boolean;
+  edits: boolean;
 } {
   const { products } = ctx;
   const online = { off: !!products?.find, usda: !!products?.searchUsda, webSearch: !!products?.find && !!products.webSearch };
-  if (ctx.recipe) return { ...online, journal: false, sleep: false, activity: false, water: false, ketones: false, weight: false, bloodPressure: false, habits: false, shopping: false, pantry: false, recipe: true, recipes: false, ideas: false, forgotten: false, insights: false, check: false };
+  if (ctx.recipe) return { ...online, journal: false, sleep: false, activity: false, water: false, ketones: false, weight: false, bloodPressure: false, habits: false, shopping: false, pantry: false, recipe: true, recipes: false, ideas: false, forgotten: false, insights: false, check: false, edits: false };
   return {
     ...online,
     journal: !!ctx.journal,
@@ -557,6 +564,7 @@ export function sourcesOf(ctx: Pick<ToolContext, 'products' | 'journal' | 'sleep
     forgotten: !!ctx.forgotten,
     insights: !!ctx.insights,
     check: !!ctx.foodCheck,
+    edits: !!ctx.recent,
   };
 }
 
@@ -725,7 +733,7 @@ export async function runSearchUsda(input: unknown, ctx: ToolContext): Promise<{
 }
 
 /** Parse a proposed local time and check it is plausible (not in the future, not years back). */
-function checkTime(text: string | undefined, now: number | undefined): { time?: number; problem?: string } {
+export function checkTime(text: string | undefined, now: number | undefined): { time?: number; problem?: string } {
   const timeText = text?.trim() ?? '';
   if (!timeText) return {};
   const time = parseLocalDateTime(timeText);
@@ -844,7 +852,7 @@ export function validateBloodPressureProposal(input: unknown, now?: number): { o
 }
 
 /** Input check against unit mix-ups (e.g. mg/dL for mmol/L), not physiology: values above these are sent back to the assistant to check. */
-const MAX_KETONE: Record<KetoneType, number> = { blood: 10, breath: 500, urine: 16 };
+export const MAX_KETONE: Record<KetoneType, number> = { blood: 10, breath: 500, urine: 16 };
 
 /** Check a `propose_ketone` call: a value in the method's own unit, at a plausible time. */
 export function validateKetoneProposal(input: unknown, now?: number): { ok: true; proposal: KetoneProposal } | { ok: false; error: string } {
@@ -1326,7 +1334,7 @@ export interface BatchProposal {
 }
 
 /** Sanity limit for portions in one serving, not a physiological number. */
-const MAX_SERVING_PORTIONS = 10;
+export const MAX_SERVING_PORTIONS = 10;
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 /** Check changes against the ingredients they change: known foods, plausible amounts, an ingredient that is there. */

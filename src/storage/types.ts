@@ -115,7 +115,8 @@ export type FeatureKey =
   | 'forgottenCheck'
   | 'weight'
   | 'habits'
-  | 'bloodPressure';
+  | 'bloodPressure'
+  | 'recentDays';
 
 export interface Settings extends Versioned {
   id: 'settings';
@@ -165,6 +166,8 @@ export interface Settings extends Versioned {
   kitchenView?: 'grid' | 'list';
   /** Recipe ideas: diet, likes, kitchen, time, batch size, in the user's words (guidance for the assistant, not a filter). */
   cookingPreferences?: string;
+  /** Recent days (assistant): how many days before today go with a chat, 1–7; unset = 3. */
+  recentDays?: number;
   /** Weight of the empty pot last weighed (g), offered when the next pot is weighed. */
   potGrams?: number;
   /** Empty pots remembered by name ("Big red pot"), so weighing a batch is one number. */

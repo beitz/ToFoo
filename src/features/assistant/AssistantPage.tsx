@@ -90,6 +90,10 @@ import { takeAsk, takeAskData } from '../../app/ask';
 import { openCardIds, reopenChat, type Reopened } from './reopen';
 import { ChangeButton, DoneRow } from './CardFrame';
 import { pairingName } from '../food/pairingName';
+import { DEFAULT_RECENT_DAYS, recentDays, recentUpdate, type RecentContext } from '../../ai/recent';
+import { readRecentRecords } from './editStore';
+import { ChangeCard, DeleteCard } from './EditCards';
+import { RecentTick } from './RecentTick';
 
 export type { RecipeChat } from './cards';
 
@@ -359,6 +363,10 @@ function Chat({
   const pantry = useLiveQuery(() => (kitchenOn ? repo.db.pantry.toArray() : []), [kitchenOn]);
   const pantryLeft = usePantryLeft();
   const kitchenCounts = kitchenOn && pantry ? countByPlace(pantry, pantryLeft) : undefined;
+  // Recent days (opt-in): ticked by default once turned on; after the first message with them, fixed for the chat.
+  const recentOn = !recipe && isOn(d.settings.features, 'recentDays');
+  const [recentTick, setRecentTick] = useState(true);
+  const recentN = conversation.recent?.n ?? d.settings.recentDays ?? DEFAULT_RECENT_DAYS;
 
   useEffect(() => {
     endRef.current?.scrollIntoView?.({ block: 'end', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
@@ -441,6 +449,14 @@ function Chat({
     const places = kitchenOn ? (sharing?.kitchen ?? []) : [];
     const home = (pantry ?? []).filter((i) => places.includes(i.place));
     if (places.length && !shared) notes.push(kitchenNote(places, home.map((i) => kitchenThing(i, pantryLeft(i), d))));
+    // Recent days: the whole list with the first message, then only what changed in those days.
+    let recent: RecentContext | undefined;
+    if (recentOn && (conversation.recent || recentTick)) {
+      const days = recentDays(d.today, recentN, day, conversation.recent?.days);
+      const u = recentUpdate(await readRecentRecords(days, d.settings.features, d.profile), conversation.recent, { n: recentN, days, today: d.today });
+      if (u.note) notes.push(u.note);
+      recent = u.context;
+    }
     const share = notes.length ? notes.join(' ') : undefined;
     // With Patterns on, the food check reads only what is ticked under Include my data.
     const scope: FoodCheckData['scope'] = dataOn
@@ -524,6 +540,7 @@ function Chat({
               ...(atHome ? { pantry: atHome } : {}),
               recipes: recipeTools(),
               ...(insights ? { insights } : {}),
+              ...(recent ? { recent } : {}),
               foodCheck: {
                 today: d.today,
                 log: d.log,
@@ -535,7 +552,7 @@ function Chat({
             }),
       };
       // Photos whose cards are all saved leave the chat, so this and later requests don't pay for them again.
-      const lighter = retirePhotos(sharing ? { ...conversation, shared: sharing } : conversation, (id) => !cardsRef.current.get(id) || !!cardsRef.current.get(id)?.logged);
+      const lighter = retirePhotos({ ...conversation, ...(sharing ? { shared: sharing } : {}), ...(recent ? { recent: recent.state } : {}) }, (id) => !cardsRef.current.get(id) || !!cardsRef.current.get(id)?.logged);
       const r = await sendMessage(create, model, lighter, msg, ctx, onUsage);
       if (habits?.length) habitsSent.current = JSON.stringify(habits);
       if (containers?.length) containersSent.current = JSON.stringify(containers);
@@ -598,6 +615,8 @@ function Chat({
         ...outcome.portions.map((p): Card => ({ kind: 'portion', portion: p, logged: false })),
         ...outcome.batches.map((b): Card => ({ kind: 'batch', batch: b, logged: false })),
         ...outcome.fixes.map((f): Card => (f.use === 'looks_right' ? { kind: 'checked', checked: f, logged: false } : { kind: 'fix', fix: f, logged: false })),
+        ...outcome.changes.map((c): Card => ({ kind: 'change', change: c, logged: false })),
+        ...outcome.deletes.map((x): Card => ({ kind: 'delete', remove: x, logged: false })),
       ];
       // In the order the assistant proposed them, so a day reads in order and related cards sit together.
       const rank = (c: Card) => outcome.order.indexOf(cardId(c));
@@ -807,6 +826,7 @@ function Chat({
                     isOn(d.settings.features, 'atHome') && t('ai.introPantry'),
                     t('ai.introRecipes'),
                     t('ai.introCheck'),
+                    recentOn && t('ai.introEdits'),
                   ]
                     .filter(Boolean)
                     .join(', ')}
@@ -924,6 +944,7 @@ function Chat({
             </button>
           </div>
         )}
+        {recentOn && <RecentTick n={recentN} ticked={recentTick} onTick={setRecentTick} sent={!!conversation.recent} />}
         {dataOn && (
           <DataPanel
             choice={choice}
@@ -1114,6 +1135,8 @@ function CardView({ card, ...rest }: CardProps<Card>) {
   if (card.kind === 'batch') return <BatchCard card={card} {...rest} />;
   if (card.kind === 'fix') return <FoodFixCard card={card} {...rest} />;
   if (card.kind === 'checked') return <MarkCheckedCard card={card} {...rest} />;
+  if (card.kind === 'change') return <ChangeCard card={card} {...rest} />;
+  if (card.kind === 'delete') return <DeleteCard card={card} {...rest} />;
   return <NoteCard card={card} {...rest} />;
 }
 

@@ -33,6 +33,14 @@ const FLOWS: Flow[] = [
     terms: { text: ANTHROPIC_TERMS.text, links: [...ANTHROPIC_TERMS.links] },
   },
   {
+    title: 'sent.recentTitle',
+    feature: ['aiAssistant', 'recentDays'],
+    when: 'sent.recentWhen',
+    what: ['sent.recentWhat'],
+    not: 'sent.recentNot',
+    terms: { text: ANTHROPIC_TERMS.text, links: [...ANTHROPIC_TERMS.links] },
+  },
+  {
     title: 'sent.patternsTitle',
     feature: ['aiAssistant', 'insights'],
     when: 'sent.patternsWhen',
