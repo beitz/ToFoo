@@ -88,6 +88,14 @@ describe('resolve', () => {
     expect(st['2026-10-02']).toBe('partial');
   });
 
+  it('keeps a fast going through plain tea or coffee logged as a food, not through tea with sugar', () => {
+    const fast = { id: 'f', schemaVersion: 1, startDay: '2026-10-01' };
+    const tea = log({ kind: 'food', ref: { source: 'BLS', version: '4.0', code: 'N630000' }, grams: 1000, preparation: 'asListed', day: '2026-10-02' });
+    expect(activeFast([fast], [tea], new Map(), '2026-10-03')).toBe(fast);
+    const sweet = log({ kind: 'food', ref: { source: 'BLS', version: '4.0', code: 'N630600' }, grams: 300, preparation: 'asListed', day: '2026-10-02' });
+    expect(activeFast([fast], [sweet], new Map(), '2026-10-03')).toBeUndefined();
+  });
+
   it('starts the model on the first logged or marked day, not when the profile was set up', () => {
     expect(firstModelDay([log({ kind: 'drink', drink: 'coffee', day: '2026-10-05' }), log({ kind: 'drink', drink: 'coffee', day: '2026-10-03' })], {}, '2026-10-10')).toBe('2026-10-03');
     expect(firstModelDay([log({ kind: 'drink', drink: 'coffee', day: '2026-10-05' })], { '2026-10-01': 'fasted' }, '2026-10-10')).toBe('2026-10-01');
