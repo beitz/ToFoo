@@ -14,6 +14,7 @@ npm run typecheck   # tsc, strict
 npm run build       # data + typecheck + vite build (dist/)
 npm run schema      # regenerate docs/exchange-format.schema.json after changing src/exchange/schema.ts
 npm run compendium  # data/raw Compendium PDF → src/activities/compendium-2024.json (needs pdftotext; only when the PDF changes)
+npm run portions    # data/usda-portions.csv + USDA SR Legacy zip → src/foods/portions-usda.json (common sizes; after `npm run data`, only when the mapping changes)
 ```
 
 CI (`.github/workflows/deploy.yml`) runs data → typecheck → test → build → e2e on every push (any branch); pushes to `main` also deploy to Pages.
@@ -22,7 +23,8 @@ CI (`.github/workflows/deploy.yml`) runs data → typecheck → test → build �
 
 | Path | What |
 | --- | --- |
-| `data/raw/` | BLS 4.0 zip, the UK table CoFID 2021 (selenium only) and the 2024 Adult Compendium PDF, never edited. Formats documented in `data/README.md`. |
+| `data/raw/` | BLS 4.0 zip, the UK table CoFID 2021 (selenium only), USDA FoodData Central SR Legacy (common sizes only) and the 2024 Adult Compendium PDF, never edited. Formats documented in `data/README.md`. |
+| `data/usda-portions.csv` | Which USDA food gives each BLS food its common sizes (hand-made mapping). |
 | `scripts/` | Build-time scripts (BLS conversion, selenium from CoFID). |
 | `model/` | **Data files with sources**: `reference-values.ts` (DGE/EFSA), `parameters.ts` (absorption, capacity, retention, sun). Every number has a citation, a low/central/high range and a confidence note. |
 | `src/model/` | The nutrient model: **pure functions only** (no React, no IndexedDB, no `Date.now()`), fully unit-tested. |

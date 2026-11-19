@@ -13,6 +13,7 @@ import type { FindResult, UsdaFindResult } from '../foods/findProduct';
 import type { OffListing } from '../foods/offIndex';
 import { normalizeBarcode } from '../foods/openFoodFacts';
 import { labelPiece, piecesToGrams } from '../foods/pieces';
+import { sizesNote } from '../foods/portions';
 import { hasOwnMicros, isProductCode, productFood, productId, productLabel, productRef } from '../foods/products';
 import { normalize, search, type SearchIndex } from '../foods/search';
 import { parseLocalDateTime } from './photoTime';
@@ -634,7 +635,7 @@ export function runSearchFoods(input: unknown, ctx: ToolContext): { ok: boolean;
     const home = (key: string) => (ctx.pantry?.has(key) ? ' [at home]' : '');
     const lines = [
       ...products.map((p) => describeProduct(p, ctx.db) + pieceNote(p.id, p, ctx.pieces) + home(p.id)),
-      ...hits.map((f) => describeFood(f, ctx.db) + pieceNote(f.code, undefined, ctx.pieces) + home(`BLS:${f.code}`)),
+      ...hits.map((f) => describeFood(f, ctx.db) + pieceNote(f.code, undefined, ctx.pieces) + sizesNote(f.code) + home(`BLS:${f.code}`)),
     ];
     return `Results for "${q}":\n${lines.length ? lines.join('\n') : 'No matches. Try a shorter or more generic word, in English or German.'}`;
   });

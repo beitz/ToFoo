@@ -170,3 +170,13 @@ The 2024 Adult Compendium of Physical Activities (adults 19–59), as downloaded
 
 One table: major heading, five-digit activity code (the first two digits are the heading), MET value, description. The PDF lists 1,111 activities (the paper counts 1,114). `npm run compendium` (needs `pdftotext` from poppler-utils, so it is not part of `npm run data`) extracts it into `src/activities/compendium-2024.json`, which is committed: `{ source, url, rows: [[code, MET, description], …] }`, values and descriptions exactly as printed. Long descriptions wrap around their row in the PDF (start above, rest below the code); the script joins them. A test checks the row count, unique codes and a few known rows.
 
+
+## `raw/FoodData_Central_sr_legacy_food_csv_2018-04.zip`: common sizes
+
+USDA FoodData Central, SR Legacy (April 2018 release, the last Standard Reference), CSV download from [fdc.nal.usda.gov](https://fdc.nal.usda.gov/download-datasets) on 2026-11-19. Public domain (CC0 1.0).
+
+> U.S. Department of Agriculture, Agricultural Research Service (2019): FoodData Central. fdc.nal.usda.gov
+
+Only three files are read: `food.csv` (`fdc_id`, `description`), `food_portion.csv` (one household measure per row: `fdc_id`, `seq_num`, `amount`, `modifier` such as `medium (3" dia)` or `tbsp`, `gram_weight`; the measure unit column is always 9999 "undetermined" in SR Legacy, so the text is in `modifier`). Gram weights are of the edible part (a medium banana: 118 g, peeled), like BLS values.
+
+BLS 4.0 has no portion or piece weights. `data/usda-portions.csv` (hand-made, not raw) says which USDA food gives each BLS food its sizes: `bls_code, fdc_id, keep, note`, where `keep` is an optional regex on the measure text and `note` an optional i18n key (`portions.note.*`). `npm run portions` (after `npm run data`, which it checks the codes against) writes `src/foods/portions-usda.json`, committed: `{ source, url, licence, usda: { <fdc id[:keep]>: { fdc, name, sizes: [{ label, grams, detail? }] } }, foods: { <BLS code>: { usda, note? } } }`. Kept: pieces, sizes, slices, leaves, wedges and spoons, up to six per food; dropped: cups, ounces, pounds, packs, cans and servings; "1 oz (22 whole kernels)" becomes "22 whole kernels"; inches become centimetres. `--report` prints every match with its sizes for review.

@@ -48,6 +48,28 @@ test('a food is logged in pieces once its piece weight is known, and the diary s
   expect(errors).toEqual([]);
 });
 
+test('a common size from USDA logs an apple in one tap, a second tap adds another', async ({ page }) => {
+  const errors = watchErrors(page);
+  await firstLaunch(page);
+  await page.goto('./#/log');
+  await page.getByPlaceholder('Search foods').fill('apple raw');
+  await page.getByRole('button', { name: /^Apple raw/ }).first().click();
+  await page.getByRole('button', { name: '1 medium · 182 g' }).click();
+  await expect(page.locator('.amount-field input').first()).toHaveValue('182');
+  await page.getByRole('button', { name: '1 medium · 182 g' }).click();
+  await expect(page.getByRole('button', { name: '2 × medium · 364 g' })).toBeVisible();
+  // A usual size is not a weighing.
+  await expect(page.getByRole('radio', { name: 'Estimated' })).toBeChecked();
+  // Where the weights are from, one tap away.
+  await page.getByText('Sizes from USDA: Apples, raw, with skin').click();
+  await expect(page.getByText('7.5 cm across').first()).toBeVisible();
+  await page.getByRole('button', { name: 'Add', exact: true }).click();
+
+  await page.goto('./#/diary');
+  await expect(page.getByText(/364 g/).first()).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
 test('a food logged earlier is pinned and put in the freezer from its diary item', async ({ page }) => {
   const errors = watchErrors(page);
   await firstLaunch(page);

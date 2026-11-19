@@ -7,6 +7,8 @@ import { fmtNumber } from '../../lib/format';
 import { repo } from '../../storage/repo';
 import type { PortionSize, Product } from '../../storage/types';
 import { Field, NumberInput, Segmented } from '../../ui/controls';
+import { commonSizes, onePieceGrams } from '../../foods/portions';
+import { CommonSizeChips } from './CommonSizes';
 
 export interface Amount {
   grams: number | undefined;
@@ -46,6 +48,7 @@ export function PieceWeightLine({ code, product }: { code: string; product?: Pro
     return (
       <div className="card">
         <PieceWeightEditor
+          code={code}
           product={product}
           unit={unit}
           current={piece}
@@ -71,9 +74,29 @@ export function PieceWeightLine({ code, product }: { code: string; product?: Pro
  * How much of a food: grams (ml for drinks) or pieces. Pieces need the weight of one piece: the
  * user's (saved with the food's portion sizes, so it is in backups) or one read from the label;
  * without either, the user types it once, or the pack's weight and count. `children` (chips and
- * the like) show in grams mode only.
+ * the like) show in grams mode only, after the user's own sizes (`first`) and a BLS food's common
+ * sizes from USDA.
  */
-export function AmountField({ code, product, value, onChange, autoFocus, children }: { code: string; product?: Product; value: Amount; onChange: (a: Amount) => void; autoFocus?: boolean; children?: ReactNode }) {
+export function AmountField({
+  code,
+  product,
+  value,
+  onChange,
+  autoFocus,
+  first,
+  onCommonSize,
+  children,
+}: {
+  code: string;
+  product?: Product;
+  value: Amount;
+  onChange: (a: Amount) => void;
+  autoFocus?: boolean;
+  first?: ReactNode;
+  /** A common size was tapped: the amount is a usual size, not weighed. */
+  onCommonSize?: () => void;
+  children?: ReactNode;
+}) {
   const { piece, loaded } = usePieceWeight(code, product);
   const unit = product?.perMl ? 'ml' : 'g';
   const [mode, setMode] = useState<'grams' | 'pieces'>(value.pieces !== undefined ? 'pieces' : 'grams');
@@ -133,6 +156,17 @@ export function AmountField({ code, product, value, onChange, autoFocus, childre
       {mode === 'grams' ? (
         <>
           <NumberInput value={value.grams} onChange={(grams) => onChange({ grams })} placeholder="0" suffix={unit} min={0} autoFocus={autoFocus} />
+          {first}
+          {!product && (
+            <CommonSizeChips
+              code={code}
+              grams={value.grams}
+              onPick={(grams) => {
+                onChange({ grams });
+                onCommonSize?.();
+              }}
+            />
+          )}
           {children}
         </>
       ) : piece && !editing ? (
@@ -154,7 +188,7 @@ export function AmountField({ code, product, value, onChange, autoFocus, childre
           </div>
         </>
       ) : (
-        <PieceWeightEditor product={product} unit={unit} current={piece} onSave={(g) => void savePiece(g)} onCancel={piece ? () => setEditing(false) : undefined} />
+        <PieceWeightEditor code={code} product={product} unit={unit} current={piece} onSave={(g) => void savePiece(g)} onCancel={piece ? () => setEditing(false) : undefined} />
       )}
     </div>
   );
@@ -164,8 +198,10 @@ export function AmountField({ code, product, value, onChange, autoFocus, childre
  * Type the weight of one piece, or the pack's weight and how many pieces it holds (the app
  * divides). Starts from what the pack text says ("60 pieces", "42 g").
  */
-function PieceWeightEditor({ product, unit, current, onSave, onCancel }: { product?: Product; unit: string; current?: PieceWeight; onSave: (g: number | undefined) => void; onCancel?: () => void }) {
+function PieceWeightEditor({ code, product, unit, current, onSave, onCancel }: { code: string; product?: Product; unit: string; current?: PieceWeight; onSave: (g: number | undefined) => void; onCancel?: () => void }) {
   const hints = packHints(product);
+  // A BLS food's common sizes (USDA) offer a piece weight in one tap; products have their label.
+  const sizes = product ? undefined : commonSizes(code);
   const [packGrams, setPackGrams] = useState<number | undefined>(hints.grams);
   const [count, setCount] = useState<number | undefined>(hints.count);
   const fromPack = packGrams && count ? Math.round((packGrams / count) * 100) / 100 : undefined;
@@ -183,6 +219,21 @@ function PieceWeightEditor({ product, unit, current, onSave, onCancel }: { produ
     <div className="piece-editor">
       <p className="small">{t(current ? 'piece.editTitle' : product ? 'piece.unknownProduct' : 'piece.unknown')}</p>
       <Field label={t('piece.onePiece')}>{(id) => <NumberInput id={id} value={own} onChange={setOwn} placeholder="0" suffix={unit} min={0} autoFocus />}</Field>
+      {sizes && (
+        <>
+          <p className="muted small">{t('piece.fromSizes', { name: sizes.usdaName })}</p>
+          <div className="chips">
+            {sizes.sizes.map((s) => {
+              const g = onePieceGrams(s);
+              return (
+                <button key={s.label} type="button" className={`chip${own === g ? ' on' : ''}`} aria-pressed={own === g} onClick={() => setOwn(g)}>
+                  {s.label} · {fmtG(g, unit)}
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
       <p className="muted small">{t('piece.orFromPack')}</p>
       <div className="grid-2">
         <Field label={t('piece.packWeight')}>{(id) => <NumberInput id={id} value={packGrams} onChange={(g) => setPack(g, count)} placeholder="0" suffix={unit} min={0} />}</Field>

@@ -9,6 +9,7 @@ import { refKey } from '../../lib/refs';
 import { Field, NumberInput, Sheet } from '../../ui/controls';
 import { Icon } from '../../ui/Icon';
 import { BarcodeSheet } from '../log/BarcodeSheet';
+import { CommonSizeChips } from '../log/CommonSizes';
 import { FoodPicker, type PickedFood } from '../log/FoodPicker';
 import { PreparationSelect } from '../log/PreparationSelect';
 import { MatchPicker, ProductInfo, saveProductChoice, useMatchChoice } from '../log/ProductParts';
@@ -133,6 +134,7 @@ export function IngredientSheet({
           <Field label={gramsLabel ?? t('recipes.gramsInRecipe')}>
             {(id) => <NumberInput id={id} value={grams} onChange={setGrams} placeholder="0" suffix={productDraft?.perMl ? 'ml' : 'g'} min={0} autoFocus={!grams} />}
           </Field>
+          {current && !productDraft && <CommonSizeChips code={current.code} grams={grams} onPick={setGrams} />}
           {productDraft && <MatchPicker key={productDraft.id} product={productDraft} choice={choice} onChange={setChoice} />}
           <PreparationSelect id="ingredient-prep" value={preparation} onChange={setPreparation} />
           {preview?.(item)}

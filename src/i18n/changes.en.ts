@@ -8,6 +8,8 @@
  * scenes and small fixes. A pull request that changes what users see adds its line here in the same PR.
  */
 export const changesEn = {
+  'change.200': 'Logging: common sizes ready to tap (1 medium apple · 182 g, 1 egg, 1 roll, 1 tbsp oil) for 288 foods, from USDA; tap again for one more, with where the weight comes from.',
+  'change.200.major': 'Common sizes when logging',
   'change.199': 'Assistant: turn on Recent days (Settings → AI assistant) and a tick box in the chat sends what you logged today and the days before (1 to 7), so it skips what is already logged and knows your usual meals. It can also offer to change or delete a saved entry; nothing changes until you tap the card, and Undo puts it back.',
   'change.199.major': 'Assistant sees your recent days and can fix saved entries',
   'change.198': 'Water: add your own cups, bottles and teapots once (name, size, and whether it holds water, tea or coffee). The water card then has one button per container, so a full teapot is one tap; the sheet takes half a pot or two bottles. The assistant understands "two pots of tea" with your sizes. Plain tea and coffee without milk or sugar no longer end a fast.',
