@@ -6,6 +6,7 @@ import { NUTRIENT_BY_ID } from '../../model/nutrients';
 import { fmtNumber } from '../../lib/format';
 import { parseDay } from '../../lib/dates';
 import { locale } from '../../lib/locale';
+<<<<<<< HEAD
 
 /** A measure's value in the UI language (the assistant gets the English form from ai/insights). */
 export const fmtMeasure = (id: string, v: number) => fmtMeasureEn(id, v, fmtNumber);
@@ -19,6 +20,8 @@ export function measureName(id: string): string {
   const name = t(key);
   return name === key ? (MEASURE_BY_ID.get(id)?.name ?? id) : name;
 }
+=======
+>>>>>>> origin/claude/project-thread-7x24zt
 
 const OP_TEXT = { '<': '<', '<=': '≤', '>': '>', '>=': '≥' } as const;
 
