@@ -5,6 +5,8 @@ import type { changesEn } from './changes.en';
  * same PR; the type makes a missing one a type error.
  */
 export const changesDe: Record<keyof typeof changesEn, string> = {
+  'change.205': 'Wasser: Eine Teekanne oder Flasche kannst du eintragen, wenn sie leer ist. Ein Tipp sagt, dass sie leer ist, und ihre Menge wird gleichmäßig auf die Tage seit dem Füllen verteilt, sodass jeder Tag seinen Anteil bekommt. Der Assistent versteht auch „die Teekanne ist leer“.',
+  'change.205.major': 'Teekanne eintragen, wenn sie leer ist',
   'change.203': 'ToFoo spricht Deutsch: Einstellungen → Darstellung → Sprache (Automatisch folgt deinem Handy, English oder Deutsch). Jeder Bildschirm, die Nährstoff-Erklärungen und der Versionsverlauf, mit deutschen Lebensmittelnamen zuerst und Dezimalkomma; der Assistent antwortet und schreibt seine Karten auch auf Deutsch.',
   'change.203.major': 'ToFoo auf Deutsch',
   'change.201': 'Mit Wasser an hat der runde Knopf „Getränk hinzufügen“, direkt über dem Assistenten: ein Glas, oder eine deiner eigenen Tassen und Flaschen.',

@@ -8,6 +8,8 @@
  * scenes and small fixes. A pull request that changes what users see adds its line here in the same PR.
  */
 export const changesEn = {
+  'change.205': 'Water: a teapot or bottle can be logged when it is empty. One tap says it is finished, and its amount is spread evenly over the days since it was filled, so each day gets its share. The assistant understands "the teapot is empty" too.',
+  'change.205.major': 'Log a teapot when it is empty',
   'change.203': 'ToFoo speaks German: Settings → Appearance → Language (Automatic follows your phone, English or Deutsch). Every screen, the nutrient explanations and the version history, with German food names first and the decimal comma; the assistant answers and writes its cards in German too.',
   'change.203.major': 'ToFoo in German',
   'change.201': 'With Water on, the round button has Add a drink, right above the assistant: a glass, or one of your own cups and bottles.',
