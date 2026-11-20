@@ -5,6 +5,7 @@ import type { changesEn } from './changes.en';
  * same PR; the type makes a missing one a type error.
  */
 export const changesDe: Record<keyof typeof changesEn, string> = {
+  'change.208': 'Wasser: Deine Tassen und Flaschen stehen auf Start nebeneinander in der Wasserkarte, jede mit ihrer Größe, und ein kleines Symbol zeigt, wie sie zählt: + für eine, die du jedes Mal einträgst, eine Sanduhr für eine, die du einträgst, wenn sie leer ist.',
   'change.207': 'Wasser: Eine Flasche kann sagen, welches Wasser darin ist, per Name oder Strichcode gesucht oder vom Etikett eingetippt, und jede Füllung zählt dann sein Calcium, Magnesium und die anderen Mineralstoffe. Leitungswasser bleibt reines Wasser.',
   'change.207.major': 'Mineralwasser zählt seine Mineralstoffe',
   'change.205': 'Wasser: Eine Teekanne oder Flasche kannst du eintragen, wenn sie leer ist. Ein Tipp sagt, dass sie leer ist, und ihre Menge wird gleichmäßig auf die Tage seit dem Füllen verteilt, sodass jeder Tag seinen Anteil bekommt. Der Assistent versteht auch „die Teekanne ist leer“.',
