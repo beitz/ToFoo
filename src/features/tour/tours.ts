@@ -105,6 +105,7 @@ export const TOURS: Record<TourId, Tour> = {
       { target: 'nutrient.filling', text: 'tour.nutrient.filling' },
       { target: 'nutrient.sources', text: 'tour.nutrient.sources' },
       { target: 'nutrient.fills', text: 'tour.nutrient.fills' },
+      { target: 'nutrient.protein', text: 'tour.nutrient.protein' },
       { target: 'nutrient.why', text: 'tour.nutrient.why' },
     ],
   },

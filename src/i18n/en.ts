@@ -7,6 +7,7 @@ import { ladderEn } from './ladder.en';
 import { doesEn } from './does.en';
 import { howOftenEn } from './howOften.en';
 import { changesEn } from './changes.en';
+import { proteinEn } from './protein.en';
 
 export const en = {
   ...nutrientInfoEn,
@@ -17,6 +18,7 @@ export const en = {
   ...groupInfoEn,
   ...homeInfoEn,
   ...changesEn,
+  ...proteinEn,
   'app.name': 'ToFoo',
   'app.loadError': 'ToFoo could not start.',
   'diag.title': 'Diagnostics',
@@ -2995,6 +2997,7 @@ export const en = {
   'tour.nutrient.filling': 'How long it takes to fill up again, and what helps.',
   'tour.nutrient.sources': 'Where it came from: which foods and meals gave you the most.',
   'tour.nutrient.fills': 'Foods that fill it best, ones you ate before first.',
+  'tour.nutrient.protein': 'What protein is built from, and how good each kind is.',
   'tour.nutrient.why': 'The science behind it, with sources, when you want it.',
 
   // About
