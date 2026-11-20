@@ -2827,6 +2827,35 @@ body:has(.fab-stack) .toast-area {
   padding: 10px 12px;
 }
 /* Own containers: a row of one-tap buttons under the bar (a full teapot, a full bottle). */
+/* Calcium and magnesium from a known water, each a link to its nutrient page (44 px tall to tap). */
+.water-minerals {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 8px;
+  margin: 0;
+}
+.water-minerals a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+.water-kind {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 8px;
+}
+.water-kind svg {
+  flex: none;
+  color: var(--accent);
+}
+.water-kind-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
 .water-containers {
   flex-basis: 100%;
   display: flex;

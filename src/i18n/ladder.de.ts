@@ -255,7 +255,7 @@ export const ladderDe: Record<keyof typeof ladderEn, string> = {
   'ladder.MG.none.how': 'Die Nieren halten Magnesium bei niedriger Zufuhr zurück, daher braucht es viel, bis es knapp wird.',
   'ladder.MG.none.signs': 'Krämpfe, Zittern · Stimmungsschwankungen · Übelkeit',
   'ladder.MG.none.who': 'Langer Durchfall, Diabetes, manche Entwässerungsmittel, viel Alkohol, höheres Alter.',
-  'ladder.MG.over': 'Nur aus Ergänzungsmitteln: Durchfall. Magnesium aus dem Essen schadet nicht.',
+  'ladder.MG.over': 'Nur aus Ergänzungsmitteln oder Mineralwasser: Durchfall. Magnesium aus dem Essen schadet nicht.',
   'ladder.MG.over.signs': 'Durchfall',
   'ladder.MG.over.who': 'Bei Nierenerkrankung können Ergänzungsmittel eine echte Vergiftung verursachen.',
 

@@ -151,6 +151,7 @@ export interface SimulationResult {
 export interface DailyTotals {
   absorbed: Record<Scenario, Record<string, number>>;
   intake: Record<string, number>;
+  /** Raw intake from supplements and plain water's minerals, for upper limits that cover only those (magnesium). */
   supplementIntake: Record<string, number>;
   /** Nutrients some eaten food had no data for. */
   missing: ReadonlySet<string>;
@@ -164,7 +165,7 @@ export interface MealSummary {
   intake: Record<string, number>;
   /** Central absorbed. */
   absorbed: Record<string, number>;
-  /** Only a day's share of drinks spread over several days (ModelEntry.spread): counts, but is no meal at a time. */
+  /** Only drinks with no meal time of their own (ModelEntry.spread, ModelEntry.water): counts, but is no meal at a time. */
   spread?: boolean;
 }
 
@@ -236,7 +237,7 @@ function drinkWeights(start: number, drinks: ReadonlyArray<{ time: number; tea: 
 
 /** Effective day status: explicit, else "logged" if the day has entries, else unknown. Today without anything is "pending". */
 export function effectiveDayStatus(days: readonly string[], explicit: Readonly<Record<string, DayStatus>>, entries: readonly ModelEntry[]): Record<string, DayStatus | 'pending'> {
-  const withEntries = new Set(entries.filter((e) => !e.spread).map((e) => e.dayKey));
+  const withEntries = new Set(entries.filter((e) => !e.spread && !e.water).map((e) => e.dayKey));
   const today = days[days.length - 1];
   const out: Record<string, DayStatus | 'pending'> = {};
   for (const d of days) {
@@ -334,7 +335,9 @@ export function simulate(input: SimulationInput): SimulationResult {
   const drinkMeals: ModelEntry[][] = [];
   for (const e of inRange) {
     const kind = drinkKind(e);
-    if (kind) {
+    // Plain water's minerals: a meal of their own (sipped over hours, no meal time to act on).
+    if (e.water) drinkMeals.push([e]);
+    else if (kind) {
       if (!e.spread) drinks.push({ time: e.time, ...kind });
       drinkMeals.push([e]);
     } else foodEntries.push(e);
@@ -366,7 +369,8 @@ export function simulate(input: SimulationInput): SimulationResult {
       meal.forEach((e, i) => {
         const ei = intakes[i]!;
         ei.missing.forEach((m) => day.missing.add(m));
-        if (e.isSupplement) for (const [id, v] of Object.entries(ei.intake)) add(day.supplementIntake, id, v);
+        // Water counts too: the magnesium upper limit covers dissolved magnesium salts "in supplements, water or added to foods" (model/reference-values.ts).
+        if (e.isSupplement || e.water) for (const [id, v] of Object.entries(ei.intake)) add(day.supplementIntake, id, v);
         if (s === 'central' && di >= contribFrom) {
           // Attribute the meal's absorbed amount to entries by their share of intake (only needed within the window).
           const byLabel = contrib[di]!;
@@ -380,7 +384,7 @@ export function simulate(input: SimulationInput): SimulationResult {
         }
       });
       if (s === 'central') {
-        mealSummaries.push({ day: meal[0]!.dayKey, start: meal[0]!.time, entryIds: meal.map((e) => e.id), intake: comp.intake, absorbed, ...(meal.every((e) => e.spread) ? { spread: true } : {}) });
+        mealSummaries.push({ day: meal[0]!.dayKey, start: meal[0]!.time, entryIds: meal.map((e) => e.id), intake: comp.intake, absorbed, ...(meal.every((e) => e.spread || e.water) ? { spread: true } : {}) });
       }
     });
   }

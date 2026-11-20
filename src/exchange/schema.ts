@@ -152,9 +152,9 @@ export const settingsSchema = z.object({
   potGrams: z.number().positive().optional(),
   pots: z.array(z.object({ id: z.string(), name: z.string().min(1), grams: z.number().positive() })).optional().describe('Empty pots remembered by name'),
   drinkContainers: z
-    .array(z.object({ id: z.string(), name: z.string().min(1), ml: z.number().positive(), drink: blsRef.optional(), whenEmpty: z.boolean().optional() }))
+    .array(z.object({ id: z.string(), name: z.string().min(1), ml: z.number().positive(), drink: blsRef.optional(), whenEmpty: z.boolean().optional(), water: foodRef.optional() }))
     .optional()
-    .describe('Cups, bottles and teapots the user drinks from: name, size when full (ml), the plain BLS drink it holds (none = plain water), and whether it is logged when empty (spread over the time since it was filled)'),
+    .describe('Cups, bottles and teapots the user drinks from: name, size when full (ml), the plain BLS drink it holds (none = plain water), whether it is logged when empty (spread over the time since it was filled), and for plain water which water it holds (its minerals count)'),
 });
 
 export const recipeRecordSchema = z.object({
@@ -213,6 +213,7 @@ export const customFoodSchema = z.object({
   nutrients,
   confidence,
   createdAt: z.number(),
+  water: z.literal(true).optional().describe("A mineral water's label values per litre, counted only through the water logged"),
 });
 
 export const productSchema = z
@@ -284,8 +285,8 @@ export const activitySchema = z
   .describe('One activity: what, when (epoch ms), how long, roughly how hard, outside or not; sunSkin when it counts toward the vitamin D sun estimate');
 
 export const waterSchema = z
-  .object({ id: z.string(), ...versioned, time: z.number(), day, ml: z.number().nonnegative(), ...containerFields })
-  .describe('Plain water drunk: when (epoch ms) and how much (ml), and the container it came from; with `from`, a container finished at `time` and drunk evenly since `from`; drinks with nutrients are food log entries');
+  .object({ id: z.string(), ...versioned, time: z.number(), day, ml: z.number().nonnegative(), ...containerFields, water: foodRef.optional().describe('Which water it was (a product, a BLS water or a label as a custom food): its minerals count') })
+  .describe('Plain water drunk: when (epoch ms) and how much (ml), the container it came from and which water it was; with `from`, a container finished at `time` and drunk evenly since `from`; drinks with energy are food log entries');
 
 const shopSection = z.enum(['produce', 'bakery', 'dairy', 'meat', 'dry', 'pantry', 'drinks', 'ready', 'other']);
 export const shoppingItemSchema = z

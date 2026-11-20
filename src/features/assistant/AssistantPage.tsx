@@ -97,7 +97,7 @@ import { readRecentRecords } from './editStore';
 import { ChangeCard, DeleteCard } from './EditCards';
 import { RecentTick } from './RecentTick';
 import { useWaterRecords } from '../water/useWater';
-import { containerAmountText, lengthText, saveContainer } from '../water/containers';
+import { containerAmountText, lengthText, saveContainer, waterName } from '../water/containers';
 import { lastFromContainer, MAX_SPREAD_DAYS, spreadProblem } from '../../logic/spread';
 
 export type { RecipeChat } from './cards';
@@ -282,6 +282,7 @@ function Chat({
     name: c.name,
     ml: c.ml,
     ...(c.drink ? { drink: { code: c.drink.code, name: d.foods.byCode.get(c.drink.code)?.nameEn ?? c.drink.code } } : {}),
+    ...(!c.drink && c.water ? { water: waterName(c.water, d) ?? 'a mineral water' } : {}),
     ...(c.whenEmpty ? { whenEmpty: true } : {}),
     ...(last !== undefined ? { last } : {}),
   }));
@@ -545,7 +546,7 @@ function Chat({
               sleep: isOn(d.settings.features, 'sleep'),
               activity: isOn(d.settings.features, 'activity'),
               water: isOn(d.settings.features, 'water'),
-              ...(containerRows?.length ? { containers: containerRows.map(({ c, last }) => ({ id: c.id, name: c.name, ml: c.ml, ...(last !== undefined ? { last } : {}) })) } : {}),
+              ...(containerRows?.length ? { containers: containerRows.map(({ c, last }) => ({ id: c.id, name: c.name, ml: c.ml, ...(last !== undefined ? { last } : {}), ...(c.drink ? { drink: true as const } : {}) })) } : {}),
               ketones: isOn(d.settings.features, 'ketosis') && isOn(d.settings.features, 'ketoneReadings'),
               weight: isOn(d.settings.features, 'weight'),
               bloodPressure: isOn(d.settings.features, 'bloodPressure'),
@@ -1228,12 +1229,14 @@ function WaterProposalCard({ card, day, toast, onLogged, register }: CardProps<E
   const [time, setTime] = useState(() => water.time ?? defaultTimeFor(day, d.today));
   const [saving, setSaving] = useState(false);
   const problem = waterProblem(ml);
+  // From one of the user's water containers: saved with it and the water it holds now (its minerals count).
+  const source = water.source ? d.settings.drinkContainers?.find((c) => c.id === water.source!.id && !c.drink) : undefined;
 
   async function save(): Promise<Undo | undefined> {
     if (problem || !ml || saving) return;
     setSaving(true);
     try {
-      const added = await repo.addWater({ ml: Math.round(ml), time, day: dayKey(new Date(time)) });
+      const added = await repo.addWater({ ml: Math.round(ml), time, day: dayKey(new Date(time)), ...(source ? { containerId: source.id, ...(source.water ? { water: source.water } : {}) } : {}) });
       onLogged(true, localTimes({ ml: added.ml, time }));
       return async () => {
         await repo.deleteWater(added.id);
@@ -1270,6 +1273,7 @@ function WaterProposalCard({ card, day, toast, onLogged, register }: CardProps<E
           {water.id}
         </span>
       </div>
+      {source && <p className="muted small">{t('ai.waterFrom', { name: source.name, water: source.water ? (waterName(source.water, d) ?? t('drinks.water')) : t('drinks.water') })}</p>}
       <Field label={t('water.amount')}>{(id) => <NumberInput id={id} value={ml} onChange={setMl} suffix="ml" min={0} />}</Field>
       <TimeField value={time} onChange={setTime} />
       <div className="sheet-actions">
@@ -1301,13 +1305,13 @@ function ContainerEmptyCard({ card, day, toast, onLogged, register }: CardProps<
   const [saving, setSaving] = useState(false);
   const spread = spreadProblem(from, time);
   const problem = !container ? t('ai.containerGone', { name: proposed.name }) : spread === 'order' ? t('drinks.problem.order') : spread === 'long' ? t('drinks.problem.long', { n: MAX_SPREAD_DAYS }) : undefined;
-  const what = container ? containerAmountText(container, proposed.amount, d.foods) : waterText(water.ml);
+  const what = container ? containerAmountText(container, proposed.amount, d) : waterText(water.ml);
 
   async function save(): Promise<Undo | undefined> {
     if (problem || !container || saving) return;
     setSaving(true);
     try {
-      const undo = await saveContainer(container, proposed.amount, time, from, d.foods);
+      const undo = await saveContainer(container, proposed.amount, time, from, d);
       onLogged(true, { ...localTimes({ time }), since: localTimes({ time: from }).time });
       return async () => {
         undo();

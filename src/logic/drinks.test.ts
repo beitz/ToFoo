@@ -22,6 +22,12 @@ describe('drink containers', () => {
     expect(withoutContainer(two, 'a')).toEqual({ list: [two[1]], index: 0 });
   });
 
+  it('keeps which water only for a water container', () => {
+    const klar = { source: 'custom' as const, id: 'klar' };
+    expect(withContainer([], { id: 'a', name: 'Arbeitsflasche', ml: 1000, water: klar })[0]).toEqual({ id: 'a', name: 'Arbeitsflasche', ml: 1000, water: klar });
+    expect(withContainer([], { id: 'b', name: 'Kanne', ml: 1000, drink: bls('N630000'), water: klar })[0]).toEqual({ id: 'b', name: 'Kanne', ml: 1000, drink: bls('N630000') });
+  });
+
   it('names what a container holds', () => {
     expect(containerDrinkKey({})).toBe('water');
     expect(containerDrinkKey({ drink: bls('N630000') })).toBe('blackTea');

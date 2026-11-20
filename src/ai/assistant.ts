@@ -450,7 +450,7 @@ export async function sendMessage(
           results.push({ type: 'tool_result', tool_use_id: use.id, content: r.error, is_error: true });
         }
       } else if ((use.name === 'propose_water' || use.name === 'propose_container_empty') && sources.water) {
-        const r = use.name === 'propose_water' ? validateWaterProposal(use.input, ctx.now) : validateContainerEmpty(use.input, ctx.containers ?? [], ctx.now);
+        const r = use.name === 'propose_water' ? validateWaterProposal(use.input, ctx.now, ctx.containers ?? []) : validateContainerEmpty(use.input, ctx.containers ?? [], ctx.now);
         if (r.ok) watersProposed.push({ id: use.id, proposal: r.proposal });
         else {
           rejected = true;
@@ -731,6 +731,8 @@ export interface ContainerInfo {
   ml: number;
   /** The plain drink it holds; none = plain water. */
   drink?: { code: string; name: string };
+  /** Plain water of a known kind (a mineral water): its name; its minerals count. */
+  water?: string;
   /** Logged when empty (its amount spread over the time since it was filled). */
   whenEmpty?: boolean;
   /** When it was last emptied or logged (epoch ms). */
@@ -762,7 +764,7 @@ export function appNote(o: { now: number; day: string; today: string; logged: st
   if (o.barcodes.length) parts.push(`Barcodes the app read from the photos: ${o.barcodes.join(', ')}.`);
   if (o.habits?.length) parts.push(`The user's habits: ${o.habits.map((h) => `"${h.name}" (${HABIT_KIND_NOTE[h.kind]})`).join(', ')}.`);
   if (o.containers?.length) {
-    const one = (c: ContainerInfo) => `"${c.name}" ${c.ml} ml ${c.drink ? `${c.drink.name} (BLS ${c.drink.code})` : 'plain water'}${c.whenEmpty ? ', logged when empty' : ''}${c.last !== undefined ? `, last emptied or logged ${fmtLocalDateTime(c.last)}` : ''}`;
+    const one = (c: ContainerInfo) => `"${c.name}" ${c.ml} ml ${c.drink ? `${c.drink.name} (BLS ${c.drink.code})` : c.water ? `plain water: ${c.water} (its minerals count)` : 'plain water'}${c.whenEmpty ? ', logged when empty' : ''}${c.last !== undefined ? `, last emptied or logged ${fmtLocalDateTime(c.last)}` : ''}`;
     parts.push(`The user's cups and bottles (full): ${o.containers.map(one).join('; ')}.`);
   }
   if (o.share) parts.push(o.share);

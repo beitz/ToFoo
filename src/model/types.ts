@@ -48,6 +48,12 @@ export interface ModelEntry {
    * own, so it acts on no meal (tea and iron) and does not make its day count as logged.
    */
   spread?: boolean;
+  /**
+   * The minerals of plain water from the Water tracker (a container that holds a known water): a meal
+   * of its own that acts on no other meal and does not make its day count as logged for food. Its
+   * water is counted by the tracker from the water record, not from here.
+   */
+  water?: boolean;
 }
 
 /**

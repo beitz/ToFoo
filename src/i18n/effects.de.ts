@@ -139,8 +139,8 @@ export const effectsDe: Record<keyof typeof effectsEn, string> = {
   'effect.CA.high': 'Nierensteine und Verstopfung sind möglich.',
   'effect.CA.highHelp': 'Meist aus Ergänzungsmitteln zusätzlich zu Milchprodukten; prüf die Dosis.',
 
-  'effect.MG.high': 'Magnesium aus Ergänzungsmitteln macht in hohen Dosen Durchfall.',
-  'effect.MG.highHelp': 'Senk die Dosis des Ergänzungsmittels; Magnesium aus normalem Essen zählt hier nicht.',
+  'effect.MG.high': 'Magnesium aus Ergänzungsmitteln oder Mineralwasser macht in hohen Dosen Durchfall.',
+  'effect.MG.highHelp': 'Senk die Dosis des Ergänzungsmittels oder trink ein magnesiumärmeres Wasser; Magnesium aus normalem Essen zählt hier nicht.',
 
   'effect.FE.high': 'Magenbeschwerden, und mit der Zeit zu viel Eisen im Körper.',
   'effect.FE.highHelp': 'Meist aus Ergänzungsmitteln; nimm sie nur nach einem Ferritintest und mit deiner Ärztin oder deinem Arzt.',

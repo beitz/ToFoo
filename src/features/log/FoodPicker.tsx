@@ -21,7 +21,7 @@ const SUGGESTIONS = 6;
  * Find another food for an entry: the same sources as the log screen (BLS, saved products, USDA on
  * a tap, a barcode scan), without saved items, manual entry or drinks, which are not "a food in grams".
  */
-export function FoodPicker({ onPick, onScan, onCancel }: { onPick: (p: PickedFood) => void; onScan: () => void; onCancel: () => void }) {
+export function FoodPicker({ onPick, onScan, onCancel, title }: { onPick: (p: PickedFood) => void; onScan: () => void; onCancel: () => void; title?: string }) {
   const d = useData();
   const [query, setQuery] = useState('');
   const q = query.trim();
@@ -65,7 +65,7 @@ export function FoodPicker({ onPick, onScan, onCancel }: { onPick: (p: PickedFoo
   return (
     <div className="food-picker">
       <div className="row-between">
-        <span className="field-label">{t('edit.pickTitle')}</span>
+        <span className="field-label">{title ?? t('edit.pickTitle')}</span>
         <button className="btn btn-small btn-ghost" onClick={onCancel}>
           {t('common.cancel')}
         </button>

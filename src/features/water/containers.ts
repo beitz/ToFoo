@@ -1,56 +1,71 @@
 import type { useToast } from '../../app/toast';
-import type { FoodDb } from '../../foods/foodDb';
+import type { AppData } from '../../app/data';
+import { productLabel } from '../../foods/products';
+import { refKey } from '../../lib/refs';
 import { t } from '../../i18n';
 import { dayKey, formatDateTime } from '../../lib/dates';
 import { ASK_SINCE_AFTER_DAYS, lastFromContainer, spreadLength } from '../../logic/spread';
 import { containerDrinkKey, containerMl } from '../../logic/drinks';
 import { repo } from '../../storage/repo';
-import type { DrinkContainer, LogEntry, WaterRecord } from '../../storage/types';
+import type { DrinkContainer, FoodRef, LogEntry, WaterRecord } from '../../storage/types';
 import { waterText } from './format';
 import { foodName } from '../../i18n/names';
 
-/** What a container holds, in words: "water", "black tea", … */
-export function drinkName(c: Pick<DrinkContainer, 'drink'>, foods: FoodDb): string {
-  const key = containerDrinkKey(c);
-  if (key !== 'other') return t(`drinks.${key}`);
-  return foodName(foods.byCode.get(c.drink!.code)) ?? c.drink!.code;
+/** What the water and drink texts look things up in: foods, saved products and label waters. */
+export type DrinkContext = Pick<AppData, 'foods' | 'productsById' | 'customFoodsById'>;
+
+/** A water's name: the product ("klar Medium"), the BLS water, or the name typed with its label; undefined when it is gone. */
+export function waterName(ref: FoodRef, d: DrinkContext): string | undefined {
+  if (ref.source === 'custom') return d.customFoodsById.get(ref.id)?.name;
+  if (ref.source === 'BLS') return foodName(d.foods.byCode.get(ref.code));
+  const p = d.productsById.get(refKey(ref));
+  return p ? productLabel(p) : undefined;
 }
 
-/** "1 l black tea", "375 ml water". */
-export function containerAmountText(c: DrinkContainer, amount: number, foods: FoodDb): string {
-  return t('drinks.amountOf', { amount: waterText(containerMl(c, amount)), drink: drinkName(c, foods) });
+/** What a container holds, in words: "water", "klar Medium", "black tea", … */
+export function drinkName(c: Pick<DrinkContainer, 'drink' | 'water'>, d: DrinkContext): string {
+  const key = containerDrinkKey(c);
+  if (key === 'water') return (c.water && waterName(c.water, d)) ?? t('drinks.water');
+  if (key !== 'other') return t(`drinks.${key}`);
+  return foodName(d.foods.byCode.get(c.drink!.code)) ?? c.drink!.code;
+}
+
+/** "1 l black tea", "375 ml water", "1 l klar Medium". */
+export function containerAmountText(c: DrinkContainer, amount: number, d: DrinkContext): string {
+  return t('drinks.amountOf', { amount: waterText(containerMl(c, amount)), drink: drinkName(c, d) });
 }
 
 /**
  * Log `amount` of a container (1 = full, 0.5 = half) at `time`, with undo: plain water as a water
  * record, a drink as its BLS food (its water, nutrients and tea or coffee effect count from the data).
  */
-export async function logContainer(c: DrinkContainer, amount: number, time: number, foods: FoodDb, toast: ReturnType<typeof useToast>): Promise<void> {
-  const undo = await saveContainer(c, amount, time, undefined, foods);
-  toast(t('drinks.added', { name: c.name, what: containerAmountText(c, amount, foods) }), undo);
+export async function logContainer(c: DrinkContainer, amount: number, time: number, d: DrinkContext, toast: ReturnType<typeof useToast>): Promise<void> {
+  const undo = await saveContainer(c, amount, time, undefined, d);
+  toast(t('drinks.added', { name: c.name, what: containerAmountText(c, amount, d) }), undo);
 }
 
 /**
  * Save `amount` of a container drunk at `time` or, with `from`, finished at `time` after being filled
- * at `from` (drunk evenly in between: src/logic/spread.ts). Returns the undo.
+ * at `from` (drunk evenly in between: src/logic/spread.ts). Plain water keeps which water it was, so
+ * its minerals count (and keep counting if the container later holds another). Returns the undo.
  */
-export async function saveContainer(c: DrinkContainer, amount: number, time: number, from: number | undefined, foods: FoodDb): Promise<() => void> {
+export async function saveContainer(c: DrinkContainer, amount: number, time: number, from: number | undefined, d: DrinkContext): Promise<() => void> {
   const ml = containerMl(c, amount);
   const day = dayKey(new Date(time));
   const spread = from !== undefined && from < time ? { from } : {};
   if (!c.drink) {
-    const added = await repo.addWater({ ml, time, day, containerId: c.id, ...spread });
+    const added = await repo.addWater({ ml, time, day, containerId: c.id, ...spread, ...(c.water ? { water: c.water } : {}) });
     return () => void repo.deleteWater(added.id);
   }
-  const food = foods.byCode.get(c.drink.code);
-  const entry = await repo.addLog({ kind: 'food', ref: c.drink, grams: ml, preparation: 'asListed', time, day, confidence: 'B', label: foodName(food) ?? drinkName(c, foods), containerId: c.id, ...spread });
+  const food = d.foods.byCode.get(c.drink.code);
+  const entry = await repo.addLog({ kind: 'food', ref: c.drink, grams: ml, preparation: 'asListed', time, day, confidence: 'B', label: foodName(food) ?? drinkName(c, d), containerId: c.id, ...spread });
   return () => void repo.deleteLog(entry.id);
 }
 
 /** Log a container finished at `time`, filled at `from`, with undo: "Teapot empty: 2 l black tea since Mon 20:04 (2 days)". */
-export async function logFinished(c: DrinkContainer, amount: number, time: number, from: number, foods: FoodDb, toast: ReturnType<typeof useToast>): Promise<void> {
-  const undo = await saveContainer(c, amount, time, from, foods);
-  toast(t('drinks.finished', { name: c.name, what: containerAmountText(c, amount, foods), since: formatDateTime(from), length: lengthText(from, time) }), undo);
+export async function logFinished(c: DrinkContainer, amount: number, time: number, from: number, d: DrinkContext, toast: ReturnType<typeof useToast>): Promise<void> {
+  const undo = await saveContainer(c, amount, time, from, d);
+  toast(t('drinks.finished', { name: c.name, what: containerAmountText(c, amount, d), since: formatDateTime(from), length: lengthText(from, time) }), undo);
 }
 
 /** "2 days 4 h", "9 h". */

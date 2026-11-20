@@ -1164,7 +1164,7 @@
                       }
                     },
                     "drinkContainers": {
-                      "description": "Cups, bottles and teapots the user drinks from: name, size when full (ml), the plain BLS drink it holds (none = plain water), and whether it is logged when empty (spread over the time since it was filled)",
+                      "description": "Cups, bottles and teapots the user drinks from: name, size when full (ml), the plain BLS drink it holds (none = plain water), whether it is logged when empty (spread over the time since it was filled), and for plain water which water it holds (its minerals count)",
                       "type": "array",
                       "items": {
                         "type": "object",
@@ -1203,6 +1203,81 @@
                           },
                           "whenEmpty": {
                             "type": "boolean"
+                          },
+                          "water": {
+                            "oneOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "source": {
+                                    "type": "string",
+                                    "const": "BLS"
+                                  },
+                                  "version": {
+                                    "type": "string"
+                                  },
+                                  "code": {
+                                    "type": "string",
+                                    "pattern": "^[A-Z][0-9A-Z]{6}$"
+                                  }
+                                },
+                                "required": [
+                                  "source",
+                                  "version",
+                                  "code"
+                                ]
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "source": {
+                                    "type": "string",
+                                    "const": "custom"
+                                  },
+                                  "id": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "source",
+                                  "id"
+                                ]
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "source": {
+                                    "type": "string",
+                                    "const": "OFF"
+                                  },
+                                  "code": {
+                                    "type": "string",
+                                    "pattern": "^\\d{4,14}$"
+                                  }
+                                },
+                                "required": [
+                                  "source",
+                                  "code"
+                                ]
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "source": {
+                                    "type": "string",
+                                    "const": "USDA"
+                                  },
+                                  "code": {
+                                    "type": "string",
+                                    "pattern": "^\\d{1,10}$"
+                                  }
+                                },
+                                "required": [
+                                  "source",
+                                  "code"
+                                ]
+                              }
+                            ]
                           }
                         },
                         "required": [
@@ -2382,6 +2457,11 @@
                   },
                   "createdAt": {
                     "type": "number"
+                  },
+                  "water": {
+                    "description": "A mineral water's label values per litre, counted only through the water logged",
+                    "type": "boolean",
+                    "const": true
                   }
                 },
                 "required": [
@@ -2872,6 +2952,82 @@
                   "from": {
                     "description": "A container finished at `time`: when it was filled (epoch ms); the amount counts evenly over that stretch",
                     "type": "number"
+                  },
+                  "water": {
+                    "description": "Which water it was (a product, a BLS water or a label as a custom food): its minerals count",
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "source": {
+                            "type": "string",
+                            "const": "BLS"
+                          },
+                          "version": {
+                            "type": "string"
+                          },
+                          "code": {
+                            "type": "string",
+                            "pattern": "^[A-Z][0-9A-Z]{6}$"
+                          }
+                        },
+                        "required": [
+                          "source",
+                          "version",
+                          "code"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "source": {
+                            "type": "string",
+                            "const": "custom"
+                          },
+                          "id": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "source",
+                          "id"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "source": {
+                            "type": "string",
+                            "const": "OFF"
+                          },
+                          "code": {
+                            "type": "string",
+                            "pattern": "^\\d{4,14}$"
+                          }
+                        },
+                        "required": [
+                          "source",
+                          "code"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "source": {
+                            "type": "string",
+                            "const": "USDA"
+                          },
+                          "code": {
+                            "type": "string",
+                            "pattern": "^\\d{1,10}$"
+                          }
+                        },
+                        "required": [
+                          "source",
+                          "code"
+                        ]
+                      }
+                    ]
                   }
                 },
                 "required": [
@@ -2881,7 +3037,7 @@
                   "day",
                   "ml"
                 ],
-                "description": "Plain water drunk: when (epoch ms) and how much (ml), and the container it came from; with `from`, a container finished at `time` and drunk evenly since `from`; drinks with nutrients are food log entries"
+                "description": "Plain water drunk: when (epoch ms) and how much (ml), the container it came from and which water it was; with `from`, a container finished at `time` and drunk evenly since `from`; drinks with energy are food log entries"
               }
             },
             "shopping": {
