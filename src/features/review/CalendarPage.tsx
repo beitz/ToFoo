@@ -1,5 +1,4 @@
 import { useMemo } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
 import { useData } from '../../app/data';
 import { href, navigate } from '../../app/router';
 import { t, type MessageKey } from '../../i18n';
@@ -7,6 +6,7 @@ import { parseDay } from '../../lib/dates';
 import { addMonths, formatMonth, monthGrid, presetRange } from '../../lib/periods';
 import { dayLayers, layerCounts, LAYERS, type DayLayers, type Layer } from '../../logic/calendarLayers';
 import type { DayStatus } from '../../model/types';
+import { useWaterDays } from '../water/useWater';
 import { repo } from '../../storage/repo';
 import type { Settings } from '../../storage/types';
 import { Icon } from '../../ui/Icon';
@@ -47,7 +47,7 @@ export function CalendarPage({ month: monthParam }: { month?: string }) {
   const saved = d.settings.calendarLayer ?? 'all';
   const view: View = saved === 'all' || on.includes(saved) ? saved : 'all';
   const sleep = useSleep();
-  const water = useLiveQuery(() => repo.db.water.toArray(), []);
+  const water = useWaterDays();
   const journal = useJournal();
   const skipped = useSkipped();
   const habits = useHabitLayers();

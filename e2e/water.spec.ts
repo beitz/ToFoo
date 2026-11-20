@@ -55,3 +55,46 @@ test('water: own teapot and bottle, one tap for a full one, half a pot from the 
   await expect(page.getByText('Black tea (infusion)').first()).toBeVisible();
   expect(errors).toEqual([]);
 });
+
+// Owner's ask 2026-11-20: a 2 l teapot lasts two or three days, and he logs it only when it is empty.
+test('water: a teapot logged when empty is spread over the days since it was filled', async ({ page }) => {
+  const errors = watchErrors(page);
+  await firstLaunch(page);
+  await page.goto('./#/settings');
+  await page.getByText('What you track').click();
+  await page.getByRole('switch', { name: /^Water/ }).click();
+
+  await page.goto('./#/');
+  const card = page.locator('.water-card');
+  await card.locator('.water-main').click();
+  const sheet = page.getByRole('dialog');
+  await sheet.getByRole('button', { name: 'Add your cup or bottle' }).click();
+  await sheet.getByRole('textbox', { name: 'Name' }).fill('Teekanne');
+  await sheet.getByRole('textbox', { name: 'Holds when full' }).fill('2000');
+  await sheet.getByRole('button', { name: 'Black tea' }).click();
+  await sheet.getByRole('button', { name: 'When it is empty' }).click();
+  await sheet.getByRole('button', { name: 'Save' }).click();
+
+  // Never logged before: the sheet asks since when; two days ago gives about a litre a day.
+  await expect(sheet).toHaveAccessibleName('Add a drink');
+  await expect(sheet.getByRole('alert')).toHaveText('Say since when you have been drinking from it.');
+  await sheet.getByRole('button', { name: '2 days ago' }).click();
+  await expect(sheet.getByText(/Over 2 days: about 1 l a day\./)).toBeVisible();
+  await sheet.getByRole('button', { name: 'Save' }).click();
+  await expect(page.getByText(/Teekanne empty: 2 l black tea since .* \(2 days\)\./)).toBeVisible();
+
+  // Yesterday lies wholly inside: half the pot counts there.
+  const y = new Date();
+  y.setDate(y.getDate() - 1);
+  const yesterday = `${y.getFullYear()}-${String(y.getMonth() + 1).padStart(2, '0')}-${String(y.getDate()).padStart(2, '0')}`;
+  await page.goto(`./#/diary/${yesterday}`);
+  await expect(page.getByText(/Teekanne: 1 l of 2 l · /)).toBeVisible();
+  await expect(page.locator('.water-card')).toContainText(/99\d ml of/);
+
+  // The next time, one tap on Home: since the last time it was emptied, with undo.
+  await page.goto('./#/');
+  await card.getByRole('button', { name: /Teekanne is empty/ }).click();
+  await expect(page.getByText(/Teekanne empty: 2 l black tea since /)).toBeVisible();
+  await page.getByRole('button', { name: 'Undo' }).click();
+  expect(errors).toEqual([]);
+});

@@ -4,6 +4,7 @@ import { isOn } from '../../settings/features';
 import { missingOn, type CatchUpKind } from '../../logic/catchUp';
 import { openHabitsOn } from '../../logic/habits';
 import { useHabits } from '../habits/useHabits';
+import { useWaterDays } from '../water/useWater';
 import { repo } from '../../storage/repo';
 import { useSleep } from '../sleep/useSleep';
 
@@ -27,7 +28,7 @@ export async function skip(day: string, kind: CatchUpKind): Promise<() => Promis
 export function useCatchUp(day: string): CatchUpKind[] | undefined {
   const d = useData();
   const sleep = useSleep();
-  const water = useLiveQuery(() => repo.db.water.toArray(), []);
+  const water = useWaterDays();
   const skipped = useLiveQuery(async () => {
     const kinds = new Set((await repo.getMeta<CatchUpKind[]>(skipKey(day))) ?? []);
     if (await repo.getMeta<boolean>(foodSkipKey(day))) kinds.add('food');

@@ -152,9 +152,9 @@ export const settingsSchema = z.object({
   potGrams: z.number().positive().optional(),
   pots: z.array(z.object({ id: z.string(), name: z.string().min(1), grams: z.number().positive() })).optional().describe('Empty pots remembered by name'),
   drinkContainers: z
-    .array(z.object({ id: z.string(), name: z.string().min(1), ml: z.number().positive(), drink: blsRef.optional() }))
+    .array(z.object({ id: z.string(), name: z.string().min(1), ml: z.number().positive(), drink: blsRef.optional(), whenEmpty: z.boolean().optional() }))
     .optional()
-    .describe('Cups, bottles and teapots the user drinks from: name, size when full (ml), and the plain BLS drink it holds (none = plain water)'),
+    .describe('Cups, bottles and teapots the user drinks from: name, size when full (ml), the plain BLS drink it holds (none = plain water), and whether it is logged when empty (spread over the time since it was filled)'),
 });
 
 export const recipeRecordSchema = z.object({
@@ -190,8 +190,13 @@ export const batchSchema = z.object({
 });
 
 const logBase = { id: z.string(), ...versioned, time: z.number(), day, confidence, label: z.string() };
+/** A drink from one of the user's containers; `from` when it was logged empty (spread from `from` to `time`). */
+const containerFields = {
+  containerId: z.string().optional().describe('The container (settings.drinkContainers) it was drunk from'),
+  from: z.number().optional().describe('A container finished at `time`: when it was filled (epoch ms); the amount counts evenly over that stretch'),
+};
 export const logEntrySchema = z.discriminatedUnion('kind', [
-  z.object({ ...logBase, kind: z.literal('food'), ref: foodRef, grams: z.number().positive(), preparation, pieces }),
+  z.object({ ...logBase, kind: z.literal('food'), ref: foodRef, grams: z.number().positive(), preparation, pieces, ...containerFields }),
   z.object({ ...logBase, kind: z.literal('portion'), ...portionFields }),
   z.object({ ...logBase, kind: z.literal('custom'), customFoodId: z.string(), servings: z.number().positive() }),
   z.object({ ...logBase, kind: z.literal('manual'), nutrients, isSupplement: z.boolean() }),
@@ -279,8 +284,8 @@ export const activitySchema = z
   .describe('One activity: what, when (epoch ms), how long, roughly how hard, outside or not; sunSkin when it counts toward the vitamin D sun estimate');
 
 export const waterSchema = z
-  .object({ id: z.string(), ...versioned, time: z.number(), day, ml: z.number().nonnegative() })
-  .describe('Plain water drunk: when (epoch ms) and how much (ml); drinks with nutrients are food log entries');
+  .object({ id: z.string(), ...versioned, time: z.number(), day, ml: z.number().nonnegative(), ...containerFields })
+  .describe('Plain water drunk: when (epoch ms) and how much (ml), and the container it came from; with `from`, a container finished at `time` and drunk evenly since `from`; drinks with nutrients are food log entries');
 
 const shopSection = z.enum(['produce', 'bakery', 'dairy', 'meat', 'dry', 'pantry', 'drinks', 'ready', 'other']);
 export const shoppingItemSchema = z

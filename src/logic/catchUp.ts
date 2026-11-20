@@ -143,7 +143,9 @@ export function frequentActivities(records: readonly ActivityRecord[], day: stri
 export function usualWater(records: readonly WaterRecord[], day: string): number | undefined {
   const byDay = new Map<string, number>();
   for (const r of records) if (r.day < day) byDay.set(r.day, (byDay.get(r.day) ?? 0) + r.ml);
+  // A day with only tea from a container (a 0 ml mark) had no plain water to repeat.
   const recent = [...byDay.entries()]
+    .filter(([, ml]) => ml > 0)
     .sort((a, b) => (a[0] < b[0] ? 1 : -1))
     .slice(0, 14)
     .map(([, ml]) => ml);

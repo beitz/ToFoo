@@ -6,9 +6,10 @@ import { fmtNumber } from '../../lib/format';
 import { dayWater, waterTarget } from '../../logic/water';
 import { Icon } from '../../ui/Icon';
 import { defaultTimeFor } from '../log/time';
-import { containerAmountText, logContainer } from './containers';
+import type { DrinkContainer } from '../../storage/types';
+import { containerAmountText, logContainer, logFinished, sinceForTap } from './containers';
 import { waterText } from './format';
-import { useWater } from './useWater';
+import { useWaterDays, useWaterRecords } from './useWater';
 import { addWaterWithUndo, WaterSheet } from './WaterSheet';
 
 /** One glass, the quick-add amount. */
@@ -23,17 +24,28 @@ const GLASS_ML = 250;
 export function WaterCard({ day, compact = false }: { day: string; compact?: boolean }) {
   const d = useData();
   const toast = useToast();
-  const records = useWater(day);
-  const [adding, setAdding] = useState(false);
-  if (!records) return null;
+  const records = useWaterDays();
+  const stored = useWaterRecords();
+  // The add sheet, open on one container (one logged when empty whose fill time the app must ask).
+  const [adding, setAdding] = useState<{ container?: string } | null>(null);
+  if (!records || !stored) return null;
   const w = dayWater(day, d.modelEntries, records);
   const target = waterTarget(d.requirements.ageGroup);
   const pct = Math.round((w.totalMl / target) * 100);
   const containers = d.settings.drinkContainers ?? [];
 
+  /** One tap: a full one drunk now, or one logged when empty finished now (since its last finish). */
+  function tap(c: DrinkContainer) {
+    const time = defaultTimeFor(day, d.today);
+    if (!c.whenEmpty) return void logContainer(c, 1, time, d.foods, toast);
+    const since = sinceForTap(c, stored ?? [], d.log, time);
+    if (since === undefined) setAdding({ container: c.id });
+    else void logFinished(c, 1, time, since, d.foods, toast);
+  }
+
   return (
     <div className="card water-card">
-      <button className="water-main" onClick={() => setAdding(true)} aria-label={`${t('water.title')}: ${t('water.ofTarget', { amount: waterText(w.totalMl), target: waterText(target) })}. ${t('water.addTitle')}`}>
+      <button className="water-main" onClick={() => setAdding({})} aria-label={`${t('water.title')}: ${t('water.ofTarget', { amount: waterText(w.totalMl), target: waterText(target) })}. ${t('water.addTitle')}`}>
         <span className="water-head">
           <span className="water-title">
             <Icon name="drop" size={18} /> {t('water.title')}
@@ -61,13 +73,13 @@ export function WaterCard({ day, compact = false }: { day: string; compact?: boo
         // One tap logs a full container; the sheet takes part of one (half a pot).
         <div className="water-containers">
           {containers.map((c) => (
-            <button key={c.id} className="btn btn-secondary water-glass" onClick={() => void logContainer(c, 1, defaultTimeFor(day, d.today), d.foods, toast)} aria-label={t('drinks.addFull', { name: c.name, what: containerAmountText(c, 1, d.foods) })}>
-              <Icon name="plus" size={18} /> <span className="water-container-name">{c.name}</span>
+            <button key={c.id} className="btn btn-secondary water-glass" onClick={() => tap(c)} aria-label={t(c.whenEmpty ? 'drinks.finishFull' : 'drinks.addFull', { name: c.name, what: containerAmountText(c, 1, d.foods) })}>
+              <Icon name={c.whenEmpty ? 'check' : 'plus'} size={18} /> <span className="water-container-name">{c.whenEmpty ? t('drinks.emptyButton', { name: c.name }) : c.name}</span>
             </button>
           ))}
         </div>
       )}
-      {adding && <WaterSheet defaultTime={defaultTimeFor(day, d.today)} onClose={() => setAdding(false)} />}
+      {adding && <WaterSheet defaultTime={defaultTimeFor(day, d.today)} container={adding.container} onClose={() => setAdding(null)} />}
     </div>
   );
 }

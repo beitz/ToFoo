@@ -1164,7 +1164,7 @@
                       }
                     },
                     "drinkContainers": {
-                      "description": "Cups, bottles and teapots the user drinks from: name, size when full (ml), and the plain BLS drink it holds (none = plain water)",
+                      "description": "Cups, bottles and teapots the user drinks from: name, size when full (ml), the plain BLS drink it holds (none = plain water), and whether it is logged when empty (spread over the time since it was filled)",
                       "type": "array",
                       "items": {
                         "type": "object",
@@ -1200,6 +1200,9 @@
                               "version",
                               "code"
                             ]
+                          },
+                          "whenEmpty": {
+                            "type": "boolean"
                           }
                         },
                         "required": [
@@ -1962,6 +1965,14 @@
                         "description": "Logged as a count of pieces: how many (grams is what counts)",
                         "type": "number",
                         "exclusiveMinimum": 0
+                      },
+                      "containerId": {
+                        "description": "The container (settings.drinkContainers) it was drunk from",
+                        "type": "string"
+                      },
+                      "from": {
+                        "description": "A container finished at `time`: when it was filled (epoch ms); the amount counts evenly over that stretch",
+                        "type": "number"
                       }
                     },
                     "required": [
@@ -2853,6 +2864,14 @@
                   "ml": {
                     "type": "number",
                     "minimum": 0
+                  },
+                  "containerId": {
+                    "description": "The container (settings.drinkContainers) it was drunk from",
+                    "type": "string"
+                  },
+                  "from": {
+                    "description": "A container finished at `time`: when it was filled (epoch ms); the amount counts evenly over that stretch",
+                    "type": "number"
                   }
                 },
                 "required": [
@@ -2862,7 +2881,7 @@
                   "day",
                   "ml"
                 ],
-                "description": "Plain water drunk: when (epoch ms) and how much (ml); drinks with nutrients are food log entries"
+                "description": "Plain water drunk: when (epoch ms) and how much (ml), and the container it came from; with `from`, a container finished at `time` and drunk evenly since `from`; drinks with nutrients are food log entries"
               }
             },
             "shopping": {

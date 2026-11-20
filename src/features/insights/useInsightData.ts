@@ -5,6 +5,7 @@ import { sleepNeed } from '../../../model/parameters';
 import { sleepAgeGroup } from '../../../model/sleep';
 import { buildInsightData, SHARE_KINDS, type InsightData, type ShareKind } from '../../logic/insights';
 import { isOn } from '../../settings/features';
+import { useWaterDays } from '../water/useWater';
 import { repo } from '../../storage/repo';
 import { useJournal } from '../journal/useJournal';
 import { useHabits } from '../habits/useHabits';
@@ -20,7 +21,7 @@ export function useInsightData(enabled: boolean): InsightData | undefined {
   const journal = useJournal();
   const sleep = useLiveQuery(() => repo.db.sleep.toArray(), []);
   const activities = useLiveQuery(() => repo.db.activities.toArray(), []);
-  const water = useLiveQuery(() => repo.db.water.toArray(), []);
+  const water = useWaterDays();
   const habits = useHabits();
   return useMemo(() => {
     if (!enabled || !journal || !sleep || !activities || !water || !habits) return undefined;

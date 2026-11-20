@@ -1,11 +1,10 @@
 import { useMemo } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
 import { useData } from '../../app/data';
 import { href } from '../../app/router';
 import { t } from '../../i18n';
 import { formatDay, parseDay, weekdayShort } from '../../lib/dates';
 import { dayLayers, type Layer } from '../../logic/calendarLayers';
-import { repo } from '../../storage/repo';
+import { useWaterDays } from '../water/useWater';
 import { Segmented } from '../../ui/controls';
 import { useSkipped } from '../catchup/useCatchUp';
 import { useHabitLayers } from '../habits/useHabits';
@@ -23,7 +22,7 @@ export function WindowSwitch({ value, onChange }: { value: Window; onChange: (w:
 export function useMissingDays(layer: Layer, days: readonly string[]): string[] | undefined {
   const d = useData();
   const sleep = useSleep();
-  const water = useLiveQuery(() => repo.db.water.toArray(), []);
+  const water = useWaterDays();
   const journal = useJournal();
   const skipped = useSkipped();
   const habits = useHabitLayers();

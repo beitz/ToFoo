@@ -1,5 +1,4 @@
 import { useMemo, type ReactNode } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
 import { useData } from '../../app/data';
 import { href } from '../../app/router';
 import { t, type MessageKey } from '../../i18n';
@@ -14,7 +13,7 @@ import { defaultWeek, isoWeek, nutrientWeeks, weekMoves, weekPeriods, weeksEndin
 import { periodBreakdown } from '../../model/period';
 import type { GaugeStatus } from '../../model/simulate';
 import { isOn } from '../../settings/features';
-import { repo } from '../../storage/repo';
+import { useWaterDays } from '../water/useWater';
 import { AskLink } from '../../ui/AskChips';
 import { Icon } from '../../ui/Icon';
 import { STATUS_ICON, statusLabel } from '../../ui/status';
@@ -47,7 +46,7 @@ export function OverviewPage() {
   const d = useData();
   const f = d.settings.features;
   const sleep = useSleep();
-  const water = useLiveQuery(() => repo.db.water.toArray(), []);
+  const water = useWaterDays();
   const journal = useJournal();
   const skipped = useSkipped();
   const habits = useHabitLayers();

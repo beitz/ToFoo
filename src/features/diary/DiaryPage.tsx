@@ -4,7 +4,7 @@ import { useData } from '../../app/data';
 import { useToast } from '../../app/toast';
 import { href, navigate } from '../../app/router';
 import { t, type MessageKey } from '../../i18n';
-import { addDays, formatDate, formatDay, formatTime, parseDay } from '../../lib/dates';
+import { addDays, formatDate, formatDateTime, formatDay, formatTime, parseDay } from '../../lib/dates';
 import { followOnSleep, NEW_SLEEP_MS } from '../../logic/sleep';
 import { fmtAmount } from '../../lib/format';
 import { groupMeals } from '../../model/simulate';
@@ -35,7 +35,8 @@ import { useActivities } from '../activity/useActivities';
 import { WaterCard } from '../water/WaterCard';
 import { DayBloodPressure } from '../bloodPressure/BloodPressureCard';
 import { WaterSheet } from '../water/WaterSheet';
-import { useWater } from '../water/useWater';
+import { useWater, useWaterRecords } from '../water/useWater';
+import { daySpreads } from '../../logic/spread';
 import { waterText } from '../water/format';
 import { InsightsTabs } from '../review/InsightsTabs';
 import { waterTarget } from '../../logic/water';
@@ -72,7 +73,11 @@ export function DiaryPage({ day: dayParam }: { day?: string }) {
   const adds = useAddsText();
   const countsFor = useCountsFor();
   const waterOn = isOn(d.settings.features, 'water');
-  const water = useWater(day) ?? [];
+  const water = (useWater(day) ?? []).filter((w) => w.from === undefined);
+  // Containers logged empty that were drunk on this day (some finished on a later one).
+  const allWater = useWaterRecords();
+  const spreads = allWater ? daySpreads(day, allWater, d.log) : [];
+  const containerName = (id: string | undefined, fallback: string) => d.settings.drinkContainers?.find((c) => c.id === id)?.name ?? fallback;
   const [waterSheet, setWaterSheet] = useState<WaterRecord | null>(null);
   // The day status choices fold away; the status itself shows at the top of the day card.
   const [statusOpen, setStatusOpen] = useState(false);
@@ -278,6 +283,37 @@ export function DiaryPage({ day: dayParam }: { day?: string }) {
                   </button>
                 </li>
               ))}
+            </ul>
+          )}
+          {spreads.length > 0 && (
+            <ul className="plain-list water-list">
+              {spreads.map((sp) => {
+                const rec = sp.kind === 'water' ? sp.record : sp.entry;
+                const total = sp.kind === 'water' ? sp.record.ml : sp.entry.grams;
+                const name = containerName(rec.containerId, sp.kind === 'water' ? t('drinks.water') : sp.entry.label);
+                const text = t('drinks.spreadRow', { name, amount: waterText(sp.ml), total: waterText(total), from: formatDateTime(rec.from), to: formatDateTime(rec.time) });
+                const inner = (
+                  <>
+                    <span className="entry-label">{text}</span>
+                    <span className="entry-edit">
+                      <Icon name="edit" size={16} />
+                    </span>
+                  </>
+                );
+                return (
+                  <li key={rec.id}>
+                    {sp.kind === 'water' ? (
+                      <button className="entry-row" onClick={() => setWaterSheet(sp.record)}>
+                        {inner}
+                      </button>
+                    ) : (
+                      <a className="entry-row" href={href('entry', sp.entry.id)}>
+                        {inner}
+                      </a>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           )}
           <p className="muted small">{t('water.guide', { target: waterText(waterTarget(d.requirements.ageGroup)) })}</p>

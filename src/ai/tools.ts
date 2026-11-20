@@ -22,6 +22,7 @@ import { refKey } from '../lib/refs';
 import { MAX_SLEEP_MS } from '../logic/sleep';
 import { MAX_ACTIVITY_MINUTES } from '../logic/activity';
 import { MAX_WATER_ML } from '../logic/water';
+import { MAX_SPREAD_DAYS, spreadProblem } from '../logic/spread';
 import { BP_INPUT, bpProblem } from '../logic/bloodPressure';
 import { MAX_WEIGHT_KG, MIN_WEIGHT_KG } from '../logic/weight';
 import { dayKey } from '../lib/dates';
@@ -220,11 +221,33 @@ export const waterProposalInput = z.object({
   replaces: z.string().optional(),
 });
 
-/** Plain water the assistant proposes, for the user to check. */
+/** Plain water the assistant proposes, for the user to check; or one of the user's containers, now empty. */
 export interface WaterProposal {
   ml: number;
   time?: number;
   replaces?: string;
+  /** A container finished (propose_container_empty): which, how full it was (1 = full), and when it was filled (epoch ms). */
+  container?: { id: string; name: string; amount: number; from: number };
+}
+
+export const containerEmptyInput = z.object({
+  container: z.string(),
+  /** How full it was when filled: 1 = full, 0.5 = half. */
+  how_full: z.number().optional(),
+  /** Local "YYYY-MM-DD HH:MM" it was emptied; empty for now. */
+  time: z.string().optional(),
+  /** Local "YYYY-MM-DD HH:MM" it was filled; empty for the last time it was emptied. */
+  since: z.string().optional(),
+  replaces: z.string().optional(),
+});
+
+/** One of the user's containers, as the assistant's tools see it: size and when it was last emptied (or logged). */
+export interface ContainerTool {
+  id: string;
+  name: string;
+  ml: number;
+  /** Epoch ms it was last emptied or logged; absent when never. */
+  last?: number;
 }
 
 export const bloodPressureProposalInput = z.object({
@@ -467,6 +490,8 @@ export interface ToolContext {
   activity?: boolean;
   /** Water is on: the assistant may propose plain water. */
   water?: boolean;
+  /** With water on: the user's own cups, bottles and teapots, for propose_container_empty. */
+  containers?: readonly ContainerTool[];
   /** The ketosis estimate is on: the assistant may propose ketone measurements. */
   ketones?: boolean;
   /** Weight is on: the assistant may propose weigh-ins. */
@@ -824,6 +849,44 @@ export function validateWaterProposal(input: unknown, now?: number): { ok: true;
   if (problems.length) return { ok: false, error: `${problems.join('\n')}\nFix these and call propose_water again.` };
   const replaces = parsed.data.replaces?.trim();
   return { ok: true, proposal: { ml: Math.round(ml), ...(time !== undefined ? { time } : {}), ...(replaces ? { replaces } : {}) } };
+}
+
+/**
+ * Check a `propose_container_empty` call: one of the user's containers, how full, and a stretch from
+ * when it was filled (or its last time) to when it was emptied that the app can spread over.
+ */
+export function validateContainerEmpty(input: unknown, containers: readonly ContainerTool[], now?: number): { ok: true; proposal: WaterProposal } | { ok: false; error: string } {
+  const parsed = containerEmptyInput.safeParse(input);
+  if (!parsed.success) return { ok: false, error: `Invalid input: ${parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}` };
+  const problems: string[] = [];
+  const wanted = parsed.data.container.trim().toLowerCase();
+  const c = containers.find((x) => x.name.trim().toLowerCase() === wanted);
+  if (!c) problems.push(containers.length ? `container "${parsed.data.container}" is not one of the user's: ${containers.map((x) => `"${x.name}"`).join(', ')}. Use one of these names, or log the drink as usual.` : 'the user has no containers set up; log the drink as usual.');
+  const amount = parsed.data.how_full ?? 1;
+  if (!(amount > 0) || amount > 1) problems.push(`how_full is ${amount}; give the part it was filled to, more than 0 and at most 1 (1 = full).`);
+  const end = checkTime(parsed.data.time, now);
+  if (end.problem) problems.push(end.problem);
+  const time = end.time ?? now ?? Date.now();
+  const sinceText = parsed.data.since?.trim();
+  let from: number | undefined;
+  if (sinceText) {
+    from = parseLocalDateTime(sinceText);
+    if (from === undefined) problems.push(`since "${sinceText}" is not a valid local time; write it as YYYY-MM-DD HH:MM, or leave it empty for the last time it was emptied.`);
+  } else if (c) {
+    from = c.last !== undefined && c.last < time ? c.last : undefined;
+    if (from === undefined) problems.push(`"${c.name}" was never logged before, so the app does not know when it was filled: ask the user, or give since.`);
+  }
+  if (from !== undefined) {
+    const p = spreadProblem(from, time);
+    if (p === 'order') problems.push('since must be before the time it was emptied.');
+    else if (p === 'long') problems.push(`since is more than ${MAX_SPREAD_DAYS} days before it was emptied; ask the user when they filled it.`);
+  }
+  if (problems.length || !c || from === undefined) return { ok: false, error: `${problems.join('\n')}\nFix these and call propose_container_empty again.` };
+  const replaces = parsed.data.replaces?.trim();
+  return {
+    ok: true,
+    proposal: { ml: Math.round(c.ml * amount), ...(end.time !== undefined ? { time: end.time } : {}), ...(replaces ? { replaces } : {}), container: { id: c.id, name: c.name, amount, from } },
+  };
 }
 
 /** At most this many readings in one sitting's card (the protocol's two, and a third when they differ). */

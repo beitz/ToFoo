@@ -96,6 +96,9 @@ import { DEFAULT_RECENT_DAYS, recentDays, recentUpdate, type RecentContext } fro
 import { readRecentRecords } from './editStore';
 import { ChangeCard, DeleteCard } from './EditCards';
 import { RecentTick } from './RecentTick';
+import { useWaterRecords } from '../water/useWater';
+import { containerAmountText, lengthText, saveContainer } from '../water/containers';
+import { lastFromContainer, MAX_SPREAD_DAYS, spreadProblem } from '../../logic/spread';
 
 export type { RecipeChat } from './cards';
 
@@ -271,9 +274,17 @@ function Chat({
   const habitRows = useLiveQuery(() => repo.db.habits.orderBy('order').toArray(), []);
   const habits: HabitInfo[] | undefined = !recipe && isOn(d.settings.features, 'habits') ? habitRows?.filter((h) => !h.archived).map(({ id, name, kind }) => ({ id, name, kind })) : undefined;
   const habitsSent = useRef<string | undefined>(undefined);
-  const containers: ContainerInfo[] | undefined = !recipe && isOn(d.settings.features, 'water')
-    ? (d.settings.drinkContainers ?? []).map((c) => ({ name: c.name, ml: c.ml, ...(c.drink ? { drink: { code: c.drink.code, name: d.foods.byCode.get(c.drink.code)?.nameEn ?? c.drink.code } } : {}) }))
-    : undefined;
+  // When each was last emptied or logged: a container logged empty is spread from then.
+  const storedWater = useWaterRecords();
+  const lastOf = (id: string) => (storedWater ? lastFromContainer(id, storedWater, d.log, Infinity) : undefined);
+  const containerRows = !recipe && isOn(d.settings.features, 'water') ? (d.settings.drinkContainers ?? []).map((c) => ({ c, last: lastOf(c.id) })) : undefined;
+  const containers: ContainerInfo[] | undefined = containerRows?.map(({ c, last }) => ({
+    name: c.name,
+    ml: c.ml,
+    ...(c.drink ? { drink: { code: c.drink.code, name: d.foods.byCode.get(c.drink.code)?.nameEn ?? c.drink.code } } : {}),
+    ...(c.whenEmpty ? { whenEmpty: true } : {}),
+    ...(last !== undefined ? { last } : {}),
+  }));
   const containersSent = useRef<string | undefined>(undefined);
   /** The undo of each card saved in this visit, for its folded row. */
   const [undos, setUndos] = useState<ReadonlyMap<string, Undo>>(new Map());
@@ -534,6 +545,7 @@ function Chat({
               sleep: isOn(d.settings.features, 'sleep'),
               activity: isOn(d.settings.features, 'activity'),
               water: isOn(d.settings.features, 'water'),
+              ...(containerRows?.length ? { containers: containerRows.map(({ c, last }) => ({ id: c.id, name: c.name, ml: c.ml, ...(last !== undefined ? { last } : {}) })) } : {}),
               ketones: isOn(d.settings.features, 'ketosis') && isOn(d.settings.features, 'ketoneReadings'),
               weight: isOn(d.settings.features, 'weight'),
               bloodPressure: isOn(d.settings.features, 'bloodPressure'),
@@ -1125,7 +1137,7 @@ function CardView({ card, ...rest }: CardProps<Card>) {
   if (card.kind === 'meal') return <ProposalCard card={card} {...rest} />;
   if (card.kind === 'sleep') return <SleepCard card={card} {...rest} />;
   if (card.kind === 'activity') return <ActivityCard card={card} {...rest} />;
-  if (card.kind === 'water') return <WaterProposalCard card={card} {...rest} />;
+  if (card.kind === 'water') return card.water.container ? <ContainerEmptyCard card={card} {...rest} /> : <WaterProposalCard card={card} {...rest} />;
   if (card.kind === 'ketone') return <KetoneProposalCard card={card} {...rest} />;
   if (card.kind === 'weight') return <WeightProposalCard card={card} {...rest} />;
   if (card.kind === 'bloodPressure') return <BloodPressureProposalCard card={card} {...rest} />;
@@ -1269,6 +1281,82 @@ function WaterProposalCard({ card, day, toast, onLogged, register }: CardProps<E
         <ChangeButton />
         <button className="btn btn-primary" disabled={!!problem || saving} onClick={() => void saveOne()}>
           {t('ai.saveWater')}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * One of the user's containers, now empty (propose_container_empty): check when it was filled and
+ * emptied, then save; its amount counts evenly over that stretch (src/logic/spread.ts).
+ */
+function ContainerEmptyCard({ card, day, toast, onLogged, register }: CardProps<Extract<Card, { kind: 'water' }>>) {
+  const { water } = card;
+  const proposed = water.container!;
+  const d = useData();
+  const container = d.settings.drinkContainers?.find((c) => c.id === proposed.id);
+  const [time, setTime] = useState(() => water.time ?? defaultTimeFor(day, d.today));
+  const [from, setFrom] = useState(proposed.from);
+  const [saving, setSaving] = useState(false);
+  const spread = spreadProblem(from, time);
+  const problem = !container ? t('ai.containerGone', { name: proposed.name }) : spread === 'order' ? t('drinks.problem.order') : spread === 'long' ? t('drinks.problem.long', { n: MAX_SPREAD_DAYS }) : undefined;
+  const what = container ? containerAmountText(container, proposed.amount, d.foods) : waterText(water.ml);
+
+  async function save(): Promise<Undo | undefined> {
+    if (problem || !container || saving) return;
+    setSaving(true);
+    try {
+      const undo = await saveContainer(container, proposed.amount, time, from, d.foods);
+      onLogged(true, { ...localTimes({ time }), since: localTimes({ time: from }).time });
+      return async () => {
+        undo();
+        onLogged(false);
+      };
+    } finally {
+      setSaving(false);
+    }
+  }
+  useRegister(water.id, card.logged ? undefined : save, register);
+
+  async function saveOne() {
+    const undo = await save();
+    if (undo) toast(t('drinks.finished', { name: proposed.name, what, since: formatDateTime(from), length: lengthText(from, time) }), undo);
+  }
+
+  if (card.logged) {
+    return (
+      <DoneRow>
+        <span>
+          {t('drinks.finished', { name: proposed.name, what, since: formatDateTime(from), length: lengthText(from, time) })} <a href={href('diary', dayKey(new Date(time)))}>{t('edit.inDiary')}</a>
+        </span>
+      </DoneRow>
+    );
+  }
+
+  return (
+    <div className="card proposal">
+      <div className="row-between">
+        <strong className="journal-label">
+          <Icon name="drop" size={18} /> {t('drinks.emptyButton', { name: proposed.name })}
+        </strong>
+        <span className="muted small" title={t('ai.cardId')}>
+          {water.id}
+        </span>
+      </div>
+      <p className="drink-amount">{what}</p>
+      <TimeField value={from} onChange={setFrom} label={t('drinks.filledAt')} />
+      <TimeField value={time} onChange={setTime} label={t('drinks.finishedAt')} />
+      {!spread && <p className="muted small">{t('drinks.spreadShort', { length: lengthText(from, time) })} {t('drinks.spreadHint')}</p>}
+      <div className="sheet-actions">
+        {problem && (
+          <span className="notice small" role="alert">
+            {problem}
+          </span>
+        )}
+        <ChangeButton />
+        <button className="btn btn-primary" disabled={!!problem || saving} onClick={() => void saveOne()}>
+          {t('common.save')}
         </button>
       </div>
     </div>

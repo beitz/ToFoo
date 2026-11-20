@@ -43,6 +43,11 @@ export interface ModelEntry {
   direct?: Readonly<Record<string, number>>;
   /** Drinks with this meal that change iron absorption. */
   modifiers?: { tea?: boolean; coffee?: boolean };
+  /**
+   * One day's share of a drink spread over the days a container was drunk from: it has no time of its
+   * own, so it acts on no meal (tea and iron) and does not make its day count as logged.
+   */
+  spread?: boolean;
 }
 
 /**

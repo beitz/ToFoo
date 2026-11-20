@@ -39,7 +39,7 @@ export function SleepPage() {
   const debt = useMemo(() => sleepDebt(nights), [nights]);
   const times = useMemo(() => nightTimes(nights), [nights]);
   const weeks = useMemo(() => weeklySleep(records ?? [], d.today, WEEKS), [records, d.today]);
-  const mealStarts = useMemo(() => d.model.meals.map((m) => m.start), [d.model.meals]);
+  const mealStarts = useMemo(() => d.model.meals.filter((m) => !m.spread).map((m) => m.start), [d.model.meals]);
   const usual = times.bed && times.wake ? { bed: times.bed.median, wake: times.wake.median } : undefined;
   const unknown = nights.filter((n) => n.asleep === undefined);
   const axisLen = useMemo(() => axisLength(nights), [nights]);

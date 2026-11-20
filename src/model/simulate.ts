@@ -164,6 +164,8 @@ export interface MealSummary {
   intake: Record<string, number>;
   /** Central absorbed. */
   absorbed: Record<string, number>;
+  /** Only a day's share of drinks spread over several days (ModelEntry.spread): counts, but is no meal at a time. */
+  spread?: boolean;
 }
 
 interface DayTotals {
@@ -234,7 +236,7 @@ function drinkWeights(start: number, drinks: ReadonlyArray<{ time: number; tea: 
 
 /** Effective day status: explicit, else "logged" if the day has entries, else unknown. Today without anything is "pending". */
 export function effectiveDayStatus(days: readonly string[], explicit: Readonly<Record<string, DayStatus>>, entries: readonly ModelEntry[]): Record<string, DayStatus | 'pending'> {
-  const withEntries = new Set(entries.map((e) => e.dayKey));
+  const withEntries = new Set(entries.filter((e) => !e.spread).map((e) => e.dayKey));
   const today = days[days.length - 1];
   const out: Record<string, DayStatus | 'pending'> = {};
   for (const d of days) {
@@ -333,7 +335,7 @@ export function simulate(input: SimulationInput): SimulationResult {
   for (const e of inRange) {
     const kind = drinkKind(e);
     if (kind) {
-      drinks.push({ time: e.time, ...kind });
+      if (!e.spread) drinks.push({ time: e.time, ...kind });
       drinkMeals.push([e]);
     } else foodEntries.push(e);
   }
@@ -378,7 +380,7 @@ export function simulate(input: SimulationInput): SimulationResult {
         }
       });
       if (s === 'central') {
-        mealSummaries.push({ day: meal[0]!.dayKey, start: meal[0]!.time, entryIds: meal.map((e) => e.id), intake: comp.intake, absorbed });
+        mealSummaries.push({ day: meal[0]!.dayKey, start: meal[0]!.time, entryIds: meal.map((e) => e.id), intake: comp.intake, absorbed, ...(meal.every((e) => e.spread) ? { spread: true } : {}) });
       }
     });
   }
