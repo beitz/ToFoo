@@ -30,6 +30,11 @@ export function drinkName(c: Pick<DrinkContainer, 'drink' | 'water'>, d: DrinkCo
   return foodName(d.foods.byCode.get(c.drink!.code)) ?? c.drink!.code;
 }
 
+/** How a container counts, as an icon: + a full one drunk at once, the hourglass one logged when empty (spread over the days since it was filled). */
+export function containerIcon(c: Pick<DrinkContainer, 'whenEmpty'>): 'plus' | 'hourglass' {
+  return c.whenEmpty ? 'hourglass' : 'plus';
+}
+
 /** "1 l black tea", "375 ml water", "1 l klar Medium". */
 export function containerAmountText(c: DrinkContainer, amount: number, d: DrinkContext): string {
   return t('drinks.amountOf', { amount: waterText(containerMl(c, amount)), drink: drinkName(c, d) });

@@ -1590,6 +1590,7 @@ export const en = {
   'drinks.spreadShort': 'Over {length}.',
   'drinks.spreadHint': 'Each day gets its share, as if you drank it evenly.',
   'drinks.whenEmptyShort': 'logged when empty',
+  'drinks.buttonWhenEmpty': '{amount} · when empty',
   'drinks.logWhen': 'When you log it',
   'drinks.logEach': 'Each time',
   'drinks.logEmpty': 'When it is empty',
