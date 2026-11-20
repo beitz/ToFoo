@@ -20,7 +20,7 @@ export const effectsEn = {
   'effect.ENERCC.lowHelp': 'If you don’t mean to lose weight, add a meal or a snack, or more energy-dense foods: nuts, oils, whole-grain bread, dairy.',
 
   'effect.PROT625.low': 'Over time: loss of muscle and strength, slower healing, weaker immune defence.',
-  'effect.PROT625.lowHelp': 'Add a protein food to each meal: legumes, dairy, eggs, fish, meat, tofu. Plant proteins become more complete when mixed, for example grains with legumes.',
+  'effect.PROT625.lowHelp': 'Add a protein food to each meal: legumes, dairy, eggs, fish, meat, tofu. Different proteins over the day make up for each other’s gaps.',
 
   'effect.EAA.low': 'Limits how much protein your body can build, even if total protein looks enough.',
   'effect.EAA.lowHelp': 'More protein overall, or mix sources: grains are low in lysine and legumes in methionine, so eating both fills each other’s gap. Animal foods and soy have all of them.',

@@ -12,7 +12,7 @@ export const nutrientInfoEn = {
   'info.PROT625.low': 'Loss of muscle and strength, slower healing, weaker immune defence.',
   'info.PROT625.high': 'Intakes up to about twice the reference are considered safe for healthy adults; much more brings no extra benefit.',
 
-  'info.EAA.role': 'An essential amino acid: a protein building block the body cannot make, so it must come from food. Animal foods and soy, or combinations like grains with legumes, provide all of them.',
+  'info.EAA.role': 'An essential amino acid: a protein building block the body cannot make, so it must come from food. Animal foods and soy bring all of them in good amounts; with other plant foods, a mix of different kinds over the day does.',
   'info.EAA.low': 'Missing any one of them limits how much protein the body can build, even if total protein looks enough.',
   'info.EAA.high': 'No problems are known from food; very high doses from isolated supplements are not recommended.',
 

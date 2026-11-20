@@ -9,11 +9,11 @@ import { useData } from '../../app/data';
 import { href } from '../../app/router';
 import { lowerName, t, type MessageKey } from '../../i18n';
 import { GROUP_INFO_SOURCES } from '../../i18n/groupInfo.en';
-import { fmtPercent } from '../../lib/format';
+import { fmtNumber, fmtPercent } from '../../lib/format';
 import { NUTRIENT_BY_ID, NUTRIENTS } from '../../model/nutrients';
 import { aminoAcidPattern } from '../../../model/reference-values';
 import { fatSoluble, preparationRetention, retentionClassOf, storage } from '../../../model/parameters';
-import { aminoProfiles, FAT_EXAMPLES, fatProfile, PROTEIN_KINDS } from '../../foods/groupStats';
+import { aminoProfiles, FAT_EXAMPLES, fatProfile, kindSummaries, type ProteinKind } from '../../foods/groupStats';
 import { EAA_IDS } from '../../i18n/nutrientInfo.en';
 import { Sheet } from '../../ui/controls';
 import { Icon } from '../../ui/Icon';
@@ -156,67 +156,73 @@ function ProteinInfo({ onNavigate }: { onNavigate: () => void }) {
   );
 }
 
-/** Kinds of protein food as columns. */
-export const PROTEIN_KIND_KEYS = { grains: 'ginfo.protein.colGrains', legumes: 'ginfo.protein.colLegumes', nuts: 'ginfo.protein.colNuts', animal: 'ginfo.protein.colAnimal' } as const;
+/** A kind of protein food's name, e.g. "Grains" or "Soy, tofu". */
+export function kindName(kind: ProteinKind): string {
+  return t(`ginfo.kind.${kind}` as MessageKey);
+}
 
 /**
- * How much of the need for each essential amino acid a gram of protein covers, by kind of food (median
- * over BLS), with its intro and note; on the group page and in "Mixing plant proteins" on the protein page.
+ * Every kind of protein food with its shortest amino acid (median over BLS, against the WHO adult pattern)
+ * and the kinds richest in it; a tap shows all nine. On the group page and in "Mixing proteins" on the
+ * protein page. One row per kind, not a table of nine columns, so it fits a phone and grows with kinds.
  */
 export function AminoKindTable({ onNavigate }: { onNavigate: () => void }) {
   const d = useData();
-  const profiles = useMemo(() => aminoProfiles(d.foods.foods, EAA_ORDER), [d.foods]);
-  const count = Object.fromEntries(profiles.map((p) => [p.kind, p.foods]));
-  const colKey = PROTEIN_KIND_KEYS;
+  const kinds = useMemo(() => kindSummaries(aminoProfiles(d.foods.foods, EAA_ORDER), aminoAcidPattern.value), [d.foods]);
   return (
     <>
       <p>{t('ginfo.protein.tableIntro')}</p>
-      <div className="table-scroll">
-        <table className="nutrient-table group-info-table">
-          <thead>
-            <tr>
-              <th scope="col" />
-              {PROTEIN_KINDS.map((k) => (
-                <th scope="col" key={k.id} className="num">
-                  {t(colKey[k.id])}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {EAA_ORDER.map((id) => {
-              const need = aminoAcidPattern.value[id];
-              return (
-                <tr key={id}>
-                  <th scope="row">
-                    <NutrientLink id={id} onNavigate={onNavigate}>
-                      {NUTRIENT_BY_ID.get(id)?.short ?? id}
-                    </NutrientLink>
-                  </th>
-                  {profiles.map((p) => {
-                    const v = p.mgPerG[id];
-                    const ratio = v !== undefined && need ? v / need : undefined;
-                    const below = ratio !== undefined && ratio < 1;
+      <div className="aa-kinds">
+        {kinds.map((k) => {
+          const below = !!k.shortest && k.shortest.ratio < 1;
+          return (
+            <details key={k.profile.kind} className="fold aa-kind">
+              <summary className="fold-row">
+                <span className="grow">
+                  <strong>{kindName(k.profile.kind)}</strong>
+                  {k.profile.protein !== undefined && <span className="muted"> · {t('ginfo.protein.perHundred', { g: fmtNumber(k.profile.protein, k.profile.protein < 10 ? 1 : 0) })}</span>}
+                  <br />
+                  {k.shortest ? (
+                    <span className={below ? 'below' : undefined}>
+                      {t('ginfo.protein.shortest', { name: lowerName(NUTRIENT_BY_ID.get(k.shortest.id)?.name ?? k.shortest.id), pct: fmtPercent(k.shortest.ratio) })}
+                      {below && (
+                        <>
+                          {' '}
+                          <span aria-hidden>↓</span>
+                          <span className="visually-hidden">{t('ginfo.protein.below')}</span>
+                        </>
+                      )}
+                    </span>
+                  ) : (
+                    <span className="muted">–</span>
+                  )}
+                </span>
+                <Icon name="down" size={16} />
+              </summary>
+              <div className="fold-body">
+                {k.shortest && k.partners.length > 0 && (
+                  <p>{t('ginfo.protein.partners', { name: lowerName(NUTRIENT_BY_ID.get(k.shortest.id)?.name ?? k.shortest.id), kinds: k.partners.map((x) => kindName(x)).join(' · ') })}</p>
+                )}
+                <ul className="aa-chips">
+                  {EAA_ORDER.map((id) => {
+                    const r = k.ratios[id];
                     return (
-                      <td key={p.kind} className={below ? 'num below' : 'num'}>
-                        {ratio === undefined ? '–' : fmtPercent(ratio)}
-                        {below && (
-                          <>
-                            {' '}
-                            <span aria-hidden>↓</span>
-                            <span className="visually-hidden">{t('ginfo.protein.below')}</span>
-                          </>
-                        )}
-                      </td>
+                      <li key={id} className={r !== undefined && r < 1 ? 'below' : undefined}>
+                        <NutrientLink id={id} onNavigate={onNavigate}>
+                          {NUTRIENT_BY_ID.get(id)?.short ?? id}
+                        </NutrientLink>{' '}
+                        {r === undefined ? '–' : fmtPercent(r)}
+                      </li>
                     );
                   })}
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                </ul>
+                <p className="muted">{t('ginfo.protein.kindFoods', { n: k.profile.foods })}</p>
+              </div>
+            </details>
+          );
+        })}
       </div>
-      <p className="muted">{t('ginfo.protein.tableNote', { grains: count.grains ?? 0, legumes: count.legumes ?? 0, nuts: count.nuts ?? 0, animal: count.animal ?? 0 })}</p>
+      <p className="muted">{t('ginfo.protein.tableNote')}</p>
     </>
   );
 }
