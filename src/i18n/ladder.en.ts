@@ -267,7 +267,7 @@ export const ladderEn = {
   'ladder.MG.none.how': 'The kidneys keep magnesium back when intake is low, so it takes a lot to run short.',
   'ladder.MG.none.signs': 'Spasms, tremor · Mood changes · Nausea',
   'ladder.MG.none.who': 'Long diarrhoea, diabetes, some diuretics, heavy drinking, older age.',
-  'ladder.MG.over': 'Only from supplements: diarrhoea. Magnesium in food does no harm.',
+  'ladder.MG.over': 'Only from supplements or mineral water: diarrhoea. Magnesium in food does no harm.',
   'ladder.MG.over.signs': 'Diarrhoea',
   'ladder.MG.over.who': 'With kidney disease, supplements can cause real poisoning.',
 

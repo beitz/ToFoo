@@ -3,7 +3,10 @@ import { useData } from '../../app/data';
 import { useToast } from '../../app/toast';
 import { t } from '../../i18n';
 import { fmtNumber } from '../../lib/format';
-import { dayWater, waterTarget } from '../../logic/water';
+import { dayWater, dayWaterMinerals, waterTarget } from '../../logic/water';
+import { href } from '../../app/router';
+import { fmtAmount } from '../../lib/format';
+import { NUTRIENT_BY_ID } from '../../model/nutrients';
 import { Icon } from '../../ui/Icon';
 import { defaultTimeFor } from '../log/time';
 import type { DrinkContainer } from '../../storage/types';
@@ -37,10 +40,10 @@ export function WaterCard({ day, compact = false }: { day: string; compact?: boo
   /** One tap: a full one drunk now, or one logged when empty finished now (since its last finish). */
   function tap(c: DrinkContainer) {
     const time = defaultTimeFor(day, d.today);
-    if (!c.whenEmpty) return void logContainer(c, 1, time, d.foods, toast);
+    if (!c.whenEmpty) return void logContainer(c, 1, time, d, toast);
     const since = sinceForTap(c, stored ?? [], d.log, time);
     if (since === undefined) setAdding({ container: c.id });
-    else void logFinished(c, 1, time, since, d.foods, toast);
+    else void logFinished(c, 1, time, since, d, toast);
   }
 
   return (
@@ -65,6 +68,7 @@ export function WaterCard({ day, compact = false }: { day: string; compact?: boo
           </span>
         )}
       </button>
+      {!compact && <WaterMinerals day={day} />}
       {containers.length === 0 ? (
         <button className="btn btn-secondary water-glass" onClick={() => void addWaterWithUndo(GLASS_ML, defaultTimeFor(day, d.today), toast)} aria-label={t('water.addGlass', { amount: waterText(GLASS_ML) })}>
           <Icon name="plus" size={18} /> {waterText(GLASS_ML)}
@@ -73,7 +77,7 @@ export function WaterCard({ day, compact = false }: { day: string; compact?: boo
         // One tap logs a full container; the sheet takes part of one (half a pot).
         <div className="water-containers">
           {containers.map((c) => (
-            <button key={c.id} className="btn btn-secondary water-glass" onClick={() => tap(c)} aria-label={t(c.whenEmpty ? 'drinks.finishFull' : 'drinks.addFull', { name: c.name, what: containerAmountText(c, 1, d.foods) })}>
+            <button key={c.id} className="btn btn-secondary water-glass" onClick={() => tap(c)} aria-label={t(c.whenEmpty ? 'drinks.finishFull' : 'drinks.addFull', { name: c.name, what: containerAmountText(c, 1, d) })}>
               <Icon name={c.whenEmpty ? 'check' : 'plus'} size={18} /> <span className="water-container-name">{c.whenEmpty ? t('drinks.emptyButton', { name: c.name }) : c.name}</span>
             </button>
           ))}
@@ -81,5 +85,23 @@ export function WaterCard({ day, compact = false }: { day: string; compact?: boo
       )}
       {adding && <WaterSheet defaultTime={defaultTimeFor(day, d.today)} container={adding.container} onClose={() => setAdding(null)} />}
     </div>
+  );
+}
+
+/** "Minerals from water: 240 mg calcium · 109 mg magnesium", each a way to its nutrient page; nothing when no water of a known kind was drunk. */
+function WaterMinerals({ day }: { day: string }) {
+  const d = useData();
+  const m = dayWaterMinerals(day, d.modelEntries);
+  const ids = (['CA', 'MG'] as const).filter((id) => (m[id] ?? 0) > 0);
+  if (!ids.length) return null;
+  return (
+    <p className="muted small water-minerals">
+      <span>{t('water.minerals')}</span>
+      {ids.map((id) => (
+        <a key={id} href={href('nutrient', id)}>
+          {fmtAmount(id, m[id]!)} {NUTRIENT_BY_ID.get(id)?.name ?? id}
+        </a>
+      ))}
+    </p>
   );
 }

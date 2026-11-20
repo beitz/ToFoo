@@ -7,6 +7,7 @@ import { cameFrom, timesEaten } from '../../logic/nutrientPage';
 import type { NutrientResult } from '../../model/simulate';
 import type { LogEntry } from '../../storage/types';
 import { refHref } from '../food/links';
+import { waterName } from '../water/containers';
 
 /**
  * "Where it came from" (design 2026-10-22): what gave the amount taken up in the window, as a bar
@@ -84,11 +85,20 @@ export function CameFromCard({ r, days }: { r: NutrientResult; days?: readonly s
 export function contributorHref(d: AppData, label: string): string | undefined {
   let latest: LogEntry | undefined;
   for (const e of d.log) if (e.label === label && (!latest || e.time > latest.time)) latest = e;
-  if (!latest) return undefined;
+  if (!latest) return waterHref(d, label);
   if (latest.kind === 'portion') {
     const recipeId = d.batchesById.get(latest.batchId)?.recipeId;
     if (recipeId && d.recipes.some((x) => x.id === recipeId)) return href('recipes', recipeId);
   }
   if (latest.kind === 'food') return refHref(d, latest.ref) ?? href('entry', latest.id);
   return href('entry', latest.id);
+}
+
+/** A water's line (its minerals, src/logic/water.ts) leads to the water's page, or the Water page for a label typed in. */
+function waterHref(d: AppData, label: string): string | undefined {
+  for (const c of d.settings.drinkContainers ?? []) {
+    if (!c.water || waterName(c.water, d) !== label) continue;
+    return refHref(d, c.water) ?? href('water');
+  }
+  return undefined;
 }

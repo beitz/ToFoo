@@ -8,14 +8,18 @@ import { newId } from '../../lib/id';
 import { CONTAINER_AMOUNTS, CONTAINER_DRINKS, containerDrinkKey, containerMl, MAX_CONTAINER_ML, withContainer, withoutContainer } from '../../logic/drinks';
 import { MAX_WATER_ML } from '../../logic/water';
 import { repo } from '../../storage/repo';
-import type { DrinkContainer, WaterRecord } from '../../storage/types';
+import type { DrinkContainer, FoodRef, WaterRecord } from '../../storage/types';
 import { Field, NumberInput, Sheet } from '../../ui/controls';
 import { TimeField } from '../log/TimeField';
-import { containerAmountText, drinkName, lengthText, logContainer, logFinished, sinceForTap } from './containers';
+import { containerAmountText, drinkName, lengthText, logContainer, logFinished, sinceForTap, waterName } from './containers';
 import { useWaterRecords } from './useWater';
 import { lastFromContainer, MAX_SPREAD_DAYS, spreadProblem } from '../../logic/spread';
 import { formatDateTime } from '../../lib/dates';
 import { waterText } from './format';
+import { initialWater, LabelForm, WaterKindSection, WaterPicker, type WaterChoice } from './WaterKind';
+import { labelWater } from '../../logic/water';
+import { productRef } from '../../foods/products';
+import { saveProductChoice } from '../log/ProductParts';
 
 const PRESETS = [150, 250, 330, 500, 750, 1000];
 const DAY_MS = 86_400_000;
@@ -106,8 +110,8 @@ function AddDrink({ containers, defaultTime, initial, onSetUp, onClose }: { cont
 
   async function save() {
     if (problem) return;
-    if (container && finishing && since !== undefined) await logFinished(container, amount, time, since, d.foods, toast);
-    else if (container) await logContainer(container, amount, time, d.foods, toast);
+    if (container && finishing && since !== undefined) await logFinished(container, amount, time, since, d, toast);
+    else if (container) await logContainer(container, amount, time, d, toast);
     else if (ml) await addWaterWithUndo(Math.round(ml), time, toast);
     onClose();
   }
@@ -136,7 +140,7 @@ function AddDrink({ containers, defaultTime, initial, onSetUp, onClose }: { cont
               </button>
             ))}
           </div>
-          <p className="drink-amount">{containerAmountText(container, amount, d.foods)}</p>
+          <p className="drink-amount">{containerAmountText(container, amount, d)}</p>
           {finishing && <SinceChoice since={since} last={last} time={time} ml={containerMl(container, amount)} onChange={setSince} />}
         </>
       ) : (
@@ -210,7 +214,7 @@ function ContainerList({ containers, onEdit }: { containers: DrinkContainer[]; o
           <button type="button" className="pot-choice" onClick={() => onEdit(c)} aria-label={t('drinks.editOne', { name: c.name })}>
             <span className="grow">
               {c.name}
-              <span className="muted small"> · {drinkName(c, d.foods)}{c.whenEmpty ? ` · ${t('drinks.whenEmptyShort')}` : ''}</span>
+              <span className="muted small"> · {drinkName(c, d)}{c.whenEmpty ? ` · ${t('drinks.whenEmptyShort')}` : ''}</span>
             </span>
             <strong>{waterText(c.ml)}</strong>
           </button>
@@ -228,16 +232,57 @@ function ContainerForm({ container, containers, onDone }: { container?: DrinkCon
   const [ml, setMl] = useState<number | undefined>(container?.ml);
   const [drink, setDrink] = useState<string>(container ? containerDrinkKey(container) : 'water');
   const [whenEmpty, setWhenEmpty] = useState(!!container?.whenEmpty);
+  const [water, setWater] = useState<WaterChoice>(() => initialWater(container, d));
+  // Finding the water or typing its label takes the sheet's place for a moment (the form keeps its state).
+  const [waterStep, setWaterStep] = useState<'find' | 'label'>();
   const problem = !name.trim() ? t('drinks.problem.name') : !ml || !(ml > 0) ? t('drinks.problem.size') : ml > MAX_CONTAINER_ML ? t('drinks.problem.big') : undefined;
+
+  /** The water's reference, saving what it needs first: a product picked online, or the label as a custom food. */
+  async function saveWater(): Promise<FoodRef | undefined> {
+    if (water.kind === 'none') return undefined;
+    if (water.kind === 'ref') {
+      if (water.product) await saveProductChoice(water.product);
+      return water.product ? productRef(water.product) : water.ref;
+    }
+    // The same name corrects the label (earlier fills follow); a new name is another water, so earlier fills keep theirs.
+    const old = water.id ? d.customFoodsById.get(water.id) : undefined;
+    const id = old && old.name.trim().toLowerCase() === water.name.trim().toLowerCase() ? old.id : newId();
+    const cf = labelWater(id, water.name, water.values, old?.createdAt ?? Date.now());
+    await repo.saveCustomFood(cf);
+    return { source: 'custom', id };
+  }
 
   async function save() {
     if (problem || !ml) return;
     const code = CONTAINER_DRINKS.find((x) => x.key === drink)?.code;
     // A drink no longer offered ('other') keeps its food.
     const ref = drink === 'other' ? container?.drink : code ? { source: 'BLS' as const, version: d.foods.version, code } : undefined;
-    await repo.updateSettings({ drinkContainers: withContainer(containers, { id: container?.id ?? newId(), name, ml, ...(ref ? { drink: ref } : {}), ...(whenEmpty ? { whenEmpty } : {}) }) });
+    const waterRef = ref ? undefined : await saveWater();
+    await repo.updateSettings({ drinkContainers: withContainer(containers, { id: container?.id ?? newId(), name, ml, ...(ref ? { drink: ref } : waterRef ? { water: waterRef } : {}), ...(whenEmpty ? { whenEmpty } : {}) }) });
     onDone(!container);
   }
+
+  if (waterStep === 'find')
+    return (
+      <WaterPicker
+        onPick={(w) => {
+          setWater(w);
+          setWaterStep(undefined);
+        }}
+        onCancel={() => setWaterStep(undefined)}
+      />
+    );
+  if (waterStep === 'label')
+    return (
+      <LabelForm
+        initial={water.kind === 'label' ? water : undefined}
+        onDone={(w) => {
+          setWater(w);
+          setWaterStep(undefined);
+        }}
+        onCancel={() => setWaterStep(undefined)}
+      />
+    );
 
   async function remove() {
     if (!container) return;
@@ -255,7 +300,7 @@ function ContainerForm({ container, containers, onDone }: { container?: DrinkCon
   const options: Array<{ key: string; label: string }> = [
     { key: 'water', label: t('drinks.water') },
     ...CONTAINER_DRINKS.map((x) => ({ key: x.key, label: t(`drinks.${x.key}`) })),
-    ...(drink === 'other' && container ? [{ key: 'other', label: drinkName(container, d.foods) }] : []),
+    ...(drink === 'other' && container ? [{ key: 'other', label: drinkName(container, d) }] : []),
   ];
 
   return (
@@ -274,6 +319,7 @@ function ContainerForm({ container, containers, onDone }: { container?: DrinkCon
         ))}
       </div>
       <p className="muted small">{t(drink === 'water' ? 'drinks.holdsWater' : 'drinks.holdsDrink')}</p>
+      {drink === 'water' && <WaterKindSection water={water} onFind={() => setWaterStep('find')} onLabel={() => setWaterStep('label')} onClear={() => setWater({ kind: 'none' })} />}
       <h3 className="section-title">{t('drinks.logWhen')}</h3>
       <div className="chips" role="group" aria-label={t('drinks.logWhen')}>
         {([false, true] as const).map((v) => (
@@ -308,7 +354,9 @@ function ContainerForm({ container, containers, onDone }: { container?: DrinkCon
 
 /** Edit or delete a plain water entry, with undo. */
 function PlainWater({ record, defaultTime, onClose }: { record: WaterRecord; defaultTime: number; onClose: () => void }) {
+  const d = useData();
   const toast = useToast();
+  const kind = record.water ? (waterName(record.water, d) ?? t('drinks.waterGone')) : undefined;
   const [ml, setMl] = useState<number | undefined>(record.ml);
   const [time, setTime] = useState(record.time ?? defaultTime);
   // A container logged empty: when it was filled (the amount counts evenly from then to `time`).
@@ -331,6 +379,7 @@ function PlainWater({ record, defaultTime, onClose }: { record: WaterRecord; def
 
   return (
     <Sheet title={t('water.editTitle')} onClose={onClose}>
+      {kind && <p className="muted small">{t('water.kindLine', { name: kind })}</p>}
       <div className="chips" role="group" aria-label={t('water.presets')}>
         {PRESETS.map((p) => (
           <button key={p} type="button" className={`chip${ml === p ? ' on' : ''}`} aria-pressed={ml === p} onClick={() => setMl(p)}>

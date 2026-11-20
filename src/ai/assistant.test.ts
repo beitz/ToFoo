@@ -232,6 +232,11 @@ describe('several meals at once', () => {
     expect(note).toContain('"Teekanne" 1200 ml Black tea (infusion) (BLS N630000); "Flasche" 750 ml plain water.');
   });
 
+  it('names the mineral water in a water container', () => {
+    const note = appNote({ now, day: '2026-10-17', today: '2026-10-17', logged: [], open: [], barcodes: [], containers: [{ name: 'Arbeitsflasche', ml: 1000, water: 'klar Medium' }] });
+    expect(note).toContain('"Arbeitsflasche" 1000 ml plain water: klar Medium (its minerals count).');
+  });
+
   it('says which containers are logged when empty and when each was last emptied', () => {
     const note = appNote({ now, day: '2026-10-17', today: '2026-10-17', logged: [], open: [], barcodes: [], containers: [{ name: 'Teekanne', ml: 2000, whenEmpty: true, last: new Date(2026, 9, 15, 20, 4).getTime() }] });
     expect(note).toContain('"Teekanne" 2000 ml plain water, logged when empty, last emptied or logged Thu 2026-10-15 20:04.');
@@ -682,6 +687,14 @@ describe('water', () => {
     expect(validateWaterProposal({ ml: 4000, time: '', replaces: '' }, now)).toMatchObject({ ok: false });
     expect(validateWaterProposal({ ml: 250, time: '2026-10-18 09:00', replaces: '' }, now)).toMatchObject({ ok: false });
     expect(validateWaterProposal({ ml: 249.6, time: '', replaces: 'W1' }, now)).toEqual({ ok: true, proposal: { ml: 250, replaces: 'W1' } });
+    const containers: ContainerTool[] = [
+      { id: 'c1', name: 'Arbeitsflasche', ml: 1000 },
+      { id: 'c2', name: 'Teekanne', ml: 2000, drink: true },
+    ];
+    expect(validateWaterProposal({ ml: 1000, time: '', replaces: '', container: 'arbeitsflasche ' }, now, containers)).toEqual({ ok: true, proposal: { ml: 1000, source: { id: 'c1', name: 'Arbeitsflasche' } } });
+    expect(validateWaterProposal({ ml: 1000, time: '', replaces: '', container: '' }, now, containers)).toEqual({ ok: true, proposal: { ml: 1000 } });
+    expect(validateWaterProposal({ ml: 1000, time: '', replaces: '', container: 'Teekanne' }, now, containers)).toMatchObject({ ok: false });
+    expect(validateWaterProposal({ ml: 1000, time: '', replaces: '', container: 'Flasche' }, now, containers)).toMatchObject({ ok: false });
   });
 
   const pot: ContainerTool = { id: 'pot', name: 'Teekanne', ml: 2000, last: new Date(2026, 9, 15, 20, 0).getTime() };

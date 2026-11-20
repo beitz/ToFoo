@@ -9,7 +9,7 @@ import { isOn } from '../settings/features';
 import { repo } from '../storage/repo';
 import { startAutoBackups } from './autoBackup';
 import { applyLanguage } from './language';
-import type { ActivityRecord, Batch, BloodPressureReading, CustomFood, KetoneReading, DayStatusRecord, Fast, LogEntry, Product, Profile, Recipe, Settings, SunEntry } from '../storage/types';
+import type { ActivityRecord, Batch, BloodPressureReading, CustomFood, FoodRef, KetoneReading, DayStatusRecord, Fast, LogEntry, Product, Profile, Recipe, Settings, SunEntry, WaterRecord } from '../storage/types';
 import { resolveRequirements, type ResolvedRequirements } from '../model/requirements';
 import { simulate, type SimulationResult } from '../model/simulate';
 import type { ModelEntry } from '../model/types';
@@ -17,6 +17,9 @@ import { currentWeight, explicitDayStatus, firstModelDay, resolveEntry, sunByDay
 import { activitySun } from '../logic/activity';
 import { measuredStores } from '../logic/lab';
 import { spreadEntry } from '../logic/spread';
+import { waterEntries } from '../logic/water';
+import { productLabel } from '../foods/products';
+import { foodName } from '../i18n/names';
 import { slowWindow } from '../../model/parameters';
 
 /** Longest history the model simulates (performance guard). */
@@ -33,6 +36,7 @@ export interface AppData {
   batches: Batch[];
   batchesById: Map<string, Batch>;
   log: LogEntry[];
+  /** Saved items and supplements (not the labels of waters, which are in `customFoodsById`). */
   customFoods: CustomFood[];
   customFoodsById: Map<string, CustomFood>;
   /** Foods from online databases (Open Food Facts, USDA) saved on this device, most recently used first. */
@@ -43,7 +47,10 @@ export interface AppData {
   fasts: Fast[];
   sunEntries: SunEntry[];
   requirements: ResolvedRequirements;
-  /** The log as the model counts it: a container logged empty is one part per day it was drunk on (src/logic/spread.ts). */
+  /**
+   * The log as the model counts it: a container logged empty is one part per day it was drunk on
+   * (src/logic/spread.ts); plain water of a known kind adds its minerals (src/logic/water.ts).
+   */
   modelEntries: ModelEntry[];
   /** Each log entry resolved whole, by its id (a finished container with all of its amount), for item and meal pages. */
   entriesById: Map<string, ModelEntry>;
@@ -103,10 +110,12 @@ export interface RawData {
   activities: ActivityRecord[];
   ketones: KetoneReading[];
   bloodPressure: BloodPressureReading[];
+  /** Plain water; only water of a known kind (a mineral water) reaches the model. */
+  water?: WaterRecord[];
 }
 
 /** Everything the screens read, derived from the stored records; also used for the tour's sample week. */
-export function computeAppData({ today, foods, searchIndex, profile, settings, recipes, batches, log, customFoods, dayStatus, fasts, sunEntries, productList, activities, ketones, bloodPressure }: RawData): AppData {
+export function computeAppData({ today, foods, searchIndex, profile, settings, recipes, batches, log, customFoods, dayStatus, fasts, sunEntries, productList, activities, ketones, bloodPressure, water = [] }: RawData): AppData {
   const batchesById = new Map(batches.map((b) => [b.id, b]));
   const customFoodsById = new Map(customFoods.map((c) => [c.id, c]));
   const weight = currentWeight(profile);
@@ -124,6 +133,12 @@ export function computeAppData({ today, foods, searchIndex, profile, settings, r
     entriesById.set(e.id, m);
     modelEntries.push(...spreadEntry(m, e));
   }
+  const waterName = (ref: FoodRef) => {
+    if (ref.source === 'BLS') return foodName(foods.byCode.get(ref.code));
+    const p = ref.source === 'custom' ? undefined : productsById.get(refKey(ref));
+    return p ? productLabel(p) : undefined;
+  };
+  modelEntries.push(...waterEntries(water, ctx, waterName));
   const explicit = explicitDayStatus(dayStatus, fasts, log, customFoodsById, today);
   const first = firstModelDay(log, explicit, today);
   const start = first < addDays(today, -MAX_MODEL_DAYS) ? addDays(today, -MAX_MODEL_DAYS) : first;
@@ -173,7 +188,8 @@ export function computeAppData({ today, foods, searchIndex, profile, settings, r
     batches,
     batchesById,
     log,
-    customFoods,
+    // Saved items to log; a mineral water's label counts only through the water logged.
+    customFoods: customFoods.filter((c) => !c.water),
     customFoodsById,
     products,
     productsById,
@@ -226,6 +242,7 @@ export function DataProvider({ children, fallback }: { children: ReactNode; fall
   const activities = useLiveQuery(() => repo.db.activities.toArray(), []);
   const ketones = useLiveQuery(() => repo.db.ketones.orderBy('time').toArray(), []);
   const bloodPressure = useLiveQuery(() => repo.db.bloodPressure.orderBy('time').toArray(), []);
+  const water = useLiveQuery(() => repo.db.water.toArray(), []);
 
   const searchIndex = useMemo(() => (foods ? buildIndex(foods.foods.map((f) => ({ key: f.code, nameEn: f.nameEn, nameDe: f.nameDe }))) : null), [foods]);
 
@@ -256,9 +273,9 @@ export function DataProvider({ children, fallback }: { children: ReactNode; fall
   }, [accent]);
 
   const value = useMemo<AppData | null>(() => {
-    if (!foods || !searchIndex || !profile || !settings || !recipes || !batches || !log || !customFoods || !dayStatus || !fasts || !sunEntries || !productList || !activities || !ketones || !bloodPressure) return null;
-    return computeAppData({ today, foods, searchIndex, profile, settings, recipes, batches, log, customFoods, dayStatus, fasts, sunEntries, productList, activities, ketones, bloodPressure });
-  }, [foods, searchIndex, profile, settings, recipes, batches, log, customFoods, dayStatus, fasts, sunEntries, productList, activities, ketones, bloodPressure, today]);
+    if (!foods || !searchIndex || !profile || !settings || !recipes || !batches || !log || !customFoods || !dayStatus || !fasts || !sunEntries || !productList || !activities || !ketones || !bloodPressure || !water) return null;
+    return computeAppData({ today, foods, searchIndex, profile, settings, recipes, batches, log, customFoods, dayStatus, fasts, sunEntries, productList, activities, ketones, bloodPressure, water });
+  }, [foods, searchIndex, profile, settings, recipes, batches, log, customFoods, dayStatus, fasts, sunEntries, productList, activities, ketones, bloodPressure, water, today]);
 
   // Set before the screens render, since t() reads the language as they do; a change remounts them
   // (key) so every string, memo included, is drawn again in the new language.

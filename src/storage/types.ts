@@ -198,6 +198,13 @@ export interface DrinkContainer {
    * since it was filled (src/logic/spread.ts).
    */
   whenEmpty?: boolean;
+  /**
+   * Plain water only: which water it holds, so each fill adds its minerals (owner's ask 2026-11-20: a
+   * work bottle of mineral water with 240 mg calcium and 109 mg magnesium a litre). A product (Open
+   * Food Facts), a BLS water, or values typed from the label (a custom food with `water`). Unset: the
+   * minerals are not counted (tap water, or a water too low in them to matter).
+   */
+  water?: FoodRef;
 }
 
 /** An empty pot, weighed once and remembered by name. */
@@ -365,6 +372,11 @@ export interface CustomFood extends Versioned {
   nutrients: Record<string, number>;
   confidence: EntryConfidence;
   createdAt: number;
+  /**
+   * A mineral water's label (Water: a container's `water`), per litre (servingGrams 1000): counted
+   * only through the water logged, never offered as a food to log.
+   */
+  water?: true;
 }
 
 export interface DayStatusRecord extends Versioned {
@@ -439,6 +451,8 @@ export interface WaterRecord extends Versioned {
   containerId?: string;
   /** A container finished at `time`, filled at `from` (epoch ms): drunk evenly in between (see the food log's `from`). */
   from?: number;
+  /** Which water it was (the container's `water` when it was logged): its minerals count in the nutrient model. */
+  water?: FoodRef;
 }
 
 export const HABIT_KINDS = ['do', 'avoid', 'minutes'] as const;

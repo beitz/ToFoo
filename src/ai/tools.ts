@@ -219,6 +219,8 @@ export const waterProposalInput = z.object({
   time: z.string().optional(),
   /** Id of the open water card this replaces (e.g. "W1"); empty for a new one. */
   replaces: z.string().optional(),
+  /** Name of the user's water container it was drunk from (its water's minerals then count); empty for none. */
+  container: z.string().optional(),
 });
 
 /** Plain water the assistant proposes, for the user to check; or one of the user's containers, now empty. */
@@ -228,6 +230,8 @@ export interface WaterProposal {
   replaces?: string;
   /** A container finished (propose_container_empty): which, how full it was (1 = full), and when it was filled (epoch ms). */
   container?: { id: string; name: string; amount: number; from: number };
+  /** Drunk from one of the user's water containers (propose_water with a container): saved with it, so its water's minerals count. */
+  source?: { id: string; name: string };
 }
 
 export const containerEmptyInput = z.object({
@@ -248,6 +252,8 @@ export interface ContainerTool {
   ml: number;
   /** Epoch ms it was last emptied or logged; absent when never. */
   last?: number;
+  /** It holds tea or coffee (logged as a food), not plain water. */
+  drink?: true;
 }
 
 export const bloodPressureProposalInput = z.object({
@@ -837,7 +843,7 @@ export function validateActivityProposal(input: unknown, now?: number): { ok: tr
 }
 
 /** Check a `propose_water` call: a plausible amount at a plausible time. */
-export function validateWaterProposal(input: unknown, now?: number): { ok: true; proposal: WaterProposal } | { ok: false; error: string } {
+export function validateWaterProposal(input: unknown, now?: number, containers: readonly ContainerTool[] = []): { ok: true; proposal: WaterProposal } | { ok: false; error: string } {
   const parsed = waterProposalInput.safeParse(input);
   if (!parsed.success) return { ok: false, error: `Invalid input: ${parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}` };
   const problems: string[] = [];
@@ -846,9 +852,16 @@ export function validateWaterProposal(input: unknown, now?: number): { ok: true;
   else if (ml > MAX_WATER_ML) problems.push(`ml is ${ml}, more than ${MAX_WATER_ML} in one card; split it over the day (one card per part of the day).`);
   const { time, problem } = checkTime(parsed.data.time, now);
   if (problem) problems.push(problem);
+  // A water container: its water (a mineral water) goes with the card, so its minerals count.
+  const wanted = parsed.data.container?.trim().toLowerCase();
+  const c = wanted ? containers.find((x) => x.name.trim().toLowerCase() === wanted) : undefined;
+  if (wanted && !c) {
+    const water = containers.filter((x) => !x.drink);
+    problems.push(water.length ? `container "${parsed.data.container}" is not one of the user's water containers: ${water.map((x) => `"${x.name}"`).join(', ')}. Use one of these names, or leave container empty.` : 'the user has no water containers; leave container empty.');
+  } else if (c?.drink) problems.push(`"${c.name}" holds tea or coffee, not plain water: log it in propose_meal with its food.`);
   if (problems.length) return { ok: false, error: `${problems.join('\n')}\nFix these and call propose_water again.` };
   const replaces = parsed.data.replaces?.trim();
-  return { ok: true, proposal: { ml: Math.round(ml), ...(time !== undefined ? { time } : {}), ...(replaces ? { replaces } : {}) } };
+  return { ok: true, proposal: { ml: Math.round(ml), ...(time !== undefined ? { time } : {}), ...(replaces ? { replaces } : {}), ...(c ? { source: { id: c.id, name: c.name } } : {}) } };
 }
 
 /**

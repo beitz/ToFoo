@@ -98,3 +98,46 @@ test('water: a teapot logged when empty is spread over the days since it was fil
   await page.getByRole('button', { name: 'Undo' }).click();
   expect(errors).toEqual([]);
 });
+
+// Owner's ask 2026-11-20: a work bottle of mineral water, about 1 l a day, 240 mg calcium and 109 mg magnesium a litre.
+test("water: a bottle of mineral water from its label counts its minerals; tap water stays plain", async ({ page }) => {
+  const errors = watchErrors(page);
+  await firstLaunch(page);
+  await page.goto('./#/settings');
+  await page.getByText('What you track').click();
+  await page.getByRole('switch', { name: /^Water/ }).click();
+
+  await page.goto('./#/diary');
+  const card = page.locator('.water-card');
+  await card.locator('.water-main').click();
+  const sheet = page.getByRole('dialog');
+  await sheet.getByRole('button', { name: 'Add your cup or bottle' }).click();
+  await sheet.getByRole('textbox', { name: 'Name' }).fill('Arbeitsflasche');
+  await sheet.getByRole('textbox', { name: 'Holds when full' }).fill('1000');
+  await expect(sheet.getByText(/Minerals not counted/)).toBeVisible();
+  await sheet.getByRole('button', { name: 'From the label' }).click();
+  await sheet.getByRole('textbox', { name: 'Name of the water' }).fill('klar Medium');
+  await sheet.getByRole('textbox', { name: 'Calcium' }).fill('240');
+  await sheet.getByRole('textbox', { name: 'Magnesium' }).fill('109');
+  await sheet.getByRole('textbox', { name: 'Sodium' }).fill('63.9');
+  await sheet.getByRole('button', { name: 'Use these values' }).click();
+  await expect(sheet.locator('.water-kind')).toContainText('klar Medium · 240 mg Calcium · 109 mg Magnesium a litre');
+  await sheet.getByRole('button', { name: 'Save' }).click();
+  await expect(sheet).toHaveAccessibleName('Add a drink');
+  await page.keyboard.press('Escape');
+
+  // One tap: a full bottle, its minerals on the card; plain water adds none.
+  await card.getByRole('button', { name: 'Add a full Arbeitsflasche (1 l klar Medium)' }).click();
+  await expect(page.getByText('Arbeitsflasche: 1 l klar Medium added.')).toBeVisible();
+  await expect(card.locator('.water-minerals')).toHaveText('From water:240 mg Calcium109 mg Magnesium');
+  await card.locator('.water-main').click();
+  await sheet.getByRole('button', { name: 'Other amount' }).click();
+  await sheet.getByRole('button', { name: 'Save' }).click();
+  await expect(card).toContainText(/1\.3 l of/);
+  await expect(card.locator('.water-minerals')).toHaveText('From water:240 mg Calcium109 mg Magnesium');
+
+  // The label is no saved item to log.
+  await page.goto('./#/settings/saved');
+  await expect(page.getByText('klar Medium')).toHaveCount(0);
+  expect(errors).toEqual([]);
+});

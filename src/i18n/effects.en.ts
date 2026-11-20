@@ -152,8 +152,8 @@ export const effectsEn = {
   'effect.CA.high': 'Kidney stones and constipation are possible.',
   'effect.CA.highHelp': 'Usually from supplements on top of dairy; check the dose.',
 
-  'effect.MG.high': 'Magnesium from supplements causes diarrhoea in high doses.',
-  'effect.MG.highHelp': 'Lower the supplement dose; magnesium in ordinary food does not count here.',
+  'effect.MG.high': 'Magnesium from supplements or mineral water causes diarrhoea in high doses.',
+  'effect.MG.highHelp': 'Lower the supplement dose or drink a water with less magnesium; magnesium in ordinary food does not count here.',
 
   'effect.FE.high': 'Stomach upset, and over time too much iron in the body.',
   'effect.FE.highHelp': 'Usually from supplements; take them only after a ferritin test and with your doctor.',

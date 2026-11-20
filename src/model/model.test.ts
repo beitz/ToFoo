@@ -368,6 +368,25 @@ describe('meals and days', () => {
     const s = effectiveDayStatus(d, {}, [manual('a@2026-01-01', '2026-01-01', 12, { K: 10 }, { spread: true })]);
     expect(s['2026-01-01']).toBe('unknown');
   });
+
+  it("does not count a day as logged for a mineral water's minerals", () => {
+    const d = days('2026-01-01', 3);
+    const s = effectiveDayStatus(d, {}, [manual('water:w1', '2026-01-01', 12, { CA: 240 }, { isSupplement: false, water: true })]);
+    expect(s['2026-01-01']).toBe('unknown');
+  });
+
+  it("counts a mineral water's magnesium toward the supplement upper limit, as a meal of its own", () => {
+    const d = days('2026-01-01', 2);
+    const food = manual('meal', '2026-01-01', 12, { MG: 100, CA: 300 }, { isSupplement: false });
+    const water = manual('water:w1', '2026-01-01', 12, { MG: 109, CA: 240 }, { isSupplement: false, water: true });
+    const r = simulate(baseInput(d, [food, water]));
+    expect(r.daily[0]!.supplementIntake.MG).toBeCloseTo(109);
+    expect(r.daily[0]!.intake.MG).toBeCloseTo(209);
+    // Two meals at the same time: the water did not join the food's meal, and it is no meal at a time.
+    const meals = r.meals.filter((m) => m.day === '2026-01-01');
+    expect(meals).toHaveLength(2);
+    expect(meals.find((m) => m.entryIds.includes('water:w1'))?.spread).toBe(true);
+  });
 });
 
 describe('simulation', () => {
