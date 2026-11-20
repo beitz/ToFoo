@@ -7,7 +7,7 @@ export const effectsDe: Record<keyof typeof effectsEn, string> = {
   'effect.ENERCC.lowHelp': 'Wenn du nicht abnehmen willst, nimm eine Mahlzeit oder einen Snack dazu, oder energiereichere Lebensmittel: Nüsse, Öle, Vollkornbrot, Milchprodukte.',
 
   'effect.PROT625.low': 'Mit der Zeit: Verlust von Muskeln und Kraft, langsamere Heilung, schwächere Abwehr.',
-  'effect.PROT625.lowHelp': 'Nimm zu jeder Mahlzeit ein Eiweißlebensmittel: Hülsenfrüchte, Milchprodukte, Eier, Fisch, Fleisch, Tofu. Pflanzliche Proteine werden gemischt vollständiger, etwa Getreide mit Hülsenfrüchten.',
+  'effect.PROT625.lowHelp': 'Nimm zu jeder Mahlzeit ein Eiweißlebensmittel: Hülsenfrüchte, Milchprodukte, Eier, Fisch, Fleisch, Tofu. Verschiedene Proteine über den Tag gleichen gegenseitig ihre Lücken aus.',
 
   'effect.EAA.low': 'Begrenzt, wie viel Protein dein Körper aufbauen kann, auch wenn das Gesamtprotein reicht.',
   'effect.EAA.lowHelp': 'Insgesamt mehr Protein, oder Quellen mischen: Getreide hat wenig Lysin und Hülsenfrüchte wenig Methionin, beides zusammen füllt die Lücke des anderen. Tierische Lebensmittel und Soja haben alle.',

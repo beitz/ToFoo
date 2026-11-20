@@ -29,27 +29,34 @@ export const groupInfoEn = {
   'ginfo.protein.dispensableList': 'alanine, asparagine, aspartic acid, glutamic acid, serine',
   'ginfo.protein.histidineNote': 'ToFoo tracks the nine essential ones. WHO counts histidine as essential for adults too; DGE lists it as essential for infants.',
   'ginfo.protein.roles': 'What the essential ones do',
-  'ginfo.protein.plantAnimal': 'Plant and animal protein',
-  'ginfo.protein.tableIntro':
-    'Every protein food contains all nine, but in different proportions. The table shows how much of the need for each one a gram of protein covers, as a typical value for each kind of food. Below 100% (↓), that kind of protein on its own has less of this amino acid per gram than the body needs.',
-  'ginfo.protein.colGrains': 'Grains',
-  'ginfo.protein.colLegumes': 'Legumes',
-  'ginfo.protein.colNuts': 'Nuts, seeds',
-  'ginfo.protein.colAnimal': 'Animal',
+  'ginfo.protein.plantAnimal': 'Protein by kind of food',
+  'ginfo.protein.tableIntro': 'Every protein food contains all nine, but in different proportions, and each kind of food is shortest in one of them. Below: each kind’s shortest amino acid per gram of protein, as a share of what the body needs (↓ below 100%). Tap a kind for all nine and what makes up for it.',
   'ginfo.protein.below': 'below need',
-  'ginfo.protein.tableNote':
-    'Typical value = median over BLS 4.0 foods with at least 3 g protein per 100 g ({grains} grain, {legumes} legume, {nuts} nut and seed, {animal} animal foods). Need = WHO adult requirement pattern, mg per g protein. Many BLS amino acid values are calculated from typical patterns rather than measured.',
-  'ginfo.protein.combine':
-    'Grains are low in lysine and legumes have just about enough methionine + cysteine, so the two make up for each other: lentils with rice, or pea soup with bread. Animal protein usually brings all nine in sufficient amounts. Amino acids from plant protein are also somewhat less available to the body; cooking and sprouting change this, and tannins in grains and legumes lower it.',
+  'ginfo.protein.tableNote': 'Typical value = median over the BLS 4.0 foods of that kind that have a noticeable amount of protein. Need = WHO adult requirement pattern, mg per g protein. Many BLS amino acid values are calculated from typical patterns rather than measured.',
+  'ginfo.protein.perHundred': '{g} g protein per 100 g',
+  'ginfo.protein.shortest': 'Shortest: {name}, {pct}',
+  'ginfo.protein.partners': 'Foods rich in {name} make up for it, most of all: {kinds}.',
+  'ginfo.protein.kindFoods': 'From {n} BLS foods.',
+  'ginfo.kind.grains': 'Grains, bread',
+  'ginfo.kind.legumes': 'Legumes',
+  'ginfo.kind.soy': 'Soy, tofu',
+  'ginfo.kind.nuts': 'Nuts, seeds',
+  'ginfo.kind.vegetables': 'Vegetables',
+  'ginfo.kind.potatoes': 'Potatoes, tubers',
+  'ginfo.kind.mushrooms': 'Mushrooms',
+  'ginfo.kind.dairy': 'Milk, dairy',
+  'ginfo.kind.eggs': 'Eggs',
+  'ginfo.kind.meat': 'Meat, poultry, sausages',
+  'ginfo.kind.fish': 'Fish, seafood',
+  'ginfo.protein.combine': 'Foods that are short in different amino acids make up for each other when eaten over the same day, whatever kinds they are: lentils with rice, bread or pasta with cheese, rice and beans. Animal protein and soy usually bring all nine in good amounts. Amino acids from plant protein are also somewhat less available to the body; cooking and sprouting change this, and tannins in grains and legumes lower it.',
   'ginfo.protein.vegan': 'DGE counts protein among the nutrients to watch.',
 
   'aaRole.HIS': 'Counted as essential for adults, though this was long debated: a shortage shows only after weeks without it.',
   'aaRole.ILE':
     'One of the three branched-chain amino acids (with leucine and valine), which the body breaks down along the same pathway. Its need is estimated from that of leucine.',
   'aaRole.LEU': 'A branched-chain amino acid, like isoleucine and valine. Of the nine, it is the one needed in the largest amount.',
-  'aaRole.LYS': 'The one most likely to run short in grain-based meals: cereal protein, especially wheat, has little of it.',
-  'aaRole.SAA':
-    'Methionine and cysteine contain sulphur. The body makes cysteine from methionine, so the need is set for both together. Methionine also hands on methyl groups in many reactions. Legume protein has only just enough.',
+  'aaRole.LYS': 'Often the shortest in grains and nuts, so it is the one most likely to run short when they bring most of the protein.',
+  'aaRole.SAA': 'Methionine and cysteine contain sulphur. The body makes cysteine from methionine, so the need is set for both together. Methionine also hands on methyl groups in many reactions. Often the shortest in legumes, soy and vegetables.',
   'aaRole.AAA':
     'The body makes tyrosine from phenylalanine, so the need is set for both together. Tyrosine is the starting point for thyroid hormones, adrenaline, noradrenaline and the skin pigment melanin.',
   'aaRole.THR':

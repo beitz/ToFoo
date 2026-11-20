@@ -11,7 +11,7 @@ export const proteinDe: Record<keyof typeof proteinEn, string> = {
   'pq.row.short': 'Kurz gesagt: worauf es ankommt',
   'pq.row.digest': 'Wie viel der Darm aufnimmt',
   'pq.row.scores': 'Qualitätswerte: PDCAAS und DIAAS',
-  'pq.row.mix': 'Pflanzliche Proteine kombinieren',
+  'pq.row.mix': 'Proteine kombinieren',
   'pq.row.leucine': 'Leucin und Muskelaufbau',
   'pq.sources': 'Quellen',
 
@@ -24,9 +24,8 @@ export const proteinDe: Record<keyof typeof proteinEn, string> = {
 
   'pq.short.enough': 'Zuerst zählt, insgesamt genug Protein zu essen. Ein besseres Protein gleicht zu wenig nicht aus.',
   'pq.short.animal': 'Eier, Milch, Fleisch und Fisch bringen alle neun unentbehrlichen Aminosäuren in guter Menge, und der Darm nimmt {low}–{high}% ihres Proteins auf.',
-  'pq.short.plant':
-    'Pflanzliches Protein wird etwas weniger aufgenommen ({low}–{high}% bei Bohnen, Erbsen und Vollkorn), und jeder Art fehlt vor allem eine Aminosäure: Getreide Lysin, Hülsenfrüchten Methionin.',
-  'pq.short.mix': 'Getreide und Hülsenfrüchte gleichen sich aus, und das nicht nur in derselben Mahlzeit: Eine Mischung über den Tag reicht.',
+  'pq.short.plant': 'Pflanzliches Protein wird etwas weniger aufgenommen ({low}–{high}% bei Bohnen, Erbsen und Vollkorn). Und die meisten Lebensmittel sind bei einer Aminosäure am knappsten, je nach Art eine andere.',
+  'pq.short.mix': 'Lebensmittel, denen verschiedene Aminosäuren fehlen, gleichen sich aus, und das nicht nur in derselben Mahlzeit: Eine abwechslungsreiche Mischung über den Tag reicht.',
   'pq.short.soy': 'Soja braucht keinen Partner: Im Tofu liegt selbst die niedrigste Aminosäure bei {pct} dessen, was der Körper pro Gramm Protein braucht.',
   'pq.short.muscle':
     'Für Muskelaufbau verteile das Protein über den Tag: etwa {g} g pro Mahlzeit für dich, alle {hMin} bis {hMax} Stunden. Für die Gesundheit allgemein geht es in der Empfehlung um die Menge am Tag.',
@@ -67,15 +66,15 @@ export const proteinDe: Record<keyof typeof proteinEn, string> = {
   'pq.scores.diaasWhy': 'Die Verdauungsdaten, die der DIAAS braucht, gibt es nur für wenige Lebensmittel, daher kann ToFoo ihn für deine nicht berechnen.',
   'pq.scores.adjust': 'Wofür die WHO einen solchen Wert nutzt: Bei einer Ernährung mit einem Wert unter 1 ist der Proteinbedarf die Empfehlung geteilt durch den Wert.',
 
-  'pq.mix.lead': 'Getreide fehlt es an Lysin, Hülsenfrüchten an Methionin und Cystein. Zusammen gegessen füllt jedes die Lücke des anderen.',
-  'pq.mix.example': 'Berechnet aus dem BLS',
+  'pq.mix.lead': 'Jede Art von Lebensmittel ist bei einer Aminosäure am knappsten, und nicht alle bei derselben. Lebensmittel, denen verschiedene fehlen, füllen gegenseitig ihre Lücken.',
+  'pq.mix.example': 'Ein Beispiel, berechnet aus dem BLS',
   'pq.mix.part': '{grams} g {food}',
   'pq.mix.together': 'Beides zusammen',
   'pq.mix.lowestOf': 'am knappsten {name}',
   'pq.mix.note': 'Anteil = die knappste Aminosäure pro Gramm Protein, verglichen mit dem WHO-Muster 2007 für Erwachsene.',
   'pq.mix.when': 'Sie müssen nicht in derselben Mahlzeit sein: Eine vernünftige Mischung über den Tag reicht. In einer Mahlzeit zu kombinieren, zählt vor allem, wenn insgesamt wenig Protein gegessen wird.',
-  'pq.mix.digestion': 'Kombinieren gleicht die Aminosäuren aus, nicht die Verdauung: Bohnen und Vollkorn werden trotzdem etwas weniger aufgenommen als Eier oder Milch.',
-  'pq.mix.pairs': 'Klassische Paare: Linsen mit Reis, Erbsensuppe mit Brot, Reis mit Bohnen, Couscous mit Kichererbsen.',
+  'pq.mix.digestion': 'Kombinieren gleicht die Aminosäuren aus, nicht die Verdauung: Das Protein jedes Lebensmittels wird so gut aufgenommen, wie es auch allein würde.',
+  'pq.mix.pairs': 'Gerichte, die das tun: Linsen mit Reis, Erbsensuppe mit Brot, Brot oder Nudeln mit Käse, Reis mit Bohnen, Couscous mit Kichererbsen.',
   'pq.mix.kinds': 'Nach Art des Lebensmittels',
 
   'pq.leu.lead': 'Leucin ist ein Baustein und zugleich ein Signal: Nach einer Mahlzeit hilft es, den Aufbau von Muskelprotein anzuschalten.',

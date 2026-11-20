@@ -9745,3 +9745,32 @@ button.link-row {
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
+
+/* Protein by kind of food: one row per kind, all nine amino acids behind a tap. */
+.aa-kinds {
+  margin: 6px 0;
+}
+.aa-kind + .aa-kind {
+  border-top: 1px solid var(--border);
+}
+.aa-kind > summary {
+  padding: 6px 0;
+}
+.aa-kind .below {
+  font-weight: 700;
+  color: var(--warn);
+}
+.aa-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 6px 0;
+  padding: 0;
+  list-style: none;
+}
+.aa-chips > li {
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-variant-numeric: tabular-nums;
+}

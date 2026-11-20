@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { RawValue } from '../model/types';
 import type { Food } from './foodDb';
-import { aminoProfiles, fatProfile } from './groupStats';
+import { aminoProfiles, fatProfile, kindSummaries } from './groupStats';
 
 function food(code: string, per100: Record<string, RawValue>): Food {
   return { code, nameDe: code, nameEn: code, group: code.charAt(0), per100, provenance: {} };
@@ -24,7 +24,31 @@ describe('amino acids by kind of food', () => {
     expect(byKind.grains?.mgPerG.LYS).toBeCloseTo(40);
     expect(byKind.grains?.foods).toBe(4);
     expect(byKind.legumes?.mgPerG.LYS).toBeCloseTo(70);
-    expect(byKind.animal?.mgPerG.LYS).toBeCloseTo(90);
+    expect(byKind.meat?.mgPerG.LYS).toBeCloseTo(90);
+    expect(byKind.grains?.protein).toBeCloseTo(10);
+  });
+
+  it('counts vegetables from 1 g protein, since they rarely have 3', () => {
+    const veg = aminoProfiles([food('G100000', { PROT625: 2, LYS: 0.1 }), food('G750100', { PROT625: 12, LYS: 0.8 })], ['LYS']);
+    expect(veg.find((p) => p.kind === 'vegetables')?.foods).toBe(1);
+    expect(veg.find((p) => p.kind === 'soy')?.foods).toBe(1);
+  });
+
+  it("names each kind's shortest amino acid and the kinds richest in it", () => {
+    const profiles = aminoProfiles(
+      [
+        food('C131000', { PROT625: 10, LYS: 0.3, SAA: 0.4 }), // grains: lysine 30, sulphur 40
+        food('H701000', { PROT625: 10, LYS: 0.7, SAA: 0.2 }), // legumes: lysine 70, sulphur 20
+        food('U201000', { PROT625: 10, LYS: 0.9, SAA: 0.4 }), // meat: lysine 90, sulphur 40
+      ],
+      ['LYS', 'SAA'],
+    );
+    const s = Object.fromEntries(kindSummaries(profiles, { LYS: 45, SAA: 22 }).map((k) => [k.profile.kind, k]));
+    expect(s.grains?.shortest?.id).toBe('LYS');
+    expect(s.grains?.partners).toEqual(['meat', 'legumes']);
+    expect(s.legumes?.shortest?.id).toBe('SAA');
+    expect(s.legumes?.partners).toEqual(['grains', 'meat']);
+    expect(s.nuts?.shortest).toBeUndefined();
   });
 
   it('leaves a kind without data empty instead of zero', () => {

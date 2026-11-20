@@ -26,7 +26,7 @@ import { Icon } from '../../ui/Icon';
 import { InfoButton } from '../../ui/InfoButton';
 import { StatusMark } from '../../ui/Tile';
 import { hasNoData } from '../../ui/Gauge';
-import { AminoKindTable, EAA_ORDER, GroupInfoLink, PROTEIN_KIND_KEYS } from '../info/GroupInfo';
+import { AminoKindTable, EAA_ORDER, GroupInfoLink, kindName } from '../info/GroupInfo';
 
 const m = (key: string, vars?: Record<string, string | number>) => t(key as MessageKey, vars);
 
@@ -308,6 +308,8 @@ function Mixing({ onNavigate }: Nav) {
       <p>
         <strong>{t('pq.mix.lead')}</strong>
       </p>
+      <h3>{t('pq.mix.kinds')}</h3>
+      <AminoKindTable onNavigate={onNavigate} />
       {ex && (
         <>
           <h3>{t('pq.mix.example')}</h3>
@@ -338,8 +340,6 @@ function Mixing({ onNavigate }: Nav) {
       <p>{t('pq.mix.when')}</p>
       <p>{t('pq.mix.digestion')}</p>
       <p>{t('pq.mix.pairs')}</p>
-      <h3>{t('pq.mix.kinds')}</h3>
-      <AminoKindTable onNavigate={onNavigate} />
       <Sources list={[DGE_FAQ, cited(leucineFacts), WHO_2007, BLS]} />
     </>
   );
@@ -388,7 +388,7 @@ function Leucine({ onNavigate }: Nav) {
               const mgPerG = p.mgPerG.LEU;
               return (
                 <tr key={p.kind}>
-                  <th scope="row">{t(PROTEIN_KIND_KEYS[p.kind])}</th>
+                  <th scope="row">{kindName(p.kind)}</th>
                   <td className="num">{mgPerG === undefined ? '–' : `${fmtNumber(mgPerG / 10, 1)} g`}</td>
                   <td className="num">{mgPerG === undefined ? '–' : `${fmtNumber((lf.thresholdG * 1000) / mgPerG)} g`}</td>
                 </tr>

@@ -14,7 +14,7 @@ export const proteinEn = {
   'pq.row.short': 'In short: what matters',
   'pq.row.digest': 'How much the gut takes up',
   'pq.row.scores': 'Quality scores: PDCAAS and DIAAS',
-  'pq.row.mix': 'Mixing plant proteins',
+  'pq.row.mix': 'Mixing proteins',
   'pq.row.leucine': 'Leucine and building muscle',
   'pq.sources': 'Sources',
 
@@ -27,9 +27,8 @@ export const proteinEn = {
 
   'pq.short.enough': 'Enough protein in total comes first. A better protein cannot make up for too little.',
   'pq.short.animal': 'Eggs, milk, meat and fish bring all nine essential amino acids in good amounts, and the gut takes up {low}–{high}% of their protein.',
-  'pq.short.plant':
-    'Plant protein is taken up a little less ({low}–{high}% for beans, peas and whole grains), and each kind runs short of one amino acid in particular: grains of lysine, legumes of methionine.',
-  'pq.short.mix': 'Grains and legumes make up for each other, and not only in the same meal: a mix over the day is enough.',
+  'pq.short.plant': 'Plant protein is taken up a little less ({low}–{high}% for beans, peas and whole grains). And most foods are shortest in one amino acid, which differs by kind of food.',
+  'pq.short.mix': 'Foods short in different amino acids make up for each other, and not only in the same meal: a varied mix over the day is enough.',
   'pq.short.soy': 'Soy needs no partner: in tofu, even the lowest amino acid is at {pct} of what the body needs per gram of protein.',
   'pq.short.muscle':
     'For building muscle, spread the protein over the day: about {g} g a meal for you, every {hMin} to {hMax} hours. For health in general, the day’s total is what the recommendation is about.',
@@ -70,15 +69,15 @@ export const proteinEn = {
   'pq.scores.diaasWhy': 'The digestion data DIAAS needs exists for few foods, so ToFoo cannot work it out for yours.',
   'pq.scores.adjust': 'WHO’s use for a score: for a diet that scores below 1, the protein needed is the recommendation divided by the score.',
 
-  'pq.mix.lead': 'Grains are short of lysine, legumes of methionine and cysteine. Eaten together, each fills the other’s gap.',
-  'pq.mix.example': 'Worked out from BLS',
+  'pq.mix.lead': 'Every kind of food is shortest in one amino acid, and not all in the same one. Foods short in different ones fill each other’s gaps.',
+  'pq.mix.example': 'For example, worked out from BLS',
   'pq.mix.part': '{grams} g {food}',
   'pq.mix.together': 'Both together',
   'pq.mix.lowestOf': 'lowest {name}',
   'pq.mix.note': 'Share = the lowest amino acid per gram of protein, against the WHO 2007 adult pattern.',
   'pq.mix.when': 'They don’t need to be in the same meal: a reasonable mix over the day covers it. Mixing within one meal matters most when protein is low overall.',
-  'pq.mix.digestion': 'Mixing fixes the balance of amino acids, not the digestion: beans and whole grains are still taken up a little less than eggs or milk.',
-  'pq.mix.pairs': 'Classic pairs: lentils with rice, pea soup with bread, rice and beans, couscous with chickpeas.',
+  'pq.mix.digestion': 'Mixing fixes the balance of amino acids, not the digestion: each food’s protein is taken up as well as it would be on its own.',
+  'pq.mix.pairs': 'Dishes that do this: lentils with rice, pea soup with bread, bread or pasta with cheese, rice and beans, couscous with chickpeas.',
   'pq.mix.kinds': 'By kind of food',
 
   'pq.leu.lead': 'Leucine is a building block and also a signal: after a meal it helps switch on the building of muscle protein.',

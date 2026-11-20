@@ -10,7 +10,7 @@ export const nutrientInfoDe: Record<keyof typeof nutrientInfoEn, string> = {
   'info.PROT625.low': 'Verlust von Muskeln und Kraft, langsamere Heilung, schwächere Abwehr.',
   'info.PROT625.high': 'Mengen bis etwa zum Doppelten des Referenzwerts gelten für gesunde Erwachsene als sicher; viel mehr bringt keinen zusätzlichen Nutzen.',
 
-  'info.EAA.role': 'Eine essenzielle Aminosäure: ein Proteinbaustein, den der Körper nicht selbst bilden kann, daher muss sie aus dem Essen kommen. Tierische Lebensmittel und Soja, oder Kombinationen wie Getreide mit Hülsenfrüchten, liefern alle.',
+  'info.EAA.role': 'Eine essenzielle Aminosäure: ein Proteinbaustein, den der Körper nicht selbst bilden kann, daher muss sie aus dem Essen kommen. Tierische Lebensmittel und Soja bringen alle in guter Menge; bei anderen pflanzlichen Lebensmitteln schafft das eine Mischung verschiedener Arten über den Tag.',
   'info.EAA.low': 'Fehlt eine davon, begrenzt das, wie viel Protein der Körper aufbauen kann, auch wenn das Gesamtprotein reicht.',
   'info.EAA.high': 'Aus dem Essen sind keine Probleme bekannt; sehr hohe Dosen aus isolierten Ergänzungsmitteln werden nicht empfohlen.',
 
