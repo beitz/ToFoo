@@ -11,7 +11,8 @@ import { repo } from '../../storage/repo';
 import type { DrinkContainer, FoodRef, WaterRecord } from '../../storage/types';
 import { Field, NumberInput, Sheet } from '../../ui/controls';
 import { TimeField } from '../log/TimeField';
-import { containerAmountText, drinkName, lengthText, logContainer, logFinished, sinceForTap, waterName } from './containers';
+import { containerAmountText, containerIcon, drinkName, lengthText, logContainer, logFinished, sinceForTap, waterName } from './containers';
+import { Icon } from '../../ui/Icon';
 import { useWaterRecords } from './useWater';
 import { lastFromContainer, MAX_SPREAD_DAYS, spreadProblem } from '../../logic/spread';
 import { formatDateTime } from '../../lib/dates';
@@ -212,6 +213,7 @@ function ContainerList({ containers, onEdit }: { containers: DrinkContainer[]; o
       {containers.map((c) => (
         <li key={c.id}>
           <button type="button" className="pot-choice" onClick={() => onEdit(c)} aria-label={t('drinks.editOne', { name: c.name })}>
+            <Icon name={containerIcon(c)} size={18} />
             <span className="grow">
               {c.name}
               <span className="muted small"> · {drinkName(c, d)}{c.whenEmpty ? ` · ${t('drinks.whenEmptyShort')}` : ''}</span>

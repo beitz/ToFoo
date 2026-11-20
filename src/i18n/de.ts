@@ -1584,6 +1584,7 @@ export const de: Record<MessageKey, string> = {
   'drinks.spreadShort': 'Über {length}.',
   'drinks.spreadHint': 'Jeder Tag bekommt seinen Anteil, als hättest du gleichmäßig getrunken.',
   'drinks.whenEmptyShort': 'eingetragen, wenn leer',
+  'drinks.buttonWhenEmpty': '{amount} · wenn leer',
   'drinks.logWhen': 'Wann du einträgst',
   'drinks.logEach': 'Jedes Mal',
   'drinks.logEmpty': 'Wenn leer',

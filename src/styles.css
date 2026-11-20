@@ -2826,7 +2826,6 @@ body:has(.fab-stack) .toast-area {
   gap: 10px;
   padding: 10px 12px;
 }
-/* Own containers: a row of one-tap buttons under the bar (a full teapot, a full bottle). */
 /* Calcium and magnesium from a known water, each a link to its nutrient page (44 px tall to tap). */
 .water-minerals {
   flex-basis: 100%;
@@ -2856,23 +2855,50 @@ body:has(.fab-stack) .toast-area {
   flex-wrap: wrap;
   gap: 8px;
 }
+/* Own containers: a row of one-tap buttons under the bar (a full teapot, a full bottle). */
 .water-containers {
   flex-basis: 100%;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
+/* Side by side, each as wide as its name needs (a short "Teekanne" leaves room for "Arbeitsflasche"); a long one shortens. */
 .water-containers .water-glass {
-  flex: 1 1 0;
+  flex: 1 1 auto;
   min-width: 0;
+  min-height: 48px;
+  padding: 4px 12px 4px 10px;
+  gap: 6px;
+}
+/* Up to three stay on one line (the usual teapot and bottle); more wrap. */
+.water-containers.few {
+  flex-wrap: nowrap;
 }
 .water-containers .water-glass svg {
   flex: none;
 }
-.water-container-name {
+/* Name over its size and how it counts: "Teekanne" / "2 l · when empty". */
+.water-container-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
   min-width: 0;
+  line-height: 1.2;
+  text-align: left;
+}
+.water-container-name,
+.water-container-sub {
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.water-container-name {
+  font-size: 0.9375rem;
+}
+.water-container-sub {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-muted);
 }
 .drink-amount {
   margin: 4px 0 8px;

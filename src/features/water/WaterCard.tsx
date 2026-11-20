@@ -10,13 +10,15 @@ import { NUTRIENT_BY_ID } from '../../model/nutrients';
 import { Icon } from '../../ui/Icon';
 import { defaultTimeFor } from '../log/time';
 import type { DrinkContainer } from '../../storage/types';
-import { containerAmountText, logContainer, logFinished, sinceForTap } from './containers';
+import { containerAmountText, containerIcon, logContainer, logFinished, sinceForTap } from './containers';
 import { waterText } from './format';
 import { useWaterDays, useWaterRecords } from './useWater';
 import { addWaterWithUndo, WaterSheet } from './WaterSheet';
 
 /** One glass, the quick-add amount. */
 const GLASS_ML = 250;
+/** Up to this many own containers sit side by side on one line; more wrap onto a second. */
+const FEW_CONTAINERS = 3;
 
 /**
  * Water on one day (docs/SPEC.md, "Water"): plain water plus the water in foods and other drinks,
@@ -74,11 +76,16 @@ export function WaterCard({ day, compact = false }: { day: string; compact?: boo
           <Icon name="plus" size={18} /> {waterText(GLASS_ML)}
         </button>
       ) : (
-        // One tap logs a full container; the sheet takes part of one (half a pot).
-        <div className="water-containers">
+        // One tap logs a full container, side by side; the sheet takes part of one (half a pot). The icon
+        // says how it counts: + a full one drunk now, the hourglass one logged when empty (spread since filled).
+        <div className={containers.length <= FEW_CONTAINERS ? 'water-containers few' : 'water-containers'}>
           {containers.map((c) => (
             <button key={c.id} className="btn btn-secondary water-glass" onClick={() => tap(c)} aria-label={t(c.whenEmpty ? 'drinks.finishFull' : 'drinks.addFull', { name: c.name, what: containerAmountText(c, 1, d) })}>
-              <Icon name={c.whenEmpty ? 'check' : 'plus'} size={18} /> <span className="water-container-name">{c.whenEmpty ? t('drinks.emptyButton', { name: c.name }) : c.name}</span>
+              <Icon name={containerIcon(c)} size={16} />
+              <span className="water-container-text" aria-hidden>
+                <span className="water-container-name">{c.name}</span>
+                <span className="water-container-sub">{c.whenEmpty ? t('drinks.buttonWhenEmpty', { amount: waterText(c.ml) }) : waterText(c.ml)}</span>
+              </span>
             </button>
           ))}
         </div>

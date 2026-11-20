@@ -43,6 +43,14 @@ test('water: own teapot and bottle, one tap for a full one, half a pot from the 
   await expect(page.getByText('Teekanne: 600 ml black tea added.')).toBeVisible();
   await expect(card).toContainText(/59\d ml of/);
 
+  // Both containers side by side on Home, each with its size (owner's ask 2026-11-20).
+  const buttons = card.locator('.water-containers .water-glass');
+  await expect(buttons).toHaveCount(2);
+  await expect(buttons.nth(0)).toContainText('Teekanne1.2 l');
+  await expect(buttons.nth(1)).toContainText('Flasche750 ml');
+  const [a, b] = [await buttons.nth(0).boundingBox(), await buttons.nth(1).boundingBox()];
+  expect(Math.abs(a!.y - b!.y)).toBeLessThan(2);
+
   // One tap on the card: a full bottle of plain water, then undo.
   await card.getByRole('button', { name: 'Add a full Flasche (750 ml water)' }).click();
   await expect(page.getByText('Flasche: 750 ml water added.')).toBeVisible();
@@ -93,6 +101,7 @@ test('water: a teapot logged when empty is spread over the days since it was fil
 
   // The next time, one tap on Home: since the last time it was emptied, with undo.
   await page.goto('./#/');
+  await expect(card.locator('.water-glass')).toContainText('Teekanne2 l · when empty');
   await card.getByRole('button', { name: /Teekanne is empty/ }).click();
   await expect(page.getByText(/Teekanne empty: 2 l black tea since /)).toBeVisible();
   await page.getByRole('button', { name: 'Undo' }).click();
