@@ -20,6 +20,8 @@ import { PortionFields, portionDraftValid, type PortionDraft } from '../log/Port
 import { MatchPicker, ProductInfo, saveProductChoice, useMatchChoice } from '../log/ProductParts';
 import { AmountField } from '../log/AmountField';
 import { TimeField } from '../log/TimeField';
+import { MAX_SPREAD_DAYS, spreadProblem } from '../../logic/spread';
+import { lengthText } from '../water/containers';
 import { foodName } from '../../i18n/names';
 
 /** A portion entry with changed fields; a field set to undefined is left out (not stored as undefined). */
@@ -50,7 +52,14 @@ export function EditEntrySheet({ entry, onClose, nutrientsLink = true }: { entry
   // A product with no label values and no matched food would count nothing but a name.
   const hasValues = !productDraft || Object.keys(productDraft.per100).length > 0 || !!choice.food;
   const batch = draft.kind === 'portion' ? d.batchesById.get(draft.batchId) : undefined;
-  const finished = draft.kind === 'portion' && batch && !portionDraftValid(draft, batch) ? undefined : completeDraft(draft);
+  // A container logged empty: its amount counts evenly from when it was filled to when it was finished.
+  const spread = draft.kind === 'food' && draft.from !== undefined ? spreadProblem(draft.from, draft.time) : undefined;
+  const spreadNote = draft.kind !== 'food' || draft.from === undefined
+    ? undefined
+    : spread
+      ? { problem: true, text: t(spread === 'order' ? 'drinks.problem.order' : 'drinks.problem.long', { n: MAX_SPREAD_DAYS }) }
+      : { problem: false, text: `${t('drinks.spreadShort', { length: lengthText(draft.from, draft.time) })} ${t('drinks.spreadHint')}` };
+  const finished = spread || (draft.kind === 'portion' && batch && !portionDraftValid(draft, batch)) ? undefined : completeDraft(draft);
 
   /** The BLS food behind the old entry: a good first guess for a product's missing vitamins and minerals. */
   function oldFood(): Food | undefined {
@@ -151,7 +160,9 @@ export function EditEntrySheet({ entry, onClose, nutrientsLink = true }: { entry
           )}
           {draft.kind === 'manual' && <p className="muted small">{t('diary.manualHint')}</p>}
           {draft.kind !== 'drink' && <ConfidenceField value={draft.confidence} onChange={(c) => set({ confidence: c })} />}
-          <TimeField value={draft.time} onChange={(time) => set({ time })} />
+          {draft.kind === 'food' && draft.from !== undefined && <TimeField value={draft.from} onChange={(from) => set({ from })} label={t('drinks.filledAt')} />}
+          <TimeField value={draft.time} onChange={(time) => set({ time })} label={draft.kind === 'food' && draft.from !== undefined ? t('drinks.finishedAt') : undefined} />
+          {spreadNote && <p className={spreadNote.problem ? 'notice small' : 'muted small'}>{spreadNote.text}</p>}
           <div className="sheet-actions">
             <button className="btn btn-danger-ghost" onClick={() => void remove()}>
               {t('common.delete')}

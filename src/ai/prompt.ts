@@ -53,7 +53,8 @@ const HABITS = `- Habits: the user keeps habits, listed by name in the app's not
 const CHECK = `- Checking logged foods: when the user asks you to check what they logged ("check my foods from last week", "do the BLS foods make sense?"), call check_logged_foods with the days to look back (7 unless they say; 0 for everything). It lists every food eaten, once, flagged ones first: for products the label, categories, ingredients and the BLS food the vitamins and minerals come from, with how well the label fits it; for BLS foods what was eaten. Judge each pairing like a nutrition-savvy friend: is the BLS food the same kind of food (a beer needs a beer, not beer ham; a ready meal its dish or its ingredients)? Do the amounts look like what one person eats? For each pairing that is clearly wrong, call propose_food_fix (search_foods first for the right BLS food): use "bls" with the BLS code, "ingredients" to build a product from its ingredient list, or "label_only"; reason: one short line in plain words why (e.g. "A beer, not a ham"). A fix for a BLS food changes the entries logged by itself in that period (give the same days). Only propose what you are sure of; mention borderline ones and odd amounts in your text, and say when everything looks right. The app shows its own flags; a flag alone is not a reason to change a pairing that makes sense, but a pairing of another kind (a drink with a food, tofu with fish, a supplement with any food) is almost always wrong. Foods the user marked as checked are left out; include them only when the user asks to check everything again. Foods the user marked as not right come first: search for the right food and propose a fix for each, or say why it is right after all. After a check, call propose_mark_checked once with every food you judged right (not the ones you propose fixes for or have doubts about), so their next check covers only new foods. What the check covers is what the user included under Include my data: their food log (from the period they chose) and, with Kitchen ticked, what they have at home in the ticked places ("at home: …"); when the tool says something is not included, tell them to tick it there. To change an open fix card, call it again with replaces set to its id (F1, F2, …).`;
 
 const WATER = `- Water: plain water (tap, mineral, sparkling, nothing added) goes in propose_water with ml and time, not in a meal: it is kept apart so it never ends a fast. Every other drink (coffee, tea, juice, milk, soda, beer, smoothies) goes in a meal as a food, since the app counts the water in foods from the database. Glasses ≈ 250 ml, a small bottle 500 ml, a large bottle 1,500 ml (or what the user says). For "about two litres over the day", propose two or three cards spread over the day rather than one. To change an open water card, call propose_water again with replaces set to its id (W1, W2, …).
-- Own cups and bottles: the app's note lists the user's own containers with what each holds when full. When they drank from one ("zwei Kannen Tee", "one bottle", "half my teapot", "drei Becher"), go by its size: how many × its ml (half a pot is half its ml), and say it in assumptions (e.g. "2 × Teekanne, 1,200 ml each"). One with plain water goes in propose_water. One with tea or coffee goes in propose_meal as its own card with that BLS code and grams = ml (preparation asListed, confidence B), at the time it was drunk; plain tea and coffee do not end a fast. Milk or sugar added goes in as its own food on that card. A container they did not name in the list is not one of theirs: estimate as usual.`;
+- Own cups and bottles: the app's note lists the user's own containers with what each holds when full. When they drank from one ("zwei Kannen Tee", "one bottle", "half my teapot", "drei Becher"), go by its size: how many × its ml (half a pot is half its ml), and say it in assumptions (e.g. "2 × Teekanne, 1,200 ml each"). One with plain water goes in propose_water. One with tea or coffee goes in propose_meal as its own card with that BLS code and grams = ml (preparation asListed, confidence B), at the time it was drunk; plain tea and coffee do not end a fast. Milk or sugar added goes in as its own food on that card. A container they did not name in the list is not one of theirs: estimate as usual.
+- Containers emptied: when the user says one of their containers is empty or finished ("die Teekanne ist leer", "finished my bottle", most often for those logged when empty), call propose_container_empty with its name, the time it was emptied, and since: when it was filled, only if they say it ("seit gestern Abend"; empty for the last time it was emptied or logged, from the note). how_full if it was not filled up (0.5 = half). The app spreads its amount evenly over the days between, so do not also log it as a meal or as water. If it was never logged and they did not say when they filled it, ask.`;
 
 export interface PromptSources {
   /** Open Food Facts barcode lookup on. */
@@ -408,7 +409,7 @@ function tools({ off = false, usda = false, webSearch = false, journal = false, 
     ...(journal ? [PROPOSE_JOURNAL_ENTRY] : []),
     ...(sleep ? [PROPOSE_SLEEP] : []),
     ...(activity ? [SEARCH_ACTIVITIES, PROPOSE_ACTIVITY] : []),
-    ...(water ? [PROPOSE_WATER] : []),
+    ...(water ? [PROPOSE_WATER, PROPOSE_CONTAINER_EMPTY] : []),
     ...(ketones ? [PROPOSE_KETONE] : []),
     ...(weight ? [PROPOSE_WEIGHT] : []),
     ...(bloodPressure ? [PROPOSE_BLOOD_PRESSURE] : []),
@@ -689,6 +690,24 @@ const PROPOSE_WATER: BetaTool = {
     },
     required: ['ml', 'time', 'replaces'],
     additionalProperties: false,
+  },
+};
+
+const PROPOSE_CONTAINER_EMPTY: BetaTool = {
+  name: 'propose_container_empty',
+  description:
+    "Show the user one of their own containers (from the app's note) as finished, as a card for the user to check and confirm; nothing is saved until they do. Its amount (water, or its tea or coffee) is spread evenly from when it was filled to when it was emptied. After a correction, call it again with replaces set to the card id.",
+  // Not strict: see STRICT_NESTED. The app validates the input itself and sends errors back.
+  input_schema: {
+    type: 'object',
+    properties: {
+      container: { type: 'string', description: 'The container\'s name exactly as in the app\'s note, e.g. "Teekanne".' },
+      how_full: { type: 'number', description: 'How full it was filled, 1 = full (default), 0.5 = half.' },
+      time: { type: 'string', description: 'When it was emptied, local "YYYY-MM-DD HH:MM"; empty for now.' },
+      since: { type: 'string', description: 'When it was filled, local "YYYY-MM-DD HH:MM", only if the user said; empty for the last time it was emptied or logged.' },
+      replaces: { type: 'string', description: 'Id of the open water card this corrects (e.g. "W1"); empty for a new one.' },
+    },
+    required: ['container', 'time', 'since', 'replaces'],
   },
 };
 

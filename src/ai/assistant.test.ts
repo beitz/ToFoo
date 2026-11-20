@@ -3,7 +3,7 @@ import type * as Beta from '@anthropic-ai/sdk/resources/beta/messages/messages';
 import type { Food } from '../foods/foodDb';
 import { buildIndex } from '../foods/search';
 import { appNote, emptyConversation, requestParams, retirePhotos, sendMessage, textOf, type CreateMessage } from './assistant';
-import { describeFood, validateBatchProposal, validatePortionProposal, MAX_INGREDIENT_GRAMS, MAX_ITEM_GRAMS, runCheckRecipe, runListRecipes, validateRecipeProposal, validateIngredientsProposal, runLookupBarcode, runSearchFoods, runSearchProducts, runSearchActivities, runSearchUsda, validateJournalProposal, validateProposal, validateSleepProposal, validateActivityProposal, validateWaterProposal, validateKetoneProposal, validateWeightProposal, validateBloodPressureProposal, validateHabitsProposal, validateShoppingProposal, validateHomeProposal, type ProductTools, type ToolContext } from './tools';
+import { describeFood, validateBatchProposal, validatePortionProposal, MAX_INGREDIENT_GRAMS, MAX_ITEM_GRAMS, runCheckRecipe, runListRecipes, validateRecipeProposal, validateIngredientsProposal, runLookupBarcode, runSearchFoods, runSearchProducts, runSearchActivities, runSearchUsda, validateJournalProposal, validateProposal, validateSleepProposal, validateActivityProposal, validateWaterProposal, validateContainerEmpty, validateKetoneProposal, validateWeightProposal, validateBloodPressureProposal, validateHabitsProposal, validateShoppingProposal, validateHomeProposal, type ContainerTool, type ProductTools, type ToolContext } from './tools';
 import type { Product } from '../storage/types';
 import type { FindResult } from '../foods/findProduct';
 
@@ -230,6 +230,11 @@ describe('several meals at once', () => {
   it('lists the user\'s cups and bottles with their size and drink', () => {
     const note = appNote({ now, day: '2026-10-17', today: '2026-10-17', logged: [], open: [], barcodes: [], containers: [{ name: 'Teekanne', ml: 1200, drink: { code: 'N630000', name: 'Black tea (infusion)' } }, { name: 'Flasche', ml: 750 }] });
     expect(note).toContain('"Teekanne" 1200 ml Black tea (infusion) (BLS N630000); "Flasche" 750 ml plain water.');
+  });
+
+  it('says which containers are logged when empty and when each was last emptied', () => {
+    const note = appNote({ now, day: '2026-10-17', today: '2026-10-17', logged: [], open: [], barcodes: [], containers: [{ name: 'Teekanne', ml: 2000, whenEmpty: true, last: new Date(2026, 9, 15, 20, 4).getTime() }] });
+    expect(note).toContain('"Teekanne" 2000 ml plain water, logged when empty, last emptied or logged Thu 2026-10-15 20:04.');
   });
 
   it('asks for German text and cards only when the app is in German', () => {
@@ -677,6 +682,38 @@ describe('water', () => {
     expect(validateWaterProposal({ ml: 4000, time: '', replaces: '' }, now)).toMatchObject({ ok: false });
     expect(validateWaterProposal({ ml: 250, time: '2026-10-18 09:00', replaces: '' }, now)).toMatchObject({ ok: false });
     expect(validateWaterProposal({ ml: 249.6, time: '', replaces: 'W1' }, now)).toEqual({ ok: true, proposal: { ml: 250, replaces: 'W1' } });
+  });
+
+  const pot: ContainerTool = { id: 'pot', name: 'Teekanne', ml: 2000, last: new Date(2026, 9, 15, 20, 0).getTime() };
+
+  it('offers propose_container_empty with water on, not strict', () => {
+    const tool = (requestParams('claude-opus-5-5', [], { water: true }).tools ?? []).find((t) => 'name' in t && t.name === 'propose_container_empty') as { strict?: boolean } | undefined;
+    expect(tool).toBeDefined();
+    expect(tool!.strict).toBeUndefined();
+  });
+
+  it('checks an emptied container: one of the user\'s, filled before it was emptied, at most two weeks before', () => {
+    // Since its last time by default, at the user's own name for it in any case.
+    expect(validateContainerEmpty({ container: 'teekanne', time: '', since: '', replaces: '' }, [pot], now)).toEqual({ ok: true, proposal: { ml: 2000, container: { id: 'pot', name: 'Teekanne', amount: 1, from: pot.last } } });
+    expect(validateContainerEmpty({ container: 'Teekanne', how_full: 0.5, time: '2026-10-17 18:00', since: '2026-10-16 08:00', replaces: 'W1' }, [pot], now)).toEqual({
+      ok: true,
+      proposal: { ml: 1000, time: new Date(2026, 9, 17, 18, 0).getTime(), replaces: 'W1', container: { id: 'pot', name: 'Teekanne', amount: 0.5, from: new Date(2026, 9, 16, 8, 0).getTime() } },
+    });
+    const error = (input: object, list = [pot]) => {
+      const r = validateContainerEmpty(input, list, now);
+      return r.ok ? '' : r.error;
+    };
+    expect(error({ container: 'Kanne', time: '', since: '', replaces: '' })).toContain('"Teekanne"');
+    expect(error({ container: 'Teekanne', time: '', since: '2026-10-18 08:00', replaces: '' })).toContain('before');
+    expect(error({ container: 'Teekanne', time: '', since: '2026-09-01 08:00', replaces: '' })).toContain('more than 14 days');
+    expect(error({ container: 'Teekanne', time: '', since: '', replaces: '' }, [{ id: 'pot', name: 'Teekanne', ml: 2000 }])).toContain('ask the user');
+    expect(error({ container: 'Teekanne', how_full: 2, time: '', since: '', replaces: '' })).toContain('how_full');
+  });
+
+  it('shows an emptied container as a water card', async () => {
+    const api = scripted(reply([toolUse('e', 'propose_container_empty', { container: 'Teekanne', time: '', since: '', replaces: '' })], 'tool_use'));
+    const { outcome } = await sendMessage(api.create, 'claude-opus-5-5', emptyConversation(), { text: 'die Teekanne ist leer', images: [] }, { ...ctx, now, water: true, containers: [pot] });
+    expect(outcome.kind === 'proposal' && outcome.waters).toEqual([{ id: 'W1', ml: 2000, container: { id: 'pot', name: 'Teekanne', amount: 1, from: pot.last } }]);
   });
 });
 

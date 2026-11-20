@@ -25,6 +25,7 @@ import {
 } from '../../logic/weekly';
 import { NUTRIENT_BY_ID, NUTRIENTS } from '../../model/nutrients';
 import { isOn } from '../../settings/features';
+import { useWaterDays } from '../water/useWater';
 import { repo } from '../../storage/repo';
 import { Icon } from '../../ui/Icon';
 import { AskChips } from '../../ui/AskChips';
@@ -74,7 +75,7 @@ export function WeekPage({ week: param }: { week?: string }) {
   const journal = useLiveQuery(() => repo.db.journal.toArray(), []);
   const sleep = useLiveQuery(() => repo.db.sleep.toArray(), []);
   const activities = useLiveQuery(() => repo.db.activities.toArray(), []);
-  const water = useLiveQuery(() => repo.db.water.toArray(), []);
+  const water = useWaterDays();
   const f = d.settings.features;
   const trackers = useMemo(() => {
     if (!journal || !sleep || !activities || !water) return [];

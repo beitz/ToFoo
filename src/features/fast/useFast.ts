@@ -1,4 +1,3 @@
-import { useMemo } from 'react';
 import { useData } from '../../app/data';
 import { useNow } from '../../app/useNow';
 import { t, type MessageKey } from '../../i18n';
@@ -43,7 +42,7 @@ export interface FastView {
 export function useFast(): FastView | undefined {
   const d = useData();
   const now = useNow();
-  const entries = useMemo(() => new Map(d.modelEntries.map((e) => [e.id, e])), [d.modelEntries]);
+  const entries = d.entriesById;
   const fast = d.activeFast;
   if (!fast) return undefined;
   const weightKg = currentWeight(d.profile);

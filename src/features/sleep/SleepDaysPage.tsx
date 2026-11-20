@@ -36,7 +36,7 @@ export function SleepDaysPage() {
   const axisLen = useMemo(() => axisLength(all), [all]);
   const times = useMemo(() => nightTimes(all.slice(-sleepNeed.windowNights.value)), [all]);
   const usual = times.bed && times.wake ? { bed: times.bed.median, wake: times.wake.median } : undefined;
-  const mealStarts = useMemo(() => d.model.meals.map((m) => m.start), [d.model.meals]);
+  const mealStarts = useMemo(() => d.model.meals.filter((m) => !m.spread).map((m) => m.start), [d.model.meals]);
   const more = shown < all.length;
 
   // Load the next days a little before the end of the list comes into view.

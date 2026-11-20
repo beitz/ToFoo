@@ -85,7 +85,7 @@ export function useMealBreakdown(pieces: readonly Piece[]) {
 
 function useBreakdown(pieces: readonly Piece[]) {
   const d = useData();
-  const entries = useMemo(() => new Map<string, ModelEntry>(d.modelEntries.map((e) => [e.id, e])), [d.modelEntries]);
+  const entries = d.entriesById;
   const retention = isOn(d.settings.features, 'retention');
   const key = pieces.map((p) => `${p.entryId}:${p.part ?? ''}`).join(',');
   // `key` stands for `pieces`, a new array on every render.

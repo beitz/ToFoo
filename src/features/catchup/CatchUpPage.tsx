@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
 import { useData } from '../../app/data';
 import { goBack, navigate } from '../../app/router';
 import { useToast } from '../../app/toast';
 import { t, type MessageKey } from '../../i18n';
 import { formatDay } from '../../lib/dates';
 import { atDayMinute, frequentActivities, usualNight, usualWater, type CatchUpKind } from '../../logic/catchUp';
+import { useWaterDays } from '../water/useWater';
 import { repo } from '../../storage/repo';
 import type { DayStatusRecord } from '../../storage/types';
 import { BackButton } from '../../ui/BackButton';
@@ -192,7 +192,7 @@ function ActivityChoices({ day }: { day: string }) {
 
 function WaterChoices({ day }: { day: string }) {
   const toast = useToast();
-  const water = useLiveQuery(() => repo.db.water.toArray(), []);
+  const water = useWaterDays();
   const [sheet, setSheet] = useState(false);
   if (!water) return null;
   const usual = usualWater(water, day);

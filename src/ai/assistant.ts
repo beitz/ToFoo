@@ -26,6 +26,7 @@ import {
   validateSleepProposal,
   validateActivityProposal,
   validateWaterProposal,
+  validateContainerEmpty,
   validateKetoneProposal,
   validateWeightProposal,
   validateBloodPressureProposal,
@@ -448,8 +449,8 @@ export async function sendMessage(
           rejected = true;
           results.push({ type: 'tool_result', tool_use_id: use.id, content: r.error, is_error: true });
         }
-      } else if (use.name === 'propose_water' && sources.water) {
-        const r = validateWaterProposal(use.input, ctx.now);
+      } else if ((use.name === 'propose_water' || use.name === 'propose_container_empty') && sources.water) {
+        const r = use.name === 'propose_water' ? validateWaterProposal(use.input, ctx.now) : validateContainerEmpty(use.input, ctx.containers ?? [], ctx.now);
         if (r.ok) watersProposed.push({ id: use.id, proposal: r.proposal });
         else {
           rejected = true;
@@ -635,7 +636,7 @@ export async function sendMessage(
       results.push({ type: 'tool_result', tool_use_id: id, content: 'Not shown: another proposal in this response had errors. Call propose_sleep again for this sleep too.', is_error: true });
     }
     for (const { id } of watersProposed) {
-      results.push({ type: 'tool_result', tool_use_id: id, content: 'Not shown: another proposal in this response had errors. Call propose_water again for this water too.', is_error: true });
+      results.push({ type: 'tool_result', tool_use_id: id, content: 'Not shown: another proposal in this response had errors. Call propose_water (or propose_container_empty) again for this water too.', is_error: true });
     }
     for (const { id } of weightsProposed) {
       results.push({ type: 'tool_result', tool_use_id: id, content: 'Not shown: another proposal in this response had errors. Call propose_weight again for this weigh-in too.', is_error: true });
@@ -730,6 +731,10 @@ export interface ContainerInfo {
   ml: number;
   /** The plain drink it holds; none = plain water. */
   drink?: { code: string; name: string };
+  /** Logged when empty (its amount spread over the time since it was filled). */
+  whenEmpty?: boolean;
+  /** When it was last emptied or logged (epoch ms). */
+  last?: number;
 }
 
 const HABIT_KIND_NOTE: Record<HabitInfo['kind'], string> = { do: 'do', avoid: 'avoid', minutes: 'minutes of activity, from the activity log' };
@@ -756,7 +761,10 @@ export function appNote(o: { now: number; day: string; today: string; logged: st
   if (o.open.length) parts.push(`Cards still open: ${o.open.join(', ')}.`);
   if (o.barcodes.length) parts.push(`Barcodes the app read from the photos: ${o.barcodes.join(', ')}.`);
   if (o.habits?.length) parts.push(`The user's habits: ${o.habits.map((h) => `"${h.name}" (${HABIT_KIND_NOTE[h.kind]})`).join(', ')}.`);
-  if (o.containers?.length) parts.push(`The user's cups and bottles (full): ${o.containers.map((c) => `"${c.name}" ${c.ml} ml ${c.drink ? `${c.drink.name} (BLS ${c.drink.code})` : 'plain water'}`).join('; ')}.`);
+  if (o.containers?.length) {
+    const one = (c: ContainerInfo) => `"${c.name}" ${c.ml} ml ${c.drink ? `${c.drink.name} (BLS ${c.drink.code})` : 'plain water'}${c.whenEmpty ? ', logged when empty' : ''}${c.last !== undefined ? `, last emptied or logged ${fmtLocalDateTime(c.last)}` : ''}`;
+    parts.push(`The user's cups and bottles (full): ${o.containers.map(one).join('; ')}.`);
+  }
   if (o.share) parts.push(o.share);
   return `(${parts.join(' ')})`;
 }

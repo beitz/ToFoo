@@ -32,6 +32,11 @@ export function repeatMeal(meal: readonly LogEntry[], time: number, dayOf: (time
     const at = time - (last - e.time);
     const day = dayOf(at);
     const { id: _id, schemaVersion: _v, ...rest } = e;
+    if (rest.kind === 'food' && rest.from !== undefined) {
+      // A container finished again: over the same stretch as that time, ending at the new time.
+      entries.push({ ...rest, from: at - (e.time - rest.from), time: at, day });
+      continue;
+    }
     if (rest.kind !== 'portion') {
       entries.push({ ...rest, time: at, day });
       continue;
@@ -164,6 +169,11 @@ export function favouriteFromMeal(meal: readonly LogEntry[], id: string): Favour
     .sort((a, b) => a.time - b.time)
     .map((e): FavouriteMealItem => {
       const { id: _id, schemaVersion: _v, time, day: _day, ...rest } = e;
+      // A container's fill time belongs to that one finish; pinned, the drink is an amount like any other.
+      if (rest.kind === 'food') {
+        const { from: _from, containerId: _c, ...food } = rest;
+        return { ...food, offsetMinutes: Math.round((last - time) / MINUTE) };
+      }
       return { ...rest, offsetMinutes: Math.round((last - time) / MINUTE) };
     });
   return { id, items };

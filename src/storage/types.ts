@@ -192,6 +192,12 @@ export interface DrinkContainer {
   /** How much it holds when full (ml). */
   ml: number;
   drink?: { source: 'BLS'; version: string; code: string };
+  /**
+   * Logged when it is empty, not each time one drinks from it (owner's ask, 2026-11-20: a 2 l teapot
+   * lasts two or three days): one tap says "finished", and its volume is spread evenly over the time
+   * since it was filled (src/logic/spread.ts).
+   */
+  whenEmpty?: boolean;
 }
 
 /** An empty pot, weighed once and remembered by name. */
@@ -213,7 +219,8 @@ export interface FavouriteMeal {
 /** A pinned activity: what it is and how it usually goes, without when (owner's ask 2026-10-26: the same activity again and again). */
 export type FavouriteActivity = Pick<ActivityRecord, 'id' | 'kind' | 'name' | 'minutes' | 'intensity' | 'compendium' | 'outside' | 'sunSkin'>;
 
-export type FavouriteMealItem = DistributiveOmit<LogEntry, 'id' | 'schemaVersion' | 'time' | 'day'> & { offsetMinutes: number };
+/** A pinned meal's item: a log entry without its own time (and without a container's fill time, which belongs to one finish). */
+export type FavouriteMealItem = DistributiveOmit<LogEntry, 'id' | 'schemaVersion' | 'time' | 'day' | 'containerId' | 'from'> & { offsetMinutes: number };
 
 export interface StoragePlan {
   fresh: number;
@@ -289,6 +296,13 @@ export type LogEntry =
       preparation: Preparation;
       /** Logged as a count of pieces ("1 piece of chewing gum"): how many. `grams` is what counts. */
       pieces?: number;
+      /** Logged from one of the user's containers (settings.drinkContainers). */
+      containerId?: string;
+      /**
+       * A container finished at `time`, filled at `from` (epoch ms): drunk evenly in between, so the
+       * days it covers each get their share (worked out when read, never stored per day).
+       */
+      from?: number;
     })
   | (LogBase & {
       kind: 'portion';
@@ -421,6 +435,10 @@ export interface WaterRecord extends Versioned {
   /** Local calendar day of `time` (YYYY-MM-DD). */
   day: string;
   ml: number;
+  /** Logged from one of the user's containers (settings.drinkContainers). */
+  containerId?: string;
+  /** A container finished at `time`, filled at `from` (epoch ms): drunk evenly in between (see the food log's `from`). */
+  from?: number;
 }
 
 export const HABIT_KINDS = ['do', 'avoid', 'minutes'] as const;
@@ -660,7 +678,7 @@ export interface MetaRecord {
   value: unknown;
 }
 
-type DistributiveOmit<T, K extends keyof T> = T extends unknown ? Omit<T, K> : never;
+type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
 
 /** A log entry before the repository gives it an id and schema version. */
 export type NewLogEntry = DistributiveOmit<LogEntry, 'id' | 'schemaVersion'>;

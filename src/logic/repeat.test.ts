@@ -41,6 +41,15 @@ describe('repeatMeal', () => {
     expect(entries[0]).not.toHaveProperty('schemaVersion');
   });
 
+  it('repeats a container emptied over the same stretch, and pins it without its fill time', () => {
+    const pot = { ...food('p', T0, 'N630000', 2000), containerId: 'pot', from: T0 - 48 * H } as LogEntry;
+    const now = T0 + 72 * H;
+    expect(repeatMeal([pot], now, dayOf, new Map()).entries[0]).toMatchObject({ time: now, from: now - 48 * H, containerId: 'pot' });
+    const item = favouriteFromMeal([pot], 'f').items[0]!;
+    expect(item).not.toHaveProperty('from');
+    expect(item).not.toHaveProperty('containerId');
+  });
+
   it('takes portions from current stock and skips a batch that has run out', () => {
     const meal = [portion('a', T0, 'b1'), food('b', T0, 'C131000', 10)];
     const withStock = repeatMeal(meal, T0 + 24 * H, dayOf, new Map([['b1', batch({ fresh: 0, fridge: 1, freezer: 2 })]]));

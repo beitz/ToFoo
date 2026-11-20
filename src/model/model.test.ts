@@ -362,6 +362,12 @@ describe('meals and days', () => {
     const s = effectiveDayStatus(d, { '2026-01-01': 'fasted' }, [manual('a', '2026-01-02', 12, { VITC: 1 })]);
     expect(s).toEqual({ '2026-01-01': 'fasted', '2026-01-02': 'logged', '2026-01-03': 'pending' });
   });
+
+  it('does not count a day as logged for a share of a container drunk over several days', () => {
+    const d = days('2026-01-01', 3);
+    const s = effectiveDayStatus(d, {}, [manual('a@2026-01-01', '2026-01-01', 12, { K: 10 }, { spread: true })]);
+    expect(s['2026-01-01']).toBe('unknown');
+  });
 });
 
 describe('simulation', () => {

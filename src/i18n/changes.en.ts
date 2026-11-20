@@ -8,6 +8,8 @@
  * scenes and small fixes. A pull request that changes what users see adds its line here in the same PR.
  */
 export const changesEn = {
+  'change.205': 'Water: a teapot or bottle can be logged when it is empty. One tap says it is finished, and its amount is spread evenly over the days since it was filled, so each day gets its share. The assistant understands "the teapot is empty" too.',
+  'change.205.major': 'Log a teapot when it is empty',
   'change.204': 'Protein page: a Protein quality card shows the nine essential amino acids (tap one for its page) and opens short explanations, with sources: how much of each protein the gut takes up, quality scores (PDCAAS worked out per food, DIAAS), why grains and legumes make up for each other, and leucine for building muscle.',
   'change.204.major': 'Protein quality explained',
   'change.203': 'ToFoo speaks German: Settings → Appearance → Language (Automatic follows your phone, English or Deutsch). Every screen, the nutrient explanations and the version history, with German food names first and the decimal comma; the assistant answers and writes its cards in German too.',

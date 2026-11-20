@@ -6,7 +6,6 @@ import { formatDay, formatTime } from '../../lib/dates';
 import { fmtAmount, fmtGrams, fmtPercent } from '../../lib/format';
 import { breakdown } from '../../logic/mealNutrients';
 import { ingredientPieces, splitNutrient, type SplitPiece } from '../../logic/nutrientSplit';
-import type { ModelEntry } from '../../model/types';
 import { NUTRIENT_BY_ID } from '../../model/nutrients';
 import { isOn } from '../../settings/features';
 import type { Recipe } from '../../storage/types';
@@ -45,7 +44,7 @@ export function recipePieces(d: AppData, recipe: Pick<Recipe, 'name' | 'portions
 function logPieces(d: AppData, ctx: SplitContext, nutrient: string): { title: string; pieces: ShownPiece[] } | undefined {
   const entry = d.log.find((e) => e.id === ctx.id);
   if (!entry) return undefined;
-  const entries = new Map<string, ModelEntry>(d.modelEntries.map((e) => [e.id, e]));
+  const entries = d.entriesById;
   const opts = { retention: isOn(d.settings.features, 'retention') };
   const of = (entryId: string, part?: number) => {
     const b = breakdown([{ entryId, part }], entries, d.model.meals, opts);

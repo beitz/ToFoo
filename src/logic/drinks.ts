@@ -55,7 +55,7 @@ export function containerMl(c: Pick<DrinkContainer, 'ml'>, amount: number): numb
 export function withContainer(list: readonly DrinkContainer[], c: DrinkContainer): DrinkContainer[] {
   const name = c.name.trim();
   if (!name || !(c.ml > 0) || c.ml > MAX_CONTAINER_ML) return [...list];
-  const clean: DrinkContainer = { id: c.id, name, ml: Math.round(c.ml), ...(c.drink ? { drink: c.drink } : {}) };
+  const clean: DrinkContainer = { id: c.id, name, ml: Math.round(c.ml), ...(c.drink ? { drink: c.drink } : {}), ...(c.whenEmpty ? { whenEmpty: true } : {}) };
   return list.some((x) => x.id === c.id) ? list.map((x) => (x.id === c.id ? clean : x)) : [...list, clean];
 }
 

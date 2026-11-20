@@ -205,7 +205,7 @@ export function buildInsightData(input: InsightInput): InsightData {
       if (e.parts.length === 0 && !e.isSupplement) missing.add('total_water');
     }
     values.alcohol = foodComplete ? alcohol : null;
-    const meals = groupMeals(dayEntries.filter((e) => !e.isSupplement), input.mealWindowMinutes);
+    const meals = groupMeals(dayEntries.filter((e) => !e.isSupplement && !e.spread), input.mealWindowMinutes);
     values.meals = foodComplete ? meals.length : null;
     values.first_meal = foodComplete && meals.length ? clockHours(meals[0]![0]!.time) : null;
     values.last_meal = foodComplete && meals.length ? clockHours(meals[meals.length - 1]![0]!.time) : null;

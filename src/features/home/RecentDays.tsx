@@ -16,7 +16,7 @@ export function RecentDays() {
   return (
     <div className="recent-days">
       {days.map((day) => {
-        const meals = d.model.meals.filter((m) => m.day === day);
+        const meals = d.model.meals.filter((m) => m.day === day && !m.spread);
         const kcal = meals.reduce((s, m) => s + (m.intake.ENERCC ?? 0), 0);
         return (
           <section key={day} className="recent-day" aria-label={formatDay(day, d.today)}>

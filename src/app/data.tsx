@@ -16,6 +16,7 @@ import type { ModelEntry } from '../model/types';
 import { currentWeight, explicitDayStatus, firstModelDay, resolveEntry, sunByDay, activeFast } from '../logic/resolve';
 import { activitySun } from '../logic/activity';
 import { measuredStores } from '../logic/lab';
+import { spreadEntry } from '../logic/spread';
 import { slowWindow } from '../../model/parameters';
 
 /** Longest history the model simulates (performance guard). */
@@ -42,7 +43,10 @@ export interface AppData {
   fasts: Fast[];
   sunEntries: SunEntry[];
   requirements: ResolvedRequirements;
+  /** The log as the model counts it: a container logged empty is one part per day it was drunk on (src/logic/spread.ts). */
   modelEntries: ModelEntry[];
+  /** Each log entry resolved whole, by its id (a finished container with all of its amount), for item and meal pages. */
+  entriesById: Map<string, ModelEntry>;
   model: SimulationResult;
   /** The days the model covers, aligned with `model.daily`. */
   modelDays: string[];
@@ -112,7 +116,14 @@ export function computeAppData({ today, foods, searchIndex, profile, settings, r
   );
   const productsById = new Map(productList.map((p) => [p.id, p]));
   const ctx = { foods, products: productsById, batches: batchesById, customFoods: customFoodsById, salt: profile.salt };
-  const modelEntries = log.map((e) => resolveEntry(e, ctx)).filter((e): e is ModelEntry => e !== null);
+  const entriesById = new Map<string, ModelEntry>();
+  const modelEntries: ModelEntry[] = [];
+  for (const e of log) {
+    const m = resolveEntry(e, ctx);
+    if (!m) continue;
+    entriesById.set(e.id, m);
+    modelEntries.push(...spreadEntry(m, e));
+  }
   const explicit = explicitDayStatus(dayStatus, fasts, log, customFoodsById, today);
   const first = firstModelDay(log, explicit, today);
   const start = first < addDays(today, -MAX_MODEL_DAYS) ? addDays(today, -MAX_MODEL_DAYS) : first;
@@ -171,6 +182,7 @@ export function computeAppData({ today, foods, searchIndex, profile, settings, r
     sunEntries,
     requirements,
     modelEntries,
+    entriesById,
     model,
     modelDays: days,
     activeFast: activeFast(fasts, log, customFoodsById, today),
