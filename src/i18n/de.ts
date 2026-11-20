@@ -24,6 +24,7 @@ import { ladderDe } from './ladder.de';
 import { doesDe } from './does.de';
 import { howOftenDe } from './howOften.de';
 import { changesDe } from './changes.de';
+import { proteinDe } from './protein.de';
 
 export const de: Record<MessageKey, string> = {
   ...nutrientInfoDe,
@@ -34,6 +35,7 @@ export const de: Record<MessageKey, string> = {
   ...groupInfoDe,
   ...homeInfoDe,
   ...changesDe,
+  ...proteinDe,
   'app.name': 'ToFoo',
   'app.loadError': 'ToFoo konnte nicht starten.',
   'diag.title': 'Diagnose',
@@ -2938,6 +2940,7 @@ export const de: Record<MessageKey, string> = {
   'tour.nutrient.filling': 'Wie lange das Auffüllen dauert und was hilft.',
   'tour.nutrient.sources': 'Woher es kam: welche Lebensmittel und Mahlzeiten dir am meisten gaben.',
   'tour.nutrient.fills': 'Lebensmittel, die ihn am besten füllen, schon gegessene zuerst.',
+  'tour.nutrient.protein': 'Woraus Protein besteht und wie gut jede Art ist.',
   'tour.nutrient.why': 'Die Wissenschaft dahinter, mit Quellen, wenn du sie willst.',
   'about.title': 'Über ToFoo und Datenquellen',
   'about.intro': 'ToFoo ist ein persönlicher Ernährungstracker. Es schätzt, wie voll deine Körperspeicher sind, damit du dein nächstes Gericht planen kannst. Es ist allgemeine Information, keine medizinische Beratung.',

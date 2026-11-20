@@ -123,13 +123,9 @@ function NutrientLink({ id, onNavigate, children }: { id: string; onNavigate: ()
   );
 }
 
-const EAA_ORDER = NUTRIENTS.filter((n) => EAA_IDS.has(n.id)).map((n) => n.id);
+export const EAA_ORDER = NUTRIENTS.filter((n) => EAA_IDS.has(n.id)).map((n) => n.id);
 
 function ProteinInfo({ onNavigate }: { onNavigate: () => void }) {
-  const d = useData();
-  const profiles = useMemo(() => aminoProfiles(d.foods.foods, EAA_ORDER), [d.foods]);
-  const count = Object.fromEntries(profiles.map((p) => [p.kind, p.foods]));
-  const colKey = { grains: 'ginfo.protein.colGrains', legumes: 'ginfo.protein.colLegumes', nuts: 'ginfo.protein.colNuts', animal: 'ginfo.protein.colAnimal' } as const;
   return (
     <>
       <p>{t('ginfo.protein.intro')}</p>
@@ -153,6 +149,27 @@ function ProteinInfo({ onNavigate }: { onNavigate: () => void }) {
       </ul>
 
       <h3>{t('ginfo.protein.plantAnimal')}</h3>
+      <AminoKindTable onNavigate={onNavigate} />
+      <p>{t('ginfo.protein.combine')}</p>
+      <Vegan text={t('ginfo.protein.vegan')} />
+    </>
+  );
+}
+
+/** Kinds of protein food as columns. */
+export const PROTEIN_KIND_KEYS = { grains: 'ginfo.protein.colGrains', legumes: 'ginfo.protein.colLegumes', nuts: 'ginfo.protein.colNuts', animal: 'ginfo.protein.colAnimal' } as const;
+
+/**
+ * How much of the need for each essential amino acid a gram of protein covers, by kind of food (median
+ * over BLS), with its intro and note; on the group page and in "Mixing plant proteins" on the protein page.
+ */
+export function AminoKindTable({ onNavigate }: { onNavigate: () => void }) {
+  const d = useData();
+  const profiles = useMemo(() => aminoProfiles(d.foods.foods, EAA_ORDER), [d.foods]);
+  const count = Object.fromEntries(profiles.map((p) => [p.kind, p.foods]));
+  const colKey = PROTEIN_KIND_KEYS;
+  return (
+    <>
       <p>{t('ginfo.protein.tableIntro')}</p>
       <div className="table-scroll">
         <table className="nutrient-table group-info-table">
@@ -200,8 +217,6 @@ function ProteinInfo({ onNavigate }: { onNavigate: () => void }) {
         </table>
       </div>
       <p className="muted">{t('ginfo.protein.tableNote', { grains: count.grains ?? 0, legumes: count.legumes ?? 0, nuts: count.nuts ?? 0, animal: count.animal ?? 0 })}</p>
-      <p>{t('ginfo.protein.combine')}</p>
-      <Vegan text={t('ginfo.protein.vegan')} />
     </>
   );
 }

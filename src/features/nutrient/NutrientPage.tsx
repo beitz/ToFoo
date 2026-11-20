@@ -10,7 +10,7 @@ import { statusThresholds, trendDisplay } from '../../../model/parameters';
 import { logTrust, trustReasons } from '../../../model/log-trust';
 import { storeTrendOf, trendOf, type Trend } from '../../model/trend';
 import { isOn } from '../../settings/features';
-import { infoId, NUTRIENT_INFO_SOURCES } from '../../i18n/nutrientInfo.en';
+import { EAA_IDS, infoId, NUTRIENT_INFO_SOURCES } from '../../i18n/nutrientInfo.en';
 import { storeAhead, tileTop, weekMarks, windowDays, type WindowDay } from '../../logic/nutrientPage';
 import { InfoButton } from '../../ui/InfoButton';
 import { AskChips } from '../../ui/AskChips';
@@ -42,6 +42,7 @@ import { WhatItDoes } from './WhatItDoes';
 import { FillingUp } from './FillingUp';
 import { HowOftenChip, WindowWhy } from './HowOften';
 import { MissingChip } from './MissingChip';
+import { ProteinQuality } from './ProteinQuality';
 
 export function NutrientPage({ id, context }: { id: string; context?: SplitContext }) {
   const d = useData();
@@ -130,6 +131,7 @@ export function NutrientPage({ id, context }: { id: string; context?: SplitConte
       {uptakeVaries(id) && req && <UptakeCard id={id} need={req.physiological} />}
       <CameFromCard r={r} />
       {fills && <FillsBest id={id} recommended={req.recommended} />}
+      {(id === 'PROT625' || EAA_IDS.has(id)) && <ProteinQuality id={id} />}
 
       <div className="card fold-group" data-tour="nutrient.why">
         <NutrientInfo id={id} r={r} />

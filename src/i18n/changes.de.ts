@@ -5,6 +5,8 @@ import type { changesEn } from './changes.en';
  * same PR; the type makes a missing one a type error.
  */
 export const changesDe: Record<keyof typeof changesEn, string> = {
+  'change.204': 'Proteinseite: Eine Karte Proteinqualität zeigt die neun unentbehrlichen Aminosäuren (tippe auf eine für ihre Seite) und öffnet kurze Erklärungen mit Quellen: wie viel von jedem Protein der Darm aufnimmt, Qualitätswerte (PDCAAS pro Lebensmittel berechnet, DIAAS), warum sich Getreide und Hülsenfrüchte ergänzen und Leucin für den Muskelaufbau.',
+  'change.204.major': 'Proteinqualität erklärt',
   'change.203': 'ToFoo spricht Deutsch: Einstellungen → Darstellung → Sprache (Automatisch folgt deinem Handy, English oder Deutsch). Jeder Bildschirm, die Nährstoff-Erklärungen und der Versionsverlauf, mit deutschen Lebensmittelnamen zuerst und Dezimalkomma; der Assistent antwortet und schreibt seine Karten auch auf Deutsch.',
   'change.203.major': 'ToFoo auf Deutsch',
   'change.201': 'Mit Wasser an hat der runde Knopf „Getränk hinzufügen“, direkt über dem Assistenten: ein Glas, oder eine deiner eigenen Tassen und Flaschen.',
