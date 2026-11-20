@@ -9638,3 +9638,110 @@ button.link-row {
 .sizes-source p {
   margin: 4px 0;
 }
+
+/* Protein quality on the protein and amino acid pages: nine tiles, then one row per topic. */
+.pq-grid-label {
+  margin: 0 0 6px;
+}
+.pq-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0 0 8px;
+  padding: 0;
+  list-style: none;
+}
+.pq-cell {
+  display: grid;
+  gap: 2px;
+  min-height: 48px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: inherit;
+  text-decoration: none;
+}
+.pq-cell-here {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.pq-cell-value {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.pq-cell-name {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pq-rows {
+  margin-top: 4px;
+}
+.pq-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 48px;
+  padding: 0;
+  border: 0;
+  border-top: 1px solid var(--border);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.pq-short > li + li {
+  margin-top: 6px;
+}
+.pq-bars {
+  display: grid;
+  gap: 6px;
+  margin: 6px 0 10px;
+  padding: 0;
+  list-style: none;
+}
+.pq-bar-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 72px 3.2em;
+  align-items: center;
+  gap: 8px;
+}
+.pq-mix .pq-bar-row {
+  grid-template-columns: minmax(0, 1fr) 64px 3.2em;
+}
+.pq-bar-total {
+  font-weight: 600;
+}
+.pq-bar-track {
+  position: relative;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--border);
+}
+.pq-bar-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 4px;
+  background: var(--accent);
+}
+.pq-bar-short {
+  background: var(--warn);
+}
+.pq-bar-need {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  background: var(--text);
+}
+.pq-bar-value {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
