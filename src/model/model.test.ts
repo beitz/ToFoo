@@ -349,6 +349,19 @@ describe('retention', () => {
     expect(low.intake.VITC!).toBeLessThan(c.intake.VITC!);
     expect(entryIntake(entry, 'central', { retention: false }).intake.VITC).toBeCloseTo(200);
   });
+
+  it("leaves nothing unknown for a mineral water: its label's minerals count, energy and the rest are not missing", () => {
+    const label = manual('water:w1', '2026-01-01', 12, { CA: 240, MG: 109 }, { isSupplement: false, water: true });
+    const fromLabel = entryIntake(label, 'central', { retention: false });
+    expect(fromLabel.intake.CA).toBeCloseTo(240);
+    expect(fromLabel.missing).toEqual([]);
+    const bls: ModelEntry = { ...label, direct: undefined, parts: [{ label: 'Mineral water', grams: 1000, per100: { CA: 10, ENERCC: 0, VITC: null }, preparation: 'asListed', storage: 'fresh' }] };
+    const fromFood = entryIntake(bls, 'central', { retention: false });
+    expect(fromFood.intake.CA).toBeCloseTo(100);
+    expect(fromFood.missing).toEqual([]);
+    // A food typed from its label still leaves the rest unknown.
+    expect(entryIntake({ ...label, water: undefined }, 'central', { retention: false }).missing).toContain('ENERCC');
+  });
 });
 
 describe('meals and days', () => {
@@ -386,6 +399,14 @@ describe('meals and days', () => {
     const meals = r.meals.filter((m) => m.day === '2026-01-01');
     expect(meals).toHaveLength(2);
     expect(meals.find((m) => m.entryIds.includes('water:w1'))?.spread).toBe(true);
+  });
+
+  it("does not count a day with a mineral water as missing data for energy", () => {
+    const d = days('2026-01-01', 2);
+    const food = manual('meal', '2026-01-01', 12, { ENERCC: 2000, MG: 100 }, { isSupplement: true });
+    const water = manual('water:w1', '2026-01-01', 15, { MG: 109, CA: 240 }, { isSupplement: false, water: true });
+    const r = simulate(baseInput(d, [food, water]));
+    expect(r.daily[0]!.missing.has('ENERCC')).toBe(false);
   });
 });
 
