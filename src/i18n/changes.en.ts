@@ -8,6 +8,7 @@
  * scenes and small fixes. A pull request that changes what users see adds its line here in the same PR.
  */
 export const changesEn = {
+  'change.209': 'Water: a bottle of mineral water no longer shows up as "1 food without a value" on nutrient pages. Its minerals count; energy and the rest are simply not part of water.',
   'change.208': 'Water: your cups and bottles sit side by side on the water card on Home, each with its size, and a small icon says how it counts: + for one logged each time, an hourglass for one logged when it is empty.',
   'change.207': 'Water: a bottle can say which water it holds, found by name or barcode or typed from the label, and every fill then counts its calcium, magnesium and other minerals. Tap water stays plain water.',
   'change.207.major': 'Mineral water counts its minerals',
