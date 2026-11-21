@@ -80,6 +80,12 @@ function scenarioFactor(u: number, scenario: Scenario): number {
   return scenario === 'low' ? 1 - u : scenario === 'high' ? 1 + u : 1;
 }
 
+/**
+ * What one entry adds, per nutrient, and which nutrients it leaves unknown. Plain water from the Water
+ * tracker (`entry.water`) adds the minerals its label or food lists and leaves nothing unknown: like
+ * water of no known kind, which adds nothing, it says nothing about whether the day's food was
+ * complete (the owner saw "1 food without a value" for energy from his bottle of mineral water).
+ */
 export function entryIntake(entry: ModelEntry, scenario: Scenario, opts: { retention: boolean }): EntryIntake {
   const intake: Record<string, number> = {};
   const missing = new Set<string>();
@@ -100,7 +106,7 @@ export function entryIntake(entry: ModelEntry, scenario: Scenario, opts: { reten
     const sign = scenario === 'low' ? -1 : scenario === 'high' ? 1 : 0;
     for (let k = 0; k < vec.values.length; k++) {
       if (vec.missing[k]) {
-        missingFlags[k] = 1;
+        if (!entry.water) missingFlags[k] = 1;
         continue;
       }
       const raw = vec.values[k]!;
@@ -129,7 +135,7 @@ export function entryIntake(entry: ModelEntry, scenario: Scenario, opts: { reten
     }
     // A manual food lists only what is known (e.g. from a label): the rest is unknown, not zero.
     // A supplement lists everything it contains: the rest is zero.
-    if (!entry.isSupplement && entry.parts.length === 0) {
+    if (!entry.isSupplement && !entry.water && entry.parts.length === 0) {
       for (const id of TRACKED_IDS) if (!(id in entry.direct)) missing.add(id);
     }
   }

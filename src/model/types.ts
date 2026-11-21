@@ -51,7 +51,8 @@ export interface ModelEntry {
   /**
    * The minerals of plain water from the Water tracker (a container that holds a known water): a meal
    * of its own that acts on no other meal and does not make its day count as logged for food. Its
-   * water is counted by the tracker from the water record, not from here.
+   * water is counted by the tracker from the water record, not from here. What it does not list is not
+   * counted, and is not marked missing (it is water, not a food whose values are unknown).
    */
   water?: boolean;
 }
