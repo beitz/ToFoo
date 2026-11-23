@@ -9506,6 +9506,16 @@ button.link-row {
 .bp-row .icon-btn {
   flex: none;
 }
+.bp-stamp {
+  margin: -6px 0 10px;
+  font-variant-numeric: tabular-nums;
+}
+.bp-sitting {
+  padding: 6px 0 0;
+}
+.bp-entered {
+  font-variant-numeric: tabular-nums;
+}
 .bp-big {
   display: flex;
   align-items: baseline;

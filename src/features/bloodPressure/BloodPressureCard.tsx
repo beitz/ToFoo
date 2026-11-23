@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import { homeProtocol } from '../../../model/blood-pressure';
 import { useData } from '../../app/data';
 import { href } from '../../app/router';
 import { t } from '../../i18n';
-import { formatTime } from '../../lib/dates';
-import { bpCategory, bpWeek, lastVeryHigh, type BpCategory } from '../../logic/bloodPressure';
+import { formatTime, formatTimeSeconds } from '../../lib/dates';
+import { bpCategory, bpSittings, bpWeek, lastVeryHigh, type BpCategory } from '../../logic/bloodPressure';
 import type { BloodPressureReading } from '../../storage/types';
 import { Icon } from '../../ui/Icon';
 import { defaultTimeFor } from '../log/time';
@@ -69,23 +69,35 @@ export function BloodPressureCard() {
   );
 }
 
-/** The readings of one day as rows that open for editing; for the diary and the page. */
+/**
+ * The readings of one day as rows that open for editing; for the diary and the page. A sitting whose
+ * readings carry their own times (owner's ask 2026-11-23) gets a line with the sitting's time, and
+ * each reading shows when its numbers were filled in, to the second, in that order.
+ */
 export function ReadingRows({ readings, onEdit }: { readings: readonly BloodPressureReading[]; onEdit: (r: BloodPressureReading) => void }) {
   return (
     <ul className="plain-list">
-      {readings.map((r) => (
-        <li key={r.id}>
-          <button className="entry-row" onClick={() => onEdit(r)}>
-            <span className="entry-label">
-              {formatTime(r.time)} · <strong>{bpText(r)}</strong>
-              {r.pulse !== undefined && <span className="muted"> · {t('bp.pulseValue', { n: r.pulse })}</span>}
-            </span>
-            <span className="entry-edit">
-              <Icon name="edit" size={16} />
-            </span>
-          </button>
-        </li>
-      ))}
+      {bpSittings(readings).map((sitting) => {
+        const timed = sitting.some((r) => r.enteredAt !== undefined);
+        return (
+          <Fragment key={sitting[0]!.id}>
+            {timed && <li className="small muted bp-sitting">{t(sitting.length === 1 ? 'bp.sittingOne' : 'bp.sitting', { time: formatTime(sitting[0]!.time), n: sitting.length })}</li>}
+            {sitting.map((r) => (
+              <li key={r.id}>
+                <button className="entry-row" onClick={() => onEdit(r)}>
+                  <span className="entry-label">
+                    {timed && r.enteredAt !== undefined ? <span className="bp-entered">{formatTimeSeconds(r.enteredAt)}</span> : formatTime(r.time)} · <strong>{bpText(r)}</strong>
+                    {r.pulse !== undefined && <span className="muted"> · {t('bp.pulseValue', { n: r.pulse })}</span>}
+                  </span>
+                  <span className="entry-edit">
+                    <Icon name="edit" size={16} />
+                  </span>
+                </button>
+              </li>
+            ))}
+          </Fragment>
+        );
+      })}
     </ul>
   );
 }

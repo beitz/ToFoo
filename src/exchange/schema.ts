@@ -337,8 +337,9 @@ export const bloodPressureSchema = z
     systolic: z.number().positive(),
     diastolic: z.number().positive(),
     pulse: z.number().positive().optional(),
+    enteredAt: z.number().optional().describe("Epoch ms this reading's numbers were filled in, when typed in at the sitting; `time` is the sitting's"),
   })
-  .describe('One blood pressure reading from a cuff: when (epoch ms), systolic and diastolic in mmHg, and the pulse in beats per minute when noted; two readings a minute apart are two records');
+  .describe('One blood pressure reading from a cuff: when (epoch ms, the time of the sitting), systolic and diastolic in mmHg, the pulse in beats per minute when noted, and when its own numbers were filled in; two readings a minute apart are two records');
 
 const activityKind = z.enum(['walk', 'run', 'cycling', 'strength', 'other']);
 export const habitSchema = z
