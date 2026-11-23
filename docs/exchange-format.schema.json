@@ -3650,6 +3650,10 @@
                   "pulse": {
                     "type": "number",
                     "exclusiveMinimum": 0
+                  },
+                  "enteredAt": {
+                    "description": "Epoch ms this reading's numbers were filled in, when typed in at the sitting; `time` is the sitting's",
+                    "type": "number"
                   }
                 },
                 "required": [
@@ -3660,7 +3664,7 @@
                   "systolic",
                   "diastolic"
                 ],
-                "description": "One blood pressure reading from a cuff: when (epoch ms), systolic and diastolic in mmHg, and the pulse in beats per minute when noted; two readings a minute apart are two records"
+                "description": "One blood pressure reading from a cuff: when (epoch ms, the time of the sitting), systolic and diastolic in mmHg, the pulse in beats per minute when noted, and when its own numbers were filled in; two readings a minute apart are two records"
               }
             },
             "portionSizes": {

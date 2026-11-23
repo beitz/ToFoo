@@ -530,7 +530,7 @@ export interface HabitDay extends Versioned {
  */
 export interface BloodPressureReading extends Versioned {
   id: string;
-  /** Epoch ms it was measured. */
+  /** Epoch ms it was measured: the time of the sitting, shared by the readings taken at it. */
   time: number;
   /** Local calendar day of `time` (YYYY-MM-DD). */
   day: string;
@@ -538,6 +538,13 @@ export interface BloodPressureReading extends Versioned {
   diastolic: number;
   /** Beats per minute; missing when not noted. */
   pulse?: number;
+  /**
+   * Epoch ms this reading's own numbers were filled in on the log sheet (systolic, diastolic and
+   * pulse; systolic and diastolic when no pulse was typed), so the order and gaps within a sitting
+   * show (owner's ask 2026-11-23). Missing for readings from before then, from the assistant, and
+   * when the sitting was logged long after it happened (`STAMP_NEAR_MS`).
+   */
+  enteredAt?: number;
 }
 
 export const KETONE_TYPES = ['blood', 'breath', 'urine'] as const;

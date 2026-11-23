@@ -86,6 +86,62 @@ export function bpByDay(readings: readonly BloodPressureReading[]): Map<string, 
 
 /** The newest reading when it is very high (measure again; see a doctor if it stays), else undefined. */
 export function lastVeryHigh(readings: readonly BloodPressureReading[]): BloodPressureReading | undefined {
-  const last = readings.reduce<BloodPressureReading | undefined>((a, r) => (!a || r.time > a.time ? r : a), undefined);
+  const last = readings.reduce<BloodPressureReading | undefined>((a, r) => (!a || bySittingOrder(r, a) > 0 ? r : a), undefined);
   return last && bpCategory(last) === 'veryHigh' ? last : undefined;
+}
+
+/**
+ * A reading as it is being typed in, with when its numbers were filled in: `pairAt` when systolic
+ * and diastolic first both had a value, `allAt` when the pulse had one too (owner's ask 2026-11-23:
+ * a time per reading, to spot problems with the order).
+ */
+export interface TypedReading {
+  systolic?: number;
+  diastolic?: number;
+  pulse?: number;
+  pairAt?: number;
+  allAt?: number;
+}
+
+/**
+ * `next` (a typed reading after a change) with its stamps set at `now` the first time it fills up.
+ * Fixing a typo keeps the first stamp; emptying the row starts it over.
+ */
+export function stampReading<T extends TypedReading>(next: T, now: number): T {
+  const { pairAt: _p, allAt: _a, ...rest } = next;
+  if (next.systolic === undefined && next.diastolic === undefined && next.pulse === undefined) return rest as T;
+  const pair = next.systolic !== undefined && next.diastolic !== undefined;
+  const pairAt = next.pairAt ?? (pair ? now : undefined);
+  const allAt = next.allAt ?? (pair && next.pulse !== undefined ? now : undefined);
+  return { ...rest, ...(pairAt !== undefined ? { pairAt } : {}), ...(allAt !== undefined ? { allAt } : {}) } as T;
+}
+
+/**
+ * How far a stamp may lie from the sitting's time and still be kept. A UI rule, not physiology:
+ * readings typed in at the sitting are kept; a sitting logged afterwards (from the diary, the
+ * catch-up page, or with the time moved back) was typed long after it was measured, when the typing
+ * time says nothing about the order.
+ */
+export const STAMP_NEAR_MS = 60 * 60_000;
+
+/** When the reading's numbers were filled in, if that was at the sitting `time`; else undefined. */
+export function enteredAtFor(r: TypedReading, time: number): number | undefined {
+  const at = r.allAt ?? r.pairAt;
+  return at !== undefined && Math.abs(at - time) <= STAMP_NEAR_MS ? at : undefined;
+}
+
+/** Oldest first: by the sitting's time, then by when each reading was filled in. */
+export function bySittingOrder(a: Pick<BloodPressureReading, 'time' | 'enteredAt'>, b: Pick<BloodPressureReading, 'time' | 'enteredAt'>): number {
+  return a.time - b.time || (a.enteredAt ?? 0) - (b.enteredAt ?? 0);
+}
+
+/** The readings grouped by sitting (the same `time`), oldest first, each sitting in the order taken. */
+export function bpSittings<T extends Pick<BloodPressureReading, 'time' | 'enteredAt'>>(readings: readonly T[]): T[][] {
+  const out: T[][] = [];
+  for (const r of [...readings].sort(bySittingOrder)) {
+    const last = out[out.length - 1];
+    if (last && last[0]!.time === r.time) last.push(r);
+    else out.push([r]);
+  }
+  return out;
 }

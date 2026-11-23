@@ -70,6 +70,12 @@ export function formatTime(t: number): string {
   return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+/** "13:45:07": with seconds, for readings taken a minute apart. */
+export function formatTimeSeconds(t: number): string {
+  const d = new Date(t);
+  return `${formatTime(t)}:${pad(d.getSeconds())}`;
+}
+
 /** "Wed 22.10., 13:45" (with the year when it is not this year's). */
 export function formatDateTime(t: number, today = todayKey()): string {
   const key = dayKey(new Date(t));

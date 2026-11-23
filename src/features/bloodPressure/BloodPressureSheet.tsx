@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { homeProtocol } from '../../../model/blood-pressure';
 import { useToast } from '../../app/toast';
 import { t, type MessageKey } from '../../i18n';
-import { dayKey } from '../../lib/dates';
-import { bpProblem } from '../../logic/bloodPressure';
+import { dayKey, formatTimeSeconds } from '../../lib/dates';
+import { bpProblem, enteredAtFor, stampReading, type TypedReading } from '../../logic/bloodPressure';
 import { repo } from '../../storage/repo';
 import type { BloodPressureReading } from '../../storage/types';
 import { NumberInput, Sheet } from '../../ui/controls';
@@ -14,11 +14,8 @@ import { bpText } from './format';
 /** At most this many readings at one sitting: the protocol's two, and a third when the first two differ a lot. */
 export const MAX_PER_SITTING = 3;
 
-export interface ReadingInput {
-  systolic?: number;
-  diastolic?: number;
-  pulse?: number;
-}
+/** One reading as typed; the sheet also notes when its numbers were filled in (`stampReading`). */
+export type ReadingInput = TypedReading;
 
 /** The problem with any of the readings or the time, as a message; undefined when all can be saved. */
 export function readingsProblem(rows: readonly ReadingInput[], time: number, now: number): string | undefined {
@@ -30,10 +27,13 @@ export function readingsProblem(rows: readonly ReadingInput[], time: number, now
   return undefined;
 }
 
-/** Save the readings of one sitting at `time`, with undo. */
+/** Save the readings of one sitting at `time`, each with when its numbers were filled in if that was at the sitting, with undo. */
 export async function addBloodPressureWithUndo(rows: readonly ReadingInput[], time: number, toast: ReturnType<typeof useToast>): Promise<BloodPressureReading[]> {
   const added = await repo.addBloodPressure(
-    rows.map((r) => ({ time, day: dayKey(new Date(time)), systolic: Math.round(r.systolic!), diastolic: Math.round(r.diastolic!), ...(r.pulse !== undefined ? { pulse: Math.round(r.pulse) } : {}) })),
+    rows.map((r) => {
+      const enteredAt = enteredAtFor(r, time);
+      return { time, day: dayKey(new Date(time)), systolic: Math.round(r.systolic!), diastolic: Math.round(r.diastolic!), ...(r.pulse !== undefined ? { pulse: Math.round(r.pulse) } : {}), ...(enteredAt !== undefined ? { enteredAt } : {}) };
+    }),
   );
   toast(t(added.length === 1 ? 'bp.addedOne' : 'bp.added', { value: added.map(bpText).join(', ') }), () => void repo.deleteBloodPressure(added.map((r) => r.id)));
   return added;
@@ -101,12 +101,20 @@ export function BloodPressureSheet({ record, defaultTime, onClose }: { record?: 
     onClose();
   }
 
-  const set = (i: number, v: ReadingInput) => setRows((rs) => rs.map((r, j) => (j === i ? v : r)));
+  // A new sitting notes when each reading's numbers were filled in (owner's ask 2026-11-23); a changed reading keeps its own.
+  const set = (i: number, v: ReadingInput) => setRows((rs) => rs.map((r, j) => (j === i ? (record ? v : stampReading(v, Date.now())) : r)));
+  const filledAt = (r: ReadingInput) => (record ? record.enteredAt : enteredAtFor(r, time));
   return (
     <Sheet title={t(record ? 'bp.editTitle' : 'bp.addTitle')} onClose={onClose}>
-      {rows.map((r, i) => (
-        <ReadingRow key={i} n={rows.length > 1 ? i + 1 : undefined} value={r} onChange={(v) => set(i, v)} onRemove={rows.length > 1 ? () => setRows((rs) => rs.filter((_, j) => j !== i)) : undefined} />
-      ))}
+      {rows.map((r, i) => {
+        const at = filledAt(r);
+        return (
+          <div key={i}>
+            <ReadingRow n={rows.length > 1 ? i + 1 : undefined} value={r} onChange={(v) => set(i, v)} onRemove={rows.length > 1 ? () => setRows((rs) => rs.filter((_, j) => j !== i)) : undefined} />
+            {at !== undefined && <p className="small muted bp-stamp">{t('bp.filledAt', { time: formatTimeSeconds(at) })}</p>}
+          </div>
+        );
+      })}
       {!record && rows.length < MAX_PER_SITTING && (
         <button type="button" className="btn btn-ghost btn-small" onClick={() => setRows((rs) => [...rs, {}])}>
           <Icon name="plus" size={16} /> {t(rows.length === 1 ? 'bp.addSecond' : 'bp.addAnother')}

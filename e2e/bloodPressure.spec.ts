@@ -19,6 +19,8 @@ test('blood pressure: two readings from Home, the average and its page, edit wit
   await sheet.getByRole('textbox', { name: /Systolic/ }).fill('132');
   await sheet.getByRole('textbox', { name: /Diastolic/ }).fill('86');
   await sheet.getByRole('textbox', { name: /Pulse/ }).fill('64');
+  // Each reading notes when its numbers were filled in (owner's ask 2026-11-23).
+  await expect(sheet.getByText(/^Filled in at \d\d:\d\d:\d\d$/)).toHaveCount(1);
   await sheet.getByRole('button', { name: 'Second reading' }).click();
   // Swapped numbers are caught before saving.
   await sheet.getByRole('textbox', { name: 'Systolic, mmHg 2' }).fill('80');
@@ -40,6 +42,11 @@ test('blood pressure: two readings from Home, the average and its page, edit wit
   await expect(page.locator('[data-tour="bp.average"]')).toContainText('130/84');
   await expect(page.locator('[data-tour="bp.average"]')).toContainText('pulse 64');
   await expect(page.locator('[data-tour="bp.lines"] .is-mine')).toContainText('Raised');
+  // The sitting's time once, then each reading at its own time, in the order typed in.
+  const list = page.locator('[data-tour="bp.readings"]');
+  await expect(list.getByText(/^Measured at \d\d:\d\d · 2 readings$/)).toBeVisible();
+  await expect(list.locator('.bp-entered')).toHaveCount(2);
+  await expect(list.getByRole('button').first()).toContainText('132/86');
 
   // Change a reading, then undo.
   await page.locator('[data-tour="bp.readings"]').getByRole('button', { name: /128\/82/ }).click();
