@@ -5,6 +5,7 @@ import type { changesEn } from './changes.en';
  * same PR; the type makes a missing one a type error.
  */
 export const changesDe: Record<keyof typeof changesEn, string> = {
+  'change.210': 'Blutdruck: Jede Messung einer Messreihe bekommt jetzt ihre eigene Uhrzeit, notiert, wenn ihre Werte eingetragen sind, damit du Reihenfolge und Abstände siehst.',
   'change.209': 'Wasser: Eine Flasche Mineralwasser erscheint auf den Nährstoffseiten nicht mehr als „1 Lebensmittel ohne Wert“. Ihre Mineralstoffe zählen; Energie und der Rest gehören einfach nicht zu Wasser.',
   'change.208': 'Wasser: Deine Tassen und Flaschen stehen auf Start nebeneinander in der Wasserkarte, jede mit ihrer Größe, und ein kleines Symbol zeigt, wie sie zählt: + für eine, die du jedes Mal einträgst, eine Sanduhr für eine, die du einträgst, wenn sie leer ist.',
   'change.207': 'Wasser: Eine Flasche kann sagen, welches Wasser darin ist, per Name oder Strichcode gesucht oder vom Etikett eingetippt, und jede Füllung zählt dann sein Calcium, Magnesium und die anderen Mineralstoffe. Leitungswasser bleibt reines Wasser.',
