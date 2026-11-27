@@ -200,6 +200,15 @@ export function parseStock(text: string): { name: string; pieces?: number; grams
   return amount ? { name, ...stockAmount(amount) } : { name };
 }
 
+/**
+ * Whether a bought line is kept track of at home when the trolley is put away: food (it names a
+ * food, or sits in a food section of the shop) and anything already at home. Other things (toilet
+ * paper) just leave the list.
+ */
+export function keptAtHome(line: Pick<ShoppingItem, 'ref' | 'section'>, atHome: boolean): boolean {
+  return atHome || !!line.ref || line.section !== 'other';
+}
+
 /** A shopping list line as something to put away: pieces when it says how many, else grams. */
 export function fromShopping(line: Pick<ShoppingItem, 'name' | 'ref' | 'grams' | 'amount'>, place: HomePlace): NewPantryItem {
   const item: NewPantryItem = { name: line.name, place };

@@ -193,3 +193,62 @@ test('things at home show as icons with short names, which can be changed, or as
   await expect(page.locator('main .home-row', { hasText: 'Pizza Diavola' })).toBeVisible();
   expect(errors).toEqual([]);
 });
+
+test('the shopping list keeps its order, hides what is ticked and acts on it in one tap', async ({ page }) => {
+  const errors = watchErrors(page);
+  await firstLaunch(page);
+
+  await page.goto('./#/shopping');
+  const main = page.locator('main');
+  const box = page.getByPlaceholder('Add an item, e.g. "milk 2 l"');
+  for (const name of ['frozen peas', 'Bread', 'Rolls', 'Toilet paper']) {
+    await box.fill(name);
+    await box.press('Enter');
+    await expect(main.getByRole('checkbox', { name: new RegExp(`^${name}`) })).toBeVisible();
+  }
+
+  // A ticked line stays a moment, then hides; the switch shows it again in its place.
+  await main.getByRole('checkbox', { name: /^Bread/ }).click();
+  await expect(main.getByRole('checkbox', { name: /^Bread/ })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Show ticked (1)' }).click();
+  await expect(main.getByRole('checkbox', { name: /^Bread/ })).toHaveAttribute('aria-checked', 'true');
+  const names = await main.locator('.shop-name').allTextContents();
+  expect(names.indexOf('Bread')).toBeLessThan(names.indexOf('Rolls'));
+
+  // The place on a ticked line puts it away there (it used to only untick it).
+  await main.getByRole('checkbox', { name: /^frozen peas/ }).click();
+  await main.getByRole('button', { name: 'Put frozen peas away: Freezer' }).click();
+  await expect(page.getByText('frozen peas put away: Freezer.')).toBeVisible();
+  await expect(main.getByRole('checkbox', { name: /^frozen peas/ })).toHaveCount(0);
+
+  // A heading ticks everything under it; Untick puts it all back.
+  await main.getByRole('checkbox', { name: 'Tick off everything under Bread and baked goods' }).click();
+  await expect(main.getByRole('checkbox', { name: /^Rolls/ })).toHaveAttribute('aria-checked', 'true');
+  await page.getByRole('button', { name: 'Untick' }).click();
+  await expect(page.getByText('2 back on the list.')).toBeVisible();
+  await expect(main.getByRole('checkbox', { name: /^Bread/ })).toHaveAttribute('aria-checked', 'false');
+
+  // Swiping a line to the left deletes it, with undo.
+  const row = main.locator('.swipe-front', { hasText: 'Toilet paper' });
+  const r = (await row.boundingBox())!;
+  await page.mouse.move(r.x + r.width - 30, r.y + r.height / 2);
+  await page.mouse.down();
+  for (let i = 1; i <= 10; i++) await page.mouse.move(r.x + r.width - 30 - i * 25, r.y + r.height / 2);
+  await page.mouse.up();
+  await expect(page.getByText('Toilet paper removed from the list.')).toBeVisible();
+  await expect(main.getByText('Toilet paper')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(main.getByRole('checkbox', { name: /^Toilet paper/ })).toBeVisible();
+
+  // Tick the rest and put it all away: food goes home, toilet paper just leaves the list.
+  await main.getByRole('checkbox', { name: /^Toilet paper/ }).click();
+  await main.getByRole('checkbox', { name: 'Tick off everything under Bread and baked goods' }).click();
+  await page.getByRole('button', { name: 'Put away' }).click();
+  await expect(page.getByText('2 put away at home, 1 off the list.')).toBeVisible();
+  await expect(main.locator('.shop-name')).toHaveCount(0);
+
+  await page.goto('./#/kitchen');
+  for (const name of ['frozen peas', 'Bread', 'Rolls']) await expect(main.getByRole('button', { name: new RegExp(`^${name}`) }).first()).toBeVisible();
+  await expect(main.getByRole('button', { name: /^Toilet paper/ })).toHaveCount(0);
+  expect(errors).toEqual([]);
+});

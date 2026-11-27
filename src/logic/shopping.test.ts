@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { FoodRef, Recipe, ShoppingItem } from '../storage/types';
-import { commonSection, sectionFromFoods, amountText, bySection, joinAmounts, MAX_REMEMBERED, parseAmount, parseEntry, planAdd, planClear, recipeLines, sectionOfCode, sectionOfRef, shareText, suggestions } from './shopping';
+import { commonSection, sectionFromFoods, amountText, bySection, joinAmounts, MAX_REMEMBERED, parseAmount, parseEntry, planAdd, planClear, planTick, recipeLines, sectionOfCode, sectionOfRef, shareText, suggestions } from './shopping';
 
 const bls = (code: string): FoodRef => ({ source: 'BLS', version: '4.0', code });
 let n = 0;
@@ -147,6 +147,26 @@ describe('after shopping', () => {
     const { put, remove } = planClear([oldMilk, milk, bread], 10);
     expect(put).toEqual([{ ...milk, clearedAt: 10 }]);
     expect(remove).toEqual(['old']);
+  });
+
+  it('clears only the lines asked for, ticked or not', () => {
+    const milk = item({ id: 'm', name: 'Milk', checkedAt: 9 });
+    const bread = item({ id: 'b', name: 'Bread' });
+    const eggs = item({ id: 'e', name: 'Eggs', checkedAt: 8 });
+    const { put, remove } = planClear([milk, bread, eggs], 10, ['b', 'e']);
+    expect(put).toEqual([
+      { ...bread, clearedAt: 10 },
+      { ...eggs, clearedAt: 10 },
+    ]);
+    expect(remove).toEqual([]);
+  });
+
+  it('ticks off and puts back only lines that change', () => {
+    const milk = item({ id: 'm', name: 'Milk', checkedAt: 3 });
+    const bread = item({ id: 'b', name: 'Bread' });
+    const gone = item({ id: 'g', name: 'Gone', clearedAt: 2 });
+    expect(planTick([milk, bread, gone], ['m', 'b', 'g'], true, 10).put).toEqual([{ ...bread, checkedAt: 10 }]);
+    expect(planTick([milk, bread, gone], ['m', 'b', 'g'], false, 10).put).toEqual([{ id: 'm', schemaVersion: 1, section: 'other', addedAt: 1, name: 'Milk' }]);
   });
 
   it('remembers at most MAX_REMEMBERED names', () => {

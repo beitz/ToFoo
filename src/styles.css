@@ -3815,13 +3815,40 @@ button.week-row:focus-visible {
 .shop-suggestions li:last-child .result {
   border-bottom: none;
 }
+/* A section heading is a tick box for every line under it (owner, 2026-11-27). */
 .shop-section {
-  margin: 1.1rem 0 0.4rem;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  margin: 0.6rem 0 0.1rem;
+  padding: 0 0 0 13px;
+  background: none;
+  border: none;
   color: var(--text-muted);
+  font: inherit;
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.04em;
+  text-align: left;
   text-transform: uppercase;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.shop-check.small {
+  width: 22px;
+  height: 22px;
+  border-width: 2px;
+  border-radius: 5px;
+}
+.shop-check.some {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.shop-show {
+  min-height: 44px;
+  margin: 2px 0 0;
 }
 .shop-list > li,
 .shop-pick > li {
@@ -3899,12 +3926,57 @@ button.week-row:focus-visible {
   align-items: center;
   gap: 4px;
 }
+/* Where a ticked line goes at home: a button that puts it there. */
 .shop-goes {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   flex: none;
-  padding: 2px 8px;
-  border-radius: 8px;
+  min-height: 44px;
+  max-width: 48%;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
   background: var(--surface-3);
   color: var(--text);
+  font: inherit;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+/* What is ticked: put away, untick, delete, always one tap away above the add box. */
+.shop-bulk {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 8px;
+}
+.shop-bulk .btn {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 6px;
+  gap: 4px;
+  white-space: nowrap;
+}
+.shop-bulk-n {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+  padding: 0 4px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.shop-bulk .shop-bulk-delete {
+  color: var(--low);
+}
+@media (max-width: 374px) {
+  .shop-bulk .btn svg {
+    display: none;
+  }
 }
 .offline-pill {
   display: inline-flex;
@@ -3939,11 +4011,54 @@ button.week-row:focus-visible {
   border-radius: 4px;
   background: var(--text);
 }
-.shop-trolley {
+.shop-from-recipe {
+  margin-top: 16px;
+}
+
+/* ── Swipe rows (src/ui/SwipeRow.tsx) ─────────────────────────── */
+.swipe-row {
+  position: relative;
+  border-radius: 14px;
+}
+.swipe-front {
+  position: relative;
+  /* The browser keeps vertical scrolling; sideways moves come to the row. */
+  touch-action: pan-y;
+  transition: transform 180ms ease;
+}
+.swipe-front.dragging {
+  transition: none;
+  user-select: none;
+}
+.swipe-under {
+  position: absolute;
+  inset: 0;
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 14px 0 10px;
+  padding: 0 18px;
+  border-radius: inherit;
+  font-weight: 600;
+  opacity: 0.75;
+}
+.swipe-under.to-left {
+  justify-content: flex-end;
+}
+.swipe-under.danger {
+  background: var(--low);
+  color: var(--bg);
+}
+.swipe-under.accent {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+.swipe-under.armed {
+  opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .swipe-front {
+    transition: none;
+  }
 }
 .shop-dock {
   position: sticky;

@@ -5,6 +5,8 @@ import type { changesEn } from './changes.en';
  * same PR; the type makes a missing one a type error.
  */
 export const changesDe: Record<keyof typeof changesEn, string> = {
+  'change.211': 'Einkaufsliste: Die Liste behält beim Einkaufen ihre Reihenfolge, und Abgehaktes verschwindet (Abgehakte zeigen holt es zurück). Tippe eine Abteilung an, um alles darunter abzuhaken. Was abgehakt ist, kannst du mit einem Tipp zu Hause einräumen, wieder öffnen oder löschen, und der Ort an einer abgehakten Zeile räumt sie jetzt dort ein. Wisch eine Zeile nach links, um sie zu löschen.',
+  'change.211.major': 'Einkaufsliste überarbeitet, Wischen zum Löschen',
   'change.210': 'Blutdruck: Jede Messung einer Messreihe bekommt jetzt ihre eigene Uhrzeit, notiert, wenn ihre Werte eingetragen sind, damit du Reihenfolge und Abstände siehst.',
   'change.209': 'Wasser: Eine Flasche Mineralwasser erscheint auf den Nährstoffseiten nicht mehr als „1 Lebensmittel ohne Wert“. Ihre Mineralstoffe zählen; Energie und der Rest gehören einfach nicht zu Wasser.',
   'change.208': 'Wasser: Deine Tassen und Flaschen stehen auf Start nebeneinander in der Wasserkarte, jede mit ihrer Größe, und ein kleines Symbol zeigt, wie sie zählt: + für eine, die du jedes Mal einträgst, eine Sanduhr für eine, die du einträgst, wenn sie leer ist.',

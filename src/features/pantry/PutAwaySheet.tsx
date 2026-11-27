@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useToast } from '../../app/toast';
 import { t } from '../../i18n';
 import { newId } from '../../lib/id';
-import { fromShopping, planStock } from '../../logic/pantry';
+import { fromShopping, keptAtHome, planStock } from '../../logic/pantry';
 import { amountText, onList, planClear, sameThing } from '../../logic/shopping';
 import { repo } from '../../storage/repo';
 import { CURRENT_SCHEMA_VERSION, HOME_PLACES, type HomePlace } from '../../storage/types';
@@ -26,7 +26,7 @@ export function PutAwaySheet({ onClose }: { onClose: () => void }) {
     const basket = (shopping ?? []).filter((s) => onList(s) && s.checkedAt !== undefined).sort((a, b) => a.addedAt - b.addedAt);
     return basket.map((line) => {
       const home = (pantry ?? []).find((p) => sameThing(p, line));
-      return { line, home, place: home?.place ?? placeOf(line.name, line.ref), selected: !!home || !!line.ref || line.section !== 'other' };
+      return { line, home, place: home?.place ?? placeOf(line.name, line.ref), selected: keptAtHome(line, !!home) };
     });
     // Places are guessed once, when the lists have loaded.
     // eslint-disable-next-line react-hooks/exhaustive-deps

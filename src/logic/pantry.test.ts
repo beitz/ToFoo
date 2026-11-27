@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Batch, FoodRef, LogEntry, PantryItem, Product, ShoppingItem } from '../storage/types';
-import { amountField, byPlace, fromShopping, guessPlace, leftOf, leftText, loggable, packGrams, piecesAsGrams, scannedAmount, onShoppingList, pantrySuggestions, parseStock, placeFromWords, pieceUnitsOf, piecesOfLog, placeOfCode, planReports, planStock, stockAmount, toBuy, usageOf, withAmount, withStatus } from './pantry';
+import { amountField, byPlace, fromShopping, guessPlace, keptAtHome, leftOf, leftText, loggable, packGrams, piecesAsGrams, scannedAmount, onShoppingList, pantrySuggestions, parseStock, placeFromWords, pieceUnitsOf, piecesOfLog, placeOfCode, planReports, planStock, stockAmount, toBuy, usageOf, withAmount, withStatus } from './pantry';
 
 const bls = (code: string): FoodRef => ({ source: 'BLS', version: '4.0', code });
 const lasagne: FoodRef = { source: 'OFF', code: '4001' };
@@ -317,5 +317,14 @@ describe('lists', () => {
     ]);
     expect(pantrySuggestions(items, 'mi').map((i) => i.name)).toEqual(['Milk']);
     expect(pantrySuggestions(items, '')).toEqual([]);
+  });
+});
+
+describe('putting the trolley away', () => {
+  it('keeps food and things already at home, lets other things just leave the list', () => {
+    expect(keptAtHome({ section: 'other' }, false)).toBe(false);
+    expect(keptAtHome({ section: 'other' }, true)).toBe(true);
+    expect(keptAtHome({ section: 'produce' }, false)).toBe(true);
+    expect(keptAtHome({ section: 'other', ref: { source: 'BLS', version: '4.0', code: 'X000000' } }, false)).toBe(true);
   });
 });

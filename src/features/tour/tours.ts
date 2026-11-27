@@ -8,7 +8,7 @@ import type { FeatureKey, Settings } from '../../storage/types';
  * marker isn't on screen (feature off, card hidden) is skipped. Lines say what a part is, never how
  * it looks (owner's ask), so a restyle doesn't make them wrong.
  */
-export type TourId = 'home' | 'insights' | 'kitchen' | 'fan' | 'settings' | 'assistant' | 'nutrient' | 'weight' | 'habits' | 'bloodPressure';
+export type TourId = 'home' | 'insights' | 'kitchen' | 'fan' | 'settings' | 'assistant' | 'nutrient' | 'weight' | 'habits' | 'bloodPressure' | 'shopping';
 
 export interface TourStep {
   /** The `data-tour` marker to outline; none = a bubble in the middle of the screen. */
@@ -127,6 +127,15 @@ export const TOURS: Record<TourId, Tour> = {
       { target: 'bp.readings', text: 'tour.bp.readings' },
     ],
   },
+  shopping: {
+    requires: 'shoppingList',
+    steps: [
+      { target: 'shopping.line', text: 'tour.shopping.line' },
+      { target: 'shopping.heading', text: 'tour.shopping.heading' },
+      { target: 'shopping.show', text: 'tour.shopping.show' },
+      { target: 'shopping.actions', text: 'tour.shopping.actions' },
+    ],
+  },
   habits: {
     requires: 'habits',
     steps: [
@@ -154,6 +163,7 @@ export function tourForRoute(route: readonly string[]): TourId | undefined {
   if (a === 'weight') return 'weight';
   if (a === 'blood-pressure') return 'bloodPressure';
   if (a === 'habits' && !b) return 'habits';
+  if (a === 'shopping') return 'shopping';
   return undefined;
 }
 

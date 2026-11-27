@@ -8,6 +8,8 @@
  * scenes and small fixes. A pull request that changes what users see adds its line here in the same PR.
  */
 export const changesEn = {
+  'change.211': 'Shopping list: the list keeps its order while you shop, and ticked things hide (Show ticked brings them back). Tap a section heading to tick everything under it. What is ticked can be put away at home, unticked or deleted in one tap, and the place on a ticked line now puts it there. Swipe a line left to delete it.',
+  'change.211.major': 'Shopping list reworked, swipe to delete',
   'change.210': 'Blood pressure: each reading of a sitting now gets its own time, noted when its numbers are filled in, so you can see the order and the gaps between them.',
   'change.209': 'Water: a bottle of mineral water no longer shows up as "1 food without a value" on nutrient pages. Its minerals count; energy and the rest are simply not part of water.',
   'change.208': 'Water: your cups and bottles sit side by side on the water card on Home, each with its size, and a small icon says how it counts: + for one logged each time, an hourglass for one logged when it is empty.',
