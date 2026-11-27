@@ -21,8 +21,12 @@ import { portionGrams } from '../../model/ranking';
 import { NUTRIENT_BY_ID } from '../../model/nutrients';
 import { BackButton } from '../../ui/BackButton';
 
-/** A line just ticked off stays in view this long, ticked, before it hides (a wrong tap can be taken back). */
-const LINGER_MS = 1500;
+/** A line just ticked off stays in view this long, ticked (a wrong tap can be taken back), then vanishes. */
+const STAY_MS = 600;
+/** How long a line takes to vanish or appear, the lines below sliding along; also in styles.css (.shop-fold). */
+const FOLD_MS = 220;
+
+const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
 
 /**
  * Route #/shopping: the shopping list. Everything is on the phone, so it works in a shop without
@@ -41,7 +45,8 @@ export function ShoppingPage() {
   const [fromRecipe, setFromRecipe] = useState(false);
   const [editing, setEditing] = useState<ShoppingItem | null>(null);
   const [showTicked, setShowTicked] = useState(false);
-  const [lingering, setLingering] = useState<ReadonlySet<string>>(new Set());
+  // Lines on their way out: 'stay' (just ticked, still shown ticked), then 'leave' (folding away).
+  const [phase, setPhase] = useState<ReadonlyMap<string, 'stay' | 'leave'>>(new Map());
   const timers = useRef<number[]>([]);
   useEffect(() => () => timers.current.forEach((id) => window.clearTimeout(id)), []);
   const atHome = isOn(d.settings.features, 'atHome');
@@ -49,21 +54,79 @@ export function ShoppingPage() {
   const items = useMemo(() => (all ?? []).filter(onList), [all]);
   const toBuy = items.filter(isOpen);
   const trolley = items.filter((i) => i.checkedAt !== undefined);
-  const shown = (i: ShoppingItem) => isOpen(i) || showTicked || lingering.has(i.id);
+  const shown = (i: ShoppingItem) => isOpen(i) || showTicked || phase.has(i.id);
+  // Timers read the list as it is then, not as it was when they were set.
+  const latest = useRef({ items, showTicked });
+  latest.current = { items, showTicked };
   useWakeLock(items.length > 0);
 
-  function linger(ids: readonly string[]) {
-    setLingering((prev) => new Set([...prev, ...ids]));
+  function later(fn: () => void, ms: number) {
     const timer = window.setTimeout(() => {
-      setLingering((prev) => new Set([...prev].filter((id) => !ids.includes(id))));
       timers.current = timers.current.filter((x) => x !== timer);
-    }, LINGER_MS);
+      fn();
+    }, ms);
     timers.current.push(timer);
+  }
+  function setPhases(ids: readonly string[], p: 'stay' | 'leave' | undefined) {
+    setPhase((prev) => {
+      const next = new Map(prev);
+      for (const id of ids) {
+        if (p) next.set(id, p);
+        else next.delete(id);
+      }
+      return next;
+    });
+  }
+
+  /**
+   * Lines leave the screen (owner, 2026-11-27: "a nice quick vanishing animation"): they fade and
+   * fold up while the lines below slide up, then `then` runs (the delete, if any).
+   */
+  function vanish(ids: readonly string[], then?: () => Promise<void>) {
+    setPhases(ids, 'leave');
+    later(
+      () =>
+        void (async () => {
+          await then?.();
+          setPhases(ids, undefined);
+        })(),
+      reducedMotion() ? 0 : FOLD_MS,
+    );
   }
 
   async function tick(ids: readonly string[], on: boolean) {
     await repo.changeShopping((current) => planTick(current, ids, on, Date.now()));
-    if (on) linger(ids);
+    if (!on || latest.current.showTicked) return;
+    setPhases(ids, 'stay');
+    later(() => {
+      // Only what is still ticked and hidden goes; a line unticked meanwhile stays put.
+      const { items: now, showTicked: showing } = latest.current;
+      const going = showing ? [] : ids.filter((id) => now.some((i) => i.id === id && !isOpen(i)));
+      setPhases(
+        ids.filter((id) => !going.includes(id)),
+        undefined,
+      );
+      if (going.length) vanish(going);
+    }, STAY_MS);
+  }
+
+  /** Act on the trolley; lines shown fold away first. */
+  function leaveTrolley(act: () => Promise<void>) {
+    if (showTicked)
+      vanish(
+        trolley.map((i) => i.id),
+        act,
+      );
+    else void act();
+  }
+
+  function toggleShown() {
+    if (showTicked)
+      vanish(
+        trolley.map((i) => i.id),
+        async () => setShowTicked(false),
+      );
+    else setShowTicked(true);
   }
 
   async function remove(item: ShoppingItem) {
@@ -114,6 +177,21 @@ export function ShoppingPage() {
     .filter((g) => g.items.length > 0);
   const firstLine = groups[0]?.items[0]?.id;
 
+  // Lines (and sections) that just came into view fold open: added, put back, undone or shown.
+  // Those on screen when the list first loads don't.
+  const appeared = useRef<Map<string, number> | null>(null);
+  const now = performance.now();
+  const visible = groups.flatMap((g) => [`s:${g.section}`, ...g.items.map((i) => i.id)]);
+  if (!appeared.current) {
+    if (all) appeared.current = new Map(visible.map((k) => [k, -Infinity]));
+  } else {
+    const seen = appeared.current;
+    for (const k of visible) if (!seen.has(k)) seen.set(k, now);
+    for (const k of [...seen.keys()]) if (!visible.includes(k)) seen.delete(k);
+  }
+  const entering = (key: string) => (appeared.current?.get(key) ?? -Infinity) > now - FOLD_MS;
+  const fold = (key: string, leaving: boolean) => (leaving ? ' leaving' : entering(key) ? ' entering' : '');
+
   return (
     <section className="shopping-page">
       <header className="page-head row-between">
@@ -125,7 +203,14 @@ export function ShoppingPage() {
       </header>
       {/* Under the title, not beside it: "Shopping list" needs the header's width at 360 px. */}
       <div className="shop-progress">
-        {items.length > 0 && <span className="small muted">{t('shopping.progress', { get: toBuy.length, trolley: trolley.length })}</span>}
+        {items.length > 0 && (
+          <span className="small muted">
+            {t('shopping.progress', {
+              get: toBuy.length,
+              trolley: trolley.length,
+            })}
+          </span>
+        )}
         <span className="offline-pill small">
           <Icon name="check" size={14} /> {t('shopping.offline')}
         </span>
@@ -135,57 +220,76 @@ export function ShoppingPage() {
           </span>
         )}
       </div>
-      {trolley.length > 0 && (
-        <button className={`chip shop-show${showTicked ? ' on' : ''}`} aria-pressed={showTicked} onClick={() => setShowTicked(!showTicked)} data-tour="shopping.show">
-          <Icon name="eye" size={16} /> {t(showTicked ? 'shopping.hideTicked' : 'shopping.showTicked', { n: trolley.length })}
+      {/* Always there once the list has lines, so ticking the first one moves nothing (owner, 2026-11-27). */}
+      {items.length > 0 && (
+        <button className={`chip shop-show${showTicked ? ' on' : ''}`} aria-pressed={showTicked} disabled={!showTicked && trolley.length === 0} onClick={toggleShown} data-tour="shopping.show">
+          <Icon name="eye" size={16} />{' '}
+          {t(showTicked ? 'shopping.hideTicked' : 'shopping.showTicked', {
+            n: trolley.length,
+          })}
         </button>
       )}
 
       {all && items.length === 0 && <p className="muted empty">{t('shopping.empty')}</p>}
-      {items.length > 0 && toBuy.length === 0 && !showTicked && lingering.size === 0 && <p className="muted empty">{t('shopping.allInBasket')}</p>}
+      {items.length > 0 && toBuy.length === 0 && !showTicked && phase.size === 0 && <p className="muted empty">{t('shopping.allInBasket')}</p>}
       {/* The order lines were added in, ticked or not, so nothing jumps while shopping. */}
       {groups.map((g, gi) => {
         const ticked = g.items.filter((i) => !isOpen(i)).length;
         const state = ticked === 0 ? false : ticked === g.items.length ? true : ('mixed' as const);
+        const gone = g.items.every((i) => phase.get(i.id) === 'leave');
         return (
-          <div key={g.section}>
-            <button
-              className="shop-section"
-              role="checkbox"
-              aria-checked={state}
-              aria-label={t('shopping.tickSection', { name: sectionName(g.section) })}
-              onClick={() =>
-                void tick(
-                  (state === true ? g.items : g.items.filter(isOpen)).map((i) => i.id),
-                  state !== true,
-                )
-              }
-              {...(gi === 0 ? { 'data-tour': 'shopping.heading' } : {})}
-            >
-              <span className={`shop-check small${state === true ? ' on' : state === 'mixed' ? ' some' : ''}`} aria-hidden>
-                {state === true && <Icon name="check" size={14} />}
-                {state === 'mixed' && <Icon name="minus" size={14} />}
-              </span>
-              {sectionName(g.section)}
-            </button>
-            <ul className="plain-list shop-list">
-              {g.items.map((i) => {
-                const place = atHome && !isOpen(i) ? placeFor(i) : undefined;
-                return (
-                  <li key={i.id} {...(i.id === firstLine ? { 'data-tour': 'shopping.line' } : {})}>
-                    <SwipeRow left={{ label: t('shopping.delete'), icon: 'trash', tone: 'danger', run: () => void remove(i) }}>
-                      <Row
-                        item={i}
-                        goesTo={place}
-                        onToggle={() => void tick([i.id], isOpen(i))}
-                        onPutAway={place ? () => void putAwayOne(i, place) : undefined}
-                        onEdit={() => setEditing(i)}
-                      />
-                    </SwipeRow>
-                  </li>
-                );
-              })}
-            </ul>
+          <div key={g.section} className={`shop-group${fold(`s:${g.section}`, gone)}`}>
+            <div className="shop-fold">
+              <button
+                className="shop-section"
+                role="checkbox"
+                aria-checked={state}
+                aria-label={t('shopping.tickSection', {
+                  name: sectionName(g.section),
+                })}
+                onClick={() =>
+                  void tick(
+                    (state === true ? g.items : g.items.filter(isOpen)).map((i) => i.id),
+                    state !== true,
+                  )
+                }
+                {...(gi === 0 ? { 'data-tour': 'shopping.heading' } : {})}
+              >
+                <span className={`shop-check small${state === true ? ' on' : state === 'mixed' ? ' some' : ''}`} aria-hidden>
+                  {state === true && <Icon name="check" size={14} />}
+                  {state === 'mixed' && <Icon name="minus" size={14} />}
+                </span>
+                {sectionName(g.section)}
+              </button>
+              <ul className="plain-list shop-list">
+                {g.items.map((i) => {
+                  // Only with ticked lines shown: a line just ticked keeps its size while it stays.
+                  const place = atHome && showTicked && !isOpen(i) ? placeFor(i) : undefined;
+                  return (
+                    <li key={i.id} className={`shop-li${fold(i.id, phase.get(i.id) === 'leave')}`} {...(i.id === firstLine ? { 'data-tour': 'shopping.line' } : {})}>
+                      <div className="shop-fold">
+                        <SwipeRow
+                          left={{
+                            label: t('shopping.delete'),
+                            icon: 'trash',
+                            tone: 'danger',
+                            run: () => vanish([i.id], () => remove(i)),
+                          }}
+                        >
+                          <Row
+                            item={i}
+                            goesTo={place}
+                            onToggle={() => void tick([i.id], isOpen(i))}
+                            onPutAway={place ? () => vanish([i.id], () => putAwayOne(i, place)) : undefined}
+                            onEdit={() => setEditing(i)}
+                          />
+                        </SwipeRow>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
           </div>
         );
       })}
@@ -204,14 +308,14 @@ export function ShoppingPage() {
                 <Icon name="check" size={16} /> {trolley.length}
               </span>
               {atHome && (
-                <button className="btn btn-small btn-secondary" onClick={() => void putAwayTrolley()}>
+                <button className="btn btn-small btn-secondary" onClick={() => leaveTrolley(putAwayTrolley)}>
                   <Icon name="pantry" size={16} /> {t('shopping.putAway')}
                 </button>
               )}
               <button className="btn btn-small btn-secondary" onClick={() => void untickTrolley()}>
                 <Icon name="undo" size={16} /> {t('shopping.untick')}
               </button>
-              <button className="btn btn-small btn-secondary shop-bulk-delete" onClick={() => void deleteTrolley()}>
+              <button className="btn btn-small btn-secondary shop-bulk-delete" onClick={() => leaveTrolley(deleteTrolley)}>
                 <Icon name="trash" size={16} /> {t('shopping.delete')}
               </button>
             </div>
@@ -265,7 +369,14 @@ function Row({ item, goesTo, onToggle, onPutAway, onEdit }: { item: ShoppingItem
         </span>
       </button>
       {goesTo && onPutAway && (
-        <button className="shop-goes small" onClick={onPutAway} aria-label={t('shopping.putAwayIn', { name: item.name, place: placeName(goesTo) })}>
+        <button
+          className="shop-goes small"
+          onClick={onPutAway}
+          aria-label={t('shopping.putAwayIn', {
+            name: item.name,
+            place: placeName(goesTo),
+          })}
+        >
           → {placeName(goesTo)}
         </button>
       )}
