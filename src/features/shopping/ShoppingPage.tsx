@@ -1,29 +1,38 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useData } from '../../app/data';
 import { useToast } from '../../app/toast';
 import { t } from '../../i18n';
 import { errorText } from '../../lib/shareFile';
-import { amountText, bySection, isOpen, onList, planClear, shareText } from '../../logic/shopping';
+import { amountText, bySection, isOpen, onList, planClear, planTick, shareText } from '../../logic/shopping';
 import { repo } from '../../storage/repo';
-import { type ShoppingItem } from '../../storage/types';
+import { type HomePlace, type ShoppingItem } from '../../storage/types';
 import { Icon } from '../../ui/Icon';
+import { SwipeRow } from '../../ui/SwipeRow';
 import { ItemSheet, sectionName } from './ItemSheet';
 import { RecipeToListSheet } from './RecipeToListSheet';
 import { useShopping } from './useShopping';
 import { ShoppingAdd } from './ShoppingAdd';
 import { useWakeLock } from './useWakeLock';
 import { isOn } from '../../settings/features';
-import { PutAwaySheet } from '../pantry/PutAwaySheet';
-import { placeName, usePantryFoods } from '../pantry/usePantry';
+import { placeName } from '../pantry/usePantry';
+import { usePutAway } from '../pantry/usePutAway';
 import { useGaps } from '../recipes/useGaps';
 import { portionGrams } from '../../model/ranking';
 import { NUTRIENT_BY_ID } from '../../model/nutrients';
 import { BackButton } from '../../ui/BackButton';
 
+/** A line just ticked off stays in view this long, ticked, before it hides (a wrong tap can be taken back). */
+const LINGER_MS = 1500;
+
 /**
  * Route #/shopping: the shopping list. Everything is on the phone, so it works in a shop without
  * a connection. Type to add (things bought before come back as suggestions), add a recipe's
- * ingredients, tap a line to put it in the basket, clear the basket after shopping.
+ * ingredients, tap a line to put it in the trolley, swipe it left to delete it.
+ *
+ * Owner's rework (2026-11-27): the list keeps its order while shopping; ticked lines hide (a
+ * switch shows them again, in their place); a section heading ticks everything under it; and
+ * whatever is ticked can be put away at home, unticked or deleted in one tap from the bar above
+ * the add box.
  */
 export function ShoppingPage() {
   const d = useData();
@@ -31,24 +40,58 @@ export function ShoppingPage() {
   const all = useShopping();
   const [fromRecipe, setFromRecipe] = useState(false);
   const [editing, setEditing] = useState<ShoppingItem | null>(null);
-  const [puttingAway, setPuttingAway] = useState(false);
+  const [showTicked, setShowTicked] = useState(false);
+  const [lingering, setLingering] = useState<ReadonlySet<string>>(new Set());
+  const timers = useRef<number[]>([]);
+  useEffect(() => () => timers.current.forEach((id) => window.clearTimeout(id)), []);
   const atHome = isOn(d.settings.features, 'atHome');
-  const { placeOf } = usePantryFoods();
+  const { placeFor, putAway } = usePutAway();
   const items = useMemo(() => (all ?? []).filter(onList), [all]);
   const toBuy = items.filter(isOpen);
-  const basket = items.filter((i) => i.checkedAt !== undefined).sort((a, b) => b.checkedAt! - a.checkedAt!);
+  const trolley = items.filter((i) => i.checkedAt !== undefined);
+  const shown = (i: ShoppingItem) => isOpen(i) || showTicked || lingering.has(i.id);
   useWakeLock(items.length > 0);
 
-  async function toggle(item: ShoppingItem) {
-    const next = { ...item };
-    if (item.checkedAt === undefined) next.checkedAt = Date.now();
-    else delete next.checkedAt;
-    await repo.changeShopping(() => ({ put: [next], remove: [] }));
+  function linger(ids: readonly string[]) {
+    setLingering((prev) => new Set([...prev, ...ids]));
+    const timer = window.setTimeout(() => {
+      setLingering((prev) => new Set([...prev].filter((id) => !ids.includes(id))));
+      timers.current = timers.current.filter((x) => x !== timer);
+    }, LINGER_MS);
+    timers.current.push(timer);
   }
 
-  async function clear() {
-    const undo = await repo.changeShopping((current) => planClear(current, Date.now()));
-    toast(t('shopping.cleared', { n: basket.length }), () => repo.undoShopping(undo));
+  async function tick(ids: readonly string[], on: boolean) {
+    await repo.changeShopping((current) => planTick(current, ids, on, Date.now()));
+    if (on) linger(ids);
+  }
+
+  async function remove(item: ShoppingItem) {
+    const undo = await repo.changeShopping((current) => planClear(current, Date.now(), [item.id]));
+    toast(t('shopping.removed', { name: item.name }), () => repo.undoShopping(undo));
+  }
+
+  async function putAwayOne(item: ShoppingItem, place: HomePlace) {
+    const { undo } = await putAway([item], place);
+    toast(t('shopping.putAwayOne', { name: item.name, place: placeName(place) }), () => repo.undoHome(undo));
+  }
+
+  async function putAwayTrolley() {
+    const { undo, stored, left } = await putAway(trolley);
+    const message = !stored ? t('shopping.deleted', { n: left }) : left ? t('shopping.putAwayDoneOther', { n: stored, other: left }) : t('shopping.putAwayDone', { n: stored });
+    toast(message, () => repo.undoHome(undo));
+  }
+
+  async function untickTrolley() {
+    const ids = trolley.map((i) => i.id);
+    const undo = await repo.changeShopping((current) => planTick(current, ids, false, Date.now()));
+    toast(t('shopping.backOnList', { n: ids.length }), () => repo.undoShopping(undo));
+  }
+
+  async function deleteTrolley() {
+    const ids = trolley.map((i) => i.id);
+    const undo = await repo.changeShopping((current) => planClear(current, Date.now(), ids));
+    toast(t('shopping.deleted', { n: ids.length }), () => repo.undoShopping(undo));
   }
 
   async function share() {
@@ -65,7 +108,11 @@ export function ShoppingPage() {
     }
   }
 
-  const done = items.length > 0 ? basket.length / items.length : 0;
+  const done = items.length > 0 ? trolley.length / items.length : 0;
+  const groups = bySection(items)
+    .map((g) => ({ section: g.section, items: g.items.filter(shown) }))
+    .filter((g) => g.items.length > 0);
+  const firstLine = groups[0]?.items[0]?.id;
 
   return (
     <section className="shopping-page">
@@ -78,7 +125,7 @@ export function ShoppingPage() {
       </header>
       {/* Under the title, not beside it: "Shopping list" needs the header's width at 360 px. */}
       <div className="shop-progress">
-        {items.length > 0 && <span className="small muted">{t('shopping.progress', { get: toBuy.length, trolley: basket.length })}</span>}
+        {items.length > 0 && <span className="small muted">{t('shopping.progress', { get: toBuy.length, trolley: trolley.length })}</span>}
         <span className="offline-pill small">
           <Icon name="check" size={14} /> {t('shopping.offline')}
         </span>
@@ -88,45 +135,92 @@ export function ShoppingPage() {
           </span>
         )}
       </div>
+      {trolley.length > 0 && (
+        <button className={`chip shop-show${showTicked ? ' on' : ''}`} aria-pressed={showTicked} onClick={() => setShowTicked(!showTicked)} data-tour="shopping.show">
+          <Icon name="eye" size={16} /> {t(showTicked ? 'shopping.hideTicked' : 'shopping.showTicked', { n: trolley.length })}
+        </button>
+      )}
 
       {all && items.length === 0 && <p className="muted empty">{t('shopping.empty')}</p>}
-      {/* Ticked things stay in their section (design 2026-10-22), after what is still to get. */}
-      {bySection(items).map((g) => (
-        <div key={g.section}>
-          <h2 className="shop-section">{sectionName(g.section)}</h2>
-          <ul className="plain-list shop-list">
-            {[...g.items.filter(isOpen), ...g.items.filter((i) => !isOpen(i))].map((i) => (
-              <li key={i.id}>
-                <Row item={i} goesTo={atHome && !isOpen(i) ? placeName(placeOf(i.name, i.ref)) : undefined} onToggle={() => void toggle(i)} onEdit={() => setEditing(i)} />
-              </li>
-            ))}
-          </ul>
-        </div>
-      ))}
-
-      {basket.length > 0 && (
-        <div className="card shop-trolley">
-          <span className="grow">{t('shopping.basket', { n: basket.length })}</span>
-          {atHome && (
-            <button className="btn btn-small btn-secondary" onClick={() => setPuttingAway(true)}>
-              <Icon name="pantry" size={16} /> {t('shopping.putAway')}
+      {items.length > 0 && toBuy.length === 0 && !showTicked && lingering.size === 0 && <p className="muted empty">{t('shopping.allInBasket')}</p>}
+      {/* The order lines were added in, ticked or not, so nothing jumps while shopping. */}
+      {groups.map((g, gi) => {
+        const ticked = g.items.filter((i) => !isOpen(i)).length;
+        const state = ticked === 0 ? false : ticked === g.items.length ? true : ('mixed' as const);
+        return (
+          <div key={g.section}>
+            <button
+              className="shop-section"
+              role="checkbox"
+              aria-checked={state}
+              aria-label={t('shopping.tickSection', { name: sectionName(g.section) })}
+              onClick={() =>
+                void tick(
+                  (state === true ? g.items : g.items.filter(isOpen)).map((i) => i.id),
+                  state !== true,
+                )
+              }
+              {...(gi === 0 ? { 'data-tour': 'shopping.heading' } : {})}
+            >
+              <span className={`shop-check small${state === true ? ' on' : state === 'mixed' ? ' some' : ''}`} aria-hidden>
+                {state === true && <Icon name="check" size={14} />}
+                {state === 'mixed' && <Icon name="minus" size={14} />}
+              </span>
+              {sectionName(g.section)}
             </button>
-          )}
-          <button className="btn btn-small btn-ghost" onClick={() => void clear()}>
-            {t('shopping.clear')}
-          </button>
-        </div>
-      )}
-      <button className="btn btn-secondary btn-block" onClick={() => setFromRecipe(true)}>
+            <ul className="plain-list shop-list">
+              {g.items.map((i) => {
+                const place = atHome && !isOpen(i) ? placeFor(i) : undefined;
+                return (
+                  <li key={i.id} {...(i.id === firstLine ? { 'data-tour': 'shopping.line' } : {})}>
+                    <SwipeRow left={{ label: t('shopping.delete'), icon: 'trash', tone: 'danger', run: () => void remove(i) }}>
+                      <Row
+                        item={i}
+                        goesTo={place}
+                        onToggle={() => void tick([i.id], isOpen(i))}
+                        onPutAway={place ? () => void putAwayOne(i, place) : undefined}
+                        onEdit={() => setEditing(i)}
+                      />
+                    </SwipeRow>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        );
+      })}
+
+      <button className="btn btn-secondary btn-block shop-from-recipe" onClick={() => setFromRecipe(true)}>
         <Icon name="recipes" size={18} /> {t('shopping.fromRecipe')}
       </button>
       {items.length > 0 && 'wakeLock' in navigator && <p className="muted small shop-awake">{t('shopping.screenOn')}</p>}
 
-      <ShoppingAdd docked />
+      <ShoppingAdd
+        docked
+        above={
+          trolley.length > 0 && (
+            <div className="shop-bulk" role="group" aria-label={t('shopping.basket', { n: trolley.length })} data-tour="shopping.actions">
+              <span className="shop-bulk-n" title={t('shopping.basket', { n: trolley.length })}>
+                <Icon name="check" size={16} /> {trolley.length}
+              </span>
+              {atHome && (
+                <button className="btn btn-small btn-secondary" onClick={() => void putAwayTrolley()}>
+                  <Icon name="pantry" size={16} /> {t('shopping.putAway')}
+                </button>
+              )}
+              <button className="btn btn-small btn-secondary" onClick={() => void untickTrolley()}>
+                <Icon name="undo" size={16} /> {t('shopping.untick')}
+              </button>
+              <button className="btn btn-small btn-secondary shop-bulk-delete" onClick={() => void deleteTrolley()}>
+                <Icon name="trash" size={16} /> {t('shopping.delete')}
+              </button>
+            </div>
+          )
+        }
+      />
 
       {fromRecipe && <RecipeToListSheet onClose={() => setFromRecipe(false)} />}
       {editing && <ItemSheet key={editing.id} item={editing} onClose={() => setEditing(null)} />}
-      {puttingAway && <PutAwaySheet onClose={() => setPuttingAway(false)} />}
     </section>
   );
 }
@@ -134,9 +228,11 @@ export function ShoppingPage() {
 /**
  * One line as a card (design 2026-10-22, "Basket in the shop"): tap to put it in the trolley (or
  * back), the pen to change it. Under the name: the recipes it is for, else which of the user's gaps
- * a portion of it fills, else that it was typed. A ticked line says where it goes at home.
+ * a portion of it fills, else that it was typed. A ticked line has a button for where it goes at
+ * home, which puts it there (it used to be a label inside the tick button, so tapping it only
+ * unticked the line; owner, 2026-11-27).
  */
-function Row({ item, goesTo, onToggle, onEdit }: { item: ShoppingItem; goesTo?: string; onToggle: () => void; onEdit: () => void }) {
+function Row({ item, goesTo, onToggle, onPutAway, onEdit }: { item: ShoppingItem; goesTo?: HomePlace; onToggle: () => void; onPutAway?: () => void; onEdit: () => void }) {
   const fills = useFills(item);
   const done = item.checkedAt !== undefined;
   const amount = amountText(item);
@@ -167,8 +263,12 @@ function Row({ item, goesTo, onToggle, onEdit }: { item: ShoppingItem; goesTo?: 
             ) : null}
           </span>
         </span>
-        {goesTo && <span className="shop-goes small">→ {goesTo}</span>}
       </button>
+      {goesTo && onPutAway && (
+        <button className="shop-goes small" onClick={onPutAway} aria-label={t('shopping.putAwayIn', { name: item.name, place: placeName(goesTo) })}>
+          → {placeName(goesTo)}
+        </button>
+      )}
       <button className="icon-btn shop-edit" onClick={onEdit} aria-label={t('shopping.editItem', { name: item.name })}>
         <Icon name="edit" size={18} />
       </button>

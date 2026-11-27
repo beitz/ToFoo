@@ -261,11 +261,14 @@ export function planAdd(items: readonly ShoppingItem[], adds: readonly NewShoppi
 }
 
 /**
- * After shopping: ticked-off lines leave the list and are remembered for suggestions. Only the
+ * Lines leave the list and are remembered for suggestions: after shopping every ticked-off line,
+ * or just the lines in `ids` (deleted by a swipe or from the trolley, ticked or not). Only the
  * newest line per name is remembered, and at most MAX_REMEMBERED of them.
  */
-export function planClear(items: readonly ShoppingItem[], now: number): ShoppingChange {
-  const cleared = items.filter((i) => i.clearedAt === undefined && i.checkedAt !== undefined).map((i) => ({ ...i, clearedAt: now }));
+export function planClear(items: readonly ShoppingItem[], now: number, ids?: Iterable<string>): ShoppingChange {
+  const only = ids ? new Set(ids) : undefined;
+  const leaving = (i: ShoppingItem) => (only ? only.has(i.id) : i.checkedAt !== undefined);
+  const cleared = items.filter((i) => i.clearedAt === undefined && leaving(i)).map((i) => ({ ...i, clearedAt: now }));
   const remembered = [...items.filter((i) => i.clearedAt !== undefined), ...cleared].sort((a, b) => b.clearedAt! - a.clearedAt! || b.addedAt - a.addedAt);
   const seen = new Set<string>();
   const remove: string[] = [];
@@ -275,6 +278,23 @@ export function planClear(items: readonly ShoppingItem[], now: number): Shopping
     else seen.add(key);
   }
   return { put: cleared.filter((i) => !remove.includes(i.id)), remove };
+}
+
+/**
+ * Tick lines off (into the trolley) or put them back on the list. Lines already so stay as they
+ * are, so ticking a whole section keeps the time each line was ticked.
+ */
+export function planTick(items: readonly ShoppingItem[], ids: Iterable<string>, ticked: boolean, now: number): ShoppingChange {
+  const want = new Set(ids);
+  const put = items
+    .filter((i) => want.has(i.id) && onList(i) && (i.checkedAt !== undefined) !== ticked)
+    .map((i) => {
+      const next = { ...i };
+      if (ticked) next.checkedAt = now;
+      else delete next.checkedAt;
+      return next;
+    });
+  return { put, remove: [] };
 }
 
 /** Bought before (or in the basket now), matching what is typed: newest first, one per name, none already to buy. */

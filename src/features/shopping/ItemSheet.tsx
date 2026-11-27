@@ -4,7 +4,7 @@ import { href } from '../../app/router';
 import { refHref } from '../food/links';
 import { useToast } from '../../app/toast';
 import { t, type MessageKey } from '../../i18n';
-import { amountText, parseAmount } from '../../logic/shopping';
+import { amountText, parseAmount, planClear } from '../../logic/shopping';
 import { repo } from '../../storage/repo';
 import { SHOP_SECTIONS, type ShopSection, type ShoppingItem } from '../../storage/types';
 import { Field, Sheet } from '../../ui/controls';
@@ -32,7 +32,8 @@ export function ItemSheet({ item, onClose }: { item: ShoppingItem; onClose: () =
   }
 
   async function remove() {
-    const undo = await repo.changeShopping(() => ({ put: [], remove: [item.id] }));
+    // Off the list, kept as a suggestion like a swipe or the trolley's Delete.
+    const undo = await repo.changeShopping((current) => planClear(current, Date.now(), [item.id]));
     toast(t('shopping.removed', { name: item.name }), () => repo.undoShopping(undo));
     onClose();
   }

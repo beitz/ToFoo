@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { useData } from '../../app/data';
 import { useToast } from '../../app/toast';
 import { t } from '../../i18n';
@@ -19,9 +19,9 @@ const FOOD_SUGGESTIONS = 3;
  * Type what to get, with things bought before and foods from the database as suggestions. On the
  * shopping list it is docked at the bottom with its suggestions above (`docked`); on the Kitchen
  * card the suggestions open below and each add says so with undo, since the card shows only the
- * first few lines.
+ * first few lines. `above` sits over the docked box (the trolley's buttons).
  */
-export function ShoppingAdd({ docked, autoFocus }: { docked?: boolean; autoFocus?: boolean }) {
+export function ShoppingAdd({ docked, autoFocus, above }: { docked?: boolean; autoFocus?: boolean; above?: ReactNode }) {
   const d = useData();
   const toast = useToast();
   const all = useShopping();
@@ -85,6 +85,8 @@ export function ShoppingAdd({ docked, autoFocus }: { docked?: boolean; autoFocus
   );
   return docked ? (
     <div className="shop-dock">
+      {/* Docked things (the trolley's buttons) give way to suggestions while typing. */}
+      {!showSuggestions && above}
       {list}
       {form}
     </div>
