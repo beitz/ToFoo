@@ -3822,7 +3822,7 @@ button.week-row:focus-visible {
   gap: 10px;
   width: 100%;
   min-height: 44px;
-  margin: 0.6rem 0 0.1rem;
+  margin: 0.3rem 0 0.1rem;
   padding: 0 0 0 13px;
   background: none;
   border: none;
@@ -3856,7 +3856,62 @@ button.week-row:focus-visible {
 }
 .shop-list {
   display: grid;
-  gap: 6px;
+}
+/*
+ * Lines and sections fold away and open (owner, 2026-11-27: a ticked line vanishes, the ones below
+ * slide up): a one-row grid whose row goes between 1fr and 0fr; 220 ms, as FOLD_MS in ShoppingPage.
+ * The gap between lines is padding, so it folds with its line.
+ */
+.shop-li,
+.shop-group {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition:
+    grid-template-rows 220ms ease,
+    padding 220ms ease,
+    opacity 160ms ease;
+}
+.shop-li {
+  padding-bottom: 6px;
+}
+.shop-fold {
+  min-height: 0;
+  transition: transform 220ms ease;
+}
+.leaving > .shop-fold,
+.entering > .shop-fold {
+  overflow: hidden;
+}
+.shop-li.leaving,
+.shop-group.leaving {
+  grid-template-rows: 0fr;
+  padding-bottom: 0;
+  opacity: 0;
+}
+.shop-li.leaving > .shop-fold {
+  transform: scale(0.96);
+}
+.shop-li.entering,
+.shop-group.entering {
+  animation: shop-unfold 220ms ease;
+}
+@keyframes shop-unfold {
+  from {
+    grid-template-rows: 0fr;
+    padding-bottom: 0;
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .shop-li,
+  .shop-group,
+  .shop-fold {
+    transition: none;
+  }
+  .shop-li.entering,
+  .shop-group.entering {
+    animation: none;
+  }
 }
 .shop-list > li {
   border: none;

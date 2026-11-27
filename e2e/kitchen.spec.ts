@@ -207,8 +207,12 @@ test('the shopping list keeps its order, hides what is ticked and acts on it in 
     await expect(main.getByRole('checkbox', { name: new RegExp(`^${name}`) })).toBeVisible();
   }
 
-  // A ticked line stays a moment, then hides; the switch shows it again in its place.
+  // A ticked line stays a moment without moving anything, then folds away; the switch shows it again in its place.
+  const rolls = main.getByRole('checkbox', { name: /^Rolls/ });
+  const before = (await rolls.boundingBox())!.y;
   await main.getByRole('checkbox', { name: /^Bread/ }).click();
+  await expect(main.getByRole('checkbox', { name: /^Bread/ })).toHaveAttribute('aria-checked', 'true');
+  expect((await rolls.boundingBox())!.y).toBe(before);
   await expect(main.getByRole('checkbox', { name: /^Bread/ })).toHaveCount(0);
   await page.getByRole('button', { name: 'Show ticked (1)' }).click();
   await expect(main.getByRole('checkbox', { name: /^Bread/ })).toHaveAttribute('aria-checked', 'true');
